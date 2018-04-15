@@ -1,0 +1,253 @@
+NASCOM SD-card: Solid-state mass-storage for the NASCOM
+=======================================================
+
+This add-on for the NASCOM connects to the Z80-PIO connector and provides
+file-based storage on a micro SD card.
+
+The goals of the design are two-fold:
+
+1/ to provide a mechanism for extracting data (ROMS, tapes, floppy disk
+contents) from a NASCOM
+
+2/ to provide a "retro environment" in which a physical NASCOM machine can be
+used without recourse to tape recorders or floppy drives.
+
+It has been tested on a NASCOM 2 but should work equally well on a NASCOM 1.
+
+All schematics, assembly drawings, software and application examples are freely
+available.
+
+The hardware consists of an Arduino Uno board, a micro-SD Daughtercard, an LED
+and a few connectors. I built mine on an Arduino prototyping PCB. All the parts
+can be bought from Banggood (TODO note on faulty PCB).
+
+The physical interface is a ribbon-cable. The wiring is designed so that the
+26-way ribbon cable from the NASCOM 2 connects directly. The wiring would need
+to be tweaked to allow a similary straight connection to a NASCOM 1.
+
+The electrical interface uses 11 signals. 8 are used as a bi-directional data
+bus. CMD is a Command signal from the Host (NASCOM) to the Target (Arduino). H2T
+is a handshake from the Host to the Target, T2H is a handshake from the Target
+to the Host. A gnd connection completes the interface.
+
+TODO can the Arduino draw power from the NASCOM through this cable?
+
+The protocol on the electical interface uses a handshake in each direction so
+that it is fully asynchronous (ie either end can run at any
+speed). Theoretically, the CMD signal is redundant, but it makes the protocol
+more rugged and easier to debug. The LED is illuminated if a data byte is
+received when a command byte is expected; it stays illuminated until the next
+command byte is received.
+
+There are two parts to the software: software that runs on the Arduino, and
+software that runs on the NASCOM.
+
+Software running on the Arduino is written in C using the Arduino IDE. It uses
+the existing SD library to provide access to a FAT filesystem on the SD card.
+Use of the FAT filesystem means that files can be transferred to and from the
+card using modern mainstream computers.
+
+Software running on the NASCOM is written in Z80 assembler. The Z80 program
+sends commands and data to the Arduino and reads status and data. The
+command-set (implement on the Arduino) has been designed with the goal of
+keeping the Z80 software simple and small.
+
+WIRING
+======
+
+See the comments within the .ino file
+
+PROGRAMMING THE ARDUINO
+=======================
+
+Use the ARDUINO IDE. Create a project named nascom_sdcard. Put the
+nascom_sdcard.ino file into the folder created for the project. Compile and
+download.
+
+Start up the serial monitor and check for messages. If the SDcard is fitted and
+wired up correctly there should be a start-up message in the monitor window.
+
+NASCOM SOFTWARE
+===============
+
+There are some test programs: sd_loop.asm sd_wr1.asm sd_rd1.asm - they are
+short enough to be typed in by hand for test purposes.
+
+They should also act as programming examples. Refer to the appendix for a full
+list of commands.
+
+Appendix 1: Command Set
+=======================
+
+OPENn (n= 0,1,2,3,4,D)
+
+Open a file. If the file did not exist, it is created. If it did exist, it is
+opened. The initial seek point is the START of the file.
+
+n is called a fid (file identifier) and allows 5 different files to be open
+simultaneously; a particular open file is then referenced by number:
+0..4. Alternatively, the DEFAULT command can be used to specify a fid, and then
+the OPEND command can be used to reference that drive (this indirect mechanism
+is intended to match the way in which disk controller software selects a disk
+drive).
+
+If an open file is already associated with n, that file will be closed.
+
+Arguments: A zero-terminated string specifies the file name on the SD card. The
+name must match the requirements of the file format: 8.3. In the special case of
+a file length of 0, a file name of the form NASxxx.BIN will be generated
+automatically (xxx is the next available value in the sequence 000..999).
+
+For this and all other similar commands, the value n is not an argument, but is
+encoded in the low 3-bits of the command.
+
+Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
+
+
+CLOSEn (n= 0,1,2,3,4,D)
+
+Close a file. In general, this is a polite thing to do but is not necessary.
+
+Arguments: none
+
+Response: none
+
+
+SEEKn (n= 0,1,2,3,4,D)
+
+Seek to a specified byte offset in the file. Error if the fid is not in use or
+if the offset is beyond the end of the file.
+
+Arguments: 4 bytes specifying the offset. LS byte first.
+
+Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
+
+
+TS_SEEKn (n= 0,1,2,3,4,D)
+
+Seek to a specified offset in the file, specified by track and sector. Error if
+the fid is not in use or if the calculated byte offset is beyond the end of the
+file.
+
+Arguments: 2 bytes specifying the offset. Track first, sector second.
+
+Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
+
+
+SIZEn (n= 0,1,2,3,4,D)
+
+Report the size of the specified file. Error if the fid is not in use.
+
+Arguments: None
+
+Response: 4 bytes (file size, LS byte first) followed by 1 byte status; FALSE
+(0) for error, TRUE (non-zero) for success.
+
+
+N_WRITEn (n= 0,1,2,3,4,D)
+
+Write upto 2^32-1 bytes to the specified file at the current position.
+
+Arguments: 4 bytes specifying the number of bytes to be written (LS byte first)
+followed by that number of data bytes.
+
+Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
+
+
+SEC_WRITEn (n= 0,1,2,3,4,D)
+
+Write 256 bytes to the specified file at the current position.
+
+Arguments: 256 data bytes.
+
+Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
+
+
+N_READn (n= 0,1,2,3,4,D)
+
+Read upto 2^32-1 bytes from the specified file at the current position.
+
+Arguments: 4 bytes specifying the number of bytes to be read (LS byte first).
+
+Response: Specified number of data bytes, followed by 1 byte of status; FALSE
+(0) for error, TRUE (non-zero) for success.
+
+
+SEC_READn (n= 0,1,2,3,4,D)
+
+Read 256 bytes from the specified file at the current position.
+
+Arguments: None
+
+Response: 256 bytes, followed by 1 byte of status; FALSE (0) for error, TRUE
+(non-zero) for success.
+
+
+N_SIZE_READn (n= 0,1,2,3,4,D)
+
+Read all the bytes of a file. Assume file is rewound (eg, has just been opened,
+or has received a seek(0)).
+
+Arguments: None.
+
+Response: 4 bytes (file size, LS byte first) followed by all the bytes of the
+file, in order, followed by 1 status byte; FALSE (0) for error, TRUE (non-zero)
+for success.
+
+
+SAVE
+
+Save the names of the open files and the default file number. Data is stored
+in a file named NASCOM.INI
+
+Arguments: None
+
+Response: ??
+
+
+RESTORE
+
+Restore the content of a file named NASCOM.INI (See SAVE)
+
+
+DEFAULTn (n=0,1,2,3,4)
+
+Set the default fid
+
+Arguments: None (fid is encoded within the command byte)
+
+Response: None
+
+
+STATUS
+
+Return the status of the most recent command
+
+Arguments: None
+
+Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
+
+
+LOOP
+
+Send back a response equal to the 1-s complement of the argument; used for
+test/debug purposes. This command does NOT affect the value returned by the
+STATUS command.
+
+Arguments: 1 byte
+
+Response: 1 byte.
+
+
+NOP
+
+Do nothing. Used by the Host to establish its handshake with the target, and to
+check that the target is responding. Probably not needed.
+
+Arguments: None
+
+Response: None
+
+
+
+--END--
