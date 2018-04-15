@@ -1,0 +1,211 @@
+#!/usr/bin/perl
+#
+# Convert a binary file representing a NASCOM Cassette file (.cas format) into
+# NAS-SYS LOAD "L" file (.nas format).
+#
+# This is a rework of a program written in QBASIC. This is more rugged than
+# the BASIC version; that version was very strict about the count of
+# bytes between packets, whereas this version does a search for block preambles
+# and performs comprehensive validation/error-checking.
+#
+# Send kudos/bug reports/suggestions for improvement/patches to the author.
+#
+# Author: foofoobedoo@gmail.com
+# Licence: GPL V2.
+#
+# Version History
+# 03Mar2018 First version
+#
+################################################################################
+
+use strict;
+use warnings;
+
+my $current_blknum;
+
+create_handles($ARGV[0]);
+while (1) {
+    find_blk_preamble();
+    process_blk();
+}
+
+################################################################################
+# subroutines
+################################################################################
+
+sub create_handles {
+    my $file = $_[0];
+
+    my $inext;
+    my $outext;
+
+    if (defined $file && -e "$file.cas") {
+        $inext = "cas";
+        $outext = "nas";
+    }
+    elsif (defined $file && -e "$file.CAS") {
+        $inext = "CAS";
+        $outext = "NAS";
+    }
+    else {
+        die "Usage: cas2nas foo\n will look for foo.cas or foo.CAS and generate foo.nas (or foo.NAS)\n";
+    }
+
+    open IN,  "$file.$inext"   or die "ERROR could not open $file.$inext for input";
+    open OUT, ">$file.$outext" or die "ERROR could not create $file.$outext for output";
+    open BIN, ">$file.bin"     or die "ERROR could not create $file.bin for output";
+}
+
+
+# Error when looking for preamble -- OK provided we have processed block 0
+sub err_preamble {
+    # A . is the code to terminate the L command and return to the command prompt
+    print OUT ".\r\n";
+    close IN;
+    close OUT;
+    close BIN;
+    if ($current_blknum != 0) {
+        printf "ERROR reached end of file while looking for preamble after block $current_blknum\n";
+        exit 1;
+    }
+    exit 0;
+}
+
+
+# Error when reading block header/data/footer
+sub err_blk {
+    my $msg = $_[0];
+    close IN;
+    close OUT;
+    printf "ERROR reached end of file while trying to read $msg for block $current_blknum\n";
+    exit 1;
+}
+
+
+# get a byte from IN
+# $byte = get_byte(\&sub , $string)
+# if no byte available execute &sub($string)
+sub get_byte {
+    my $on_error = $_[0];
+    my $on_error_arg = $_[1];
+
+    my $byte;
+    my $ok = read IN, $byte, 1;
+    if ($ok == 1) {
+        return ord $byte;
+    }
+    else {
+        &$on_error($on_error_arg);
+    }
+}
+
+
+# Discard bytes from input until the sequence "00 ff ff ff ff" is found. Return
+# when found or exit if end of file reached. On return, the next byte to be read
+# is the first byte after the sequence.
+sub find_blk_preamble {
+    my $count = 0;
+    my $byte;
+    BYTE: while (1) {
+        $byte = get_byte(\&err_preamble);
+
+        # looking for 0xff
+        if ($byte == 0) {
+            $count = 1;
+            next BYTE;
+        }
+        # looking for 0xff
+        if ($byte == 0xff) {
+            $count = $count + 1;
+            if ($count == 5) {
+                return;
+            }
+            next BYTE;
+        }
+
+        $count = 0;
+    }
+}
+
+
+# next byte from IN is start of block. Read block header, verify header
+# checksum and block number. Read block body, output equvalent
+# data to OUT and verify block body checksum.
+sub process_blk {
+
+    # read 5-byte block header:
+    # 2 bytes start address
+    # 1 byte  block length
+    # 1 byte  block number
+    # 1 byte  header checksum
+    # The checksum is the low 8-bits of the sum of the other 4 bytes (NOT, as
+    # would be usual, a value that makes the 5 bytes sum to 0)
+    my $blkaddr = get_byte(\&err_blk, "block address") + (get_byte(\&err_blk, "block address") << 8);
+    my $blklen = get_byte(\&err_blk, "block length");
+    my $blknum = get_byte(\&err_blk, "block number");
+    my $blkcsum = get_byte(\&err_blk, "block header checksum");
+
+    # Verify checksum
+    my $sum = 0xff & (($blkaddr & 0xff) + ($blkaddr >>8) + $blklen + $blknum);
+    if ($sum != $blkcsum) {
+        printf "ERROR header checksum error in block $blknum - expected 0x%X but got 0x%X\n", $blkcsum, $sum;
+    }
+
+    # Verify block number. Block number is an 8-bit value that counts down to 0; the cassette
+    # read command terminates after block 0 has been processed.
+    # Skip check for 1st block, because block number is unknown.
+    if (defined $current_blknum) {
+        if ($current_blknum == 0) {
+            print "ERROR found block after block 0; block 0 should be the last block\n";
+            # but carry on.. it would need a second R command to get the rest
+            $current_blknum = $blknum;
+        }
+        else {
+            $current_blknum = $current_blknum - 1;
+        }
+
+        if ($blknum != $current_blknum) {
+            printf "ERROR header block number error in block $blknum. Expected 0x%X got 0x%X\n", $current_blknum, $blknum;
+        }
+    }
+
+    $current_blknum = $blknum;
+
+    # Fix up byte count
+    $blklen = 256 if ($blklen == 0);
+
+    printf "Found blk %d (0x%X bytes at address 0x%04X)\n", $blknum, $blklen, $blkaddr;
+
+    # Read block body and print to OUT in L format, accumulating checksum at the same time.
+    my $bytes_printed = 0;
+    $sum = 0;
+    for (my $i=0; $i<$blklen; $i=$i+1) {
+        my $byte = get_byte(\&err_blk, "block data");
+        print BIN chr($byte);
+        $sum = 0xff & ($sum + $byte);
+
+        if ($bytes_printed == 8) {
+            $bytes_printed = 0;
+            print OUT "\r\n";
+        }
+
+        if ($bytes_printed == 0) {
+            printf OUT "%04X %02X", $blkaddr, $byte;
+        }
+        else {
+            printf OUT " %02X", $byte;
+        }
+        $blkaddr = $blkaddr + 1;
+        $bytes_printed = $bytes_printed + 1;
+    }
+    # NAS-SYS outputs CR but most .nas files in the wild seem to be DOS format
+    print OUT "\r\n";
+
+    # Read block footer:
+    # 1 byte  data checksum
+    my $fsum = get_byte(\&err_blk, "block data checksum");
+
+    if ($sum != $fsum) {
+        printf "ERROR data checksum error in block $blknum - expected 0x%02X but got 0x%02X\n",$fsum, $sum;
+    }
+}

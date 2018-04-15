@@ -1,0 +1,219 @@
+#!/usr/bin/perl
+#
+# Convert an ASCII file in NAS-SYS LOAD "L" file (.nas format) into a
+# binary file representing a NASCOM Cassette file (.cas format).
+#
+# This is a rework of a program written in QBASIC.
+# This version performs comprehensive validation/error-checking.
+#
+# Considerations:
+# - records in .nas file might not be contiguous
+# - need to know how many cassette blocks will be created which
+#   requires parsing the whole .nas file before generating any
+#   output
+# - .nas file can have 1-9 bytes per line. If 9th is present, it is a
+#   checksum of the address and data.
+#
+# Send kudos/bug reports/suggestions for improvement/patches to the author.
+#
+# Author: foofoobedoo@gmail.com
+# Licence: GPL V2.
+#
+# Version History
+# 03Mar2018 First version
+#
+################################################################################
+
+use strict;
+use warnings;
+
+my @records;
+
+create_handles($ARGV[0]);
+parse_nas();
+build_blk_hdrs();
+write_cas();
+exit 0;
+
+################################################################################
+# subroutines
+################################################################################
+
+sub create_handles {
+    my $file = $_[0];
+
+    my $inext;
+    my $outext;
+
+    if (defined $file && -e "$file.nas") {
+        $inext = "nas";
+        $outext = "cas";
+    }
+    elsif (defined $file && -e "$file.NAS") {
+        $inext = "NAS";
+        $outext = "CAS";
+    }
+    else {
+        die "Usage: nas2cas foo\n will look for foo.nas or foo.NAS and generate foo.cas (or foo.CAS)\n";
+    }
+
+    open IN,  "$file.$inext"   or die "ERROR could not open $file.$inext for input";
+    open OUT, ">$file.$outext" or die "ERROR could not create $file.$outext for output";
+}
+
+
+# Read the .nas file and create records of upto 256 contiguous bytes
+# Each record has a start address, a byte count, data and a data checksum.
+sub parse_nas {
+    my $in_record = 0;
+
+    while (my $line = <IN>) {
+        # By inspection of various .NAS files..
+        # - line endings are inconsistent. Get rid of both CR and LF
+        # - some have nulls before the line-end. Get rid of them.
+        # - some have 0x08 before the line-end. Get rid of them.
+        $line =~ s/[\n\r\x00\x08]//g;
+
+        # Last line should be "." to indicate exit from the L command. Skip it.
+        next if $line =~ /^\.$/;
+
+        # skip blank lines (there should not be any)
+        next if $line =~ /^\s*$/;
+
+        # Lines look like this:
+        # 1000 3E AA 32 EA 12 AF 32 EC F3
+        #
+        # Must be an address and at least 1 data byte. If there are
+        # 9 bytes, the last one is a checksum of the address/data
+        my @bits = split " ", $line;
+        my $count = scalar(@bits) - 1;
+        my $addr = hex($bits[0]);
+
+        if ($count == 0) {
+            print "ERROR bad format at line $. -- address field but no data\n";
+            next;
+        }
+        if ($count == 9) {
+            # Verify checksum then discard it by bumping $count
+            my $asum = $addr + ($addr >> 8);
+            my $esum = hex($bits[9]); # actual
+            for (my $i=1; $i<9; $i=$i+1) {
+                $asum = ($asum + hex($bits[$i])) & 0xff;
+            }
+            if ($asum != $esum ) {
+                # report the error but use the data anyway.
+                printf "ERROR bad checksum at line $. -- got 0x%X but expected 0x%X\n", $asum, $esum;
+            }
+            $count = $count - 1;
+        }
+
+        if ($in_record == 1) {
+            # attempt to incorporate this line in current record
+            my $rec = $records[-1];
+
+            if ($addr == $rec->{next_addr}) {
+                # Address is contiguous
+
+                if (($rec->{len} + $count) < 257) {
+                    # It will fit in current record
+
+                    $rec->{len} = $rec->{len} + $count;
+                    $rec->{next_addr} = $rec->{addr} + $rec->{len};
+
+                    for (my $i=1; $i<($count + 1); $i=$i+1) {
+                        my $byte = hex($bits[$i]);
+                        $rec->{data} = $rec->{data} . chr($byte);
+                        $rec->{dcsum} = ($rec->{dcsum} + $byte) & 0xff;
+                    }
+                }
+                else {
+                    $in_record = 0;
+                }
+            }
+            else {
+                $in_record = 0;
+            }
+        }
+
+        if ($in_record == 0) {
+            # This line is the start of a new record
+            $in_record = 1;
+            my %record;
+            my $rec = \%record;
+
+            $rec->{addr} = $addr;
+            $rec->{len} = $count;
+            $rec->{next_addr} = $addr + $count;
+            $rec->{dcsum} = 0;
+            $record{data} = "";
+
+            for (my $i=1; $i<($count + 1); $i=$i+1) {
+                my $byte = hex($bits[$i]);
+                $rec->{data} = $rec->{data} . chr($byte);
+                $rec->{dcsum} = ($rec->{dcsum} + $byte) & 0xff;
+            }
+
+            push @records, $rec;
+        }
+    }
+    close IN;
+}
+
+
+# Now that the number of records is known, fill in the record number and the header
+# checksum in each record
+sub build_blk_hdrs {
+    my $blocks = scalar(@records);
+
+    if ($blocks > 256) {
+        print "ERROR $blocks are needed, but .cas format has a limit of 256 (0x00-0xff)\n";
+        die;
+    }
+
+    for (my $i=0; $i<$blocks; $i=$i+1) {
+        my $rec = $records[$i];
+
+        # fix up count 0x100 become 0
+        $rec->{len} = $rec->{len} & 0xff;
+        # 0 1 2 3  -- $i, $blocks=4
+        # 3 2 1 0  -- block number ($blocks - $i)
+        $rec->{blk} = $blocks - $i - 1;
+        $rec->{hcsum} = (($rec->{addr} & 0xff) + ($rec->{addr} >> 8) + $rec->{len} + $rec->{blk}) & 0xff;
+    }
+}
+
+
+# Write the records out, in order, with inter-block padding, in .cas format
+sub write_cas {
+    my $blocks = scalar(@records);
+
+    # Output 256 nulls
+    print OUT chr(0) x 256;
+
+    for (my $i=0; $i<$blocks; $i=$i+1) {
+        my $rec = $records[$i];
+
+        printf "Write blk %d (0x%X bytes at address 0x%04X)\n", $rec->{blk}, $rec->{len} == 0 ? 256:$rec->{len}, $rec->{addr};
+
+        # Output sync pattern
+        print OUT chr(0) . chr(0xff) . chr(0xff) . chr(0xff) . chr(0xff);
+
+        # Output block header and checksum
+        print OUT chr($rec->{addr} & 0xff);
+        print OUT chr($rec->{addr} >> 8);
+        print OUT chr($rec->{len});
+        print OUT chr($rec->{blk});
+        print OUT chr($rec->{hcsum});
+
+        # Output block body (already a binary string)
+        print OUT $rec->{data};
+
+        # Output block body checksum
+        print OUT pack "C", $rec->{dcsum};
+
+        # Output 10 nulls
+        print OUT chr(0) x 10;
+    }
+
+    close OUT;
+}

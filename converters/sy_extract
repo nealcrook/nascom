@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+#
+# Given a PolyDOS Polyzap assembled symbol table, reconstruct an equates
+# file.
+#
+# Send kudos/bug reports/suggestions for improvement/patches to the author.
+#
+# Author: foofoobedoo@gmail.com
+# Licence: GPL V2.
+#
+# Version History
+# 03Mar2018 First version
+#
+################################################################################
+
+use strict;
+use warnings;
+
+open IN, $ARGV[0] or die "Could not open input file";
+
+my $byte;
+my $ord;
+my $prev_ord;
+my $state = 0;
+my $count = 0;
+
+while (read IN, $byte, 1) {
+# debug
+    $count = $count + 1;
+#    die if $count == 20;
+
+    $ord = ord $byte;
+    if ($state == 0) {
+        # symbol name
+        if ($ord == 0) {
+            # end of symbol table
+            print "\n\n";
+            last;
+        }
+        if ($ord & 0x80) {
+            # last byte
+            printf "%s:", chr($ord & 0x7f);
+            $state = 1;
+        }
+        else {
+            printf "%s", $byte;
+        }
+    }
+    elsif ($state == 1) {
+        # first byte of address
+        $state = 2;
+    }
+    elsif ($state == 2) {
+        # second byte of address
+        $state = 0;
+        my $address = $prev_ord + ($ord << 8);
+        printf "\t\tEQU\t%05XH\n",$address;
+    }
+    $prev_ord = $ord;
+}
