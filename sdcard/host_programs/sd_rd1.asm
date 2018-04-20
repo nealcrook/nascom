@@ -23,7 +23,7 @@ CSTAT:        EQU     $85       ;command status
 COPEN:        EQU     $10 + FID
 CCLOSE:       EQU     $18
 CSEEK:        EQU     $20 + FID ;seek by byte offset
-CTSEEK:       EQU     $20 + FID ;seek by track/sector offset
+CTSEEK:       EQU     $28 + FID ;seek by track/sector offset
 CSRD:         EQU     $30 + FID
 CNRD:         EQU     $38 + FID
 CSWR:         EQU     $40 + FID
@@ -182,7 +182,7 @@ fnam:   ld      a,(hl)          ;send the name
         call    gotx
 
 ;;; get the file size and read it all
-        ld      a, CSZRD        read size and data
+        ld      a, CSZRD        ;read size and data
         call    putcmd
         call    gorx
         call    getval
