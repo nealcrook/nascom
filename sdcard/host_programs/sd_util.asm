@@ -24,6 +24,8 @@
 ;;; - Locate file NASnnn.BIN
 ;;; - Load it to memory starting at address ssss
 ;;; - Report the file size
+;;; FEATURE: reading a non-existent file creates that file,
+;;; with size 0 bytes. Fixing this would require new cmds.
 ;;;
 ;;; 3) WRITE FILE
 ;;;
@@ -248,16 +250,16 @@ train:	ld      a, CNOP
         ret
 
 ;;; open a file. Fatal error on fail, return on success.
-;;; HL=0 -> auto-pick filename
-;;; HL !=0 -> filename is NASxxx.BIN where xxx comes from low
+;;; Carry=0 -> auto-pick filename
+;;; Carry=1 -> filename is NASxxx.BIN where xxx comes from low
 ;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII
 ;;; corrupts: HL, AF, DE
-fopen:  ld      a, COPEN
+fopen:  push    af              ;preserve C
+        ld      a, COPEN
         call    putcmd
 
-        ld      a,h
-        or      l
-        jr      z,fauto
+        pop     af
+        jr      nc,fauto
 
         ld      a,'N'
         call    putval
@@ -272,8 +274,12 @@ fopen:  ld      a, COPEN
         add     30h             ;convert to ASCII
         call    putval
         ld      a,l
-        and     0f0h            ;mid digit
-        add     30h-16          ;convert to ASCII
+        rra                     ;shift nibble down
+        rra
+        rra
+        rra
+        and     0fh             ;mid digit
+        add     30h             ;convert to ASCII
         call    putval
         ld      a,l
         and     0fh             ;ls digit
@@ -332,10 +338,10 @@ mex1:   SCAL CRLF
 ;;; Start address in (ARG2), end address in (ARG3). Exit with
 ;;; HL=start, BC=byte count.
 ;;; corrupts: AF
-e2len:  ld      hl,(ARG2)       ;start address
-        ld      de,(ARG3)       ;end address
-
-        ccf
+e2len:  ld      de,(ARG2)       ;start address
+        ld      hl,(ARG3)       ;end address
+        ;; compute end - start + 1
+        or      a               ;clear carry flag
         sbc     hl,de
         inc     hl              ;byte count in hl
         ld      b,h
@@ -382,15 +388,14 @@ cdone:  ld      h,d             ;move sum from de to hl
 
 wrfile: call    hwinit
 
-        ld      h,0
-        ld      l,h             ;default to autopick
+        ld      de,earg         ;error message for fail
         ld      a,(ARGN)
         cp      3               ;expect 3 or 4 arguments
-        jr      z,wopen         ;3 arguments, hl=0 -> autopick
-        ld      hl, (ARG4)      ;hl!=0 -> file name
-        ld      de,earg
+        jr      z,wopen         ;3 arguments, C=0 -> autopick
         cp      4               ;4 arguments?
         jp      nz, mexit       ;no, so fail
+        ld      hl, (ARG4)      ;hl is number for file name
+        scf                     ;C=1 -> use hl for file name
 
 wopen:  call    fopen
         call    e2len           ;hl=start, bc=count
@@ -434,6 +439,7 @@ rdfile: call    hwinit
         jp      nz, mexit
 
         ld      hl,(ARG3)
+        scf
         call    fopen           ;open file by name
 
 ;;; get the file size and read it all
@@ -455,17 +461,19 @@ rdfile: call    hwinit
         push    bc              ;save file size
         ld      hl, (ARG2)      ;destination
 
-        ;; data transfer
-rnext:  call    getval          ;data byte
+        ;; data transfer - maybe 0 bytes
+rnext:  ld      a,b
+        or      c
+        jr      z, rdone
+
+        call    getval          ;data byte
         ld      (hl), a         ;store it
         inc     hl
         dec     bc
-        ld      a,b
-        or      c
-        jr      nz, rnext
+        jr      rnext
 
         ;; get status or die
-        ld      de,erd
+rdone:  ld      de,erd
         call    rs2t
 
         pop     hl              ;file size
@@ -479,10 +487,8 @@ rnext:  call    getval          ;data byte
 
 scrape: call    hwinit
 
-;;; open a (new) file; auto-pick the file name
-        ld      h,0
-        ld      l,h
-        call    fopen
+        or      a               ;C=0
+        call    fopen           ;open new file, auto-pick the name
 
         ld      c,0
         SCAL    DSIZE
@@ -627,4 +633,7 @@ e2big:  DB "File too big",0
 ebyte:  DB "Bytes "             ;FALL-THROUGH
 eok:    DB "OK", 0
 
+;;; pad to 1Kbytes
+size:   equ $ - START
+        DS 400h - size, 0ffh
 ;;; end
