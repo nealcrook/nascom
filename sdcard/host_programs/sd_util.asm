@@ -1,30 +1,25 @@
-;;; ROMable utilities for accessing the
-;;; arduino-based nascom_sdcard device
-;;; attached to the PIO.
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ROMable utilities for accessing an arduino-based nascom_sdcard
+;;; device attached to the NASCOM PIO.
 ;;;
-;;; Assemble at address xxx0, (optionally)
-;;; burn to EPROM.
+;;; Assemble at address xxx0, (optionally) burn to EPROM.
 ;;;
-;;; Provides 5 different utilites, all
-;;; invoked from NAS-SYS at different
-;;; offsets from the start address.
+;;; Provides 5 different utilites, all invoked from NAS-SYS at
+;;; different offsets from the start address.
 ;;;
 ;;; 1) CHECKSUM
 ;;;
 ;;; E xxx0 ssss eeee
 ;;;
-;;; Compute checksum of memory from ssss
-;;; to eeee inclusive. Checksum is the
-;;; sub of all bytes and is reported as a
-;;; 16-bit value. Carry off the MSB is lost/
-;;; ignored.
+;;; Compute checksum of memory from ssss to eeee inclusive.
+;;; Checksum is the sum of all bytes and is reported as a
+;;; 16-bit value. Carry off the MSB is lost/ignored.
 ;;;
 ;;; 2) READ FILE
 ;;;
-;;; E xxx2 ssss nnn
+;;; E xxx3 ssss nnn
 ;;;
-;;; Where nnn are exactly 3 decimal digits
-;;; (000..999).
+;;; Where nnn are exactly 3 decimal digits (000..999).
 ;;;
 ;;; - Locate file NASnnn.BIN
 ;;; - Load it to memory starting at address ssss
@@ -32,59 +27,47 @@
 ;;;
 ;;; 3) WRITE FILE
 ;;;
-;;; E xxx4 ssss eeee nnn
-;;; E xxx4 ssss eeee
+;;; E xxx6 ssss eeee [nnn]<-optional
 ;;;
-;;; Where nnn are exactly 3 decimal digits
-;;; (000..999). If nnn is present,
-;;;
+;;; If nnn - exactly 3 decimal digits (000..999):
 ;;; - Create file NASnnn.BIN
+;;; - Save memory from ssss to eeee inclusive to the file
 ;;;
-;;; If is nnn not present
-;;;
-;;; - Auto-pick next free name in the form
-;;;   NASnnn.BIN
-;;;
-;;; - Save memory from ssss to eeee inclusive
+;;; Without nnn:
+;;; - Auto-pick next free file name in the form NASnnn.BIN
+;;; - Save memory from ssss to eeee inclusive to the file
 ;;;
 ;;; 4) SCRAPE DISK
 ;;;
-;;; E xxx6 nnnn
-;;; E xxx6
+;;; E xxx9 [nnn]<-optional
 ;;;
-;;; Where nnn are exactly 3 decimal digits
-;;; (000..999). If nnn is present,
-;;;
+;;; If nnn - exactly 3 decimal digits (000..999).
 ;;; - Create file NASnnn.BIN
+;;; - Read all sectors of drive 0 and write them to the file
 ;;;
-;;; If is nnn not present
+;;; Without nnn:
+;;; - Auto-pick next free file name in the form NASnnn.BIN
+;;; - Read all sectors of drive 0 and write them to the file
 ;;;
-;;; - Auto-pick next free name in the form
-;;;   NASnnn.BIN, create file with that name.
-;;;
-;;; - Read all sectors of drive 0 and write
-;;;   them to the file
-;;;
-;;; This will ONLY work if the system has been
-;;; booted into Polydos, so that the Polydos SCAL
-;;; table is available.
+;;; This will ONLY work if the system has been booted into
+;;; Polydos, so that the Polydos SCAL table is available.
 ;;;
 ;;; 5) BOOT
 ;;;
-;;; E xxx8
-;;; E xxx8 n
+;;; E xxxc [n]
 ;;;
-;;; Accesses restored disk names
-;;; Without n, accesses drive 0. With n, accesses drive
-;;; n (n=0..3). Load first 256 bytes (probably 128 is
-;;; all that's needed) from the start of the disk image
-;;; to memory at address CPMLD, rewind the disk image then
-;;; jump to CPMLD.
+;;; Relies on auto-restore of files on the Arduino device.
+;;; Without n, accesses drive 0. With n, accesses drive n
+;;; (n=0..3). Seek to start of drive image, Load first 256 bytes
+;;; (probably 128 is all that's required) into memory at address
+;;;  CPMLD, jump to CPMLD.
 ;;;
-;;; This is a prototype boot-strap loader for CP/M
-;;; it will not work because it cannot load the bootstrap
-;;; code to the correct place (it's the NAS-SYS workspace
-;;; area)
+;;; Intended as a proof-of-concept boot-strap loader for CP/M but
+;;; it cannot actually boot CP/M unless the memory map is changed
+;;; to provide RAM at address 0
+;;;
+;;; https://github.com/nealcrook/nascom
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 START:  EQU     $1000
 CPMLD:  EQU     $2000
@@ -155,8 +138,8 @@ DRD:    equ     $81
         ORG     START
 
         jp      csum
-        jp      wrfile
         jp      rdfile
+        jp      wrfile
         jp      scrape
         jp      boot
 
@@ -308,23 +291,22 @@ fopen:  ld      a, COPEN
         call    putval
 
 fauto:  xor     a
-        call    putval          ;0-length filename or end of filename
-        ;; get status or die; tail recurse
+        call    putval          ;0-length/end of filename
+        ;; get status, return if OK, msg/exit on error
         ld      de,eopen
         jr      t2rs2t
 
 
 ;;; go from tx to rx, get status then go to tx.
-;;; interpret status byte; on error, print message
-;;; pointed to by DE then exit. On success, return.
+;;; Interpret status byte; on error, print message at (DE)
+;;; then exit. On success, return.
 ;;; corrupts: AF
 t2rs2t: call    gorx
 
-;;; FALL-THROUGH
-
+;;; FALL-THROUGH and subroutine
 ;;; get status then go to tx.
-;;; interpret status byte; on error, print message
-;;; pointed to by DE then exit. On success, return.
+;;; Interpret status byte; on error, print message at (DE)
+;;; then exit. On success, return.
 ;;; corrupts: AF
 rs2t:   call    getval          ;status
         call    gotx            ;does not affect A
@@ -333,11 +315,10 @@ rs2t:   call    getval          ;status
         ret
 
 ;;; Exit with message. Can be used for successful or error/fatal
-;;; exit.
-;;; (DE) is null-terminated string (possibly 0-length). Print
-;;; string then CR then return to NAS-SYS.
-;;; Come here by CALL or JP/JR -- Stack will get cleaned up
-;;; by NAS-SYS if necessary.
+;;; exit. (DE) is null-terminated string (possibly 0-length).
+;;; Print string then CR then return to NAS-SYS.
+;;; Come here by CALL or JP/JR -- NAS-SYS will clean up the
+;;; stack if necessary.
 mexit:  ld      a,(de)
         or      a
         jr      z, mex1
@@ -348,52 +329,52 @@ mexit:  ld      a,(de)
 mex1:   SCAL CRLF
         SCAL MRET
 
-
-
-;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; CSUM
-;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-csum:
-
-;;; Expect 3 arguments
-        ld      de,earg
-        ld      a,(ARGN)
-        cp      3
-        jp      nz, mexit
-
-        ld      hl,(ARG2)       ;start address
+;;; Start address in (ARG2), end address in (ARG3). Exit with
+;;; HL=start, BC=byte count.
+;;; corrupts: AF
+e2len:  ld      hl,(ARG2)       ;start address
         ld      de,(ARG3)       ;end address
 
         ccf
         sbc     hl,de
-        inc     hl              ;byte count
+        inc     hl              ;byte count in hl
         ld      b,h
         ld      c,l             ;byte count in bc
 
         ld      hl,(ARG2)       ;start address in hl
+        ret
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; CSUM
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+csum:   ld      de,earg
+        ld      a,(ARGN)
+        cp      3               ;expect 3 arguments
+        jp      nz, mexit
+
+        call    e2len           ;hl=start, bc=count
         ld      d,0
-        ld      e,d             ;accumulator in de
+        ld      e,d             ;accumulate in de
 
-c1:     ld      a,b
+c1:     ld      a,b             ;is byte count zero?
         or      c
-        jr      z,cdone
+        jr      z,cdone         ;if so, we're done
 
-        ld      a,e
-        add     a,(hl)
+        ld      a,e             ;get lo accumulator
+        add     a,(hl)          ;add next byte
         jr      nc,c2
-        inc     d
-c2:     ld      e,a
-        inc     hl
-        jr      c1
+        inc     d               ;carry to hi accumlator
+c2:     ld      e,a             ;store lo accumulator
+        inc     hl              ;next byte
+        dec     bc
+        jr      c1              ;loop
 
-        ;; done. Checksum is in de
-cdone:  ld      h,d
+cdone:  ld      h,d             ;move sum from de to hl
         ld      l,e
-        ;; print it
-        SCAL    TBCD3
+
+        SCAL    TBCD3           ;print hl
         SCAL    CRLF
-        ;; and we're done.
-        SCAL    MRET
+        SCAL    MRET            ;done.
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; WRFILE
@@ -401,21 +382,18 @@ cdone:  ld      h,d
 
 wrfile: call    hwinit
 
-;;; Expect 3 or 4 arguments
         ld      h,0
-        ld      l,h             ;autopick
+        ld      l,h             ;default to autopick
         ld      a,(ARGN)
-        cp      3
-        jr      z,wopen         ;hl=0 -> autopick
-        ld      hl, (ARG4)      ;file name
+        cp      3               ;expect 3 or 4 arguments
+        jr      z,wopen         ;3 arguments, hl=0 -> autopick
+        ld      hl, (ARG4)      ;hl!=0 -> file name
         ld      de,earg
-        cp      3
-        jp      nz, mexit
+        cp      4               ;4 arguments?
+        jp      nz, mexit       ;no, so fail
 
 wopen:  call    fopen
-
-        ld      hl,(ARG2)       ;start
-        ld      bc,(ARG3)       ;4Kbytes
+        call    e2len           ;hl=start, bc=count
 
         ld      a, CNWR         ;write
         call    putcmd
@@ -437,13 +415,12 @@ wnext:  ld      a, (hl)
         or      c
         jr      nz, wnext
 
-        ;; get status or die
+        ;; get status, return if OK, msg/exit on error
         ld      de,ewrt
         call    t2rs2t
 
-        ;; back to NAS-SYS (ought to close..)
-        SCAL    MRET
-
+        ld      de,eok
+        jp      mexit           ;done
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; RDFILE
@@ -451,15 +428,13 @@ wnext:  ld      a, (hl)
 
 rdfile: call    hwinit
 
-;;; Expect 3 arguments
         ld      de,earg
         ld      a,(ARGN)
-        cp      3
+        cp      3               ;expect 3 arguments
         jp      nz, mexit
 
-;;; open a file by name or die in the attempt
         ld      hl,(ARG3)
-        call    fopen
+        call    fopen           ;open file by name
 
 ;;; get the file size and read it all
         ld      a, CSZRD        ;read size and data
@@ -469,7 +444,7 @@ rdfile: call    hwinit
         ld      c, a            ;length, LS byte
         call    getval
         ld      b, a            ;length
-        ;; need the next two to be zero
+        ;; require the next two to be zero
         ld      de,e2big
         call    getval
         ld      h, a
@@ -481,13 +456,13 @@ rdfile: call    hwinit
         ld      hl, (ARG2)      ;destination
 
         ;; data transfer
-next:   call    getval          ;data byte
+rnext:  call    getval          ;data byte
         ld      (hl), a         ;store it
         inc     hl
         dec     bc
         ld      a,b
         or      c
-        jr      nz, next
+        jr      nz, rnext
 
         ;; get status or die
         ld      de,erd
@@ -496,7 +471,7 @@ next:   call    getval          ;data byte
         pop     hl              ;file size
         SCAL    TBCD3           ;display file size
         ld      de,ebyte
-        jp      mexit
+        jp      mexit           ;done
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; SCRAPE
@@ -518,10 +493,11 @@ scrape: call    hwinit
 
         ld      de,0            ;start at 1st sector
 
-nxtblk: ld      bc,$800         ;8 is #sectors, 0 is drive number
+nxtblk: push    hl              ;total #sectors
+        ld      bc,$800         ;8 is #sectors, 0 is drive number
         ld      hl,$1000        ;where to put it
 
-        SCAL    DRD
+        SCAL    DRD             ;TODO Check/report exit status
 
         ;; hl, bc unchanged
         ;; bc = $800 - the number of bytes to write out to SD
@@ -539,40 +515,44 @@ nxtblk: ld      bc,$800         ;8 is #sectors, 0 is drive number
         call    putval
 
         ;; data transfer
-put:    ld      a, (hl)
+snext:  ld      a, (hl)
         call    putval
         inc     hl
         dec     bc
         ld      a,b
         or      c
-        jr      nz, put
+        jr      nz, snext
 
-        ;; get status; exit on error
+        ;; get status, return if OK, msg/exit on error
         push    de
         ld      de,ewrt
         call    t2rs2t
         pop     de
 
-        dec     de              ;lazy!
-        dec     de              ;way to decrement
-        dec     de              ;sector count by 8
-        dec     de
-
-        dec     de
-        dec     de
-        dec     de
-        dec     de
-
         ld      a,'.'           ;show progress
         ROUT
 
-        ld      a,d
-        or      e
-        jr      nz, nxtblk
-
+        ;; we're done if hl=de
+        pop     hl
+        ld      a,h
+        cp      d
+        jr      nz, nxt1
+        ld      a,l
+        cp      e
+        jr      nz, nxt1
         ld      de,eok
-        jp      mexit
+        jp      mexit           ;done
 
+nxt1:   inc     de              ;lazy!
+        inc     de              ;way to increment
+        inc     de              ;sector count by 8
+        inc     de
+
+        inc     de
+        inc     de
+        inc     de
+        inc     de
+        jr      nxtblk
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; BOOT
@@ -604,7 +584,7 @@ b1:     add     CSEEK           ;add FID for drive number
         ld      de,enofil       ;check status; exit on error
         call    t2rs2t
 
-;;; Read 256 bytes
+;;; read 256 bytes
         ld      a,b             ;get FID
         add     CNRD
         call    putcmd
