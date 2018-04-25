@@ -71,7 +71,7 @@
 ;;; https://github.com/nealcrook/nascom
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-START:  EQU     $1000
+START:  EQU     $b800
 CPMLD:  EQU     $2000
 
 ; Commands for the SDcard interface
@@ -494,19 +494,25 @@ scrape: call    hwinit
         SCAL    DSIZE
 ;;; hl = number of sectors on drive 0
 
-;;; sectors are 256 bytes (0x100) each. Read 8 at a time
+;;; sectors are 256 bytes (0x100) each. Tried reading 8 at a time
+;;; but the whole disk is NOT a xple of 8, leading to a messy
+;;; end condition. Overall, easier to just read 2 at a time (all
+;;; disks have an even number of sectors..)
 ;;; and buffer them in RAM at $1000.
 
         ld      de,0            ;start at 1st sector
 
 nxtblk: push    hl              ;total #sectors
-        ld      bc,$800         ;8 is #sectors, 0 is drive number
+        ld      bc,$200         ;2 is #sectors, 0 is drive number
         ld      hl,$1000        ;where to put it
 
         SCAL    DRD             ;TODO Check/report exit status
 
+        ld      a,'.'           ;show progress - could do * for error?
+        ROUT
+
         ;; hl, bc unchanged
-        ;; bc = $800 - the number of bytes to write out to SD
+        ;; bc = $200 - the number of bytes to write out to SD
         ;; need to fix c if using drive 1 etc.
 
         ld      a, CNWR         ;write
@@ -535,9 +541,6 @@ snext:  ld      a, (hl)
         call    t2rs2t
         pop     de
 
-        ld      a,'.'           ;show progress
-        ROUT
-
         ;; we're done if hl=de
         pop     hl
         ld      a,h
@@ -549,15 +552,8 @@ snext:  ld      a, (hl)
         ld      de,eok
         jp      mexit           ;done
 
-nxt1:   inc     de              ;lazy!
-        inc     de              ;way to increment
-        inc     de              ;sector count by 8
-        inc     de
-
-        inc     de
-        inc     de
-        inc     de
-        inc     de
+nxt1:   inc     de              ;increment sector count
+        inc     de              ;by the number we've copied
         jr      nxtblk
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

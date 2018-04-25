@@ -1143,30 +1143,16 @@ RWSCTS:	PUSH	AF		;Save R/W flag
         or      CSEEK           ;merge seek with fid
         call    putcmd
 
-;;; send 32-bit byte offset formed by DE*128
+;;; send 32-bit byte offset formed by DE*256 (trivial!)
 ;;;
-        ld      a,e             ;LSB of E is MSB of LS byte
-        rrca                    ;rotate LSB into MSB
-        ld      e,a             ;for later
-        and     80h
+        xor     a
         call    putval          ;LS byte of count
         ld      a,e
-        and     7fh
-        ld      e,a
-
-        ld      a,d
-        rrca                    ;rotate LSB into MSB
-        ld      d,a             ;for later
-        and     80h
-        or      e
         call    putval          ;next byte of count
-
         ld      a,d
-        and     7fh
         call    putval          ;next byte of count
-
         xor     a
-        call    putval          ;final byte of count
+        call    putval          ;MS byte of count
 
         call    t2rs2t          ;Get status in A
         ;; 0 = error so Z => error
@@ -1179,14 +1165,14 @@ RWSCTS:	PUSH	AF		;Save R/W flag
         or      a               ;0=>read
         jr      z,rs
 
-;;; write. Data from HL, B sectors of 128 bytes.
+;;; write. Data from HL, B sectors of 256 bytes each
 
 ws:     ld      a,c             ;FID
-        or      CSWR            ;sector write: 128 bytes
+        or      CSWR            ;sector write: 256 bytes
         call    putcmd
 
         push    bc
-        ld      b,128
+        ld      b,0             ;counts as 256
 wd:     ld      a,(hl)          ;write data for 1 sector
         call    putval
         inc     hl
@@ -1204,13 +1190,15 @@ wd:     ld      a,(hl)          ;write data for 1 sector
         xor     a               ;success
         jr      RWS2            ;tidy stack and return
 
+;;; read. Data to HL, B sectors of 256 bytes each
+
 rs:     ld      a,c             ;FID
-        or      CSRD            ;sector read: 128 bytes
+        or      CSRD            ;sector read: 256 bytes
         call    putcmd
         call    gorx
 
         push    bc
-        ld      b,128
+        ld      b,0             ;counts as 256
 rd:     call    getval          ;read data for 1 sector
         ld      (hl),a
         inc     hl
@@ -1222,7 +1210,7 @@ rd:     call    getval          ;read data for 1 sector
 
         jr      z,RWS2A         ;[NAC HACK 2018Apr22] error code??
 
-        djnz    rd              ;read data loop for B sectors
+        djnz    rs              ;read data loop for B sectors
 
         xor     a               ;success
         jr      RWS2            ;tidy stack and return
@@ -1390,6 +1378,11 @@ hwinit: call    a2out           ;port A to outputs
 train:	ld      a, CNOP
 	call    putcmd
         djnz    train
+
+;;; restore the default drives
+        ld      a, CRES
+        call    putcmd
+        call    t2rs2t          ;get status, but ignore it
         ret
 
 
