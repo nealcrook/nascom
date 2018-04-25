@@ -755,6 +755,33 @@ void cmd_restore_state(void) {
 // return FALSE otherwise
 int restore_state(int auto_restore) {
   Serial.println("TODO restore_state");
+
+  // TODO for now, just attempt to load DSK0.BIN etc.
+  buf[0] = 'D';
+  buf[1] = 'S';
+  buf[2] = 'K';
+  buf[3] = '0';
+  buf[4] = '.';
+  buf[5] = 'B';
+  buf[6] = 'I';
+  buf[7] = 'N';
+  buf[8] = 0;
+  handles[0] = SD.open(buf, FILE_WRITE);
+  Serial.print("FID 0 status ");
+  Serial.println(handles[0],HEX);
+  buf[3] = '1';
+  handles[1] = SD.open(buf, FILE_WRITE);
+  Serial.print("FID 1 status ");
+  Serial.println(handles[1],HEX);
+  buf[3] = '2';
+  handles[2] = SD.open(buf, FILE_WRITE);
+  Serial.print("FID 2 status ");
+  Serial.println(handles[2],HEX);
+  buf[3] = '3';
+  handles[3] = SD.open(buf, FILE_WRITE);
+  Serial.print("FID 3 status ");
+  Serial.println(handles[3],HEX);
+
   return 1;
 }
 
@@ -879,6 +906,10 @@ void cmd_seek(char fid) {
     offset = offset | (get_value() << 16);
     offset = offset | (get_value() << 24);
     status = handles[fid].seek(offset);
+    Serial.print("Seek for fid ");
+    Serial.print(fid,HEX);
+    Serial.print(" offset ");
+    Serial.println(offset, HEX);
   }
   put_value(status, INPUT);
 }
@@ -886,6 +917,7 @@ void cmd_seek(char fid) {
 
 // helper for cmd_n_wr(), cmd_sect_wr()
 void n_wr(char fid, long count) {
+  Serial.print("Write byte count ");
   Serial.println(count,HEX);
   long written = 0L;
   if (flags & (1 << fid)) {
@@ -926,6 +958,8 @@ void cmd_sect_wr(char fid) {
 
 // helper for cmd_n_rd(), cmd_sect_rd(), cmd_size_rd()
 void n_rd(char fid, long count) {
+  Serial.print("Read byte count ");
+  Serial.println(count,HEX);
   status = 0;
   if (flags & (1 << fid)) {
      for (long i = 0L; i< count; i++) {
