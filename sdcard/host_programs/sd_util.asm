@@ -1,6 +1,7 @@
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ROMable utilities for accessing an arduino-based nascom_sdcard
 ;;; device attached to the NASCOM PIO.
+;;; https://github.com/nealcrook/nascom
 ;;;
 ;;; Assemble at address xxx0, (optionally) burn to EPROM.
 ;;;
@@ -68,7 +69,6 @@
 ;;; it cannot actually boot CP/M unless the memory map is changed
 ;;; to provide RAM at address 0
 ;;;
-;;; https://github.com/nealcrook/nascom
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 START:  EQU     $b800
@@ -110,23 +110,14 @@ RCAL:   MACRO FOO
         DB FOO - $ - 1
         ENDM
 
-RIN:    MACRO
-        RST 8
-        ENDM
-
-ROUT:   MACRO
-        RST $30
-        ENDM
-
-PRS:    MACRO
-        RST $28
-        ENDM
+PRS:    EQU     $28
+ROUT:   EQU     $30
 
 ;;; Equates for NAS-SYS SCALs
-MRET:   EQU     $5b
-TBCD3:  EQU     $66
-CRLF:   EQU     $6a
-ERRM:   EQU     $6b
+ZMRET:  EQU     $5b
+ZTBCD3: EQU     $66
+ZCRLF:  EQU     $6a
+ZERRM:  EQU     $6b
 ;;; Equates for NAS-SYS workspace
 ARGN:   EQU     $0c0b
 ARG1:   EQU     $0c0c
@@ -145,88 +136,8 @@ DRD:    equ     $81
         jp      scrape
         jp      boot
 
-;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; subroutines -- putting them at the start means I don't have to
-;;; re-type this part of the program
-;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;; assume: currently in OUTPUT
-;;; command is in A
-;;; send command, toggle handshake, wait for handshake in to match
-;;; to show that target has received it.
-;;; corrupts: A,F
-putcmd: out     (PIOAD), a      ;send command
-        in      a, (PIOBD)
-        or      4               ;CMD=1
-        jr      pvx             ;common code for cmd/data
-
-
-;;; assume: currently in OUTPUT
-;;; value is in A
-;;; send value, toggle handshake, wait for handshake in to match
-;;; to show that target has received it.
-;;; corrupts: A,F
-putval: out     (PIOAD), a      ;send value
-pv0:    in      a, (PIOBD)
-        and     $fb             ;CMD=0
-
-pvx:    xor     2               ;toggle H2T
-        out     (PIOBD), a
-
-        ;; fall-through and subroutine
-        ;; wait until handshakes match
-        ;; corrupts A,F
-waitm:  in      a, (PIOBD)      ;get status
-        and     3               ;look at handshakes
-        jr      z, wdone        ;both 0 => done
-        cp      3               ;both 1
-        jr      nz, waitm       ;not both 1 => wait
-wdone:  ret			;done
-
-
-;;; assume: currently in OUTPUT. Go to INPUT
-;;; leave CMD=0 (but irrelevant)
-;;; corrupts: A,F
-gorx:   ld      a, $cf          ;"control" mode
-        out     (PIOAC), a
-        ld      a, $ff
-        out     (PIOAC), a      ;port A all input
-        jr      getend
-
-
-;;; assume: currently in INPUT. Go to OUTPUT
-;;; leave CMD bit unchanged
-;;; corrupts: NOTHING
-gotx:   push    af
-        call    waitm           ;wait for hs to match
-        pop     af
-
-        ;; fall-through and subroutine
-        ;; set port A to output
-        ;; corrupts nothing
-a2out:  push    af
-        ld      a, $cf          ;"control" mode
-        out     (PIOAC), a
-        xor     a               ;A=0
-        out     (PIOAC), a      ;port A all output
-        pop     af
-        ret
-
-
-;;; assume: currently in INPUT
-;;; get a byte; return it in A
-;;; corrupts: A,F
-getval: call    waitm           ;wait for hs to match
-        in      a, (PIOAD)      ;get data byte
-
-        ;; fall-through and subroutine
-        ;; toggle H2T.
-getend: push    af
-        in      a, (PIOBD)
-        xor     2               ;toggle H2T
-        out     (PIOBD), a
-        pop     af
-        ret
+;;; Low-level subroutines
+        include "sd_sub1.asm"
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; more subroutines, just for these utilities.
@@ -328,12 +239,12 @@ rs2t:   call    getval          ;status
 mexit:  ld      a,(de)
         or      a
         jr      z, mex1
-        ROUT
+        rst     ROUT
         inc     de
         jr      mexit
 
-mex1:   SCAL CRLF
-        SCAL MRET
+mex1:   SCAL    ZCRLF
+        SCAL    ZMRET
 
 ;;; Start address in (ARG2), end address in (ARG3). Exit with
 ;;; HL=start, BC=byte count.
@@ -378,9 +289,9 @@ c2:     ld      e,a             ;store lo accumulator
 cdone:  ld      h,d             ;move sum from de to hl
         ld      l,e
 
-        SCAL    TBCD3           ;print hl
-        SCAL    CRLF
-        SCAL    MRET            ;done.
+        SCAL    ZTBCD3          ;print hl
+        SCAL    ZCRLF
+        SCAL    ZMRET           ;done.
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; WRFILE
@@ -477,7 +388,7 @@ rdone:  ld      de,erd
         call    rs2t
 
         pop     hl              ;file size
-        SCAL    TBCD3           ;display file size
+        SCAL    ZTBCD3          ;display file size
         ld      de,ebyte
         jp      mexit           ;done
 
@@ -498,21 +409,22 @@ scrape: call    hwinit
 ;;; but the whole disk is NOT a xple of 8, leading to a messy
 ;;; end condition. Overall, easier to just read 2 at a time (all
 ;;; disks have an even number of sectors..)
-;;; and buffer them in RAM at $1000.
+;;; and buffer them in RAM at $1000. However, to be fast I'll
+;;; do 10 (0xa) at a time.
 
         ld      de,0            ;start at 1st sector
 
 nxtblk: push    hl              ;total #sectors
-        ld      bc,$200         ;2 is #sectors, 0 is drive number
+        ld      bc,$a00         ;a is #sectors, 0 is drive number
         ld      hl,$1000        ;where to put it
 
         SCAL    DRD             ;TODO Check/report exit status
 
         ld      a,'.'           ;show progress - could do * for error?
-        ROUT
+        rst     ROUT
 
         ;; hl, bc unchanged
-        ;; bc = $200 - the number of bytes to write out to SD
+        ;; bc = $a00 - the number of bytes to write out to SD
         ;; need to fix c if using drive 1 etc.
 
         ld      a, CNWR         ;write
@@ -554,6 +466,16 @@ snext:  ld      a, (hl)
 
 nxt1:   inc     de              ;increment sector count
         inc     de              ;by the number we've copied
+        inc     de
+        inc     de
+        inc     de
+
+        inc     de
+        inc     de
+        inc     de
+        inc     de
+        inc     de              ;crude but effective!
+
         jr      nxtblk
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -614,7 +536,7 @@ b2:     call    getval          ;data byte
         ld      de,erd
         call    rs2t            ;check read was OK
 
-        PRS
+        rst     PRS
         DB      "Go to CP/M..",0
         jp      CPMLD
 
