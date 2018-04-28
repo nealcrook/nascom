@@ -82,7 +82,7 @@ Appendix 1: Command Set
 OPENn (n= 0,1,2,3,4,D)
 
 Open a file. If the file did not exist, it is created. If it did exist, it is
-opened. The initial seek point is the START of the file.
+opened (see also OPENRn). The initial seek point is the START of the file.
 
 n is called a fid (file identifier) and allows 5 different files to be open
 simultaneously; a particular open file is then referenced by number:
@@ -100,6 +100,33 @@ automatically (xxx is the next available value in the sequence 000..999).
 
 For this and all other similar commands, the value n is not an argument, but is
 encoded in the low 3-bits of the command.
+
+Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
+
+
+OPENRn (n= 0,1,2,3,4,D)
+
+Open a file with read intent. If it did exist, it is opened. The initial seek
+point is the START of the file. If the file did not exist, return error.
+
+n is called a fid (file identifier) and allows 5 different files to be open
+simultaneously; a particular open file is then referenced by number:
+0..4. Alternatively, the DEFAULT command can be used to specify a fid, and then
+the OPEND command can be used to reference that drive (this indirect mechanism
+is intended to match the way in which disk controller software selects a disk
+drive).
+
+If an open file is already associated with n, that file will be closed.
+
+Arguments: A zero-terminated string specifies the file name on the SD card. The
+name must match the requirements of the file format: 8.3. In the special case of
+a file length of 0, a file name of the form NASxxx.BIN will be generated
+automatically (xxx is the next available value in the sequence 000..999).
+
+If you use OPEN on a file that does not exist, then read it (zero bytes) you
+will be left with a zero-byte file of that name, and no errors. Also, you cannot
+distinguish between a file that did not exist and a pre-existing zero-byte file.
+However, if you OPENR a file that does not exist, you will get an error.
 
 Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
 
