@@ -302,6 +302,8 @@ char default_fid;
 int status;
 
 // Work with upto 5 files. Low bits indicate which are valid/open
+// TODO only use this at restore time, then MSB at save time. In normal
+// operation use handles[] to show whether a FID is valid.
 char flags;
 File handles[5];
 
@@ -445,11 +447,15 @@ void loop() {
 // Each pass through loop handles 1 command to completion
 // and leaves the Target set up as a receiver.
 void loop() {
+  //Serial.println("Start command wait");
+    
   int cmd_data = get_value();
 
   // Blip LED (too short to see) each command, leave it ON for error
   digitalWrite(PIN_ERROR, 1);
   if (cmd_data & 0x100) {
+    //Serial.print("Command ");
+    //Serial.println(cmd_data,HEX);
     digitalWrite(PIN_ERROR, 0);
     switch (cmd_data & 0xff) {
      case CMD_NOP:
@@ -767,21 +773,12 @@ int restore_state(int auto_restore) {
   buf[7] = 'N';
   buf[8] = 0;
   handles[0] = SD.open(buf, FILE_WRITE);
-  Serial.print("FID 0 status ");
-  Serial.println(handles[0],HEX);
   buf[3] = '1';
   handles[1] = SD.open(buf, FILE_WRITE);
-  Serial.print("FID 1 status ");
-  Serial.println(handles[1],HEX);
   buf[3] = '2';
   handles[2] = SD.open(buf, FILE_WRITE);
-  Serial.print("FID 2 status ");
-  Serial.println(handles[2],HEX);
   buf[3] = '3';
   handles[3] = SD.open(buf, FILE_WRITE);
-  Serial.print("FID 3 status ");
-  Serial.println(handles[3],HEX);
-
   return 1;
 }
 
@@ -833,10 +830,9 @@ void cmd_loop(void) {
 //
 // RESPONSE: none. Does not update global status
 void cmd_close(char fid) {
-  if (flags & (1 << fid)) {
+  if (handles[fid]) {
     // file handle is currently in use
     handles[fid].close();
-    flags = flags & (0xff ^ (1 << fid));
   }
 }
 
@@ -855,10 +851,9 @@ void cmd_open(char fid) {
   status = 0;
 
   get_filename(buf);
-  if (flags & (1 << fid)) {
+  if (handles[fid]) {
     // file handle is currently in use
     handles[fid].close();
-    flags = flags ^ (1 << fid);
   }
 
   handles[fid] = SD.open(buf, FILE_WRITE);
@@ -866,7 +861,6 @@ void cmd_open(char fid) {
     status = handles[fid].seek(0);
   }
 
-  flags = flags | (status << fid);
   put_value(status, INPUT);
 }
 
@@ -876,15 +870,22 @@ void cmd_open(char fid) {
 // - sector
 // seek drive specified by fid to the appropriate place
 // success: drive is ready to rd/wr, send response TRUE
-// fail: send response FALS
+// fail: send response FALSE
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_ts_seek(char fid) {
   status = 0;
-  if (flags & (1 << fid)) {
-    int track = get_value();
-    int sector = get_value();
+  int track = get_value();
+  int sector = get_value();  
+  if (handles[fid]) {
+//    Serial.print("Seek to track ");
+//    Serial.print(track,HEX);
+//    Serial.print(" sector" );
+//    Serial.println(sector,HEX);
     status = handles[fid].seek((SECTORS_PER_TRACK * track + sector)* BYTES_PER_SECTOR);
+  }
+  else {
+    Serial.print("Seek to track but no disk");
   }
   put_value(status, INPUT);
 }
@@ -898,18 +899,15 @@ void cmd_ts_seek(char fid) {
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_seek(char fid) {
   long offset;
-
   status = 0;
-  if (flags & (1 << fid)) {
-    offset = get_value();
-    offset = offset | (get_value() << 8);
-    offset = offset | (get_value() << 16);
-    offset = offset | (get_value() << 24);
+
+  offset = get_value();
+  offset = offset | (get_value() << 8);
+  offset = offset | (get_value() << 16);
+  offset = offset | (get_value() << 24);
+  
+  if (handles[fid]) {
     status = handles[fid].seek(offset);
-    Serial.print("Seek for fid ");
-    Serial.print(fid,HEX);
-    Serial.print(" offset ");
-    Serial.println(offset, HEX);
   }
   put_value(status, INPUT);
 }
@@ -917,16 +915,24 @@ void cmd_seek(char fid) {
 
 // helper for cmd_n_wr(), cmd_sect_wr()
 void n_wr(char fid, long count) {
-  Serial.print("Write byte count ");
-  Serial.println(count,HEX);
   long written = 0L;
-  if (flags & (1 << fid)) {
+  status = 0;
+
+//  Serial.print("Write byte count ");
+//  Serial.println(count,HEX);
+
+  if (handles[fid]) {
      for (long i = 0L; i< count; i++) {
       written = written + handles[fid].write(get_value());
      }
      status = written == count;
      // polite and rugged to do this
      handles[fid].flush();
+  }
+  else {
+     for (long i = 0L; i< count; i++) {
+       get_value(); // need this NOT to get optimised away
+     }
   }
   put_value(status, INPUT);
 }
@@ -958,16 +964,25 @@ void cmd_sect_wr(char fid) {
 
 // helper for cmd_n_rd(), cmd_sect_rd(), cmd_size_rd()
 void n_rd(char fid, long count) {
-  Serial.print("Read byte count ");
-  Serial.println(count,HEX);
   status = 0;
-  if (flags & (1 << fid)) {
-     for (long i = 0L; i< count; i++) {
+
+//  Serial.print("Read for fid ");
+//  Serial.print(fid,HEX);
+//  Serial.print(" and byte count ");
+//  Serial.println(count,HEX);
+  
+  if (handles[fid]) {
+    for (long i = 0L; i< count; i++) {
       // TODO should check for -1
       // TODO probably better.. much faster.. to pass a buffer.
       put_value(handles[fid].read(), OUTPUT);
-     }
-     status = 1;
+    }
+    status = 1;
+  }
+  else {
+    for (long i = 0L; i< count; i++) {
+      put_value(0, OUTPUT);
+    }
   }
   put_value(status, INPUT);
 }
