@@ -166,81 +166,20 @@
 #define CMD_DIR           (0x84)
 #define CMD_STATUS        (0x85)
 
-#define CMD_OPEN0 (0x10)
-#define CMD_OPEN1 (0x11)
-#define CMD_OPEN2 (0x12)
-#define CMD_OPEN3 (0x13)
-#define CMD_OPEN4 (0x14)
-// 0x15-0x17 RESERVED
-#define CMD_CLOSE0 (0x18)
-#define CMD_CLOSE1 (0x19)
-#define CMD_CLOSE2 (0x1a)
-#define CMD_CLOSE3 (0x1b)
-#define CMD_CLOSE4 (0x1c)
-#define CMD_CLOSED (0x1f)
-// 0x1d-0x1e RESERVED
-#define CMD_SEEK0  (0x20)
-#define CMD_SEEK1  (0x21)
-#define CMD_SEEK2  (0x22)
-#define CMD_SEEK3  (0x23)
-#define CMD_SEEK4  (0x24)
-#define CMD_SEEKD  (0x27)
-// 0x25-0x26 RESERVED
-#define CMD_TS_SEEK0  (0x28)
-#define CMD_TS_SEEK1  (0x29)
-#define CMD_TS_SEEK2  (0x2a)
-#define CMD_TS_SEEK3  (0x2b)
-#define CMD_TS_SEEK4  (0x2c)
-#define CMD_TS_SEEKD  (0x2f)
-// 0x2d-0x2e RESERVED
-#define CMD_SECT_RD0  (0x30)
-#define CMD_SECT_RD1  (0x31)
-#define CMD_SECT_RD2  (0x32)
-#define CMD_SECT_RD3  (0x33)
-#define CMD_SECT_RD4  (0x34)
-#define CMD_SECT_RDD  (0x37)
-// 0x35-0x36 RESERVED
-#define CMD_N_RD0     (0x38)
-#define CMD_N_RD1     (0x39)
-#define CMD_N_RD2     (0x3a)
-#define CMD_N_RD3     (0x3b)
-#define CMD_N_RD4     (0x3c)
-#define CMD_N_RDD     (0x3f)
-// 0x3d-0x3e RESERVED
-#define CMD_SECT_WR0  (0x40)
-#define CMD_SECT_WR1  (0x41)
-#define CMD_SECT_WR2  (0x42)
-#define CMD_SECT_WR3  (0x43)
-#define CMD_SECT_WR4  (0x44)
-#define CMD_SECT_WRD  (0x47)
-// 0x45-0x46 RESERVED
-#define CMD_N_WR0     (0x48)
-#define CMD_N_WR1     (0x49)
-#define CMD_N_WR2     (0x4a)
-#define CMD_N_WR3     (0x4b)
-#define CMD_N_WR4     (0x4c)
-#define CMD_N_WRD     (0x4f)
-// 0x4d-0x4e RESERVED
-#define CMD_DEFAULT0  (0x50)
-#define CMD_DEFAULT1  (0x51)
-#define CMD_DEFAULT2  (0x52)
-#define CMD_DEFAULT3  (0x53)
-#define CMD_DEFAULT4  (0x54)
-// 0x55-0x5f RESERVED
-#define CMD_SIZE0     (0x58)
-#define CMD_SIZE1     (0x59)
-#define CMD_SIZE2     (0x5a)
-#define CMD_SIZE3     (0x5b)
-#define CMD_SIZE4     (0x5c)
-#define CMD_SIZED     (0x5f)
-// 0x5d-0x5e RESERVED
-#define CMD_SIZE_RD0  (0x60)
-#define CMD_SIZE_RD1  (0x61)
-#define CMD_SIZE_RD2  (0x62)
-#define CMD_SIZE_RD3  (0x63)
-#define CMD_SIZE_RD4  (0x64)
-#define CMD_SIZE_RDD  (0x67)
-// 0x64-0x66 RESERVED
+// Bits [2:0] of these commands are the file ID (FID)
+#define CMD_OPEN     (0x10)
+#define CMD_OPENR    (0x18)
+#define CMD_SEEK     (0x20)
+#define CMD_TS_SEEK  (0x28)
+#define CMD_SECT_RD  (0x30)
+#define CMD_N_RD     (0x38)
+#define CMD_SECT_WR  (0x40)
+#define CMD_N_WR     (0x48)
+#define CMD_DEFAULT  (0x50)
+#define CMD_SIZE     (0x58)
+#define CMD_SIZE_RD  (0x60)
+#define CMD_CLOSE    (0x68)
+
 
 /////////////////////////////////////////////////////
 
@@ -276,7 +215,7 @@ unsigned int get_value(void);
 char fid(char fid);
 //
 void cmd_default(char fid);
-void cmd_open(char fid);
+void cmd_open(char fid, int mode);
 void cmd_close(char fid);
 void cmd_save_state(void);
 void cmd_restore_state(void);
@@ -448,7 +387,7 @@ void loop() {
 // and leaves the Target set up as a receiver.
 void loop() {
   //Serial.println("Start command wait");
-    
+
   int cmd_data = get_value();
 
   // Blip LED (too short to see) each command, leave it ON for error
@@ -457,22 +396,16 @@ void loop() {
     //Serial.print("Command ");
     //Serial.println(cmd_data,HEX);
     digitalWrite(PIN_ERROR, 0);
-    switch (cmd_data & 0xff) {
+    switch (cmd_data & 0xf8) {
      case CMD_NOP:
        break; // let Host decide that we're alive
-     case CMD_OPEN0:
-     case CMD_OPEN1:
-     case CMD_OPEN2:
-     case CMD_OPEN3:
-     case CMD_OPEN4:
-       cmd_open(cmd_data & 0x7);
+     case CMD_OPEN:
+       cmd_open(fid(cmd_data & 0x7), FILE_WRITE);
        break;
-     case CMD_CLOSE0:
-     case CMD_CLOSE1:
-     case CMD_CLOSE2:
-     case CMD_CLOSE3:
-     case CMD_CLOSE4:
-     case CMD_CLOSED:
+     case CMD_OPENR:
+       cmd_open(fid(cmd_data & 0x7), FILE_READ);
+       break;
+     case CMD_CLOSE:
        cmd_close(fid(cmd_data & 0x7));
        break;
      case CMD_SAVE_STATE:
@@ -487,76 +420,34 @@ void loop() {
      case CMD_LOOP:
        cmd_loop();
        break;
-     case CMD_SEEK0:
-     case CMD_SEEK1:
-     case CMD_SEEK2:
-     case CMD_SEEK3:
-     case CMD_SEEK4:
-     case CMD_SEEKD:
+     case CMD_SEEK:
        cmd_seek(fid(cmd_data & 0x7));
        break;
-     case CMD_TS_SEEK0:
-     case CMD_TS_SEEK1:
-     case CMD_TS_SEEK2:
-     case CMD_TS_SEEK3:
-     case CMD_TS_SEEK4:
-     case CMD_TS_SEEKD:
+     case CMD_TS_SEEK:
        cmd_ts_seek(fid(cmd_data & 0x7));
        break;
      case CMD_STATUS:
        cmd_status();
        break;
-     case CMD_SECT_RD0:
-     case CMD_SECT_RD1:
-     case CMD_SECT_RD2:
-     case CMD_SECT_RD3:
-     case CMD_SECT_RD4:
-     case CMD_SECT_RDD:
+     case CMD_SECT_RD:
        cmd_sect_rd(fid(cmd_data & 0x7));
        break;
-     case CMD_SECT_WR0:
-     case CMD_SECT_WR1:
-     case CMD_SECT_WR2:
-     case CMD_SECT_WR3:
-     case CMD_SECT_WR4:
-     case CMD_SECT_WRD:
+     case CMD_SECT_WR:
        cmd_sect_wr(fid(cmd_data & 0x7));
        break;
-     case CMD_N_RD0:
-     case CMD_N_RD1:
-     case CMD_N_RD2:
-     case CMD_N_RD3:
-     case CMD_N_RD4:
-     case CMD_N_RDD:
+     case CMD_N_RD:
        cmd_n_rd(fid(cmd_data & 0x7));
        break;
-     case CMD_N_WR0:
-     case CMD_N_WR1:
-     case CMD_N_WR2:
-     case CMD_N_WR3:
-     case CMD_N_WR4:
-     case CMD_N_WRD:
+     case CMD_N_WR:
        cmd_n_wr(fid(cmd_data & 0x7));
        break;
-     case CMD_DEFAULT0:
-     case CMD_DEFAULT1:
-     case CMD_DEFAULT2:
-     case CMD_DEFAULT3:
-     case CMD_DEFAULT4:
+     case CMD_DEFAULT:
        cmd_default(fid(cmd_data & 0x7));
        break;
-     case CMD_SIZE0:
-     case CMD_SIZE1:
-     case CMD_SIZE2:
-     case CMD_SIZE3:
-     case CMD_SIZE4:
+     case CMD_SIZE:
        cmd_size(fid(cmd_data & 0x7));
-       break;  
-     case CMD_SIZE_RD0:
-     case CMD_SIZE_RD1:
-     case CMD_SIZE_RD2:
-     case CMD_SIZE_RD3:
-     case CMD_SIZE_RD4:
+       break;
+     case CMD_SIZE_RD:
        cmd_size_rd(fid(cmd_data & 0x7));
        break;
      // Anything else is ignored.
@@ -837,17 +728,21 @@ void cmd_close(char fid) {
 }
 
 
-// receive null-terminated filename from host
-// close any existing file using this fid
-// open new file and seek to beginning
-// magic: if filename is 0-bytes, auto-generate a
+// Receive null-terminated filename from host.
+// Magic: if filename is 0-bytes, auto-generate a
 // name of the form NASxxx.BIN where xxx is a number
 // 000, 001 etc.
-// success: set appropriate flag bit, send response TRUE
-// fail: appropriate flag bit, send response FALSE
 //
-// RESPONSE: sends TRUE or FALSE response to host. Updates global status
-void cmd_open(char fid) {
+// close any existing file using this fid
+// attempt to open file
+// FILE_READ - error if file does not exist. FID
+// is left unused.
+// FILE_WRITE - seek to start of file
+//
+// RESPONSE: sends TRUE on success (fid is now associated
+// with a file) or FALSE on error (fid is now unused)
+// Updates global status
+void cmd_open(char fid, int mode) {
   status = 0;
 
   get_filename(buf);
@@ -856,7 +751,7 @@ void cmd_open(char fid) {
     handles[fid].close();
   }
 
-  handles[fid] = SD.open(buf, FILE_WRITE);
+  handles[fid] = SD.open(buf, mode);
   if (handles[fid]) {
     status = handles[fid].seek(0);
   }
@@ -876,7 +771,7 @@ void cmd_open(char fid) {
 void cmd_ts_seek(char fid) {
   status = 0;
   int track = get_value();
-  int sector = get_value();  
+  int sector = get_value();
   if (handles[fid]) {
 //    Serial.print("Seek to track ");
 //    Serial.print(track,HEX);
@@ -905,7 +800,7 @@ void cmd_seek(char fid) {
   offset = offset | (get_value() << 8);
   offset = offset | (get_value() << 16);
   offset = offset | (get_value() << 24);
-  
+
   if (handles[fid]) {
     status = handles[fid].seek(offset);
   }
@@ -970,7 +865,7 @@ void n_rd(char fid, long count) {
 //  Serial.print(fid,HEX);
 //  Serial.print(" and byte count ");
 //  Serial.println(count,HEX);
-  
+
   if (handles[fid]) {
     for (long i = 0L; i< count; i++) {
       // TODO should check for -1
