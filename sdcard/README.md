@@ -23,6 +23,13 @@ ribbon cable. The interface uses 8 data from Port A and 3 data from Port B.
 Finally, there is an LED, controlled from the Arduino. The LED is used to
 indicate a protocol error (command expected but data received).
 
+## Current Status
+
+29Apr2018 - using the code here, the sd_util can be used to load and save to and
+from NASCOM memory, the polydos_util_rom boots PolyDos successfully and supports
+4 disks (named DSK0.BIN DSK1.BIN DSK2.BIN DSK3.BIN on the SDcard). 
+
+
 ## Contents
 
 * photos/         -- photos of the assembled board sandwich
@@ -30,6 +37,31 @@ indicate a protocol error (command expected but data received).
 * host_programs   -- Z80 code for the NASCOM. A "library" of subroutines and some example programs for using them.
 * doc/            -- description of the protocol and the command-set
 
+## Construction
+
+You will need:
+
+* Arduino uno
+* Arduino prototyping card
+* SDcard adaptor
+* Header pins for connection the Uno to the prototyping card
+* Polarised 26-way IDC connector (male pin, female shroud)
+* 1 LED
+* 1 270 ohm resistor
+* Thin hookup wire (I use wire-wrap wire)
+* Thick hookup wire (for power connection o SDcard adaptor)
+
+The first four are easy and cheap to source from Banggood. For example:
+
+* Arduino UNO: Arduino Compatible UNO R3 ATmega16U2 AVR USB Development Main Board, product ID 68537
+* Prototyping board:Prototyping Shield PCB Board For Arduino, product ID 995386
+* SD adaptor: Micro SD TF Card Memory Shield Module SPI Micro SD Adapter For Arduino, product ID 919914
+* Header pins: 50 Pcs 40 Pin 2.54mm Single Row Male Pin Header Strip For Arduino Prototype Shield DIY. product ID 1033758
+
+For the Arduino, I recommend getting one with a socketed DIL AVR chip.
+
+
+Use the notes in nascom_arduino.ino and nascom_pio.pdf and the photos to guide you. There are about 20 wires to connect.
 
 
 ## Arduino prototyping card

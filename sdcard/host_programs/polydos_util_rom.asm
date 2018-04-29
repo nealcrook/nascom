@@ -1080,6 +1080,7 @@ CDIR:         EQU     $84       ;directory
 CSTAT:        EQU     $85       ;command status
 
 COPEN:        EQU     $10 + FID
+COPENR:       EQU     $18 + FID
 CSEEK:        EQU     $20 + FID ;seek by byte offset
 CTSEEK:       EQU     $28 + FID ;seek by track/sector offset
 CSRD:         EQU     $30 + FID
@@ -1278,7 +1279,7 @@ TD3:	POP	BC		;Restore BC
         include "sd_sub1.asm"
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; more subroutines, just for these utilities.
+;;; more subroutines, just for the polydos SD support
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; setup: initialise the PIO and the interface.
@@ -1299,11 +1300,10 @@ train:	ld      a, CNOP
 
 ;;; restore the default drives
         ld      a, CRES
-        call    putcmd
-        call    t2rs2t          ;get status, but ignore it
-        ret
+        call    putcmd          ;fall-through - ignore status
 
 
+;;; FALL-THROUGH and subroutine
 ;;; go from tx to rx, get status then go to tx.
 ;;; Set flags based on status byte
 ;;; corrupts: AF
@@ -1319,12 +1319,389 @@ rs2t:   call    getval          ;status
         ret
 
 
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ROMable utilities for accessing an arduino-based nascom_sdcard
+;;; device attached to the NASCOM PIO.
+;;; https://github.com/nealcrook/nascom
+;;;
+;;; Assemble at address xxx0, (optionally) burn to EPROM.
+;;;
+;;; Provides 5 different utilites, all invoked from NAS-SYS at
+;;; different offsets from the start address.
+;;;
+;;; 1) CHECKSUM
+;;;
+;;; E dff4 ssss eeee
+;;;
+;;; Compute checksum of memory from ssss to eeee inclusive.
+;;; Checksum is the sum of all bytes and is reported as a
+;;; 16-bit value. Carry off the MSB is lost/ignored.
+;;;
+;;; 2) READ FILE
+;;;
+;;; E dff7 ssss nnn
+;;;
+;;; Where nnn are exactly 3 decimal digits (000..999).
+;;;
+;;; - Locate file NASnnn.BIN
+;;; - Load it to memory starting at address ssss
+;;; - Report the file size
+;;;
+;;; 3) WRITE FILE
+;;;
+;;; E dffa ssss eeee [nnn]<-optional
+;;;
+;;; If nnn - exactly 3 decimal digits (000..999):
+;;; - Create file NASnnn.BIN
+;;; - Save memory from ssss to eeee inclusive to the file
+;;;
+;;; Without nnn:
+;;; - Auto-pick next free file name in the form NASnnn.BIN
+;;; - Save memory from ssss to eeee inclusive to the file
+;;;
+;;; 4) SCRAPE DISK
+;;;
+;;; E dffd [nnn]<-optional
+;;;
+;;; If nnn - exactly 3 decimal digits (000..999).
+;;; - Create file NASnnn.BIN
+;;; - Read all sectors of drive 0 and write them to the file
+;;;
+;;; Without nnn:
+;;; - Auto-pick next free file name in the form NASnnn.BIN
+;;; - Read all sectors of drive 0 and write them to the file
+;;;
+;;; This will ONLY work if the system has been booted into
+;;; DISK Polydos, so that the Polydos SCAL table is available.
+;;;
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; more subroutines, just for these utilities.
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; open a file for READ. Fatal error on fail, return on
+;;; success.
+;;; filename is NASxxx.BIN where xxx comes from low
+;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII
+;;; corrupts: HL, AF, DE
+fopenr: ld      a, COPENR
+        call    putcmd
+        jr      fman
+
+;;; open a file. Fatal error on fail, return on success.
+;;; Carry=0 -> auto-pick filename
+;;; Carry=1 -> filename is NASxxx.BIN where xxx comes from low
+;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII
+;;; corrupts: HL, AF, DE
+fopen:  push    af              ;preserve C
+        ld      a, COPEN
+        call    putcmd
+
+        pop     af
+        jr      nc,fauto
+
+fman:   ld      a,'N'
+        call    putval
+        ld      a,'A'
+        call    putval
+        ld      a,'S'
+        call    putval
+
+;;; number in HL used as xxx part of file name
+        ld      a,h
+        and     0fh             ;ms digit
+        add     30h             ;convert to ASCII
+        call    putval
+        ld      a,l
+        rra                     ;shift nibble down
+        rra
+        rra
+        rra
+        and     0fh             ;mid digit
+        add     30h             ;convert to ASCII
+        call    putval
+        ld      a,l
+        and     0fh             ;ls digit
+        add     30h             ;convert to ASCII
+        call    putval
+
+;;; extension
+        ld      a,'.'
+        call    putval
+        ld      a,'B'
+        call    putval
+        ld      a,'I'
+        call    putval
+        ld      a,'N'
+        call    putval
+
+fauto:  xor     a
+        call    putval          ;0-length/end of filename
+        ;; get status, return if OK, msg/exit on error
+
+
+;;; FALL-THROUGH and subroutine
+;;; THESE ARE FATAL-EXIT VERSIONS OF t2rs2t, rs2t USED IN THE
+;;; POLYDOS ROM CODE
+;;; go from tx to rx, get status then go to tx.
+;;; Interpret status byte; on error, print message at (DE)
+;;; then exit. On success, return.
+;;; corrupts: AF
+ft2rs2t:call    gorx
+
+;;; FALL-THROUGH and subroutine
+;;; get status then go to tx.
+;;; Interpret status byte; on error, print message at (DE)
+;;; then exit. On success, return.
+;;; corrupts: AF
+frs2t:  call    getval          ;status
+        call    gotx            ;does not affect A
+        or      a               ;update flags
+        jr      z,mexit
+        ret
+
+;;; Exit with Error message. Used for error/fatal exit.
+;;; "Error" then return to NAS-SYS.
+;;; Come here by CALL or JP/JR -- NAS-SYS will clean up the
+;;; stack if necessary.
+mexit:  SCAL    ZERRM
+        SCAL    ZMRET
+
+;;; Start address in (ARG2), end address in (ARG3). Exit with
+;;; HL=start, BC=byte count.
+;;; corrupts: AF
+e2len:  ld      de,(ARG2)       ;start address
+        ld      hl,(ARG3)       ;end address
+        ;; compute end - start + 1
+        or      a               ;clear carry flag
+        sbc     hl,de
+        inc     hl              ;byte count in hl
+        ld      b,h
+        ld      c,l             ;byte count in bc
+
+        ld      hl,(ARG2)       ;start address in hl
+        ret
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; CSUM
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+csum:   ld      a,(ARGN)
+        cp      3               ;expect 3 arguments
+        jp      nz, mexit
+
+        call    e2len           ;hl=start, bc=count
+        ld      d,0
+        ld      e,d             ;accumulate in de
+
+c1:     ld      a,b             ;is byte count zero?
+        or      c
+        jr      z,cdone         ;if so, we're done
+
+        ld      a,e             ;get lo accumulator
+        add     a,(hl)          ;add next byte
+        jr      nc,c2
+        inc     d               ;carry to hi accumlator
+c2:     ld      e,a             ;store lo accumulator
+        inc     hl              ;next byte
+        dec     bc
+        jr      c1              ;loop
+
+cdone:  ld      h,d             ;move sum from de to hl
+        ld      l,e
+
+        SCAL    ZTBCD3          ;print hl
+        SCAL    ZCRLF
+        SCAL    ZMRET           ;done.
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; WRFILE
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+wrfile: call    hwinit
+
+        ld      a,(ARGN)
+        cp      3               ;expect 3 or 4 arguments
+        jr      z,wopen         ;3 arguments, C=0 -> autopick
+        cp      4               ;4 arguments?
+        jp      nz, mexit       ;no, so fail
+        ld      hl, (ARG4)      ;hl is number for file name
+        scf                     ;C=1 -> use hl for file name
+
+wopen:  call    fopen
+        call    e2len           ;hl=start, bc=count
+
+        ld      a, CNWR         ;write
+        call    putcmd
+        ld      a, c            ;length in bytes, LS first
+        call    putval
+        ld      a, b
+        call    putval
+        xor     a
+        call    putval
+        xor     a
+        call    putval
+
+        ;; data transfer
+wnext:  ld      a, (hl)
+        call    putval
+        inc     hl
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz, wnext
+
+        ;; get status, return if OK, msg/exit on error
+        call    ft2rs2t
+        SCAL    ZMRET
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; RDFILE
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+rdfile: call    hwinit
+
+        ld      a,(ARGN)
+        cp      3               ;expect 3 arguments
+        jp      nz, mexit
+
+        ld      hl,(ARG3)
+        call    fopenr          ;open file by name
+
+;;; get the file size and read it all
+        ld      a, CSZRD        ;read size and data
+        call    putcmd
+        call    gorx
+        call    getval
+        ld      c, a            ;length, LS byte
+        call    getval
+        ld      b, a            ;length
+        ;; require the next two to be zero
+        call    getval
+        ld      h, a
+        call    getval
+        or      h
+        jp      nz, mexit
+
+        push    bc              ;save file size
+        ld      hl, (ARG2)      ;destination
+
+        ;; data transfer - maybe 0 bytes
+rnext:  ld      a,b
+        or      c
+        jr      z, rdone
+
+        call    getval          ;data byte
+        ld      (hl), a         ;store it
+        inc     hl
+        dec     bc
+        jr      rnext
+
+        ;; get status or die
+rdone:  call    frs2t
+
+        pop     hl              ;file size
+        SCAL    ZTBCD3          ;display file size
+        SCAL    ZMRET
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; SCRAPE
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+scrape: call    hwinit
+
+        or      a               ;C=0
+        call    fopen           ;open new file, auto-pick the name
+
+        ld      c,0
+        SCAL    ZDSIZE
+;;; hl = number of sectors on drive 0
+
+;;; sectors are 256 bytes (0x100) each. Tried reading 8 at a time
+;;; but the whole disk is NOT a xple of 8, leading to a messy
+;;; end condition. Overall, easier to just read 2 at a time (all
+;;; disks have an even number of sectors..)
+;;; and buffer them in RAM at $1000. However, to be fast I'll
+;;; do 10 (0xa) at a time.
+
+        ld      de,0            ;start at 1st sector
+
+nxtblk: push    hl              ;total #sectors
+        ld      bc,$a00         ;a is #sectors, 0 is drive number
+        ld      hl,$1000        ;where to put it
+
+        SCAL    ZDRD            ;TODO Check/report exit status
+
+        ld      a,'.'           ;show progress - could do * for error?
+        rst     ROUT
+
+        ;; hl, bc unchanged
+        ;; bc = $a00 - the number of bytes to write out to SD
+        ;; need to fix c if using drive 1 etc.
+
+        ld      a, CNWR         ;write
+        call    putcmd
+        ld      a, c            ;length in bytes, LS first
+        call    putval
+        ld      a, b
+        call    putval
+        xor     a
+        call    putval
+        xor     a
+        call    putval
+
+        ;; data transfer
+snext:  ld      a, (hl)
+        call    putval
+        inc     hl
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz, snext
+
+        ;; get status, return if OK, msg/exit on error
+        call    ft2rs2t
+
+        ;; we're done if hl=de
+        pop     hl
+        ld      a,h
+        cp      d
+        jr      nz, nxt1
+        ld      a,l
+        cp      e
+        jr      nz, nxt1
+        SCAL    ZMRET
+
+nxt1:   inc     de              ;increment sector count
+        inc     de              ;by the number we've copied
+        inc     de
+        inc     de
+        inc     de
+
+        inc     de
+        inc     de
+        inc     de
+        inc     de
+        inc     de              ;crude but effective!
+
+        jr      nxtblk
+
+
+
+
 ;;; pad ROM to 2Kbytes.
-MSGLEN: EQU 28h
 SIZE:   EQU $ - PDCROM
 PAD1:   EQU 800h - SIZE
-        DS  PAD1 - MSGLEN, 0ffh
+;;; 12 is the size of the jump table
+PAD2:   EQU PAD1 - 12
+        DS  PAD2, 0ffh
 
-	DEFM 'Copyright (C) PolyData microcenter ApS  '
+;;; Jump table to keep consistent entry points
+        jp      csum
+        jp      rdfile
+        jp      wrfile
+        jp      scrape
 
 $END:	END
