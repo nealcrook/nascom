@@ -1,4 +1,5 @@
 // nascom_sdcard
+// https://github.com/nealcrook/nascom
 //
 // ARDUINO connected to NASCOM 2 PIO to act as mass-storage
 // device for the purposes of:
@@ -6,7 +7,7 @@
 // - providing virtual floppy disk capability
 // - (maybe/future) providing virtual ".NAS" and ".CAS" support
 //
-// Virtual floppy capability would work in conjunction with a
+// The virtual floppy capability can work in conjunction with a
 // modified POLYDOS ROM in which the disk drivers address this hardware.
 //
 // Virtual NAS/CAS support would would work in conjunction with
@@ -65,7 +66,7 @@
 //
 // The NASCOM acts as the Host and the Arduino acts as the Target. The
 // protocol uses a handshake in each direction. There are 5 different
-// signalling patterns:
+// signalling patterns (pictures in the github sdcard/doc/ area):
 //
 // 1a/ send command byte from Host to Target
 // 1b/ send data byte from Host to Target
@@ -73,8 +74,8 @@
 // 3/ change bus direction from Host driving to Target driving
 // 4/ change bus direction from Target driving to Host driving
 //
-// After reset, the Host is driving data to the Target. H2T is low, T2H is low,
-// CMD is undefined.
+// After reset, the Host is driving data to the Target. H2T is low,
+// T2H is low, CMD is undefined.
 //
 // 1a/ send command byte from Host to Target
 // - Host: put xd=command byte, put cmd=1
@@ -109,7 +110,7 @@
 //
 // Observe:
 // - Each step requires 1 handshake toggle. Therefore, the protocol
-// can run at any speed down to DC.
+//   can run at any speed down to DC.
 // - For patterns where the Host is driving the bus, the idle state of
 //   the handshakes is that they match.
 // - For patterns where the Targer is driving the bus, the idle state of
@@ -136,6 +137,9 @@
 // TODO implement save_state
 // TODO implement cmd_dir
 // TODO do error checking in n_rd
+// TODO could drive CMD=1 during T2H to indicate ABORT but would
+// have to be very careful to ensure both sides can track state.
+
 
 // For testing
 //#define DEBUG
@@ -199,8 +203,11 @@
 // Constants for converting track/sector/side to offset
 // TODO maybe have "set geometry"?
 // These are correct for the version of PolyDos I'm running on jsnascom
-// but may be wrong for the version on my actual NASCOM
-// also, not sure how 2 sides are handled.. by doubling the tracks or otherwise?
+// but may be wrong for the version on my actual NASCOM. Also, not sure
+// how 2 sides are handled.. by doubling the tracks or otherwise?
+// ..actually, PolyDos doesn't care because it treats the disk as a linear
+// sequence of sectors and my low-level drivers do the same; don't consider
+// tracks/sectors at all.
 #define SECTORS_PER_TRACK (18)
 #define BYTES_PER_SECTOR (256)
 #define TRACKS (80)
@@ -209,6 +216,7 @@
 #include <SD.h>
 
 // Prototypes
+long get_value32(void);
 void set_data_dir(int my_dir);
 int restore_state(int auto_restore);
 unsigned int get_value(void);
@@ -616,6 +624,17 @@ void get_filename(char *buffer) {
 }
 
 
+// Get a 32-bit value from the host.
+long get_value32(void) {
+  long offset;
+
+  offset = (long)get_value();
+  offset = offset | ((long)get_value() << 8);
+  offset = offset | ((long)get_value() << 16);
+  offset = offset | ((long)get_value() << 24);
+  return offset;
+}
+
 
 // set direction to OUTPUT (T2H) or INPUT (H2T)
 void set_data_dir(int my_dir) {
@@ -699,7 +718,7 @@ void cmd_save_state(void) {
 }
 
 
-// report directory listing as formatted string
+// Report directory listing as formatted string
 // terminated with NUL (0x00)
 //
 // RESPONSE: NUL-terminated string. Does not update global status
@@ -708,7 +727,7 @@ void cmd_dir(void) {
 }
 
 
-// accept 1 byte and send back the 1s complement as
+// Accept 1 byte and send back the 1s complement as
 // a response; used for testing the link
 //
 // RESPONSE: 1 byte. Does not update global status
@@ -717,7 +736,7 @@ void cmd_loop(void) {
 }
 
 
-// close file
+// Close file
 //
 // RESPONSE: none. Does not update global status
 void cmd_close(char fid) {
@@ -760,7 +779,7 @@ void cmd_open(char fid, int mode) {
 }
 
 
-// get 2 bytes from host
+// Get 2 bytes from host
 // - track
 // - sector
 // seek drive specified by fid to the appropriate place
@@ -777,7 +796,8 @@ void cmd_ts_seek(char fid) {
 //    Serial.print(track,HEX);
 //    Serial.print(" sector" );
 //    Serial.println(sector,HEX);
-    status = handles[fid].seek((SECTORS_PER_TRACK * track + sector)* BYTES_PER_SECTOR);
+    long offset = ((long)SECTORS_PER_TRACK * (long)track + (long)sector) * (long)BYTES_PER_SECTOR;
+    status = handles[fid].seek(offset);
   }
   else {
     Serial.print("Seek to track but no disk");
@@ -786,29 +806,23 @@ void cmd_ts_seek(char fid) {
 }
 
 
-// get 4 bytes from host (LSByte first) used as offset into file.
+// Get 4 bytes from host (LSByte first) used as offset into file.
 // seek drive specified by fid to the appropriate place
 // success: drive is ready to rd/wr, send response TRUE
 // fail: send response FALSE
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_seek(char fid) {
-  long offset;
   status = 0;
 
-  offset = get_value();
-  offset = offset | (get_value() << 8);
-  offset = offset | (get_value() << 16);
-  offset = offset | (get_value() << 24);
-
   if (handles[fid]) {
-    status = handles[fid].seek(offset);
+    status = handles[fid].seek(get_value32());
   }
   put_value(status, INPUT);
 }
 
 
-// helper for cmd_n_wr(), cmd_sect_wr()
+// Helper for cmd_n_wr(), cmd_sect_wr()
 void n_wr(char fid, long count) {
   long written = 0L;
   status = 0;
@@ -833,18 +847,14 @@ void n_wr(char fid, long count) {
 }
 
 
-// get 4 bytes from the host (byte count N, ls byte first)
+// Get 4 bytes from the host (byte count N, ls byte first)
 // do write of N bytes on file specified by fid
 // assume drive is at correct place!
 //
 // RESPONSE: send TRUE or FALSE response to host. Updates global status
 void cmd_n_wr(char fid) {
   Serial.println("CMD_N_WR");
-  long count = get_value();
-  count = count | (get_value() << 8);
-  count = count | (get_value() << 16);
-  count = count | (get_value() << 24);
-  n_wr(fid, count);
+  n_wr(fid, get_value32());
 }
 
 
@@ -889,11 +899,7 @@ void n_rd(char fid, long count) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_n_rd(char fid) {
-  long count = get_value();
-  count = count | (get_value() << 8);
-  count = count | (get_value() << 16);
-  count = count | (get_value() << 24);
-  n_rd(fid, count);
+  n_rd(fid, get_value32());
 }
 
 
