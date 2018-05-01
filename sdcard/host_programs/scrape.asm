@@ -211,11 +211,14 @@ e2len:  ld      de,(ARG2)       ;start address
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 scrape: rst     PRS
-        defm    'Insert disk then press ENTER'
+        defm    'Insert disk then press ENTER, or SPACE to quit'
         defb    0
         rst     RIN
-        SCAL    ZCRLF
+        cp      ' '
+        jr      nz, go
+        SCAL    ZMRET
 
+go:     SCAL    ZCRLF
         call    hwinit
 
         or      a               ;C=0
@@ -300,13 +303,13 @@ snext:  ld      a, (hl)
         ld      a,l
         cp      e
         jr      nz, nxtblk
-        ld      de,eok
-        jp      mexit           ;done
+
+        SCAL    ZCRLF
+        jp      scrape
 
 ;;; exit messages
 eopen:  DB "File open failed",0
 ewrt:   DB "Write failed",0
-eok:    DB "OK", 0
 
 ;;; pad to 512bytes
 size:   equ $ - START
