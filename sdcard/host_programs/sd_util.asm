@@ -25,8 +25,6 @@
 ;;; - Locate file NASnnn.BIN
 ;;; - Load it to memory starting at address ssss
 ;;; - Report the file size
-;;; FEATURE: reading a non-existent file creates that file,
-;;; with size 0 bytes. Fixing this would require new cmds.
 ;;;
 ;;; 3) WRITE FILE
 ;;;
@@ -84,7 +82,7 @@ CDIR:         EQU     $84       ;directory
 CSTAT:        EQU     $85       ;command status
 
 COPEN:        EQU     $10 + FID
-CCLOSE:       EQU     $18
+COPENR:       EQU     $18 + FID
 CSEEK:        EQU     $20 + FID ;seek by byte offset
 CTSEEK:       EQU     $28 + FID ;seek by track/sector offset
 CSRD:         EQU     $30 + FID
@@ -92,6 +90,7 @@ CNRD:         EQU     $38 + FID
 CSWR:         EQU     $40 + FID
 CNWR:         EQU     $48 + FID
 CSZRD:        EQU     $60 + FID
+CCLOSE:       EQU     $68 + FID
 
 ; Equates for NASCOM I/O -- the Z80 PIO registers
 PIOAD:        EQU      $4
@@ -125,8 +124,8 @@ ARG2:   EQU     $0c0e
 ARG3:   EQU     $0c10
 ARG4:   EQU     $0c12
 ;;; Equates for PolyDOS SCALs
-DSIZE:  equ     $80
-DRD:    equ     $81
+ZDSIZE: equ     $80
+ZDRD:   equ     $81
 
         ORG     START
 
@@ -160,6 +159,15 @@ train:	ld      a, CNOP
         djnz    train
         ret
 
+;;; open a file for READ. Fatal error on fail, return on
+;;; success.
+;;; filename is NASxxx.BIN where xxx comes from low
+;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII
+;;; corrupts: HL, AF, DE
+fopenr: ld      a, COPENR
+        call    putcmd
+        jr      fman
+
 ;;; open a file. Fatal error on fail, return on success.
 ;;; Carry=0 -> auto-pick filename
 ;;; Carry=1 -> filename is NASxxx.BIN where xxx comes from low
@@ -172,7 +180,7 @@ fopen:  push    af              ;preserve C
         pop     af
         jr      nc,fauto
 
-        ld      a,'N'
+fman:   ld      a,'N'
         call    putval
         ld      a,'A'
         call    putval
@@ -350,8 +358,7 @@ rdfile: call    hwinit
         jp      nz, mexit
 
         ld      hl,(ARG3)
-        scf
-        call    fopen           ;open file by name
+        call    fopenr          ;open file by name
 
 ;;; get the file size and read it all
         ld      a, CSZRD        ;read size and data
@@ -402,7 +409,7 @@ scrape: call    hwinit
         call    fopen           ;open new file, auto-pick the name
 
         ld      c,0
-        SCAL    DSIZE
+        SCAL    ZDSIZE
 ;;; hl = number of sectors on drive 0
 
 ;;; sectors are 256 bytes (0x100) each. Tried reading 8 at a time
@@ -418,10 +425,11 @@ nxtblk: push    hl              ;total #sectors
         ld      bc,$a00         ;a is #sectors, 0 is drive number
         ld      hl,$1000        ;where to put it
 
-        SCAL    DRD             ;TODO Check/report exit status
-
-        ld      a,'.'           ;show progress - could do * for error?
-        rst     ROUT
+        SCAL    ZDRD            ;TODO Check/report exit status
+        ld      a,'*'           ;BAD reads
+        jr      nz, report
+        ld      a,'.'           ;GOOD reads
+report: rst     ROUT
 
         ;; hl, bc unchanged
         ;; bc = $a00 - the number of bytes to write out to SD
@@ -453,19 +461,8 @@ snext:  ld      a, (hl)
         call    t2rs2t
         pop     de
 
-        ;; we're done if hl=de
-        pop     hl
-        ld      a,h
-        cp      d
-        jr      nz, nxt1
-        ld      a,l
-        cp      e
-        jr      nz, nxt1
-        ld      de,eok
-        jp      mexit           ;done
-
-nxt1:   inc     de              ;increment sector count
-        inc     de              ;by the number we've copied
+        inc     de              ;increment sector count by
+        inc     de              ;the number we've just copied
         inc     de
         inc     de
         inc     de
@@ -476,7 +473,16 @@ nxt1:   inc     de              ;increment sector count
         inc     de
         inc     de              ;crude but effective!
 
-        jr      nxtblk
+        ;; we're done if hl=de
+        pop     hl
+        ld      a,h
+        cp      d
+        jr      nz, nxtblk
+        ld      a,l
+        cp      e
+        jr      nz, nxtblk
+        ld      de,eok
+        jp      mexit           ;done
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; BOOT

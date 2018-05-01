@@ -1632,10 +1632,11 @@ nxtblk: push    hl              ;total #sectors
         ld      bc,$a00         ;a is #sectors, 0 is drive number
         ld      hl,$1000        ;where to put it
 
-        SCAL    ZDRD            ;TODO Check/report exit status
-
-        ld      a,'.'           ;show progress - could do * for error?
-        rst     ROUT
+        SCAL    ZDRD
+        ld      a,'*'           ;BAD reads
+        jr      nz, report
+        ld      a,'.'           ;GOOD reads
+report: rst     ROUT
 
         ;; hl, bc unchanged
         ;; bc = $a00 - the number of bytes to write out to SD
@@ -1663,6 +1664,18 @@ snext:  ld      a, (hl)
 
         ;; get status, return if OK, msg/exit on error
         call    ft2rs2t
+
+        inc     de              ;increment sector count by
+        inc     de              ;the number we've just copied
+        inc     de
+        inc     de
+        inc     de
+
+        inc     de
+        inc     de
+        inc     de
+        inc     de
+        inc     de              ;crude but effective!
 
         ;; we're done if hl=de
         pop     hl
