@@ -22,7 +22,7 @@ CDIR:         EQU     $84       ;directory
 CSTAT:        EQU     $85       ;command status
 
 COPEN:        EQU     $10 + FID
-CCLOSE:       EQU     $18
+COPENR:       EQU     $18 + FID
 CSEEK:        EQU     $20 + FID ;seek by byte offset
 CTSEEK:       EQU     $28 + FID ;seek by track/sector offset
 CSRD:         EQU     $30 + FID
@@ -30,6 +30,7 @@ CNRD:         EQU     $38 + FID
 CSWR:         EQU     $40 + FID
 CNWR:         EQU     $48 + FID
 CSZRD:        EQU     $60 + FID
+CCLOSE:       EQU     $68 + FID
 
 ; Equates for NASCOM I/O -- the Z80 PIO registers
 PIOAD:        EQU      $4
@@ -73,8 +74,8 @@ train:	ld      a, CNOP
 	call    putcmd
         djnz    train
 
-;;; open a file by name
-lb1:    ld      a, COPEN
+;;; open a file by name, for READ
+lb1:    ld      a, COPENR
         call    putcmd
         ld      hl, name        ;point to the name
 fnam:   ld      a,(hl)          ;send the name
