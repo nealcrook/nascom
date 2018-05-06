@@ -169,6 +169,9 @@
 #define CMD_LOOP          (0x83)
 #define CMD_DIR           (0x84)
 #define CMD_STATUS        (0x85)
+#define CMD_INFO          (0x86)
+#define CMD_STOP          (0x87)
+
 
 // Bits [2:0] of these commands are the file ID (FID)
 #define CMD_OPEN     (0x10)
@@ -227,8 +230,10 @@ void cmd_open(char fid, int mode);
 void cmd_close(char fid);
 void cmd_save_state(void);
 void cmd_restore_state(void);
-void cmd_dir(void);
 void cmd_loop(void);
+void cmd_dir(void);
+void cmd_info(void);
+void cmd_stop(void);
 void cmd_seek(char fid);
 void cmd_ts_seek(char fid);
 void cmd_status(void);
@@ -397,69 +402,151 @@ void loop() {
   //Serial.println("Start command wait");
 
   int cmd_data = get_value();
+  // Turn off the ERROR LED in anticipation
+  digitalWrite(PIN_ERROR, 0);
 
-  // Blip LED (too short to see) each command, leave it ON for error
-  digitalWrite(PIN_ERROR, 1);
-  if (cmd_data & 0x100) {
-    //Serial.print("Command ");
-    //Serial.println(cmd_data,HEX);
-    digitalWrite(PIN_ERROR, 0);
-    switch (cmd_data & 0xf8) {
-     case CMD_NOP:
-       break; // let Host decide that we're alive
-     case CMD_OPEN:
-       cmd_open(fid(cmd_data & 0x7), FILE_WRITE);
-       break;
-     case CMD_OPENR:
-       cmd_open(fid(cmd_data & 0x7), FILE_READ);
-       break;
-     case CMD_CLOSE:
-       cmd_close(fid(cmd_data & 0x7));
-       break;
-     case CMD_SAVE_STATE:
-       cmd_save_state();
-       break;
-     case CMD_RESTORE_STATE:
-       cmd_restore_state();
-       break;
-     case CMD_DIR:
-       cmd_dir();
-       break;
-     case CMD_LOOP:
-       cmd_loop();
-       break;
-     case CMD_SEEK:
-       cmd_seek(fid(cmd_data & 0x7));
-       break;
-     case CMD_TS_SEEK:
-       cmd_ts_seek(fid(cmd_data & 0x7));
-       break;
-     case CMD_STATUS:
-       cmd_status();
-       break;
-     case CMD_SECT_RD:
-       cmd_sect_rd(fid(cmd_data & 0x7));
-       break;
-     case CMD_SECT_WR:
-       cmd_sect_wr(fid(cmd_data & 0x7));
-       break;
-     case CMD_N_RD:
-       cmd_n_rd(fid(cmd_data & 0x7));
-       break;
-     case CMD_N_WR:
-       cmd_n_wr(fid(cmd_data & 0x7));
-       break;
-     case CMD_DEFAULT:
-       cmd_default(fid(cmd_data & 0x7));
-       break;
-     case CMD_SIZE:
-       cmd_size(fid(cmd_data & 0x7));
-       break;
-     case CMD_SIZE_RD:
-       cmd_size_rd(fid(cmd_data & 0x7));
-       break;
-     // Anything else is ignored.
-    }
+  //Serial.print("Command ");
+  //Serial.println(cmd_data,HEX);
+
+  switch (cmd_data) {
+    case 0x100 | CMD_NOP:
+      break; // let Host decide that we're alive
+    case 0x100 | CMD_RESTORE_STATE:
+      cmd_restore_state();
+      break;
+    case 0x100 | CMD_SAVE_STATE:
+      cmd_save_state();
+      break;
+    case 0x100 | CMD_LOOP:
+      cmd_loop();
+      break;
+    case 0x100 | CMD_DIR:
+      cmd_dir();
+      break;
+    case 0x100 | CMD_STATUS:
+      cmd_status();
+      break;
+    case 0x100 | CMD_INFO:
+      cmd_info();
+      break;
+    case 0x100 | CMD_STOP:
+      cmd_status();
+      break;
+    // These are command that accept a FID in bits [2:0]
+    // This is cumbersome but should generate efficient code..
+    case 0x100 | CMD_OPEN | 0:
+    case 0x100 | CMD_OPEN | 1:
+    case 0x100 | CMD_OPEN | 2:
+    case 0x100 | CMD_OPEN | 3:
+    case 0x100 | CMD_OPEN | 4:
+    case 0x100 | CMD_OPEN | 5:
+    case 0x100 | CMD_OPEN | 7:
+      cmd_open(fid(cmd_data & 0x7), FILE_WRITE);
+      break;
+    case 0x100 | CMD_OPENR | 0:
+    case 0x100 | CMD_OPENR | 1:
+    case 0x100 | CMD_OPENR | 2:
+    case 0x100 | CMD_OPENR | 3:
+    case 0x100 | CMD_OPENR | 4:
+    case 0x100 | CMD_OPENR | 5:
+    case 0x100 | CMD_OPENR | 7:
+      cmd_open(fid(cmd_data & 0x7), FILE_READ);
+      break;
+    case 0x100 | CMD_CLOSE | 0:
+    case 0x100 | CMD_CLOSE | 1:
+    case 0x100 | CMD_CLOSE | 2:
+    case 0x100 | CMD_CLOSE | 3:
+    case 0x100 | CMD_CLOSE | 4:
+    case 0x100 | CMD_CLOSE | 5:
+    case 0x100 | CMD_CLOSE | 7:
+      cmd_close(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_SEEK | 0:
+    case 0x100 | CMD_SEEK | 1:
+    case 0x100 | CMD_SEEK | 2:
+    case 0x100 | CMD_SEEK | 3:
+    case 0x100 | CMD_SEEK | 4:
+    case 0x100 | CMD_SEEK | 5:
+    case 0x100 | CMD_SEEK | 7:
+      cmd_seek(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_TS_SEEK | 0:
+    case 0x100 | CMD_TS_SEEK | 1:
+    case 0x100 | CMD_TS_SEEK | 2:
+    case 0x100 | CMD_TS_SEEK | 3:
+    case 0x100 | CMD_TS_SEEK | 4:
+    case 0x100 | CMD_TS_SEEK | 5:
+    case 0x100 | CMD_TS_SEEK | 7:
+      cmd_ts_seek(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_SECT_RD | 0:
+    case 0x100 | CMD_SECT_RD | 1:
+    case 0x100 | CMD_SECT_RD | 2:
+    case 0x100 | CMD_SECT_RD | 3:
+    case 0x100 | CMD_SECT_RD | 4:
+    case 0x100 | CMD_SECT_RD | 5:
+    case 0x100 | CMD_SECT_RD | 7:
+      cmd_sect_rd(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_SECT_WR | 0:
+    case 0x100 | CMD_SECT_WR | 1:
+    case 0x100 | CMD_SECT_WR | 2:
+    case 0x100 | CMD_SECT_WR | 3:
+    case 0x100 | CMD_SECT_WR | 4:
+    case 0x100 | CMD_SECT_WR | 5:
+    case 0x100 | CMD_SECT_WR | 7:
+      cmd_sect_wr(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_N_RD | 0:
+    case 0x100 | CMD_N_RD | 1:
+    case 0x100 | CMD_N_RD | 2:
+    case 0x100 | CMD_N_RD | 3:
+    case 0x100 | CMD_N_RD | 4:
+    case 0x100 | CMD_N_RD | 5:
+    case 0x100 | CMD_N_RD | 7:
+      cmd_n_rd(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_N_WR | 0:
+    case 0x100 | CMD_N_WR | 1:
+    case 0x100 | CMD_N_WR | 2:
+    case 0x100 | CMD_N_WR | 3:
+    case 0x100 | CMD_N_WR | 4:
+    case 0x100 | CMD_N_WR | 5:
+    case 0x100 | CMD_N_WR | 7:
+      cmd_n_wr(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_DEFAULT | 0:
+    case 0x100 | CMD_DEFAULT | 1:
+    case 0x100 | CMD_DEFAULT | 2:
+    case 0x100 | CMD_DEFAULT | 3:
+    case 0x100 | CMD_DEFAULT | 4:
+    case 0x100 | CMD_DEFAULT | 5:
+    case 0x100 | CMD_DEFAULT | 7:
+      cmd_default(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_SIZE | 0:
+    case 0x100 | CMD_SIZE | 1:
+    case 0x100 | CMD_SIZE | 2:
+    case 0x100 | CMD_SIZE | 3:
+    case 0x100 | CMD_SIZE | 4:
+    case 0x100 | CMD_SIZE | 5:
+    case 0x100 | CMD_SIZE | 7:
+      cmd_size(fid(cmd_data & 0x7));
+      break;
+    case 0x100 | CMD_SIZE_RD | 0:
+    case 0x100 | CMD_SIZE_RD | 1:
+    case 0x100 | CMD_SIZE_RD | 2:
+    case 0x100 | CMD_SIZE_RD | 3:
+    case 0x100 | CMD_SIZE_RD | 4:
+    case 0x100 | CMD_SIZE_RD | 5:
+    case 0x100 | CMD_SIZE_RD | 7:
+      cmd_size_rd(fid(cmd_data & 0x7));
+      break;
+    default:
+      // Not a command or not a recognised command.
+      // Light the ERROR LED.
+      digitalWrite(PIN_ERROR, 1);
+      break;
   }
 }
 #endif
@@ -718,21 +805,71 @@ void cmd_save_state(void) {
 }
 
 
-// Report directory listing as formatted string
-// terminated with NUL (0x00)
-//
-// RESPONSE: NUL-terminated string. Does not update global status
-void cmd_dir(void) {
-  Serial.println("TODO cmd_dir");
-}
-
-
 // Accept 1 byte and send back the 1s complement as
 // a response; used for testing the link
 //
 // RESPONSE: 1 byte. Does not update global status
 void cmd_loop(void) {
   put_value(0xff ^ get_value(), INPUT);
+}
+
+
+// Report directory listing as formatted string
+// terminated with NUL (0x00)
+//
+// RESPONSE: NUL-terminated string. Does not update global status
+void cmd_dir(void) {
+  Serial.println("TODO cmd_dir");
+  put_value('D',OUTPUT);
+  put_value('i',OUTPUT);
+  put_value('r',OUTPUT);
+  put_value('e',OUTPUT);
+  put_value('c',OUTPUT);
+  put_value('t',OUTPUT);
+  put_value('o',OUTPUT);
+  put_value('r',OUTPUT);
+  put_value('y',OUTPUT);
+  put_value(0,INPUT);
+}
+
+
+// Report files assigned to each FID as formatted string
+// terminated with NUL (0x00)
+//
+// RESPONSE: NUL-terminated string. Does not update global status
+void cmd_info(void) {
+  Serial.println("Info");
+  for (int i=0; i<5; i++) {
+    put_value(0x30 + i,OUTPUT);
+    put_value(':',OUTPUT);
+    put_value(' ',OUTPUT);
+    Serial.print(i);
+    Serial.print(": ");
+    if (handles[i]) {
+      char * name = handles[i].name();
+      while (*name != 0) {
+        Serial.print(*name);
+        put_value(*name++, OUTPUT);
+      }
+    }
+    else {
+      put_value('-',OUTPUT);
+      Serial.print('-');
+    }
+    Serial.println();
+    put_value(0x0d,OUTPUT);
+    put_value(0x0a,OUTPUT);
+  }
+  put_value(0,INPUT);
+}
+
+
+// Switch all ports that are connected to the NASCOM to be inputs
+// (benign) then go into a tight loop doing nothing forever.
+//
+// RESPONSE: none.
+void cmd_stop(void) {
+  Serial.println("TODO cmd_stop");
 }
 
 
@@ -765,6 +902,7 @@ void cmd_open(char fid, int mode) {
   status = 0;
 
   get_filename(buf);
+
   if (handles[fid]) {
     // file handle is currently in use
     handles[fid].close();
