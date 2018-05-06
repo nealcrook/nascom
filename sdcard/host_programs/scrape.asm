@@ -1,5 +1,8 @@
 ;;; PolyDos utility: SCRAPE DISK
 ;;;
+;;; Utility for use with nascom_sdcard
+;;; https://github.com/nealcrook/nascom
+;;;
 ;;; Load and execute at 1000
 ;;; Intended to be loaded onto PolyDos floppy and executed from
 ;;; there. Uses PolyDos SCALs and therefore PolyDos must be
