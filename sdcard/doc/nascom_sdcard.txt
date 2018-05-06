@@ -276,5 +276,33 @@ Arguments: None
 Response: None
 
 
+DIR
+
+Report directory of root of SDcard FAT Filesystem.
+
+Arguments: None
+
+Response: ASCII string formated for 48-column screen, terminated with 0.
+
+
+INFO
+
+Report what files are mounted on the 5 possible FIDs.
+
+Arguments: None
+
+Response: ASCII string formated for 48-column screen, terminated with 0.
+
+
+STOP
+
+Set all pins to input and go into endless loop; do not process any more
+commands. Requires RESET to recover. Aim is to be benign on the PIO interconnect
+so that the EPROM programmer can operate.
+
+Arguments: None
+
+Response: None
+
 
 --END--
