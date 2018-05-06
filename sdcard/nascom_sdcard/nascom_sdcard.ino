@@ -135,8 +135,10 @@
 // TODO set geometry command to allow different disk types to be mixed?
 // TODO implement restore_state
 // TODO implement save_state
-// TODO implement cmd_dir
+// TODO implement file size print in cmd_dir
 // TODO do error checking in n_rd
+// TODO condider removing CMD_DEFAULT as it doesn't seem useful in the way
+// that I orginally expected.
 // TODO could drive CMD=1 during T2H to indicate ABORT but would
 // have to be very careful to ensure both sides can track state.
 
@@ -819,17 +821,33 @@ void cmd_loop(void) {
 //
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_dir(void) {
-  Serial.println("TODO cmd_dir");
-  put_value('D',OUTPUT);
-  put_value('i',OUTPUT);
-  put_value('r',OUTPUT);
-  put_value('e',OUTPUT);
-  put_value('c',OUTPUT);
-  put_value('t',OUTPUT);
-  put_value('o',OUTPUT);
-  put_value('r',OUTPUT);
-  put_value('y',OUTPUT);
+  File root = SD.open("/");
+  File entry;
+
+  while (entry = root.openNextFile()) {
+    char * name = entry.name();
+    while (*name != 0) {
+      Serial.print(*name);
+      put_value(*name++, OUTPUT);
+    }
+
+    if (entry.isDirectory()) {
+      put_value('/', OUTPUT);
+    }
+    else {
+      // TODO print file size in bytes. Max file size is 2gb ie 10 digits
+      // 2,000,000,000
+      // long size = entry.size();
+    }
+    put_value(0x0d, OUTPUT);
+    put_value(0x0a, OUTPUT);
+    entry.close();
+  }
+  Serial.println("End of directory");
+  // Tidy up and finish
   put_value(0,INPUT);
+  root.close();
+  return;
 }
 
 
