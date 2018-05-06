@@ -822,12 +822,12 @@ void cmd_loop(void) {
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_dir(void) {
   File root = SD.open("/");
+  root.rewindDirectory();
   File entry;
 
   while (entry = root.openNextFile()) {
     char * name = entry.name();
     while (*name != 0) {
-      Serial.print(*name);
       put_value(*name++, OUTPUT);
     }
 
@@ -843,7 +843,6 @@ void cmd_dir(void) {
     put_value(0x0a, OUTPUT);
     entry.close();
   }
-  Serial.println("End of directory");
   // Tidy up and finish
   put_value(0,INPUT);
   root.close();
