@@ -826,18 +826,46 @@ void cmd_dir(void) {
   File entry;
 
   while (entry = root.openNextFile()) {
+    int len = 15;
     char * name = entry.name();
     while (*name != 0) {
       put_value(*name++, OUTPUT);
+      len--;
     }
 
     if (entry.isDirectory()) {
       put_value('/', OUTPUT);
     }
     else {
-      // TODO print file size in bytes. Max file size is 2gb ie 10 digits
-      // 2,000,000,000
-      // long size = entry.size();
+      // Print file size in bytes. Max file size is 2gb ie 10 digits
+      int pad=0;
+      long i=1000000000;
+      long n = entry.size();
+      long dig;
+      
+      while (len > 0) {
+        put_value(' ', OUTPUT);
+        len--;
+      }
+
+      while (i > 0) {
+        dig = n/i; // integer division with truncation
+        n = n % i; // remainder
+        if ((dig > 0) | (pad==1) | (i==1)) {
+            pad = 1;
+            put_value('0'+dig, OUTPUT);
+        }
+        else {
+            put_value(' ', OUTPUT);
+        }
+        i = i/10;
+      }
+      put_value(' ', OUTPUT);
+      put_value('b', OUTPUT);
+      put_value('y', OUTPUT);
+      put_value('t', OUTPUT);
+      put_value('e', OUTPUT);
+      put_value('s', OUTPUT);
     }
     put_value(0x0d, OUTPUT);
     put_value(0x0a, OUTPUT);
