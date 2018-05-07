@@ -23,11 +23,30 @@ ribbon cable. The interface uses 8 data from Port A and 3 data from Port B.
 Finally, there is an LED, controlled from the Arduino. The LED is used to
 indicate a protocol error (command expected but data received).
 
-## Current Status
+## Current Status And Plans
 
-29Apr2018 - using the code here, the sd_util can be used to load and save to and
+06May2018 - using the code here, the sd_util can be used to load and save to and
 from NASCOM memory, the polydos_util_rom boots PolyDos successfully and supports
-4 disks (named DSK0.BIN DSK1.BIN DSK2.BIN DSK3.BIN on the SDcard). 
+4 disks (named DSK0.BIN DSK1.BIN DSK2.BIN DSK3.BIN on the SDcard). The SCRAPE
+utility dumps PolyDos disk images accurately and the SDDIR/SETDRV utilities are
+working.
+
+Remaining tasks:
+
+* Complete polydos_vfs, a PERL-based file-system manipulator
+* Write SDSTDIN, to allow import of (eg BASIC) programs in ASCII format
+* Write a print spooler that spools to a file on the SD card
+* Write CASDSK, a utility to intercept NAS-SYS R/W calls in favour of
+a disk file
+* Upload PolyDos material and images
+* Upload disk images
+
+
+## EPROM programming service
+
+If anyone is looking to build one of these and has an EPROM that they need
+erasing and programming, I will be happy to do this on a cost-of-postage
+basis. Contact me to make arrangements.
 
 
 ## Contents
