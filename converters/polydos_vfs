@@ -18,7 +18,6 @@
 # truncate
 # create??
 # fix -- not implemented in flex version
-# scrub <-- EASY. Do next.
 # pack
 # wildcarding
 # DELETE all old/irrelevant subroutines
@@ -26,7 +25,7 @@
 
 
 # bugette: filter also checks files that are marked as deleted.
-# bugette: polydos will only allwo you to delete a file that is unlocked. Should impose and dicument the same rule
+# bugette: polydos will only allow you to delete a file that is unlocked. Should impose and document the same rule
 
 
 # FUTURE: add optional y/n arg to delete.
@@ -38,25 +37,11 @@
 # TODO: fs in check_arg can return a wildcard. May want a variant xfs that returns
 # exactly one file - avoid over-use of legal_flex_name. Only affects commands that create
 # new files; currently import, rename, create.
-# TODO: verify assertion that bytes 2,3 on each sector are an incrementing sector
-# number starting at 1.
 # BUG: pressing CTRL-D results in lots of PERL warnings
-# BUG: if you copy a Random access file (R attribute set) the file sector map will be
-# wrong; need to rebuild it in the target using COPYR. The FLEX diagnostics manual
-# describes the format but it's not a common enough job to be worth bothering with in
-# this tool. Ought to report a warning though, when the situation arises.
 # BUG: I think a set of bugs will occur if the disk becomes full (zero free sectors).
-# Usually, expect to link new sectors to an existing sector and so the zero-free-sectors
-# case is a special case (identified by seeing the free count in the SIR equal to zero.
-# Can work around this by requiring at least 1 free sector. Look at the source code for
-# eg delete to see if it accommodates this special case.
 # TODO: when only 1 image is mounted, make drive number optional/implicit to save typing
 # TODO: allow delete to accept a list of file names
-# TODO: make mount tolerate bad formats - eg when SIR is inconsistent. Analyse one disk
-# from the 8" set which as this problem and find out what happened to the "missing"
-# sectors. Maybe mount such images as read-only? Maybe these are "bad" sectors?
-# TODO: support s19 format for export and import
-# S19 can represent a record-based format and can include the entry address.
+
 
 use strict;
 no strict 'refs'; # CLI makes subroutine from command name.
@@ -64,11 +49,10 @@ use warnings;
 use File::Basename;
 
 # POLYDOS constants
-# [NAC HACK 2018Apr28] it is a lack that there is nothing on the disk to indicate the
-# total disk size; that has to be hard-wired in the BIOS..
 my $FCB_BASE = 0xc418;
 my $FCB_SIZE = 20;
 my $FCB_OFFSET = 24;
+my $FCB_COUNT = 50;
 
 my $SFLG_DEL = 2;
 my $SFLG_LOK = 1;
@@ -273,7 +257,7 @@ sub cmd_new {
         $data[22] = 0x18;
         $data[23] = 0xc4;
         # FCBs - 50 entries of 20 bytes each
-        for (my $i=0; $i<50; $i=$i+1) {
+        for (my $i=0; $i<$FCB_COUNT; $i=$i+1) {
             for (my $j=0; $j<20; $j=$j+1) {
                 push @data, 0xe5
             }
@@ -913,9 +897,31 @@ sub cmd_scrub {
         return;
     }
 
+    my @data;
+    for (my $i=0; $i<$BYTES_SECTOR; $i=$i+1) {
+        $data[$i] = 0xe5; # formatted floppy disk data value
+    }
+    my $datas = pack("C*", @data);
+    my $data2 = pack("C*", @data[0..1]);
+    my $data8 = pack("C*", @data[0..7]);
 
     # scrub undefined entries in the directory
+    for (my $i=$dsk[$drive]->{fcbval}-1; $i<$FCB_COUNT; $i=$i+1) {
+        $dsk[$drive]->{fcb}->[$i]->{fnam} = $data8;
+        $dsk[$drive]->{fcb}->[$i]->{fext} = $data2;
+        $dsk[$drive]->{fcb}->[$i]->{fsfl} = $data2;
+        $dsk[$drive]->{fcb}->[$i]->{fufl} = $data2;
+        $dsk[$drive]->{fcb}->[$i]->{fsec} = $data2;
+        $dsk[$drive]->{fcb}->[$i]->{fnsc} = $data2;
+        $dsk[$drive]->{fcb}->[$i]->{flda} = $data2;
+        $dsk[$drive]->{fcb}->[$i]->{fexa} = $data2;
+    }
+
     # scrub unallocated sectors
+    for (my $i=$dsk[$drive]->{nxtsec}; $i<$dsk[$drive]->{blks}; $i=$i+1) {
+        wr_dsec($drive, $i, 1, $datas);
+    }
+    wr_dir($drive);
 }
 
 
@@ -1894,7 +1900,7 @@ sub cp_files {
                           $dsk[$dst]->{sir}->{FREE});
 
     foreach my $i (@{$match}) {
-        my @src_start_file_tsc = rd_file_start_tsc($src,$i);
+        my @src_start_file_tsc = 0; ##rd_file_start_tsc($src,$i);
         my $trk = $src_start_file_tsc[$TRK];
         my $sct = $src_start_file_tsc[$SCT];
         my $copied = 0;
@@ -1989,8 +1995,8 @@ sub truncate_files {
                         $dsk[$drive]->{sir}->{FREE});
 
     foreach my $i (@{$match}) {
-        my @start_file_tsc = rd_file_start_tsc($drive,$i);
-        my @end_file_tsc = rd_file_end_tsc($drive,$i);
+        my @start_file_tsc = 0; ## rd_file_start_tsc($drive,$i);
+        my @end_file_tsc = 0; ##rd_file_end_tsc($drive,$i);
 
         my $new_size = $start_file_tsc[$SIZ] - $num;
 
@@ -2052,6 +2058,23 @@ sub rd_dsec {
             # TODO BUG: this makes it a fatal error to mount a bad file. Fix that!
             die "Could not read $want bytes at offset $seek on drive $drive";
         }
+    }
+    else {
+        die "Could not reach offset $seek on drive $drive";
+    }
+}
+
+
+# write one or more sectors. Write data supplied as a string - can be any length
+# (any number of sectors). Sector specified by drive, offset
+sub wr_dsec {
+    my ($drive, $start, $data) = @_;
+
+    my $seek = $start * $BYTES_SECTOR;
+
+    if (seek $dsk[$drive]->{handle}, $seek, 0) {
+        my $fh = $dsk[$drive]->{handle};
+        print $fh $data;
     }
     else {
         die "Could not reach offset $seek on drive $drive";
@@ -2185,7 +2208,7 @@ sub describe {
     my $i = "        ";
     printf "$i Disk name: %20s\n", $dsk[$drive]->{dname};
     printf "$i Next free: 0x%04x (0x%04x sectors total)\n",  $dsk[$drive]->{nxtsec}, $dsk[$drive]->{blks};
-    printf "$i Used FCBs: %d out of 50\n", $dsk[$drive]->{fcbval};
+    printf "$i Used FCBs: %d out of %d\n", $dsk[$drive]->{fcbval}, $FCB_COUNT;
 }
 
 
@@ -2211,7 +2234,7 @@ sub rd_dir {
     $dsk[$drive]->{fcbval} = ($dsk[$drive]->{nxtfcb} - $FCB_BASE)/$FCB_SIZE;
 
     my @fcb;
-    for (my $i=0; $i<50; $i=$i+1) {
+    for (my $i=0; $i<$FCB_COUNT; $i=$i+1) {
         my $xx = substr($data, $FCB_OFFSET + $i*$FCB_SIZE + 0, 8);
         $xx =~ s/ *$//; # delete trailing spaces
         $fcb[$i]->{fnam} = $xx;
@@ -2239,7 +2262,63 @@ sub rd_dir {
 sub wr_dir {
     my ($drive) = @_;
 
-    print "NOT YET IMPLEMENTED - wr_dir\n";
+    ## currently corrupting the directory so don't run it..
+
+    ## TODO should only loop over valid/populated directory entries. Then, the
+    ## packed data structure will be <4K and when written back it will leave the
+    ## invalid entries untouched.
+
+    ## ..for now, that is the least of my worries.
+
+    print "wr_dir not yet working!!\n";
+    return;
+
+    my @data;
+    # disk name
+    for (my $i=0; $i<20; $i=$i+1) {
+        if (defined(substr($dsk[$drive]->{dname}, $i, 1))) {
+            $data[$i] = substr($dsk[$drive]->{dname}, $i, 1);
+        }
+        else {
+            $data[$i] = ' ';
+        }
+    }
+    $data[20] = ord($dsk[$drive]->{nxtsec} & 0xff);
+    $data[21] = ord($dsk[$drive]->{nxtsec} >>8);
+    $data[22] = ord($dsk[$drive]->{nxtfcb} & 0xff);
+    $data[23] = ord($dsk[$drive]->{nxtfcb} >>8);
+    for (my $fcb=0; $fcb<$FCB_COUNT; $fcb=$fcb+1) {
+        # file name
+        for (my $i=0; $i<8; $i=$i+1) {
+            if (defined(substr($dsk[$drive]->{fcb}->[$fcb]->{fnam}, $i, 1))) {
+                $data[24 + $FCB_SIZE*$fcb + $i] = substr($dsk[$drive]->{fcb}->[$fcb]->{fnam}, $i, 1);
+            }
+            else {
+                $data[24 + $FCB_SIZE*$fcb + $i] = ' ';
+            }
+        }
+        # file extension
+        for (my $i=0; $i<2; $i=$i+1) {
+            if (defined(substr($dsk[$drive]->{fcb}->[$fcb]->{fext}, $i, 1))) {
+                $data[32 + $FCB_SIZE*$fcb + $i] = substr($dsk[$drive]->{fcb}->[$fcb]->{fext}, $i, 1);
+            }
+            else {
+                $data[32 + $FCB_SIZE*$fcb + $i] = ' ';
+            }
+        }
+        $data[34 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fsfl});
+        $data[35 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fufl});
+        $data[36 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fsec} & 0xff);
+        $data[36 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{fsec} >>8);
+        $data[38 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fnsc} & 0xff);
+        $data[38 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{fnsc} >>8);
+        $data[40 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{flda} & 0xff);
+        $data[40 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{flda} >>8);
+        $data[42 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fexa} & 0xff);
+        $data[42 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{fexa} >>8);
+    }
+
+    wr_dsec($drive, 0, pack("C*", @data));
 }
 
 
@@ -2450,25 +2529,6 @@ sub wr_dir_entry {
     wr_dts($drive, $trk, $sct, pack("C*", @data));
 }
 
-
-# return start track/sector and sector count for specified file
-sub rd_file_start_tsc {
-    my ($drive, $index) = @_;
-
-    return ($dsk[$drive]->{dir}->[$index]->{FIRST_T},
-            $dsk[$drive]->{dir}->[$index]->{FIRST_S},
-            $dsk[$drive]->{dir}->[$index]->{SIZE});
-}
-
-
-# return last track/sector and sector count for specified file
-sub rd_file_end_tsc {
-    my ($drive, $index) = @_;
-
-    return ($dsk[$drive]->{dir}->[$index]->{LAST_T},
-            $dsk[$drive]->{dir}->[$index]->{LAST_S},
-            $dsk[$drive]->{dir}->[$index]->{SIZE});
-}
 
 
 # sum the sectors needed to hold the specified files
@@ -2895,9 +2955,9 @@ EOF
     scrub <virtual drive number>
 
     Over-write every unused directory entry and every unused sector
-    with 0x00 values. This is intended to remove all trace of deleted
-    files. The main motivation is to allow the resultant disk images
-    to compress better.
+    with the values they would have on a freshly formatted disk.
+    The main motivation is to allow the resultant disk images to
+    compress better.
 EOF
     }
     elsif ($cmd eq 'repair') {
