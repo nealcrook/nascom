@@ -1,0 +1,3089 @@
+#!/usr/bin/perl
+#
+# Manipulator for PolyDos disk images. Designed to act as a virtual file system
+# for disk analysis, extract, import, copy, creation, conversion.
+#
+# Mostly designed for interactive use but also allows limited non-interactive
+# use. Derived from a version I wrote for FLEX; this is far simpler.
+#
+# https://github.com/nealcrook/nascom
+#
+# Remaining commands to implement, with priorities:
+# copy
+# rename   <-- EASY. Do next.
+# type
+# export
+# import
+# undelete - if multiple matches, undeletes oldest first.
+# truncate
+# create??
+# fix -- not implemented in flex version
+# scrub <-- EASY. Do next.
+# pack
+# wildcarding
+# DELETE all old/irrelevant subroutines
+# Disk specifier in correct order and with letter restrictions
+
+
+# bugette: filter also checks files that are marked as deleted.
+# bugette: polydos will only allwo you to delete a file that is unlocked. Should impose and dicument the same rule
+
+
+# FUTURE: add optional y/n arg to delete.
+# FUTURE: THEN (command separator)
+# FUTURE: EXTEND (add sectors) BEHEAD (remove sectors from start) - both pair with TRUNCATE
+# FUTURE: allow target of copy to be unique fs rather than simply drive name (ie copy
+# file with different name)
+# FUTURE: record inode so that we cannot double-mount a drive.
+# TODO: fs in check_arg can return a wildcard. May want a variant xfs that returns
+# exactly one file - avoid over-use of legal_flex_name. Only affects commands that create
+# new files; currently import, rename, create.
+# TODO: verify assertion that bytes 2,3 on each sector are an incrementing sector
+# number starting at 1.
+# BUG: pressing CTRL-D results in lots of PERL warnings
+# BUG: if you copy a Random access file (R attribute set) the file sector map will be
+# wrong; need to rebuild it in the target using COPYR. The FLEX diagnostics manual
+# describes the format but it's not a common enough job to be worth bothering with in
+# this tool. Ought to report a warning though, when the situation arises.
+# BUG: I think a set of bugs will occur if the disk becomes full (zero free sectors).
+# Usually, expect to link new sectors to an existing sector and so the zero-free-sectors
+# case is a special case (identified by seeing the free count in the SIR equal to zero.
+# Can work around this by requiring at least 1 free sector. Look at the source code for
+# eg delete to see if it accommodates this special case.
+# TODO: when only 1 image is mounted, make drive number optional/implicit to save typing
+# TODO: allow delete to accept a list of file names
+# TODO: make mount tolerate bad formats - eg when SIR is inconsistent. Analyse one disk
+# from the 8" set which as this problem and find out what happened to the "missing"
+# sectors. Maybe mount such images as read-only? Maybe these are "bad" sectors?
+# TODO: support s19 format for export and import
+# S19 can represent a record-based format and can include the entry address.
+
+use strict;
+no strict 'refs'; # CLI makes subroutine from command name.
+use warnings;
+use File::Basename;
+
+# POLYDOS constants
+# [NAC HACK 2018Apr28] it is a lack that there is nothing on the disk to indicate the
+# total disk size; that has to be hard-wired in the BIOS..
+my $FCB_BASE = 0xc418;
+my $FCB_SIZE = 20;
+my $FCB_OFFSET = 24;
+
+my $SFLG_DEL = 2;
+my $SFLG_LOK = 1;
+
+# Bytes per sector
+my $BYTES_SECTOR = 256;
+# Sectors per disk - default for 35track DS, DD
+my $SECTORS = 35*2*18;
+
+my $cmdline;
+
+
+# FLEX constants -- TODO delete
+#
+my $DATA_SECTOR = $BYTES_SECTOR - 4;
+my @FLEX_DIR_TS = (0,5); # track/sector of directory
+
+
+# For 'type' command
+my $LINES_PER_PAGE = 40;
+
+# For 'uppercase' command
+my $UPCASE = 0;
+
+# Data structure
+# $dsk[0..3]
+# $dsk[n]->{mounted} boolean
+# $dsk[n]->{handle} file handle
+# $dsk[n]->{blks} number of blocks -- INFERRED from reading the image
+# $dsk[n]->{filename} file name by which file was accessed
+# filled in by rd_dir when disk is mounted:
+# $dsk[n]->{dir}->[n] array of data ?? TODO do I need this
+# $dsk[n]->{dname} disk name in ASCII
+# $dsk[n]->{nxtsec} next sector
+# $dsk[n]->{nxtfcb} next fcb address - 1st fcb is $c418, 2nd is $c418 + 20 etc.
+# $dsk[n]->{fcbval} number of valid fcbs. INFERRED from {nxtfcb} - valid fcbs are 0..fcbval-1
+# $dsk[n]->{fcb}->[n]-> fcb 0-49
+# $dsk[n]->{fcb}->[n]->{fnam}
+# $dsk[n]->{fcb}->[n]->{fext}
+# $dsk[n]->{fcb}->[n]->{fsfl}
+# $dsk[n]->{fcb}->[n]->{fufl}
+# $dsk[n]->{fcb}->[n]->{fsec}
+# $dsk[n]->{fcb}->[n]->{fnsc}
+# $dsk[n]->{fcb}->[n]->{flda}
+# $dsk[n]->{fcb}->[n]->{fexa}
+my @dsk;
+
+
+# Command-line interpreter
+while (1) {
+    print "polydos_vfs: ";
+    my $cmd = <>;
+    $cmdline = $cmd; # save for later
+    if (not -t STDIN) {
+        # non-interactive, so echo input to output
+        print $cmd;
+    }
+    chomp $cmd;
+    # remove comments (like this) #or like this
+    $cmd =~ s/\(.*\)//g;
+    $cmd =~ s/\#.*$//;
+    next if ($cmd eq "");
+
+    my @bits = split " ", $cmd;
+    my $sub = "cmd_$bits[0]";
+    if (defined(&{$sub})) {
+        shift @bits;
+        &{$sub}(@bits);
+    }
+    else {
+        print "ERROR: no command \'$bits[0]\'\n";
+    }
+}
+
+#################################################################
+#################################################################
+## Commands
+
+sub cmd_mount {
+    my ($drive, $file) = check_arg('v h', @_);
+    return unless defined($drive);
+
+    if ($dsk[$drive]->{mounted}) {
+        print "ERROR virtual drive $drive is already mounted.\n";
+        return;
+    }
+
+    if (open $dsk[$drive]->{handle}, '+<', $file) {
+        # so far so good
+        $dsk[$drive]->{filename} = $file;
+
+        # size the disk image
+        my $tmp;
+        $dsk[$drive]->{blks} = 0;
+        seek $dsk[$drive]->{handle}, 0, 0;
+        while (my $actual = read $dsk[$drive]->{handle}, $tmp, $BYTES_SECTOR) {
+            if ($actual == $BYTES_SECTOR) {
+                $dsk[$drive]->{blks} = $dsk[$drive]->{blks} + 1;
+            }
+            else {
+                print "ERROR image is not a multiple of $BYTES_SECTOR. Mount aborted.\n";
+                return;
+            }
+        }
+
+        if ($dsk[$drive]->{blks} != $SECTORS) {
+            print "WARNING image has $dsk[$drive]->{blks} sectors - expected the default of $SECTORS\n";
+        }
+
+        # cache the directory for easy access
+        rd_dir($drive);
+
+        # finally
+        $dsk[$drive]->{mounted} = 1;
+    }
+    else {
+        # Unlikely - it opened OK in check_arg
+        print "ERROR could not re-open $file\n";
+    }
+}
+
+
+sub cmd_clone {
+    my ($drive, $file) = check_arg('v nh', @_);
+    return unless defined($drive);
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR virtual drive $drive is not mounted.\n";
+        return;
+    }
+
+    if (open my $handle, '>', $file) {
+        seek $dsk[$drive]->{handle}, 0, 0;
+        my $data;
+        for my $blk (1..$dsk[$drive]->{blks}) {
+            # read a block
+            my $actual = read $dsk[$drive]->{handle}, $data, $BYTES_SECTOR;
+            if ($actual == $BYTES_SECTOR) {
+                # write a block
+                print $handle $data;
+            }
+            else {
+                close $handle;
+                die "FATAL internal error - failed to read data\n";
+            }
+        }
+        close $handle;
+    }
+    else {
+        # Unlikely - it opened OK in check_arg
+        print "ERROR could not re-open $file\n";
+    }
+}
+
+
+sub cmd_info {
+    for my $drive (0..3) {
+        print "Drive $drive: ";
+        if ($dsk[$drive]->{mounted}) {
+            print "Host file: $dsk[$drive]->{filename}\n";
+            describe($drive);
+        }
+        else {
+            print "not mounted\n";
+        }
+    }
+}
+
+
+sub cmd_umount {
+    my ($drive) = check_arg('v', @_);
+    return unless defined($drive);
+
+    # silently ignored if this drive number is not currently in use.
+    if ($dsk[$drive]->{mounted}) {
+        close $dsk[$drive]->{handle};
+        $dsk[$drive]->{mounted} = 0;
+    }
+}
+
+
+sub cmd_new {
+    my ($file, $sectors) = check_arg('nh os', @_);
+    return unless defined ($file);
+
+    # Arbitrary..
+    if ($sectors < 10) {
+        print "ERROR cannot have so few sectors\n";
+        return;
+     }
+
+    if (open my $handle, '>', $file) {
+        my @data;
+        # DNAME
+        for (my $i=0; $i<20; $i=$i+1) {
+            $data[$i] = ord ' ';
+        }
+        # NXTSEC
+        $data[20] = 4;
+        $data[21] = 0;
+        # NXTFCB
+        $data[22] = 0x18;
+        $data[23] = 0xc4;
+        # FCBs - 50 entries of 20 bytes each
+        for (my $i=0; $i<50; $i=$i+1) {
+            for (my $j=0; $j<20; $j=$j+1) {
+                push @data, 0xe5
+            }
+        }
+
+        my $data = pack("C*", @data);
+        # directory
+        print $handle $data;
+
+        @data = ();
+        for (my $i=0; $i<$BYTES_SECTOR; $i=$i+1) {
+            $data[$i] = 0xe5; # formatted floppy disk data value
+        }
+        $data = pack("C*", @data);
+
+        for (my $i=4; $i<$sectors; $i=$i+1) {
+            # data
+            print $handle $data;
+        }
+        close $handle;
+    }
+    else {
+        # Unlikely - it opened OK in check_arg
+        print "ERROR could not re-open $file\n";
+    }
+}
+
+
+sub cmd_copy {
+    my ($fs, $dst) = check_arg('fs v', @_);
+    return unless defined($fs);
+
+    my ($src,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$src]->{mounted}) {
+        print "ERROR source drive $src is not mounted\n";
+        return;
+    }
+    if (not $dsk[$dst]->{mounted}) {
+        print "ERROR destination drive $dst is not mounted\n";
+        return;
+    }
+    if ($src == $dst) {
+        print "ERROR cannot copy to the same drive\n";
+        return;
+    }
+
+    my $cp_match = filter_dir($src,$file,$ext);
+    # which of those names already in use at the destination?
+    my $rm_match = index_match_dir($src,$cp_match,$dst);
+
+    print "INFO 0 files match $src.$file.$ext\n" if scalar @$cp_match == 0;
+
+    # is there enough space for the copy?
+    my $dst_free = $dsk[$dst]->{sir}->{FREE} + sectors($dst, $rm_match);
+    if ($dst_free < sectors($src, $cp_match)) {
+        print "ERROR insufficient space for copy\n";
+        return;
+    }
+
+    # are there enough directory entries for the copy?
+    my $dst_dir_entries = dir_entries($dst) + scalar(@$rm_match);
+    if (scalar(@$cp_match) > $dst_dir_entries) {
+        print "ERROR insufficient directory entries for copy\n";
+        return;
+    }
+
+    rm_files($dst, $rm_match);
+    cp_files($src, $cp_match, $dst);
+}
+
+
+sub cmd_rename {
+    my ($old, $new) = check_arg('fs fs', @_);
+    return unless defined($old);
+
+    my ($drive, $ofile,$oext) = split /\./, $old;
+    my ($ndrive,$nfile,$next) = split /\./, $new;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+    if ($drive != $ndrive) {
+        print "ERROR cannot rename across drives. Use copy instead\n";
+        return;
+    }
+
+    my $old_match = filter_dir($drive, $ofile,$oext);
+    my $new_match = filter_dir($ndrive,$nfile,$next);
+
+    if (scalar @$old_match != 1) {
+        printf "ERROR source must match exactly 1 file. Matched %d files\n", scalar @$old_match;
+        return;
+    }
+    if (scalar @$new_match > 1) {
+        printf "ERROR new name must match no more than 1 file. Matched %d files\n", scalar @$new_match;
+        return;
+    }
+    if ((scalar @$new_match == 1) && ($old_match->[0] == $new_match->[0])) {
+        print "ERROR cannot rename a file to itself.\n";
+        return;
+    }
+
+    ## TODO new_match isn't working correctly when there's any wildcarding.
+    ## ..probably (Surely) both are not working in that scenario, but the 1st check above is catching
+    ## the old_match case before the ignomony of the new_match case can be exposed.
+
+    
+    print "DEBUG: OK to rename..\n";
+    print "File from $ofile to $nfile and extension from $oext to $next\n";
+    print "Old name is $dsk[$drive]->{fcb}->[$old_match->[0]]->{fnam}\n";
+    print "Old ext  is $dsk[$drive]->{fcb}->[$old_match->[0]]->{fext}\n";
+    print "New name is $dsk[$drive]->{fcb}->[$new_match->[0]]->{fnam}\n";
+    print "New ext  is $dsk[$drive]->{fcb}->[$new_match->[0]]->{fext}\n";
+
+    ## TODO an existing file of the same name is DELETED
+    
+
+##    $dsk[$drive]->{fcb}->[
+    
+#    my $dir_entry_data = rd_dir_entry($drive, $old_match->[0]);
+
+#    if (scalar @$new_match == 1) {
+#        # copy exact name (8+3 characters) from matching entry. Need to do this
+#        # because $nfile, $next may be wildcarded.
+#        my $tmp_dir_entry_data = rd_dir_entry($drive, $new_match->[0]);
+#        for my $i (0..10) {
+#            $dir_entry_data->[$i] = $tmp_dir_entry_data->[$i];
+#        }
+#        rm_files($ndrive, $new_match);
+#    }
+#    else {
+#        my $flex_name = "$nfile.$next";
+#        # make sure there's no wildcarding
+#        if (legal_flex_name($flex_name)) {
+#            name_dir_entry($flex_name, $dir_entry_data);
+#        }
+#        else {
+#            print "ERROR cannot resolve $flex_name to a unique name.\n";
+#            return;
+#        }
+#    }
+
+#    wr_dir_entry($drive, $old_match->[0], $dir_entry_data);
+#    rd_dir($drive);
+}
+
+
+sub cmd_name {
+    my ($drive, $name) = check_arg('v n',@_);
+    return unless defined($drive);
+
+    if ($dsk[$drive]->{mounted}) {
+        $dsk[$drive]->{dname} = $name;
+    }
+    else {
+        print "ERROR virtual drive $drive is not mounted\n";
+    }
+}
+
+
+sub cmd_type {
+    my ($fs, $conv_ref, $lpp) = check_arg('fs oec oi', @_);
+    return unless defined($fs);
+
+    $lpp = defined $lpp ? $lpp : $LINES_PER_PAGE;
+    # defaults for 'type'
+    $conv_ref->{bin} = exists $conv_ref->{bin} ? $conv_ref->{bin} : "record";
+    $conv_ref->{txt} = exists $conv_ref->{txt} ? $conv_ref->{txt} : "expand";
+    $conv_ref->{xxx} = exists $conv_ref->{xxx} ? $conv_ref->{xxx} : "dump";
+
+    type_export_common($fs, $conv_ref, $lpp, "", 0);
+}
+
+
+sub cmd_export {
+    my ($fs, $conv_ref, $path) = check_arg('fs oec od', @_);
+    return unless defined($fs);
+
+    $path = defined $path ? $path . "/" : "";
+    # defaults for 'export'
+    $conv_ref->{bin} = exists $conv_ref->{bin} ? $conv_ref->{bin} : "raw";
+    $conv_ref->{txt} = exists $conv_ref->{txt} ? $conv_ref->{txt} : "raw";
+    $conv_ref->{xxx} = exists $conv_ref->{xxx} ? $conv_ref->{xxx} : "raw";
+
+    type_export_common($fs, $conv_ref, 0, $path, 1);
+}
+
+
+sub type_export_common {
+    my ($fs, $conv_ref, $lpp, $path, $export) = @_;
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+
+    printf "INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+
+    export_files($drive, $match, $conv_ref, $lpp, $path, $export);
+}
+
+
+sub cmd_import {
+    my ($dst, $hf_names, $path, $conv_ref) = check_arg('v hfw oic', @_);
+    return unless defined($dst);
+
+    if (not $dsk[$dst]->{mounted}) {
+        print "ERROR drive $dst is not mounted\n";
+        return;
+    }
+
+    # defaults for 'import'
+    $conv_ref->{xxx} = exists $conv_ref->{xxx} ? $conv_ref->{xxx} : "raw";
+
+    # which (if any) files already exist? Need to take into account the
+    # file name that will be used - which means taking $UPCASE into account
+    my $rm_match = name_match_dir($dst,$hf_names, $UPCASE);
+
+    # is there enough space for the import?
+    my $dst_free = $dsk[$dst]->{sir}->{FREE} + sectors($dst, $rm_match);
+    my $sectors = 0;
+    foreach my $file (@$hf_names) {
+        my $bytes = -s "$path$file";
+        $sectors = $sectors + int(($bytes+$DATA_SECTOR-1)/$DATA_SECTOR);
+    }
+    if ($dst_free < $sectors) {
+        print "ERROR insufficient space for import\n";
+        return;
+    }
+
+    # are there enough directory entries for the import?
+    my $dst_dir_entries = dir_entries($dst) + scalar(@$rm_match);
+    if (scalar(@$hf_names) > $dst_dir_entries) {
+        print "ERROR insufficient directory entries for import\n";
+        return;
+    }
+
+    rm_files($dst, $rm_match);
+
+    my $skip = 0;
+    foreach my $i (@$hf_names) {
+        if (open HFILE, "$path$i") {
+            my $data;
+            my $flex_name = $i;
+
+            if ($UPCASE) {
+                $flex_name = uc $flex_name;
+            }
+
+            # this size check should be redundant
+            my $bytes = read HFILE, $data, ($dsk[$dst]->{sir}->{FREE} * 254);
+            if (not eof HFILE) {
+                print "ERROR skipped import of $i -- insufficient space\n";
+                $skip = $skip + 1;
+                close HFILE;
+                next;
+            }
+            my @data = unpack("C*", $data);
+            my $data_ref = \@data;
+            if ($conv_ref->{xxx} eq "compress") {
+                $data_ref = txt_compress($data_ref);
+            }
+            elsif ($conv_ref->{xxx} eq "s19") {
+                print "ERROR s19 import not yet supported. Doing raw import instead\n";
+            }
+            # [NAC HACK 2016Oct28] TODO apply other conversions. Currently just support: raw, compress
+            # [NAC HACK 2016Oct28] TODO the $conv_ref is supposed to make it easier to do all this stuff..
+            # [NAC HACK 2016Nov08] review how it's done for export and mimic here.
+
+            # Pad data to a whole number of sectors
+            my $runt = scalar(@$data_ref) % $DATA_SECTOR;
+            if ($runt != 0) {
+                my @pad = (0) x ($DATA_SECTOR - $runt);
+                push @$data_ref, @pad;
+            }
+            close HFILE;
+
+            my $TRK = 0;
+            my $SCT = 1;
+            my $SIZ = 2;
+
+            my @start_free_tsc = ($dsk[$dst]->{sir}->{FIRST_T},
+                                  $dsk[$dst]->{sir}->{FIRST_S},
+                                  $dsk[$dst]->{sir}->{FREE});
+
+            my $sectors = scalar(@$data_ref)/$DATA_SECTOR;
+
+            # Start with empty directory entry
+            my $dir_entry_data = empty_dir_entry();
+
+            # Populate file name and extension
+            name_dir_entry($flex_name, $dir_entry_data);
+
+            # Populate file length
+            $dir_entry_data->[21+0-4] = int($sectors/256);
+            $dir_entry_data->[21+1-4] = $sectors % 256;
+
+            # Populate first t/s - imported file starts at
+            # first sector of destination free-list.
+            $dir_entry_data->[17-4] = $start_free_tsc[$TRK];
+            $dir_entry_data->[18-4] = $start_free_tsc[$SCT];
+
+            for my $sector (1..$sectors) {
+                my $dst_data = rd_dts($dst,
+                                      $start_free_tsc[$TRK],
+                                      $start_free_tsc[$SCT]);
+                my @dst_data = unpack("C*", $dst_data);
+
+                # import 1 sector of data, leaving existing
+                # link (bytes 0,1) intact. Zero-out the reserved
+                # (random access) bytes
+                $dst_data[2] = 0;
+                $dst_data[3] = 0;
+                for my $byte (4..($BYTES_SECTOR-1)) {
+                    $dst_data[$byte] = shift @$data_ref;
+                }
+
+                my $nxt_trk = $dst_data[0];
+                my $nxt_sct = $dst_data[1];
+
+                if ($sector == $sectors) {
+                    # final sector
+
+                    # Populate last t/s
+                    $dir_entry_data->[19-4] = $start_free_tsc[$TRK];
+                    $dir_entry_data->[20-4] = $start_free_tsc[$SCT];
+                    # break link
+                    $dst_data[0] = 0;
+                    $dst_data[1] = 0;
+                }
+
+                wr_dts($dst, $start_free_tsc[$TRK], $start_free_tsc[$SCT], pack("C*", @dst_data));
+
+                # update free list
+                $start_free_tsc[$TRK] = $nxt_trk;
+                $start_free_tsc[$SCT] = $nxt_sct;
+                $start_free_tsc[$SIZ] = $start_free_tsc[$SIZ] - 1;
+            }
+            my $index = allocate_dir_entry($dst);
+            wr_dir_entry($dst, $index, $dir_entry_data);
+
+            # Finally, update the SIR
+##            wr_sir_start_free($dst, @start_free_tsc);
+            # and refresh the local data
+            rd_dir($dst);
+        }
+        else {
+            print "ERROR skipped import of $path$i -- cannot open\n";
+            $skip = $skip + 1;
+        }
+    }
+    printf "INFO %d files imported (%d skipped)\n", scalar(@$hf_names) - $skip, $skip;
+}
+
+
+
+# directory of host - just pass all arguments to host
+sub cmd_hdir {
+    system "dir @_";
+}
+
+
+# directory is in $dsk - just filter/print it here.
+# All of these are legal:
+# dir 1    dir 1.fred.bin   dir 1.*.bin   dir 2.fr*.*
+# the first (just the drive specified) is a special case and
+# is converted (by check_arg) into 1.*.* so that can be treated
+# in the same way as the other forms.
+sub cmd_dir {
+    my ($fs) = check_arg('fs', @_);
+    return unless defined($fs);
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+
+    print "   Sect Nsct Load Exec SysFlg   Name\n";
+
+    foreach my $i (@{$match}) {
+        my $j = $dsk[$drive]->{fcb}->[$i];
+        # system flags
+        my $sfl = "        ";
+        if ($j->{fsfl} & 0x01) {substr($sfl, 0, 1) = "L"};
+        if ($j->{fsfl} & 0x02) {substr($sfl, 1, 1) = "D"};
+
+        printf "   %04x %04x %04x %04x %s %s.%s\n",
+            $j->{fsec}, $j->{fnsc}, $j->{flda}, $j->{fexa},
+            $sfl, $j->{fnam}, $j->{fext};
+    }
+}
+
+
+# TODO: currently accepts "delete fs". Change it to "delete fs [fs..]" ie multiple file specifiers - each
+# of which is run through the match/rm_files/rd_dir sequence in turn.
+# TODO may not need rm_files for any other purpose, in which case pull it in to here.
+sub cmd_delete {
+    my ($fs) = check_arg('fs', @_);
+    return unless defined($fs);
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+
+    printf "INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+
+    rm_files($drive, $match);
+    # directory copy is out-of-date now so revise it
+##TODO    rd_dir($drive);
+}
+
+
+sub cmd_lock {
+    my ($fs) = check_arg('fs', @_);
+    return unless defined($fs);
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+
+    printf "INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+
+    foreach my $i (@{$match}) {
+        $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} | $SFLG_LOK;
+    }
+    wr_dir($drive);
+    # directory copy is out-of-date now so revise it
+##TODO    rd_dir($drive);
+}
+
+
+sub cmd_unlock {
+    my ($fs) = check_arg('fs', @_);
+    return unless defined($fs);
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+
+    printf "INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+
+    foreach my $i (@{$match}) {
+        $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} & (0xff ^ $SFLG_LOK);
+    }
+    wr_dir($drive);
+    # directory copy is out-of-date now so revise it
+##TODO    rd_dir($drive);
+}
+
+
+sub cmd_truncate {
+    my ($fs, $num) = check_arg('fs i', @_);
+    return unless defined($fs);
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+
+    printf "INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+
+    truncate_files($drive, $match, $num);
+    # file sizes in directory copy are out-of-date now so revise it
+    rd_dir($drive);
+}
+
+
+sub cmd_create {
+    my ($fs, $sectors) = check_arg('fs i', @_);
+    return unless defined($fs);
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+    # if we needed to delete a file first, the free chain would get messed up. We could cope, but better
+    # not to get into the bother of it.
+    if (scalar @$match != 0) {
+        printf "ERROR file specifier must not match existing file. Matched %d files\n", scalar @$match;
+        return;
+    }
+
+    if (dir_entries($drive) == 0) {
+        print "ERROR insufficient directory entries for create\n";
+        return;
+    }
+
+    my $flex_name = "$file.$ext";
+    if (not legal_flex_name($flex_name)) {
+        print "ERROR cannot resolve $flex_name to a unique name.\n";
+        return;
+    }
+
+    if ($sectors > $dsk[$drive]->{sir}->{FREE}) {
+        print "ERROR insufficient sectors on the free list.\n";
+        return;
+    }
+
+    # Start with empty directory entry
+    my $dir_entry_data = empty_dir_entry();
+
+    # Populate file name and extension
+    name_dir_entry($flex_name, $dir_entry_data);
+
+    # Populate file length
+    $dir_entry_data->[21+0-4] = int($sectors/256);
+    $dir_entry_data->[21+1-4] = $sectors % 256;
+
+    # Walk the free list to the sector we want
+    ##my ($status, $trk, $sct, $data_ref) = walk_chain_n($drive, $dsk[$drive]->{sir}->{FIRST_T},
+    ##                                                   $dsk[$drive]->{sir}->{FIRST_S},
+    ##                                                   $dsk[$drive]->{sir}->{FREE} - $sectors);
+
+    my ($status, $data_ref, $trk, $sct);
+    if ($status == -1) {
+        print "ERROR consistency error in free chain. Check disk image.\n";
+        return;
+    }
+
+    # Sanity check the chain that will make up the new file
+    ##my ($status2, $trk2, $sct2, $data_ref2) = walk_chain_n($drive, $data_ref->[0],
+    ##                                                       $data_ref->[1], $sectors);
+
+    my ($status2, $data_ref2);
+    if ($status2 == -1) {
+        print "ERROR consistency error in end part of free chain. Check/repair disk image.\n";
+        return;
+    }
+
+    # This ought to be the current end of the free chain and so should be a 0,0 link
+    if (($data_ref2->[0] != 0) or ($data_ref2->[1] != 0)) {
+        print "ERROR missing 0,0 link at end of free chain. Check/repair disk image.\n";
+        return;
+    }
+
+    # Everything seems to be in good order.
+
+    # Fix up the free chain link and (in the SIR) the end t/s and count
+    $data_ref->[0] = 0;
+    $data_ref->[1] = 0;
+    wr_dts($drive, $trk, $sct, pack("C*", @$data_ref));
+##    wr_sir_end_free($drive, $trk, $sct, $dsk[$drive]->{sir}->{FREE} - $sectors);
+
+    # Populate first t/s for the new file then write it to the directory
+    $dir_entry_data->[17-4] = $data_ref->[0];
+    $dir_entry_data->[18-4] = $data_ref->[1];
+    my $index = allocate_dir_entry($drive);
+    wr_dir_entry($drive, $index, $dir_entry_data);
+    rd_dir($drive);
+}
+
+
+sub cmd_fix {
+    print "fix TODO - not yet implemented\n";
+}
+
+
+# Look at the valid directory entries, ignoring whether files are deleted or not.
+# Make sure that:
+# - sectors allocated to files start at 4
+# - sectors are allocated sequentially and contiguously
+# - the free sector follows on from the last allocated sector
+sub cmd_check {
+    my ($drive) = check_arg('v', @_);
+    return unless defined($drive);
+
+    # TODO add check_arg of 'vm' - valid, mounted -- then remove
+    # these checks.
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR virtual drive $drive is not mounted.\n";
+        return;
+    }
+
+    my $error = 0;
+    my $sec_expect = 4;
+    for (my $i=0; $i<$dsk[$drive]->{fcbval}; $i=$i+1) {
+        my $sec = $dsk[$drive]->{fcb}->[$i]->{fsec};
+        my $num = $dsk[$drive]->{fcb}->[$i]->{fnsc};
+
+        if ($sec != $sec_expect) {
+            print "ERROR for directory entry $i, expected start sector of $sec_expect but read $sec\n";
+            $error = $error + 1;
+        }
+        $sec_expect = $sec + $num;
+    }
+
+    if ($sec_expect != $dsk[$drive]->{nxtsec}) {
+        print "ERROR next sector to be allocated ($dsk[$drive]->{nxtsec}) does not match sector after last file ($sec_expect)\n";
+        $error = $error + 1;
+    }
+
+    if ($error == 0) {
+        print "INFO check completed with no errors\n";
+    }
+}
+
+
+sub cmd_scrub {
+    my ($drive) = check_arg('v', @_);
+    return unless defined($drive);
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR virtual drive $drive is not mounted.\n";
+        return;
+    }
+
+
+    # scrub undefined entries in the directory
+    # scrub unallocated sectors
+}
+
+
+sub cmd_quit {
+    cmd_exit();
+}
+
+
+sub cmd_exit {
+    cmd_umount(0);
+    cmd_umount(1);
+    cmd_umount(2);
+    cmd_umount(3);
+    exit;
+}
+
+
+sub cmd_help {
+    my ($help_for) = @_;
+    if (defined $help_for) {
+        help_for($help_for);
+    }
+    else {
+        help_generic();
+    }
+}
+
+
+sub cmd_uppercase {
+    my ($flag) = check_arg('oi', @_);
+
+    if (defined $flag) {
+        $UPCASE = $flag ? 1 : 0;
+    }
+    else {
+        $UPCASE = $UPCASE ? 0 : 1;
+    }
+
+    if ($UPCASE) {
+        print "FLEX file specifiers will be forced to upper-case\n";
+    }
+    else {
+        print "FLEX file specifiers will use mixed case\n";
+    }
+}
+
+
+#################################################################
+#################################################################
+# Subroutines
+
+# Check/validate a set of arguments against expected format.
+# eg: check_arg('v h of', @_);
+# string of expected argument formats, followed by argument list.
+# On error: print error message(s) and return nothing
+# On success: return a list of valid arguments. In the simple
+# case, there is a 1-to-1 mapping between the argument list/
+# the input list/the output list. In some cases, though,
+# additional values get inserted. See case-by-case comments.
+#
+# argument formats:
+# v - virtual drive number
+# h - existing file in host filesystem
+# hfw - wildcard in host filesystem. Only recognise files that are
+#      valid FLEX file names and non-zero in size. Must match at
+#      least 1 file.
+# nh - file in host filesystem (may or may not exist)
+# od - optional directory in host filesystem (must exist) default to .
+# of - optional file format: dsk or img, also inferred from h --> TODO remove
+# fs - FLEX file specifier: 1 or 1.foo.bar
+# n - disk name (truncated/padded to 20 characters, can
+#     include spaces) - consumes all remaining arguments and so must
+#     be the last entry in the format list.
+# i - integer
+# oi - optional integer
+# ovy - optional 16-bit volume number optionally followed by date in
+#       the form mm,dd,yy. The date is returned as 3 separate
+#       entries: mm, dd, yy.
+#       mm is verified 1-12. dd is verified 1-31. yy is verified 0-99.
+# y   - date in the form mm,dd,yy. The date is returned as 3 separate
+#       entries: mm, dd, yy.
+#       mm is verified 1-12. dd is verified 1-31. yy is verified 0-99.
+# os  - optional sector. If omitted, default value is returned.
+# oic - optional import converters. Returns hash reference
+# oec - optional export converters. Returns hash reference
+sub check_arg {
+    my @expected = split " ",(shift @_);
+    my $host_file;  # stored for use by subsequent 'of' argument
+    my $i = 0;
+    ARG: foreach my $f (@expected) {
+        if ($f eq 'v') {
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected virtual drive number\n";
+                return;
+            }
+            if (($_[$i] ne "0") and ($_[$i] ne "1") and
+                ($_[$i] ne "2") and ($_[$i] ne "3")) {
+                print "ERROR $_[$i] is not a legal virtual drive number\n";
+                return;
+            }
+        }
+        elsif ($f eq 'i') {
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected integer\n";
+                return;
+            }
+            if ($_[$i] !~ /^\d+$/) {
+                print "ERROR $_[$i] is not an integer\n";
+                return;
+            }
+        }
+        elsif ($f eq 'oi') {
+            if (defined $_[$i]) {
+                if ($_[$i] !~ /^\d+$/) {
+                    print "ERROR $_[$i] is not an integer\n";
+                    return;
+                }
+            }
+        }
+        elsif ($f eq 'oec') {
+            # Zero or more export conversion rules. Remove
+            # them all; replace them with a single value: a hash ref.
+            my %conv;
+            my $first = $i;
+            while ((defined $_[$i]) and ($_[$i] =~ /^(txt|bin|xxx)=/)) {
+                if ($_[$i] =~ /^(\w+)=(raw|record|expand|dump|s19)/) {
+                    $conv{$1} = $2;
+                }
+                else {
+                    print "No such conversion: $_[$i]\n";
+                    return;
+                }
+                $i = $i + 1;
+            }
+            splice @_, $first, $i-$first, \%conv;
+            $i = $first;
+        }
+        elsif ($f eq 'oic') {
+            # Zero or more import conversion rules. Remove
+            # them all; replace them with a single value: a hash ref.
+            my %conv;
+            my $first = $i;
+            while ((defined $_[$i]) and ($_[$i] =~ /^(xxx)=/)) {
+                if ($_[$i] =~ /^(\w+)=(raw|compress|s19)/) {
+                    $conv{$1} = $2;
+                }
+                else {
+                    print "No such conversion: $_[$i]\n";
+                    return;
+                }
+                $i = $i + 1;
+            }
+            splice @_, $first, $i-$first, \%conv;
+            $i = $first;
+        }
+        elsif ($f eq 'od') {
+            # optional directory path. If absent caller assumes CWD.
+            if (defined $_[$i]) {
+                if (not opendir TMP, $_[$i]) {
+                    print "ERROR cannot open directory $_[$i]\n";
+                    return;
+                }
+                closedir TMP;
+            }
+        }
+        elsif ($f eq 'h') {
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected host file name\n";
+                return;
+            }
+            if (open my $tmp, '+<', $_[$i]) {
+                # all good
+                close $tmp;
+                # 'of' will use this
+                $host_file = $_[$i];
+            }
+            else {
+                print "ERROR could not open $_[$i] -- maybe it is read-only?\n";
+                return;
+            }
+        }
+        elsif ($f eq 'hfw') {
+            # host wildcard; only recognise files that are valid FLEX
+            # names and non-zero in size. Must match at least 1 file.
+            # Return a reference to a list of files AND a directory path
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected host file name\n";
+                return;
+            }
+            my ($name, $path, $suffix) = fileparse($_[$i], '\..*');
+
+            # turn the filename into a legal PERL regex: * -> [-\w]*
+            #                                            . -> \.
+            my $f = $name . $suffix;
+            $f =~ s|\*|\[-\\w\]\*|g;
+            $f =~ s|\.|\\\.|g;
+
+            opendir DIR, $path;
+            # $f is what we match for; final $ makes sure there's
+            # nothing more (so that fred.dsk doesn't match fred.dsk_x)
+            my @matches = grep /$f$/, readdir DIR;
+            close DIR;
+            @matches = grep { legal_flex_name($_) } @matches;
+            @matches = grep { -s "$path$_" != 0 } @matches;
+
+            if (not defined $matches[0]) {
+                print "ERROR no matching host files - candidates must be non-zero size with legal FLEX names\n";
+                return;
+            }
+
+            $_[$i] = \@matches;
+            # need the path so insert it after the files ref and skip past it
+            splice @_, $i+1, 0, $path;
+            $i = $i + 1;
+        }
+        elsif ($f eq 'nh') {
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected host file name\n";
+                return;
+            }
+            # file may not exist so open for output
+            if (open my $tmp, '>', $_[$i]) {
+                # all good
+                close $tmp;
+                # 'of' will use this
+                $host_file = $_[$i];
+            }
+            else {
+                print "ERROR could not open $_[$i] -- maybe it is read-only?\n";
+                return;
+            }
+        }
+        elsif ($f eq 'of') {
+            # optional format. If present, takes precedence and must be img or dsk
+            # If absent, inferred from file extension of host file - in which
+            # case, the incoming argument list is changed to declare the format.
+
+            if ((defined $_[$i]) && (($_[$i] eq 'img') or ($_[$i] eq 'dsk'))) {
+                # explicit format takes priority. Nothing more to do.
+            }
+            else {
+                # extract extension from host file.. which is required to
+                # occur earlier in the argument list.
+                my @ext = split /\./, lc($host_file);
+                if ((defined $ext[-1]) && (($ext[-1] eq 'img') or ($ext[-1] eq 'dsk'))) {
+                    # insert incoming argument so it's always present/valid
+                    splice @_, $i, 0, $ext[-1];
+                }
+                else {
+                    print "ERROR could not infer format. Specify dsk or img\n";
+                    return;
+                }
+            }
+        }
+        elsif ($f eq 'fs') {
+            # FLEX file specifier
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected FLEX file specifier\n";
+                return;
+            }
+            if ($UPCASE) {
+                $_[$i] = uc $_[$i];
+            }
+            if (($_[$i] eq "0") or ($_[$i] eq "1") or
+                ($_[$i] eq "2") or ($_[$i] eq "3")) {
+                # make it more regular and we're done
+                $_[$i] = "$_[$i].*.*";
+            }
+            # From FLEX User Manual
+            # 0-3 for drive, 1-8 character name, 1-3 character extension
+            # extension must start with a letter
+            # otherwise both can contain 0-9 a-z A-Z _ -
+            # in addition, name and extension can contain * to wildcard.
+            if ($_[$i] !~ /^[0123]\.[\*\w\-]{1,8}\.[\*a-zA-Z][\*\w\-]{0,2}$/) {
+                print "ERROR $_[$i] is not a legal file specifier\n";
+                return;
+            }
+        }
+        elsif ($f eq 'n') {
+            # disk name - upto 20 characters
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected disk name\n";
+            }
+
+            # disk name can include spaces so need to extract it from
+            # the raw command line.
+            $cmdline =~ /([a-zA-Z]+)\s+(\d*)\s(.*$)/;
+
+            # left-justify and truncate in 20-character field.
+            $_[$i] = sprintf("%-20.20s",$3);
+
+            # required to be the last thing, so gobble any remaining arguments
+            # and we're done
+            $i = scalar @_;
+            last ARG;
+        }
+        elsif ($f eq 'ovy') {
+            # Optional FLEX disk volume. If present, must be 16-bit value
+            if (defined $_[$i]) {
+                if (($_[$i] =~ /^\d+$/) && ($_[$i] < 65536)) {
+                    # Volume number is OK
+
+                    # Optional FLEX date mm,dd,yy.
+                    if (defined $_[$i+1]) {
+                        # point to date
+                        $i = $i + 1;
+                        my ($mm,$dd,$yy) = extract_date($_[$i]);
+                        if (defined $mm) {
+                            # replace one item with three: mm,dd,yy -> mm dd yy
+                            splice @_, $i, 1, $mm, $dd, $yy;
+                            # point past 2 extra values inserted
+                            $i = $i + 2;
+                        }
+                        else {
+                            # error message already issued by extract_date
+                            return;
+                        }
+                    }
+                }
+                else {
+                    print "ERROR illegal volume number - expected 16-bit decimal value\n";
+                    return;
+                }
+            }
+        }
+        elsif ($f eq 'y') {
+            # Date in FLEX format mm,dd,yy
+            my ($mm,$dd,$yy) = extract_date($_[$i]);
+            if (defined $mm) {
+                splice @_, $i, 1, $mm, $dd, $yy;
+            }
+            else {
+                # error message already issued by extract_date
+                return;
+            }
+        }
+        elsif ($f eq 'os') {
+            # Optional s=Y. If present, Y must be numeric. Return Y
+            if (defined $_[$i]) {
+                if ($_[$i] =~ /^s=(\d+)$/) {
+                    # sector number is OK. Rewrite with just the number
+                    $_[$i] = $1;
+                }
+                else {
+                    print "ERROR illegal size - expected s=NN got $_[$i]\n";
+                    return;
+                }
+            }
+            else {
+                splice @_, $i, 0, ($SECTORS);
+                $i = $i + 1;
+            }
+        }
+        else {
+            die "FATAL internal error - unknown format $f\n";
+        }
+        $i = $i + 1;
+    }
+    # Final check is that all the arguments have been used up
+    if (exists $_[$i]) {
+        print "ERROR unexpected argument: $_[$i]\n";
+        return;
+    }
+
+    # Phew! Success!
+    return @_;
+}
+
+
+# extract date from input string of the form mm,dd,yy
+# do minimal validation. If valid, return list mm,dd,yy
+# if invalid, print error message and return nothing
+sub extract_date {
+    if (defined $_[0] and $_[0] =~ /^(\d{1,2}),(\d{1,2}),(\d{1,2})$/) {
+        # so far so good.
+        my ($mm,$dd,$yy) = ($1, $2, $3);
+        if (($mm > 0) and ($mm < 13) and ($dd > 0) and ($dd < 32)) {
+            return ($mm,$dd,$yy);
+        }
+    }
+    print "ERROR illegal date format or range - expected mm,dd,yy\n";
+    return;
+}
+
+# export/type zero or more files
+# files specified by list of directory indices
+# $export=0 -> type to screen
+# $export=1 -> export to host file system at $path
+# TODO maybe make type_export_common build %f? then the
+# loop here will just change the *variant* parts.
+sub export_files {
+    my ($drive, $match, $conv_ref, $lpp, $path, $export) = @_;
+
+    foreach my $i (@{$match}) {
+        # build a data structure for use by the converter
+        my %f;
+        $f{name} = $dsk[$drive]->{fcb}->[$i]->{fnam} . "." .
+            $dsk[$drive]->{fcb}->[$i]->{fext};
+        if ($export) {
+            if (not open $f{handle}, '>', "$path$f{name}") {
+                print "ERROR could not open file $path$f{name}\n";
+                next;
+            }
+        }
+        else {
+            print "============= $f{name} =============\n";
+            $f{handle} = \*STDOUT;
+        }
+
+        $f{drive} = $drive;
+        $f{sec} = $dsk[$drive]->{fcb}->[$i]->{fsec};
+        $f{nsec} = $dsk[$drive]->{fcb}->[$i]->{fnsc};
+        $f{converters} = $conv_ref;
+        $f{converter} = ""; # subroutine ref
+        $f{export} = $export;
+        $f{line} = 1;
+        $f{lpp} = $lpp;
+        $f{eof} = 0;
+
+        # read first data sector - sets {index} {data} and updates {sec} {nsec}
+        if (not rd_nxt_sct(\%f)) {
+            print "ERROR no data in file $f{name}\n";
+            next;
+        }
+
+        # select and run the converter
+        set_converter(\%f);
+        &{$f{converter}}(\%f);
+
+        if ($export) {
+            close $f{handle};
+        }
+    }
+}
+
+# compress a byte array using FLEX text compression rules
+# text compression uses 09 (TAB) characters as codes, so
+# must eliminate those from the incoming text.
+sub txt_compress {
+    my ($data_ref) = @_;
+    my $PASS = 0;
+    my $EOL = 1;
+    my $SPC = 2;
+    my $eol_type;
+    my $spc_cnt;
+    my $state = $PASS;
+    my @cdata;
+    foreach my $i (@$data_ref) {
+        if ($state == $PASS) {
+            if ($i == 0x09) {
+                # mimic 4-space tabs
+                $spc_cnt = 4;
+                $state = $SPC;
+            }
+            elsif ($i == 0x20) {
+                $spc_cnt = 1;
+                $state = $SPC;
+            }
+            elsif (($i == 0x0D) or ($i == 0x0A)) {
+                $eol_type = $i;
+                $state = $EOL;
+                push @cdata, 0x0D;
+            }
+            elsif ($i == 0x00) {
+                # ignore NULL
+            }
+            else {
+                push @cdata, $i;
+            }
+        }
+        elsif ($state == $EOL) {
+            if ($i == 0x09) {
+                # mimic 4-space tabs
+                $spc_cnt = 4;
+                $state = $SPC;
+            }
+            elsif ($i == 0x20) {
+                $spc_cnt = 1;
+                $state = $SPC;
+            }
+            elsif (($i == 0x0D) or ($i == 0x0A)) {
+                if ($i != $eol_type) {
+                    # CR/LF or LF/CR pair - gobble this character
+                    $state = $PASS;
+                }
+                else {
+                    # Multiple CR or of LF - echo each one as CR
+                    push @cdata, 0x0D;
+                }
+            }
+            elsif ($i == 0x00) {
+                # ignore NULL
+                $state = $PASS;
+            }
+            else {
+                $state = $PASS;
+                push @cdata, $i;
+            }
+        }
+        else { # $state == $SPC
+            if ($i == 0x09) {
+                $spc_cnt = $spc_cnt + 4;
+            }
+            elsif ($i == 0x20) {
+                $spc_cnt = $spc_cnt + 1;
+            }
+            else {
+                # transition to non-space;
+                while ($spc_cnt > 127) {
+                    push @cdata, (0x09, 127);
+                    $spc_cnt = $spc_cnt - 127;
+                }
+                if ($spc_cnt == 1) {
+                    push @cdata, 0x20;
+                    $spc_cnt = 0;
+                }
+                if ($spc_cnt != 0) {
+                    push @cdata, (0x09, $spc_cnt);
+                    $spc_cnt = 0;
+                }
+
+                # process non-space char
+                if (($i == 0x0D) or ($i == 0x0A)) {
+                    $eol_type = $i;
+                    $state = $EOL;
+                    push @cdata, 0x0D;
+                }
+                elsif ($i == 0x00) {
+                    # ignore NULL
+                    $state = $PASS;
+                }
+                else {
+                    push @cdata, $i;
+                    $state = $PASS;
+                }
+            }
+        }
+    }
+    # flush any trailing spaces
+    if ($state = $SPC) {
+        while ($spc_cnt > 127) {
+            push @cdata, (0x09, 127);
+            $spc_cnt = $spc_cnt - 127;
+        }
+        if ($spc_cnt == 1) {
+            push @cdata, 0x20;
+            $spc_cnt = 0;
+        }
+        if ($spc_cnt != 0) {
+            push @cdata, (0x09, $spc_cnt);
+        }
+    }
+    return \@cdata;
+}
+
+
+# analyse file contents based on first few bytes. Determine
+# what conversion to use and fill in {converter}.
+sub set_converter {
+    my ($f_ref) = @_;
+    my $skip = 0;
+
+    # make sure it's being used as expected
+    if ($f_ref->{index} != 0) {
+        die "FATAL ERROR set_converter expects full sector to play with";
+    }
+
+    if ($f_ref->{data}->[4] == 0x02) {
+        # start of record indicator. Probably a Binary file
+        $f_ref->{converter} = 'export_' . $f_ref->{converters}->{bin};
+    }
+    else {
+        # Text file by default; skip run-length bytes
+        # which could legitimately have msb set.
+        $f_ref->{converter} = 'export_' . $f_ref->{converters}->{txt};
+        for my $i (4..255) {
+            if ($skip == 1) {
+                $skip = 0;
+                next;
+            }
+            elsif ($f_ref->{data}->[$i] == 0x09) {
+                $skip = 1;
+                next;
+            }
+            elsif ($f_ref->{data}->[$i] & 0x80) {
+                # Unknown type
+                $f_ref->{converter} = 'export_' . $f_ref->{converters}->{xxx};
+            }
+        }
+    }
+}
+
+
+# file export converters. Each use an %f and update fields of %f:
+# {index} {data} {trk} {sct} {line}.
+# Returns at end of file. Honours $export $lpp.
+sub export_raw {
+    my ($f_ref) = @_;
+    my $handle = $f_ref->{handle};
+
+    # cheat: simply emit in per-sector chunks
+    # make sure it's being used as expected
+    if ($f_ref->{index} != 0) {
+        die "FATAL ERROR set_converter expects full sector to play with";
+    }
+
+    my $more_data = 1;
+    while ($more_data) {
+        for my $i (0..255) {
+            print $handle chr $f_ref->{data}->[$i];
+        }
+        if (not $f_ref->{export}) {
+            print "\nPress ENTER to continue, Q ENTER to quit";
+            last if <STDIN> =~ /[qQ]/;
+        }
+        $more_data = rd_nxt_sct($f_ref);
+    }
+}
+
+
+# Text file format. Ref: FLEX APG page 46.
+sub export_expand {
+    my ($f_ref) = @_;
+    my $handle = $f_ref->{handle};
+    my $expand = 0;
+    my $page = 0;
+
+    while (not $f_ref->{eof}) {
+        my $chr = rd_nxt_chr($f_ref);
+        if ($expand) {
+            # $chr is number of spaces to insert
+            # don't allow it to be confused as control code
+        }
+        elsif (($chr == 0) or ($chr == 0x18)) {
+            next;
+        }
+        elsif ($chr == 0x09) {
+            $expand = 1;
+            next;
+        }
+        elsif ($chr == 0x0d) {
+            $chr = 0x0a; # unix line endings
+
+            if ($f_ref->{line} == $f_ref->{lpp}) {
+                $f_ref->{line} = 1;
+                $page = not $f_ref->{export};
+            }
+            else {
+                $f_ref->{line} = $f_ref->{line} + 1;
+            }
+        }
+
+        if ($expand) {
+            $expand = 0;
+            print $handle ' ' x $chr;
+        }
+        else {
+            print $handle chr $chr;
+        }
+
+        if ($page) {
+            $page = 0;
+            print "\nPress ENTER to continue, Q ENTER to quit";
+            last if <STDIN> =~ /[qQ]/;
+        }
+    }
+}
+
+
+# Binary file format. Ref: FLEX APG page 45.
+sub export_record {
+    my ($f_ref) = @_;
+    my $handle = $f_ref->{handle};
+    my $num_str;
+    my $let_str;
+
+    my $SEARCH = 0;
+    my $LOADH  = 1;
+    my $LOADL  = 2;
+    my $COUNT  = 3;
+    my $DATA   = 4;
+    my $XFERH  = 5;
+    my $XFERL  = 6;
+
+    my $state = $SEARCH;
+    my $count = 0;
+    my $addr;
+    my $xfer_addr;
+    my $byte;
+
+    my $total_skip = 0;
+    my $total_drecords = 0;
+    my $total_xrecords = 0;
+    my $total_bytes = 0;
+    my $total_disco = 0;
+    my $end_addr = 0;
+    my $bytes_this_line;
+
+    # TODO generic subroutine: page($f_ref); - use it here and EVERYWHERE
+
+    while (not $f_ref->{eof}) {
+        my $chr = rd_nxt_chr($f_ref);
+
+        if ($state == $SEARCH) {
+            if ($chr == 0x02) {
+                $state = $LOADH;
+                $total_skip = $total_skip + $count;
+                if ($count != 0) {
+                    print $handle "Skipped $count bytes\n";
+                    last if page($f_ref);
+                }
+            }
+            elsif ($chr == 0x16) {
+                $state = $XFERH;
+                $total_skip = $total_skip + $count;
+                if ($count != 0) {
+                    print $handle "Skipped $count bytes\n";
+                    last if page($f_ref);
+                }
+            }
+            else {
+                $count = $count + 1;
+                # carry on skipping bytes
+            }
+        }
+        elsif ($state == $LOADH) {
+            $addr = $chr * 256;
+            $state = $LOADL;
+        }
+        elsif ($state == $LOADL) {
+            $addr = $addr + $chr;
+            $num_str = sprintf("%04x ", $addr);
+            $let_str = '';
+            $bytes_this_line = 0;
+            $state = $COUNT;
+            if (($total_drecords != 0) and ($addr != ($end_addr + 1))) {
+                printf $handle "(skip from 0x%04x) ", $end_addr;
+                $total_disco = $total_disco + 1;
+            }
+            else {
+                printf $handle "                   ";
+            }
+        }
+        elsif ($state == $COUNT) {
+            $count = $chr;
+            $total_bytes = $total_bytes + $count;
+            $state = $DATA;
+            # [NAC HACK 2015May27] does 0 mean 0 or does it mean 256?
+            if ($count == 0) {
+                print "INFO: count of 0 encountered. Don't know if this means 0 or 256";
+            }
+            $total_drecords = $total_drecords + 1;
+            $end_addr = $addr + $count - 1;
+            printf $handle "Data record %3d: 0x%04x-0x%04x (%d bytes)\n", $total_drecords, $addr, $end_addr, $count;
+            last if page($f_ref);
+        }
+        elsif ($state == $DATA) {
+            $addr = $addr + 1;
+            $count = $count - 1;
+            if ($count == 0) {
+                $state = $SEARCH;
+            }
+
+            $num_str = $num_str . ' ' . sprintf("%02x",$chr);
+            if (($chr < 0x7F) and ($chr > 0x1f)) {
+                $let_str = $let_str . chr $chr;
+            }
+            else {
+                $let_str = $let_str . '.';
+            }
+            $bytes_this_line = $bytes_this_line + 1;
+
+            if ($bytes_this_line == 8) {
+                $num_str = $num_str . ' ';
+                $let_str = $let_str . ' ';
+            }
+
+            if (($bytes_this_line == 16) or ($count == 0)) {
+                my $pad = '   ' x (16 - $bytes_this_line);
+                if ($bytes_this_line < 8) {
+                    $pad = $pad . ' ';
+                }
+                printf $handle "%s $pad %s\n", $num_str, $let_str;
+                last if page($f_ref);
+                $bytes_this_line = 0;
+                $num_str = sprintf("%04x ", $addr);
+                $let_str = '';
+            }
+
+        }
+        elsif ($state == $XFERH) {
+            $xfer_addr = $chr * 256;
+            $state = $XFERL
+        }
+        elsif ($state == $XFERL) {
+            $xfer_addr = $xfer_addr + $chr;
+            $total_xrecords = $total_xrecords + 1;
+            printf $handle "Transfer record %d: 0x%04x\n", $total_xrecords, $xfer_addr;
+            last if page($f_ref);
+            $state = $SEARCH;
+            $count = 0;
+        }
+        else {
+            die "ERROR Unknown state\n";
+        }
+    }
+
+    $total_skip = $total_skip + $count;
+
+    if ($f_ref->{eof}) {
+        # reached the end without QUITting
+
+        if ($state != $SEARCH) {
+            die "ERROR reached end of data with state $state\n";
+        }
+
+        if ($count != 0) {
+            print $handle "Skipped $count bytes\n";
+            last if page($f_ref);
+        }
+
+        printf $handle "Data records: %d  Transfer records: %d  Data bytes: %d\n",$total_drecords, $total_xrecords,
+        $total_bytes;
+        last if page($f_ref);
+        printf $handle "Address discontinuities: %d  Skipped bytes: %d\n",$total_disco, $total_skip;
+        last if page($f_ref);
+    }
+}
+
+
+# Unknown format. Express as hex and ASCII dump
+sub export_dump {
+    my ($f_ref) = @_;
+    my $handle = $f_ref->{handle};
+    my $num_str = '';
+    my $let_str = '';
+    my $count = 0;
+    my $offset = 0;
+
+    while (not $f_ref->{eof}) {
+        my $chr = rd_nxt_chr($f_ref);
+
+        $num_str = $num_str . ' ' . sprintf("%02x",$chr);
+        if (($chr < 0x7F) and ($chr > 0x1f)) {
+            $let_str = $let_str . chr $chr;
+        }
+        else {
+            $let_str = $let_str . '.';
+        }
+        $count = $count + 1;
+
+        if ($count == 8) {
+            $num_str = $num_str . ' ';
+            $let_str = $let_str . ' ';
+        }
+
+        if ($count == 16) {
+            printf $handle "%04x%s  %s\n", $offset, $num_str, $let_str;
+            $count = 0;
+            $num_str = '';
+            $let_str = '';
+            $offset = $offset + 16;
+            last if page($f_ref);
+        }
+    }
+    # runt
+    if ($count != 0) {
+        my $pad = '   ' x (16 - $count);
+        if ($count < 8) {
+            $pad = $pad . ' ';
+        }
+        printf $handle "%04x%s $pad %s\n", $offset, $num_str, $let_str;
+    }
+}
+
+
+sub export_s19 {
+    print "ERROR s19 export not yet supported\n";
+}
+
+# Used by file converters. Takes a %f. Called after each output line
+# to do paging when stdout is in use. Return true of output should be
+# aborted.
+sub page {
+    my ($f_ref) = @_;
+
+    if ($f_ref->{line} == $f_ref->{lpp}) {
+        $f_ref->{line} = 1;
+        if (not $f_ref->{export}) {
+            print "\nPress ENTER to continue, Q ENTER to quit";
+            return 1 if <STDIN> =~ /[qQ]/;
+        }
+    }
+    else {
+        $f_ref->{line} = $f_ref->{line} + 1;
+    }
+    return 0
+}
+
+
+# Walk a chain to the end 0,0 sector, filling in the $map with the sectors
+# walked, checking for loops and double-allocations and fixing them(?!)
+# return +ve number for number of sectors in the chain
+# return -1 if error in chain
+sub walk_chain {
+    my ($map_ref, $f_ref) = @_;
+    my $count = 0;
+
+    print "In walk_chain drive=$f_ref->{drive} track=$f_ref->{trk} sector=$f_ref->{sct}, $f_ref->{name} ";
+
+    while (($f_ref->{trk} != 0) or ($f_ref->{sct} !=0)) {
+        $count = $count + 1;
+        if (defined $map_ref->[$f_ref->{trk}][$f_ref->{sct}]) {
+            print "ERROR Attempt to allocate t=$f_ref->{trk}, s=$f_ref->{sct} from $map_ref->[$f_ref->{trk}][$f_ref->{sct}] to $f_ref->{name}\n";
+            print "ERROR Abandon walk_chain after $count sectors.\n";
+            return -1;
+
+            # Approach here should be to modify the parent sector (which we will
+            # need to track) to be the end-of-chain. That will break a loop or
+            # any other form of double-allocation - though we will lose sight of
+            # who the two owners are, so we ought to print that for diagnostic
+            # purposes.
+            # At the end, we are going to look for dangling chainlets.
+            # At that point, we can be dumb or smart. The smart thing will be to
+            # try to accumulate the biggest set of chains that we can. For instance..
+            # - working on the pool of unassigned sectors
+            # - treat each as the head of a chain and see how long a chain they
+            #   grow to before hitting a double allocation or end
+            # - turn a double-allocation into an end
+            # - work from the longest chain to the shortest, creating new files
+            #   zzz1.rec zzz2.rec etc.
+
+
+        }
+        else {
+            $map_ref->[$f_ref->{trk}][$f_ref->{sct}] = $f_ref->{name};
+            rd_nxt_sct($f_ref);
+        }
+    }
+    print "Found $count sectors\n";
+    return $count;
+}
+
+
+# is this a legal FLEX name? Return true if it is, false otherwise.
+# Must be in the form "file dot extension" where
+# file starts with letter, contains a-zA-Z0-9_- only and is 1-8 char
+# extension starts with letter, contains a-zA-Z0-9_- only and is 1-3 char.
+# It is not legal to have no extension (FLEX utilities will not allow
+# you to create or to see such a file).
+# FLEX documentation doesn't state the requirement for the extension
+# to start with a letter but by experiment it seems to require it.
+# In FLEX 9.1 there is a bug where you can do this:
+# +++COPY SAVE.LOW TEST.1   -- apparently successful
+# +++COPY SAVE.LOW TEST.1   -- gives "FILE EXISTS" warning
+# +++DELETE TEST.1          -- gives "EXTENSION REQUIRED" error
+# +++DIR                    -- TEST.1 does not appear
+#
+# ie there is an inconsistency in that COPY will create the
+# file but nothing else can see it
+sub legal_flex_name {
+    my ($name) = @_;
+    return $name =~ /^[a-zA-Z][a-zA-Z\d\-\_]{0,7}\.[a-zA-Z][a-zA-Z\d\-\_]{0,2}$/;
+}
+
+# copy zero or more files
+# files specified by list of directory indices
+sub cp_files {
+    my ($src, $match, $dst) = @_;
+    my $TRK = 0;
+    my $SCT = 1;
+    my $SIZ = 2;
+
+    my @start_free_tsc = ($dsk[$dst]->{sir}->{FIRST_T},
+                          $dsk[$dst]->{sir}->{FIRST_S},
+                          $dsk[$dst]->{sir}->{FREE});
+
+    foreach my $i (@{$match}) {
+        my @src_start_file_tsc = rd_file_start_tsc($src,$i);
+        my $trk = $src_start_file_tsc[$TRK];
+        my $sct = $src_start_file_tsc[$SCT];
+        my $copied = 0;
+
+        # Use directory entry from src as starting point.
+        # *must* update start ts, end ts. Everything else
+        # can stay as-is.
+        my $dir_entry_data = rd_dir_entry($src, $i);
+
+        # copied file starts at first sector of
+        # destination free-list.
+        $dir_entry_data->[17-4] = $start_free_tsc[$TRK];
+        $dir_entry_data->[18-4] = $start_free_tsc[$SCT];
+
+        while (($trk != 0) or ($sct != 0)) {
+            $copied = $copied + 1;
+            my $data = rd_dts($src, $trk, $sct);
+            my @data = unpack("C*", $data);
+
+            my $dst_data = rd_dts($dst,
+                                  $start_free_tsc[$TRK],
+                                  $start_free_tsc[$SCT]);
+            my @dst_data = unpack("C*", $dst_data);
+
+            # next to read
+            $trk = $data[0];
+            $sct = $data[1];
+
+            # copy the sector from src to dst. First, need
+            # to update its link field so that the destination
+            # sector links to the next sector on dst.. unless
+            # this was the last sector, in which case we break
+            # the chain.
+            if (($trk == 0) and ($sct == 0)) {
+                $data[0] = 0;
+                $data[1] = 0;
+
+                # copied file ends at this sector of
+                # destination free-list.
+                $dir_entry_data->[19-4] = $start_free_tsc[$TRK];
+                $dir_entry_data->[20-4] = $start_free_tsc[$SCT];
+            }
+            else {
+                $data[0] = $dst_data[0];
+                $data[1] = $dst_data[1];
+            }
+            wr_dts($dst, $start_free_tsc[$TRK], $start_free_tsc[$SCT], pack("C*", @data));
+
+            # update free list at destination
+            $start_free_tsc[$TRK] = $dst_data[0];
+            $start_free_tsc[$SCT] = $dst_data[1];
+            $start_free_tsc[$SIZ] = $start_free_tsc[$SIZ] - 1;
+        }
+
+        # sanity
+        if ($copied != $src_start_file_tsc[$SIZ]) {
+            print "ERROR - copied file chain longer than file declared\n";
+        }
+
+        my $index = allocate_dir_entry($dst);
+        wr_dir_entry($dst, $index, $dir_entry_data);
+    }
+
+    # and refresh the local data
+    rd_dir($dst);
+}
+
+
+# delete zero or more files
+# files specified by list of directory indices
+sub rm_files {
+    my ($drive, $match) = @_;
+
+    foreach my $i (@{$match}) {
+        $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} | $SFLG_DEL;
+    }
+    wr_dir($drive);
+}
+
+
+
+# delete sectors from the end(s) of zero or more files
+# files specified by list of directory indices
+sub truncate_files {
+    my ($drive, $match, $num) = @_;
+    my $TRK = 0;
+    my $SCT = 1;
+    my $SIZ = 2;
+
+    my @end_free_tsc = ($dsk[$drive]->{sir}->{LAST_T},
+                        $dsk[$drive]->{sir}->{LAST_S},
+                        $dsk[$drive]->{sir}->{FREE});
+
+    foreach my $i (@{$match}) {
+        my @start_file_tsc = rd_file_start_tsc($drive,$i);
+        my @end_file_tsc = rd_file_end_tsc($drive,$i);
+
+        my $new_size = $start_file_tsc[$SIZ] - $num;
+
+        if ($new_size < 1) {
+            printf "ERROR cannot truncate %s.%s that much\n",
+            $dsk[$drive]->{dir}->[$i]->{NAME},
+            $dsk[$drive]->{dir}->[$i]->{EXT};
+        }
+        else {
+            # find trk, sct of new end sector for file
+            my $trk = $start_file_tsc[$TRK];
+            my $sct = $start_file_tsc[$SCT];
+            for my $j (1..$new_size-1) {
+                #($trk, $sct) = rd_link($drive, $trk, $sct);
+            }
+
+            # undate directory entry with new file size and end sector
+            my $dir_entry_data = rd_dir_entry($drive, $i);
+            $dir_entry_data->[19-4] = $trk;
+            $dir_entry_data->[20-4] = $sct;
+            $dir_entry_data->[21+0-4] = $new_size >> 8;
+            $dir_entry_data->[21+1-4] = $new_size & 0xff;
+            wr_dir_entry($drive, $i, $dir_entry_data);
+
+            # extract link from new end sector, and set its link to 0
+            ##($trk, $sct) = rdwr_link($drive, $trk, $sct, 0, 0);
+
+            # add the liberated sectors to the end of the free chain
+            ##rdwr_link($drive, $end_free_tsc[$TRK], $end_free_tsc[$SCT], $trk, $sct);
+            # ..and update the stats
+            $end_free_tsc[$TRK] = $end_file_tsc[$TRK];
+            $end_free_tsc[$SCT] = $end_file_tsc[$SCT];
+            $end_free_tsc[$SIZ] = $end_free_tsc[$SIZ] + $num;
+        }
+    }
+
+    # Finally, update the SIR and refresh the local copy
+##    wr_sir_end_free($drive, @end_free_tsc);
+}
+
+
+
+
+# read one or more sectors, return data as a string.
+# sector specified by drive, offset, number
+sub rd_dsec {
+    my ($drive, $start, $num) = @_;
+
+    my $data;
+    my $seek = $start * $BYTES_SECTOR;
+    my $want = $num * $BYTES_SECTOR;
+
+    if (seek $dsk[$drive]->{handle}, $seek, 0) {
+        my $got = read $dsk[$drive]->{handle}, $data, $want;
+        if ($got == $want) {
+            return $data;
+        }
+        else {
+            # TODO BUG: this makes it a fatal error to mount a bad file. Fix that!
+            die "Could not read $want bytes at offset $seek on drive $drive";
+        }
+    }
+    else {
+        die "Could not reach offset $seek on drive $drive";
+    }
+}
+
+# read a sector, return data as a string.
+# sector specified by drive,track,sector
+# If disk in dsk format, it's 256 bytes per sector.
+# If disk in img format, seek twice as far and read 1st copy of the data
+sub rd_dts {
+    my ($drive, $trk, $sct) = @_;
+    my $seek;
+    my $data;
+    if ($trk == 0) {
+        # don't need to know geometry
+        $seek = ($sct - 1) * 256;
+    }
+    else {
+        if ($trk > $dsk[$drive]->{sir}->{MAX_T}) {
+            die "FATAL ERROR track $trk is out of range";
+        }
+        if ($sct > $dsk[$drive]->{sir}->{MAX_S}) {
+            die "FATAL ERROR sector $sct is out of range";
+        }
+
+        $seek = (($sct - 1) + ($trk * $dsk[$drive]->{sir}->{MAX_S})) * 256;
+    }
+    if (seek $dsk[$drive]->{handle}, $seek, 0) {
+        my $got = read $dsk[$drive]->{handle}, $data, $BYTES_SECTOR;
+        if ($got == $BYTES_SECTOR) {
+            return $data;
+        }
+        else {
+            # TODO BUG: this makes it a fatal error to mount a bad file. Fix that!
+            die "Could not read $BYTES_SECTOR bytes at offset $seek on drive $drive";
+        }
+    }
+    else {
+        die "Could not reach offset $seek on drive $drive track $trk sector $sct";
+    }
+}
+
+
+# read next sector. Used to update an %f for byte-by-byte
+# file read. Updates fields of %f:
+# sec, nsec, \@data, index
+# return 1 if data updated
+# return 0 if no more data
+sub rd_nxt_sct {
+    my ($f_ref) = @_;
+
+    if ($f_ref->{nsec}==0) {
+        return 0;
+    }
+    else {
+        my $data = rd_dsec($f_ref->{drive}, $f_ref->{sec}, 1);
+        $f_ref->{sec} = $f_ref->{sec} + 1;
+        $f_ref->{nsec} = $f_ref->{nsec} - 1;
+        my @data = unpack("C*", $data);
+        $f_ref->{data} = \@data;
+        $f_ref->{index} = 0;
+        return 1;
+    }
+}
+
+
+# read next character. Used to update an %f for byte-by-byte
+# file read. Updates fields of %f:
+# sec, nsec, \@data, index eof
+# return chr
+# Must check {eof} false BEFORE calling this.
+sub rd_nxt_chr {
+    my ($f_ref) = @_;
+
+    if ($f_ref->{eof}) {
+        die "FATAL ERROR call to rd_nxt_sct past eof";
+    }
+    else {
+        my $byte = $f_ref->{data}->[$f_ref->{index}];
+        if ($f_ref->{index} < 255) { ## TODO should be $BYTES_PER_SEC or somesuch
+            $f_ref->{index} = $f_ref->{index} + 1;
+        }
+        else {
+            # final byte. Load next sector or set eof
+            if (not rd_nxt_sct($f_ref)) {
+                $f_ref->{eof} = 1;
+            }
+        }
+        return $byte;
+    }
+}
+
+
+# write a sector, incoming data is a string.
+# sector specified by drive,track,sector
+# If disk in dsk format, it's 256 bytes per sector.
+# If disk in img format, seek twice as far and write 2 copies of the data
+sub wr_dts {
+    my ($drive, $trk, $sct, $data) = @_;
+    my $seek;
+    if ($trk == 0) {
+        # don't need to know geometry
+        $seek = ($sct - 1) * 256;
+    }
+    else {
+        if ($trk > $dsk[$drive]->{sir}->{MAX_T}) {
+            die "FATAL ERROR track $trk is out of range";
+        }
+        if ($sct > $dsk[$drive]->{sir}->{MAX_S}) {
+            die "FATAL ERROR sector $sct is out of range";
+        }
+
+        $seek = (($sct - 1) + ($trk * $dsk[$drive]->{sir}->{MAX_S})) * 256;
+    }
+    if (seek $dsk[$drive]->{handle}, $seek, 0) {
+        my $fh = $dsk[$drive]->{handle};
+        print $fh $data;
+        # 2nd copy
+        print $fh $data;
+    }
+    else {
+        die "Could not reach offset $seek on drive $drive";
+    }
+}
+
+
+# Summary of the drive
+sub describe {
+    my ($drive) = @_;
+    my $i = "        ";
+    printf "$i Disk name: %20s\n", $dsk[$drive]->{dname};
+    printf "$i Next free: 0x%04x (0x%04x sectors total)\n",  $dsk[$drive]->{nxtsec}, $dsk[$drive]->{blks};
+    printf "$i Used FCBs: %d out of 50\n", $dsk[$drive]->{fcbval};
+}
+
+
+# read directory and attach as data structure to $dsk
+# this is used as a read-only cache: anything that writes to the
+# directory writes to the disk image then calls rd_dir() to keep
+# the cache up-to-date.
+# TODO or modifies it here then flushes it back out to disk? The
+# key thing is that we never keep changes lurking here between
+# commands.
+sub rd_dir {
+    my ($drive) = @_;
+
+    # Directory is in the first 4 sectors of the disk (1024 bytes).
+    # Its format is described in the PolyDos System Programmers
+    # guide.
+    my $data = rd_dsec($drive, 0, 4);
+    my @data = unpack("C*", $data);
+
+    $dsk[$drive]->{dname} = substr($data, 0, 20);
+    $dsk[$drive]->{nxtsec} = $data[20] + 256 * $data[21];
+    $dsk[$drive]->{nxtfcb} = $data[22] + 256 * $data[23];
+    $dsk[$drive]->{fcbval} = ($dsk[$drive]->{nxtfcb} - $FCB_BASE)/$FCB_SIZE;
+
+    my @fcb;
+    for (my $i=0; $i<50; $i=$i+1) {
+        my $xx = substr($data, $FCB_OFFSET + $i*$FCB_SIZE + 0, 8);
+        $xx =~ s/ *$//; # delete trailing spaces
+        $fcb[$i]->{fnam} = $xx;
+        $xx = substr($data, $FCB_OFFSET + $i*$FCB_SIZE + 8, 2);
+        $xx =~ s/ *$//; # delete trailing spaces
+        $fcb[$i]->{fext} = $xx;
+        $fcb[$i]->{fsfl} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 10];
+        $fcb[$i]->{fufl} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 11];
+        $fcb[$i]->{fsec} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 12] +
+                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 13];
+        $fcb[$i]->{fnsc} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 14] +
+                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 15];
+        $fcb[$i]->{flda} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 16] +
+                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 17];
+        $fcb[$i]->{fexa} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 18] +
+                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 19];
+    }
+
+    $dsk[$drive]->{fcb} = \@fcb;
+}
+
+
+# Create a binary data structure associated with the directory data structure
+# and write it to the disk
+sub wr_dir {
+    my ($drive) = @_;
+
+    print "NOT YET IMPLEMENTED - wr_dir\n";
+}
+
+
+
+# Given a drive number and (potentially wildcarded) file name/extension,
+# return a reference to a list of the directory entries that match.
+sub filter_dir {
+    my ($drive, $file, $ext) = @_;
+    my @matches;
+
+    # turn the file specifier into a legal PERL regex: * -> [-\w]*
+    $file =~ s|\*|\[-\\w\]\*|g;
+    $ext =~  s|\*|\[-\\w\]\*|g;
+
+    for my $i (0..($dsk[$drive]->{fcbval} -1)) {
+        if (($dsk[$drive]->{fcb}->[$i]->{fnam} =~ /^$file$/)
+            and ($dsk[$drive]->{fcb}->[$i]->{fext} =~ /^$ext$/)) {
+            push @matches, $i;
+        }
+    }
+    return \@matches;
+}
+
+
+# $files is a ref to a list of indices to files on $drive1.
+# Look for filename matches on $drive2 and return a ref
+# to a list of the directory entries that match - that list
+# corresponds to indices in $drive2, NOT $drive1.
+sub index_match_dir {
+    my ($drive1, $files, $drive2) = @_;
+    my @matches;
+    my %drive1_names;
+
+    # build a hash of the names we're looking for
+    foreach my $i (@{$files}) {
+        my $name = "$dsk[$drive1]->{dir}->[$i]->{NAME}.$dsk[$drive1]->{dir}->[$i]->{EXT}";
+        $drive1_names{$name} = 1;
+    }
+
+    for my $i (0.. $#{$dsk[$drive2]->{dir}}) {
+        my $name = "$dsk[$drive2]->{dir}->[$i]->{NAME}.$dsk[$drive2]->{dir}->[$i]->{EXT}";
+        if (exists $drive1_names{$name}) {
+            push @matches, $i;
+        }
+    }
+
+    return \@matches;
+}
+
+
+# $names is a ref to a list of file names.
+# Look for filename matches on $drive and return a ref
+# to a list of the directory entries that match - that list
+# corresponds to indices in $drive.
+# If $toupper is true, entries in $names will be forced to
+# upper case before attempting a match.
+sub name_match_dir {
+    my ($drive, $names, $toupper) = @_;
+    my @matches;
+    my %names;
+
+    # build a hash of the names we're looking for
+    foreach my $i (@{$names}) {
+        if ($toupper) {
+            $names{uc $i} = 1;
+        }
+        else {
+            $names{$i} = 1;
+        }
+    }
+
+    for my $i (0.. $#{$dsk[$drive]->{dir}}) {
+        my $name = "$dsk[$drive]->{dir}->[$i]->{NAME}.$dsk[$drive]->{dir}->[$i]->{EXT}";
+        if (exists $names{$name}) {
+            push @matches, $i;
+        }
+    }
+
+    return \@matches;
+}
+
+
+# delete an entry from the directory by editing the sector
+sub rm_dir_entry {
+    my ($drive, $index) = @_;
+
+    my $trk = $dsk[$drive]->{dir}->[$index]->{T};
+    my $sct = $dsk[$drive]->{dir}->[$index]->{S};
+    my $entry = $dsk[$drive]->{dir}->[$index]->{ENTRY};
+
+    # first byte of the directory entry (first byte of the name)
+    my $offset = 16 + ($entry * 24);
+
+    # keep local data structure intact
+    $dsk[$drive]->{dir}->[$index]->{NAME} = "%DELETED";
+    $dsk[$drive]->{dir}->[$index]->{EXT} = "%";
+
+    my $data = rd_dts($drive, $trk, $sct);
+    my @data = unpack("C*", $data);
+    # set MSB to mark it as a deleted entry
+    $data[$offset] = $data[$offset] | 0x80;
+
+    wr_dts($drive, $trk, $sct, pack("C*", @data));
+}
+
+
+# Return a reference to an empty directory entry
+# data structure - to be filled in and then used by
+# allocate_dir_entry(), wr_dir_entry() etc.
+sub empty_dir_entry {
+    my @dir_entry = (0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0);
+    return \@dir_entry;
+}
+
+
+# Insert a file name into a directory entry.
+# $flex_name is file name and extension, separated by "."
+# $dir_entry_data is a reference to an array eg created
+# by empty_dir_entry() or rd_dir_entry()
+sub name_dir_entry {
+    my ($flex_name, $dir_entry_data) = @_;
+
+    my $findex = 0;
+    my $sindex = 0;
+    while (my $char = ord substr($flex_name, $findex, 1)) {
+        if ($char == 0x2e) {
+            $sindex = 8;
+            $findex = $findex + 1;
+            next;
+        }
+
+        $dir_entry_data->[$sindex] = $char;
+        $findex = $findex + 1;
+        $sindex = $sindex + 1;
+    }
+}
+
+
+# Return an index to a directory entry that is unused.
+# If possible, an entry that has never been used will be
+# allocated. Otherwise, an entry that has been deleted will
+# be allocated. Use dir_entries() before to make sure that
+# an unallocated entry exists; there is no check here.
+sub allocate_dir_entry {
+    my ($drive) = @_;
+
+    # first try for a never-used entry
+    for my $i (0.. $#{$dsk[$drive]->{dir}}) {
+        my $j = $dsk[$drive]->{dir}->[$i];
+        if ($j->{NAME} eq "%UNUSED") {
+            # keep local data structure intact
+            $j->{NAME} = "%ALLOCATED";
+            return $i
+        }
+    }
+
+    # otherwise a deleted entry
+    for my $i (0.. $#{$dsk[$drive]->{dir}}) {
+        my $j = $dsk[$drive]->{dir}->[$i];
+        if ($j->{NAME} eq "%DELETED") {
+            # keep local data structure intact
+            $j->{NAME} = "%ALLOCATED";
+            return $i
+        }
+    }
+    die "FATAL internal error - no unused directory entry\n";
+}
+
+
+# return a reference to a 24-element array that is the directory
+# data for the specified index/drive. Read from disk.
+sub rd_dir_entry {
+    my ($drive, $index) = @_;
+
+    my $trk = $dsk[$drive]->{dir}->[$index]->{T};
+    my $sct = $dsk[$drive]->{dir}->[$index]->{S};
+    my $entry = $dsk[$drive]->{dir}->[$index]->{ENTRY};
+
+    # first byte of the directory entry
+    my $offset = 16 + ($entry * 24);
+
+    my $data = rd_dts($drive, $trk, $sct);
+    my $dir_data = substr($data, $offset, 24);
+    my @dir_data = unpack("C*", $dir_data);
+    return \@dir_data;
+}
+
+
+# write a directory entry to disk. The directory entry is a
+# reference to a 24-element array that is the directory data
+# and it's written to the specified index/drive. Writes to disk.
+# Local copy of directory structure is NOT kept coherent.
+sub wr_dir_entry {
+    my ($drive, $index, $dir_data) = @_;
+
+    my $trk = $dsk[$drive]->{dir}->[$index]->{T};
+    my $sct = $dsk[$drive]->{dir}->[$index]->{S};
+    my $entry = $dsk[$drive]->{dir}->[$index]->{ENTRY};
+
+    # first byte of the directory entry
+    my $offset = 16 + ($entry * 24);
+
+    my $data = rd_dts($drive, $trk, $sct);
+    my @data = unpack("C*", $data);
+    for my $i (0..23) {
+        $data[$offset + $i] = $dir_data->[$i];
+    }
+    wr_dts($drive, $trk, $sct, pack("C*", @data));
+}
+
+
+# return start track/sector and sector count for specified file
+sub rd_file_start_tsc {
+    my ($drive, $index) = @_;
+
+    return ($dsk[$drive]->{dir}->[$index]->{FIRST_T},
+            $dsk[$drive]->{dir}->[$index]->{FIRST_S},
+            $dsk[$drive]->{dir}->[$index]->{SIZE});
+}
+
+
+# return last track/sector and sector count for specified file
+sub rd_file_end_tsc {
+    my ($drive, $index) = @_;
+
+    return ($dsk[$drive]->{dir}->[$index]->{LAST_T},
+            $dsk[$drive]->{dir}->[$index]->{LAST_S},
+            $dsk[$drive]->{dir}->[$index]->{SIZE});
+}
+
+
+# sum the sectors needed to hold the specified files
+sub sectors {
+    my ($drive, $match) = @_;
+    my $sum = 0;
+
+    foreach my $i (@{$match}) {
+        $sum = $sum + $dsk[$drive]->{dir}->[$i]->{SIZE};
+    }
+
+    return $sum;
+}
+
+
+# count the number of free directory entries
+sub dir_entries {
+    my ($drive) = @_;
+    my $sum = 0;
+
+    for my $i (0.. $#{$dsk[$drive]->{dir}}) {
+        my $j = $dsk[$drive]->{dir}->[$i];
+        if (($j->{NAME} eq "%UNUSED") or ($j->{NAME} eq "%DELETED")) {
+            $sum = $sum + 1;
+        }
+    }
+
+    return $sum;
+}
+
+
+#################################################################
+#################################################################
+## Help
+
+sub help_for {
+    my ($cmd) = @_;
+    if ($cmd eq 'mount') {
+        print <<EOF
+    mount <virtual drive number> <file on host filesystem>
+
+    Associate a file on the host filesystem with a virtual drive number.
+
+    Virtual drive number is 0,1,2 or 3.
+
+    Examples:
+    mount 1 ../../foo.dsk
+    mount 0 advent.bin
+EOF
+    }
+    elsif ($cmd eq 'umount') {
+        print <<EOF
+    umount <virtual drive number>
+
+    Close file associated with virtual drive number and make that virtual
+    drive number available for reuse.
+
+    Examples:
+    umount 0
+    umount 2
+EOF
+}
+    elsif ($cmd eq 'clone') {
+        print <<EOF
+    clone <virtual drive number> <file on host filesystem>
+
+    Make a copy of a virtual drive as a file on the host filesystem
+
+    Virtual drive number is 0,1,2 or 3.
+
+    This is exactly the same as doing copy on the host filesystem
+
+    Examples:
+    clone 1 ../../foo.dsk
+    clone 0 advent.dsk
+    clone 2 system.img
+    clone 0 foo.zzz
+    clone 0 bar.dsk
+EOF
+    }
+    elsif ($cmd eq 'new') {
+        print <<EOF
+    new <file on host filesystem> [s=<num>]
+
+    Create a file on the host filesystem that represents a blank disk.
+    ANY EXISTING FILE OF THAT NAME WILL BE SILENTLY DELETED.
+
+    The size of the disk can be specified. s=Y creates a disk of Y
+    sectors.
+
+    If the geometry is not specified it defaults to t=$SECTORS
+
+    The disk image created is empty, with a valid, empty directory
+    and a blank disk name. Mount the image and use 'name' to set
+    the disk name.
+
+    See 'help name'
+
+    Examples:
+    new foo.bin
+    new bar.bin s=256
+    mount 0 bar.bin
+    name 0 BASIC Progs 2
+EOF
+    }
+    elsif ($cmd eq 'copy') {
+        print <<EOF
+    copy <file specifier> <virtual drive specifier>
+
+    Copy all of the files that match the file specifier (source)
+    to the specified virtual drive (destination). Any files of
+    the same name on the specified virtual drive are deleted.
+
+    The syntax of this command does not allow the name of the
+    file to be changed as a side-effect of the copy. Therefore,
+    it is not legal for the source drive to match the destination
+    drive. This restriction may be removed in the future.
+
+    Copying a file that has the R (random) attribute set does
+    NOT regenerate the file sector map in the first two sectors
+    of the file. You must rebuild that under the control of FLEX,
+    using the COPYR utility.
+
+
+    Examples:
+    copy 2 3
+    copy 2.*.* 3
+    copy 2.*.CMD 3
+    copy 1.FLEX.SYS 2
+EOF
+    }
+    elsif ($cmd eq 'rename') {
+        print <<EOF
+    rename <file specifier> <new file specifier>
+
+    Rename the file that matches the file specifier (source)
+    to the new name. Any existing file of the same name on
+    the virtual drive is deleted.
+
+    The new file specifier must be on the same virtual drive. The
+    files can be specified using wildcard, but must each resolve
+    to exactly one file.
+
+    Examples:
+    rename 1.FLEX.SYS 1.FLEX.OLD
+    rename 1.*.COR 1.FLEX.BAK
+    rename 1.FRED.TXT 1.FR*.BAK
+EOF
+    }
+    elsif ($cmd eq 'name') {
+        print <<EOF
+    name <virtual drive number> myname
+
+    Change the name for the specified virtual drive number.
+    label is truncated after 11 characters.
+
+    Example:
+    label 1 mydisk
+    label 0 fooo_by
+EOF
+    }
+    elsif ($cmd eq 'type') {
+        print <<EOF
+    type <file specifier> [<conversions>] [<lines per page>]
+
+    Display the contents of the specified files, <lines per page>
+    lines at a time (default: $LINES_PER_PAGE).
+
+    The default conversions are:
+    txt=expand
+    bin=record
+    xxx=dump
+
+    See 'help conversions' for more details. See also 'help export'
+
+    Example:
+    type 1.*.TXT txt=raw 25
+    type 1.*.TXT txt=raw bin=record xxx=dump
+EOF
+    }
+    elsif ($cmd eq 'export') {
+        print <<EOF
+    export <file specifier> [<conversions>] [<path in local file system>]
+
+    Copy the specified files to a directory in the host filesystem.
+    By default, the files will be saved in the current working directory
+    but this can be overridden by specifying a path.
+
+    Every file is saved with the same name as its name in the disk; any
+    existing file of the same name will be overwritten.
+
+    The default conversions are:
+    txt=raw
+    bin=raw
+    xxx=raw
+
+    See 'help conversions' for more details. See also 'help type'
+
+    Example:
+    export 1.*.TXT txt=expand ../files
+    export 1.*.* txt=raw bin=record xxx=dump some_subdirectory
+EOF
+    }
+    elsif ($cmd eq 'import') {
+        print <<EOF
+    import <virtual drive number> <file on host filesystem> [<conversions>]
+
+    Copy the specified file(s) to the specified virtual drive from
+    the host filesystem. Files can be specified using wildcarding
+    (see examples below).
+
+    A file on the host filesystem that might otherwise be selected
+    is silently ignored if it is zero bytes in size or if it does not
+    have a legal FLEX file name.
+
+    The 'uppercase' command does not affect the wildcard matching of
+    files in the host filesystem but does affect the name used for
+    the imported file created on the virtual drive.
+
+    Any existing file of the same name on the virtual drive is
+    overwritten.
+
+    An ambiguous situation arises if files with distinct names on the
+    host filesystem end up with the same name (because of case conversion)
+    on the virtual drive; multiple files of the same name will be created.
+
+    If there are insufficient free directory entries or free blocks
+    on the virtual drive, the import will not proceed.
+
+    The default conversion is:
+    xxx=raw
+
+    See 'help conversions' for more details. See also 'help date'
+    and 'help uppercase'.
+
+    Because import does not attempt to guess the file type, it
+    may be necessary to import files in groups, applying different
+    conversions based on file extension and user knowledge.
+
+    To copy files between virtual drives, it is best to mount
+    both virtual drives and use 'copy', rather than using an
+    'export'/'import' sequence. Using 'copy' ensures a
+    byte-accurate copy, avoiding two problems:
+
+    * 'export'/'import' is error-prone because you need to
+      specify conversions in each step
+    * 'export'/'import' may not result in a byte-accurate copy;
+      text-file compression may be more aggressive, binary files
+      will omit redundant (eg overlapping) records.
+
+    Example:
+    hdir ../
+    fred.txt Fred.TXT fred.CMD
+    import 0 ../*.* xxx=raw         # uppercase=0: import 3 files
+    import 0 ../*.* xxx=raw         # uppercase=1: either fred.txt
+                                    # or Fred.TXT will be overwritten
+    import 0 ../*.TXT xxx=compress  # uppercase=0: import Fred.TXT
+                                    # as Fred.TXT
+    import 0 ../*.TXT xxx=compress  # uppercase=1: import Fred.TXT
+                                    # as FRED.TXT
+    import 0 ../*.CMD xxx=s19       # uppercase=0: import fred.CMD
+                                    # as fred.CMD
+    import 0 ../*.CMD xxx=s19       # uppercase=1: import fred.CMD
+                                    # as FRED.CMD
+EOF
+    }
+    elsif ($cmd eq 'dir') {
+        print <<EOF
+    dir <virtual drive number> | <file specifier>
+
+    List all of the files on the specified virtual drive, or
+    all of the files that match the file specifier. The file
+    specifier can include * used as a wildcard.
+
+    Examples:
+    dir 2
+    dir 1.FLEX.SYS
+    dir 1.F*.*
+    dir 1.*.CMD
+    dir 1.*A*.*
+EOF
+    }
+    elsif ($cmd eq 'hdir') {
+        print <<EOF
+    hdir <host os arguments> <path in local file system>
+
+    List files on the host's filesystem. Just a convenience
+    to avoid you having to shell out of flex_vfs. All of the
+    arguments supported by the host are also supported.
+
+    Examples:
+    hdir
+    hdir .
+    hdir -al ../
+EOF
+    }
+    elsif ($cmd eq 'delete') {
+        print <<EOF
+    delete <virtual drive number> | <file specifier>
+
+    Set the delete (D) flag on all of the files on the specified
+    virtual drive, or all of the files that match the file specifier.
+    The file specifier can include * used as a wildcard.
+
+    BE CAREFUL BECAUSE NO CONFIRMATION IS ASKED FOR!
+
+    Examples:
+    delete 2
+    delete 1.FLEX.SYS
+    delete 1.F*.*
+    delete 1.*.CMD
+    delete 1.*A*.*
+EOF
+    }
+    elsif ($cmd eq 'lock') {
+        print <<EOF
+    lock <virtual drive number> | <file specifier>
+
+    Set the lock (L) flag on all of the files on the specified
+    virtual drive, or all of the files that match the file specifier.
+    The file specifier can include * used as a wildcard.
+
+    Examples:
+    lock 2
+    lock 1.FLEX.SYS
+    lock 1.F*.*
+    lock 1.*.CMD
+    lock 1.*A*.*
+EOF
+    }
+    elsif ($cmd eq 'unlock') {
+        print <<EOF
+    unlock <virtual drive number> | <file specifier>
+
+    Clear the lock (L) flag on all of the files on the specified
+    virtual drive, or all of the files that match the file specifier.
+    The file specifier can include * used as a wildcard.
+
+    Examples:
+    unlock 2
+    unlock 1.FLEX.SYS
+    unlock 1.F*.*
+    unlock 1.*.CMD
+    unlock 1.*A*.*
+EOF
+    }
+    elsif ($cmd eq 'truncate') {
+        print <<EOF
+    truncate <file specifier> <number of sectors>
+
+    Remove <number of sectors> from the end of every file on the
+    specified virtual drive, or all of the files that match the
+    file specifier. The file specifier can include * used as a wildcard.
+
+    The sectors that are removed are added to the end of the free
+    chain. See 'create'.
+
+    Experts only! You need a really good reason before you use this
+    command!
+
+    BE CAREFUL BECAUSE NO CONFIRMATION IS ASKED FOR!
+
+    Examples:
+    truncate 1.FLEX.SYS 2
+    truncate 1.*A*.* 4
+EOF
+    }
+    elsif ($cmd eq 'create') {
+        print <<EOF
+    create <file specifier> <number of sectors>
+
+    Create a file by taking a number of sectors from the end
+    of the free list. Can be used in conjunction with 'truncate'
+    to break a file into pieces (eg, to reverse the process
+    performed by the FLEX utility 'APPEND').
+
+    The file specifier must not match an existing file name.
+
+    Example:
+    copy 1.FLEX.SYS 1.FLEX.TMP
+    truncate 1.FLEX.TMP 3
+    create 1.FLEX.PT1 3
+    truncate 1.FLEX.TMP 4
+    create 1.FLEX.PT2 4
+EOF
+    }
+    elsif ($cmd eq 'link') {
+        print <<EOF
+    link <file specifier>
+
+    Patch the boot sector of the disk holding the specified
+    file (usually FLEX.SYS) so that a subsequent boot of the
+    system will load and start the specified file.
+
+    See 'help wrboot' for background on the FLEX boot sector.
+
+    Example:
+    link 1.FLEX.SYS
+    link 1.F*
+
+    Wildcarding will generate an error if it resolves to more
+    than one file.
+EOF
+    }
+    elsif ($cmd eq 'fix') {
+        print <<EOF
+TODO
+EOF
+    }
+    elsif ($cmd eq 'check') {
+        print <<EOF
+    check <virtual drive number>
+
+    Perform simple integrity tests on the disk directory. Specifically,
+    check that:
+
+    - sectors assigned to files start at sector 4
+    - sectors are assigned sequentially and contiguously
+    - the first free sector follows on from the last allocated sector
+EOF
+    }
+    elsif ($cmd eq 'scrub') {
+        print <<EOF
+    scrub <virtual drive number>
+
+    Over-write every unused directory entry and every unused sector
+    with 0x00 values. This is intended to remove all trace of deleted
+    files. The main motivation is to allow the resultant disk images
+    to compress better.
+EOF
+    }
+    elsif ($cmd eq 'repair') {
+        print <<EOF
+TODO
+EOF
+    }
+    elsif ($cmd eq 'uppercase') {
+        print <<EOF
+    uppercase [0|1]
+    FLEX can use mixed-case file names and flex_vfs allows this by
+    default. However, many old FLEX disks have upper-case only file
+    names and it can be tedious using the shift key continually.
+
+    flex_vfs can force all FLEX file specifiers to upper case (note
+    that wildcard '*' will still match both upper-case and lower-case
+    if they exist on the disk).
+
+    when upper-case forcing is enabled, filenames that are arguments
+    to 'import' are forced to upper case.
+
+    uppercase toggles the state of upper-case forcing. With an
+    argument of 0 or 1 it forces the state. In both cases, the new
+    state is reported.
+EOF
+    }
+    elsif ($cmd eq 'formats') {
+        print <<EOF
+    Different polydos releases supported different disk drives,
+    having different number of sectors/tracks/sides. In all cases,
+    the sector size is contant (256 bytes) and Polydos treats the
+    disk as a linear sequence of sectors, starting at 0.
+
+    All of the conversion between linear sector address and track/
+    sector/size takes place in the Polydos ROM, effectively
+    a hardware abstraction layer.
+
+    Within polydos_vfs, you can mount disk images of different
+    sizes (eg, from 35-track and 40-track systems) and transfer
+    data betweem them; the only requirement is that the sector
+    count is correct in the directory data structure.
+
+    However, Polydos itself is not so flexible; it provides a SCAL
+    DSIZ which reports the size of a disk (though on the SD/DD system
+    2 disk sizes can co-exist.
+EOF
+    }
+    elsif ($cmd eq 'comments') {
+        print <<EOF
+    Command lines can include comments (useful for a script) in two
+    different formats:
+
+    (text in braces is treated as a comment and ignored)
+    # text from a hash to the end of the line is ignored
+EOF
+    }
+    elsif ($cmd eq 'conversions') {
+        print <<EOF
+    The FLEX Advanced Programmers Guide documents 3 file formats:
+
+    * A text format that may include a simple run-length compression
+      of spaces
+    * A binary record format for executable images
+    * A random access file format
+
+    flex_vfs provides the following file converters for export/type:
+
+    raw - a literal byte stream representing the data payload of
+    every sector in the file. For a file of N sectors, the file will
+    be (256-4)*N bytes in size.
+
+    expand - decompress text file and strip NULL bytes from the end.
+
+    record - parse a binary record and dump it in readable format.
+
+    dump - hex and ASCII dump.
+
+    s19 - parse a binary record and export it in S19 format.
+
+    .. and the following file converters for import:
+
+    raw - a literal byte stream representing the data payload of
+    the host file. A file of N bytes will require N/(256-4) sectors;
+    the final sector will be padded with NULL bytes.
+
+    compress - compress a test file. Pad the final sector with NULL
+    bytes.
+
+    s19 - parse an S19 file and convert it to FLEX binary record
+    format.
+
+    The 'type' and 'export' commands use a simple heuristic to
+    classify files as 'txt', 'bin' or 'xxx' (anything else).
+    A default converter is set for each of these file types. The
+    converters can be overridden by specifying name/value pairs.
+    For example:
+
+    txt=raw bin=dump xxx=dump
+
+    'import' does not attempt to classify files but considers
+    every file to be of type 'xxx'. The default converter can be
+    overridden by specifying a name/value pair.
+    For example:
+
+    xxx=compress
+
+    Any file types with unspecified converters will use the defaults.
+EOF
+    }
+    elsif ($cmd eq 'scripts') {
+        print <<EOF
+    If you put a sequence of commands in a file you can run them
+    by redirecting STDIN. For example, create a file sys.scr with
+    this content:
+
+# make a bootable system disk
+mount 1 test1.img
+clone 1 boot.dsk
+mount 2 boot.dsk
+copy 1.*.CMD 2      # need commands
+copy 1.FLEX.SYS 2   # need this too!
+rdboot 1
+wrboot 2            # copy boot sector
+link 2.FLEX.SYS     # make it bootable
+exit
+
+    From the command line invoke it like this:
+
+\$ flex_vfs < sys.scr
+
+    The script *must* end with an 'exit' - there is no way
+    (for example) to drop out of a script and continue interactively
+    (that's a pity and I'd welcome suggestions that would make that work).
+EOF
+    } #'
+    else {
+        # no more to say about info, help, exit (or any non-existent command)
+        print <<EOF
+    No additional help is available on that topic
+EOF
+    }
+}
+
+
+sub help_generic {
+    print <<EOF
+
+new for polydos:
+FORMAT
+PACK
+
+polydos_vfs allows manipulation of up to 4 virtual drives, numbered 0 through 3.
+Each drive can be associated with a file on the host filesystem. Files
+can be copied between virtual drives or transferred between virtual drives
+and the host filesystem. Virtual drives can be inspected and manipulated.
+
+Commands are:
+
+    mount      - associate disk image with virtual drive number
+    umount     - disconnect disk image from drive number
+    info       - report virtual drives currently mounted
+    clone      - make copy of virtual drive
+    new        - create new empty disk image (optional size specification)
+    copy       - copy file(s) from one virtual drive to another
+    rename     - change name of file on virtual drive
+    name       - change disk name
+    type       - view file from virtual drive (optional format conversion)
+    export     - copy file from virtual drive to local file system (optional format conversion)
+    import     - copy file from local file system to virtual drive (optional format conversion)
+    dir        - directory of virtual drive
+    hdir       - directory of local file system
+    delete     - set delete (D) flag on file(s) from virtual drive
+    lock       - set lock (L) flag on file(s) from virtual drive
+    unlock     - clear lock (L) flag on file(s) from virtual drive
+    truncate   - delete sector(s) from file(s) from virtual drive
+    create     - create file from sector(s) on the free list
+    fix        - perform low-level edit on virtual drive
+    check      - check integrity of virtual drive
+    scrub      - null out deleted file names and unused sectors
+    uppercase  - treat all POLYDOS file specifiers as upper-case
+    exit       - unmount all mounted drives and leave polydos_vfs
+    quit       - synonym for exit
+    help       - this is it.
+
+Other help topics: comments formats scripts conversions
+
+Type help <command name> or help <topic> for more help.
+EOF
+}
