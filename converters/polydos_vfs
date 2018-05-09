@@ -15,14 +15,13 @@
 # export
 # import
 # undelete - if multiple matches, undeletes oldest first.
+# attrib - to change load address etc.
 # truncate
 # create??
 # fix -- not implemented in flex version
-# pack
 # wildcarding
 # DELETE all old/irrelevant subroutines
 # Disk specifier in correct order and with letter restrictions
-
 
 # bugette: filter also checks files that are marked as deleted.
 # bugette: polydos will only allow you to delete a file that is unlocked. Should impose and document the same rule
@@ -366,7 +365,7 @@ sub cmd_rename {
     ## ..probably (Surely) both are not working in that scenario, but the 1st check above is catching
     ## the old_match case before the ignomony of the new_match case can be exposed.
 
-    
+
     print "DEBUG: OK to rename..\n";
     print "File from $ofile to $nfile and extension from $oext to $next\n";
     print "Old name is $dsk[$drive]->{fcb}->[$old_match->[0]]->{fnam}\n";
@@ -375,10 +374,10 @@ sub cmd_rename {
     print "New ext  is $dsk[$drive]->{fcb}->[$new_match->[0]]->{fext}\n";
 
     ## TODO an existing file of the same name is DELETED
-    
+
 
 ##    $dsk[$drive]->{fcb}->[
-    
+
 #    my $dir_entry_data = rd_dir_entry($drive, $old_match->[0]);
 
 #    if (scalar @$new_match == 1) {
@@ -651,8 +650,8 @@ sub cmd_dir {
         my $j = $dsk[$drive]->{fcb}->[$i];
         # system flags
         my $sfl = "        ";
-        if ($j->{fsfl} & 0x01) {substr($sfl, 0, 1) = "L"};
-        if ($j->{fsfl} & 0x02) {substr($sfl, 1, 1) = "D"};
+        if ($j->{fsfl} & $SFLG_LOK) {substr($sfl, 0, 1) = "L"};
+        if ($j->{fsfl} & $SFLG_DEL) {substr($sfl, 1, 1) = "D"};
 
         printf "   %04x %04x %04x %04x %s %s.%s\n",
             $j->{fsec}, $j->{fnsc}, $j->{flda}, $j->{fexa},
@@ -704,8 +703,6 @@ sub cmd_lock {
         $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} | $SFLG_LOK;
     }
     wr_dir($drive);
-    # directory copy is out-of-date now so revise it
-##TODO    rd_dir($drive);
 }
 
 
@@ -728,8 +725,53 @@ sub cmd_unlock {
         $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} & (0xff ^ $SFLG_LOK);
     }
     wr_dir($drive);
-    # directory copy is out-of-date now so revise it
-##TODO    rd_dir($drive);
+}
+
+
+sub cmd_pack {
+    my ($drive) = check_arg('v', @_);
+    return unless defined($drive);
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $dir_step = 0;
+    my $sec_step = 0;
+    for (my $i=0; $i<$dsk[$drive]->{fcbval}; $i=$i+1) {
+        if ($dsk[$drive]->{fcb}->[$i]->{fsfl} & $SFLG_DEL) {
+            # this is a deleted file - account for it
+            $dir_step = $dir_step + 1;
+            $sec_step = $sec_step + $dsk[$drive]->{fcb}->[$i]->{fnsc};
+        }
+        elsif ($dir_step == 0) {
+            # this is a non-deleted file but there have been no
+            # deleted files - nothing to do
+        }
+        else{
+            # this is a non-deleted file and there have been 1 or
+            # more deleted files. Shuffle this file down to fill
+            # the gap.
+            # First, copy the directory entry - accounting for the new start sector
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{fnam} = $dsk[$drive]->{fcb}->[$i]->{fnam};
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{fext} = $dsk[$drive]->{fcb}->[$i]->{fext};
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl};
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{fufl} = $dsk[$drive]->{fcb}->[$i]->{fufl};
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{fsec} = $dsk[$drive]->{fcb}->[$i]->{fsec} - $sec_step;
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{fnsc} = $dsk[$drive]->{fcb}->[$i]->{fnsc};
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{flda} = $dsk[$drive]->{fcb}->[$i]->{flda};
+            $dsk[$drive]->{fcb}->[$i-$dir_step]->{fexa} = $dsk[$drive]->{fcb}->[$i]->{fexa};
+            # Next, copy the data
+            my $data = rd_dsec($drive, $dsk[$drive]->{fcb}->[$i]->{fsec}, $dsk[$drive]->{fcb}->[$i]->{fnsc});
+            wr_dsec($drive, $dsk[$drive]->{fcb}->[$i]->{fsec} - $sec_step, $data);
+        }
+    }
+    # Finally, update the directory with the number of free directory entries and free sectors
+    $dsk[$drive]->{nxtfcb} = $dsk[$drive]->{nxtfcb} - $dir_step * $FCB_SIZE;
+    $dsk[$drive]->{fcbval} = $dsk[$drive]->{fcbval} - $dir_step;
+    $dsk[$drive]->{nxtsec} = $dsk[$drive]->{nxtsec} - $sec_step;
+    wr_dir($drive);
 }
 
 
@@ -909,19 +951,19 @@ sub cmd_scrub {
     for (my $i=$dsk[$drive]->{fcbval}-1; $i<$FCB_COUNT; $i=$i+1) {
         $dsk[$drive]->{fcb}->[$i]->{fnam} = $data8;
         $dsk[$drive]->{fcb}->[$i]->{fext} = $data2;
-        $dsk[$drive]->{fcb}->[$i]->{fsfl} = $data2;
-        $dsk[$drive]->{fcb}->[$i]->{fufl} = $data2;
-        $dsk[$drive]->{fcb}->[$i]->{fsec} = $data2;
-        $dsk[$drive]->{fcb}->[$i]->{fnsc} = $data2;
-        $dsk[$drive]->{fcb}->[$i]->{flda} = $data2;
-        $dsk[$drive]->{fcb}->[$i]->{fexa} = $data2;
+        $dsk[$drive]->{fcb}->[$i]->{fsfl} = 0xe5;
+        $dsk[$drive]->{fcb}->[$i]->{fufl} = 0xe5;
+        $dsk[$drive]->{fcb}->[$i]->{fsec} = 0xe5e5;
+        $dsk[$drive]->{fcb}->[$i]->{fnsc} = 0xe5e5;
+        $dsk[$drive]->{fcb}->[$i]->{flda} = 0xe5e5;
+        $dsk[$drive]->{fcb}->[$i]->{fexa} = 0xe5e5;
     }
 
     # scrub unallocated sectors
     for (my $i=$dsk[$drive]->{nxtsec}; $i<$dsk[$drive]->{blks}; $i=$i+1) {
-        wr_dsec($drive, $i, 1, $datas);
+        wr_dsec($drive, $i, $datas);
     }
-    wr_dir($drive);
+    wr_dir($drive, $FCB_COUNT);
 }
 
 
@@ -2202,7 +2244,7 @@ sub wr_dts {
 }
 
 
-# Summary of the drive
+# Summary of the disk image
 sub describe {
     my ($drive) = @_;
     my $i = "        ";
@@ -2212,19 +2254,16 @@ sub describe {
 }
 
 
-# read directory and attach as data structure to $dsk
-# this is used as a read-only cache: anything that writes to the
-# directory writes to the disk image then calls rd_dir() to keep
-# the cache up-to-date.
-# TODO or modifies it here then flushes it back out to disk? The
-# key thing is that we never keep changes lurking here between
-# commands.
+# read directory from disk image and unpack as a data structure in $dsk.
+# This is used as a read-only cache: anything that writes to the directory either
+# 1/ writes to this data-structure then calls wr_dir to update the disk image or
+# 2/ writes directly to the disk image then calls rd_dir to update the data-structure.
+# In other words, we never keep changes lurking here between commands.
 sub rd_dir {
     my ($drive) = @_;
 
-    # Directory is in the first 4 sectors of the disk (1024 bytes).
-    # Its format is described in the PolyDos System Programmers
-    # guide.
+    # Directory is in the first 4 sectors of the disk (1024 bytes). Its format
+    # is described in the PolyDos System Programmers guide.
     my $data = rd_dsec($drive, 0, 4);
     my @data = unpack("C*", $data);
 
@@ -2234,93 +2273,82 @@ sub rd_dir {
     $dsk[$drive]->{fcbval} = ($dsk[$drive]->{nxtfcb} - $FCB_BASE)/$FCB_SIZE;
 
     my @fcb;
-    for (my $i=0; $i<$FCB_COUNT; $i=$i+1) {
+    # Only read entries from valid FCBs
+    for (my $i=0; $i<$dsk[$drive]->{fcbval}; $i=$i+1) {
         my $xx = substr($data, $FCB_OFFSET + $i*$FCB_SIZE + 0, 8);
         $xx =~ s/ *$//; # delete trailing spaces
         $fcb[$i]->{fnam} = $xx;
         $xx = substr($data, $FCB_OFFSET + $i*$FCB_SIZE + 8, 2);
         $xx =~ s/ *$//; # delete trailing spaces
         $fcb[$i]->{fext} = $xx;
-        $fcb[$i]->{fsfl} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 10];
-        $fcb[$i]->{fufl} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 11];
-        $fcb[$i]->{fsec} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 12] +
-                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 13];
-        $fcb[$i]->{fnsc} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 14] +
-                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 15];
-        $fcb[$i]->{flda} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 16] +
-                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 17];
-        $fcb[$i]->{fexa} = $data[        $FCB_OFFSET + $i*$FCB_SIZE + 18] +
-                     256 * $data[        $FCB_OFFSET + $i*$FCB_SIZE + 19];
+        $fcb[$i]->{fsfl} = $data[$FCB_OFFSET + $i*$FCB_SIZE + 10];
+        $fcb[$i]->{fufl} = $data[$FCB_OFFSET + $i*$FCB_SIZE + 11];
+        $fcb[$i]->{fsec} = $data[$FCB_OFFSET + $i*$FCB_SIZE + 12] +
+                     256 * $data[$FCB_OFFSET + $i*$FCB_SIZE + 13];
+        $fcb[$i]->{fnsc} = $data[$FCB_OFFSET + $i*$FCB_SIZE + 14] +
+                     256 * $data[$FCB_OFFSET + $i*$FCB_SIZE + 15];
+        $fcb[$i]->{flda} = $data[$FCB_OFFSET + $i*$FCB_SIZE + 16] +
+                     256 * $data[$FCB_OFFSET + $i*$FCB_SIZE + 17];
+        $fcb[$i]->{fexa} = $data[$FCB_OFFSET + $i*$FCB_SIZE + 18] +
+                     256 * $data[$FCB_OFFSET + $i*$FCB_SIZE + 19];
     }
 
     $dsk[$drive]->{fcb} = \@fcb;
 }
 
 
-# Create a binary data structure associated with the directory data structure
-# and write it to the disk
+# Create a binary blob to match the directory data structure and write it
+# to the virtual drive.
+# By default, $fcbval is not supplied, and entries are ONLY written for valid
+# fcbs. The resultant lump of data can be less than 4 sectors in size and leaves
+# a "high-tide" mark of old but ignored entries on the disk.
+# The exception is the scrub command where we want to write a complete set of
+# FCBs and supply $FCB_COUNT as the $fcbval argument.
 sub wr_dir {
-    my ($drive) = @_;
+    my ($drive, $fcbval) = @_;
 
-    ## currently corrupting the directory so don't run it..
-
-    ## TODO should only loop over valid/populated directory entries. Then, the
-    ## packed data structure will be <4K and when written back it will leave the
-    ## invalid entries untouched.
-
-    ## ..for now, that is the least of my worries.
-
-    print "wr_dir not yet working!!\n";
-    return;
+    if (not defined $fcbval) {
+        $fcbval = $dsk[$drive]->{fcbval};
+    }
 
     my @data;
     # disk name
-    for (my $i=0; $i<20; $i=$i+1) {
-        if (defined(substr($dsk[$drive]->{dname}, $i, 1))) {
-            $data[$i] = substr($dsk[$drive]->{dname}, $i, 1);
-        }
-        else {
-            $data[$i] = ' ';
-        }
+    for (my $i=0; $i<20; $i=$i+1) { $data[$i] = ord ' '; }
+
+    for (my $i=0; $i<length $dsk[$drive]->{dname}; $i=$i+1) {
+        $data[$i] = ord substr($dsk[$drive]->{dname}, $i, 1);
     }
-    $data[20] = ord($dsk[$drive]->{nxtsec} & 0xff);
-    $data[21] = ord($dsk[$drive]->{nxtsec} >>8);
-    $data[22] = ord($dsk[$drive]->{nxtfcb} & 0xff);
-    $data[23] = ord($dsk[$drive]->{nxtfcb} >>8);
-    for (my $fcb=0; $fcb<$FCB_COUNT; $fcb=$fcb+1) {
-        # file name
-        for (my $i=0; $i<8; $i=$i+1) {
-            if (defined(substr($dsk[$drive]->{fcb}->[$fcb]->{fnam}, $i, 1))) {
-                $data[24 + $FCB_SIZE*$fcb + $i] = substr($dsk[$drive]->{fcb}->[$fcb]->{fnam}, $i, 1);
-            }
-            else {
-                $data[24 + $FCB_SIZE*$fcb + $i] = ' ';
-            }
+
+    $data[20] = $dsk[$drive]->{nxtsec} & 0xff;
+    $data[21] = $dsk[$drive]->{nxtsec} >>8;
+    $data[22] = $dsk[$drive]->{nxtfcb} & 0xff;
+    $data[23] = $dsk[$drive]->{nxtfcb} >>8;
+
+    for (my $fcb=0; $fcb<$fcbval; $fcb=$fcb+1) {
+        # file name and extension
+        for (my $i=0; $i<10; $i=$i+1) { $data[24 + $FCB_SIZE*$fcb + $i] = ord ' '; }
+
+        for (my $i=0; $i<length $dsk[$drive]->{fcb}->[$fcb]->{fnam}; $i=$i+1) {
+            $data[24 + $FCB_SIZE*$fcb + $i] = ord (substr($dsk[$drive]->{fcb}->[$fcb]->{fnam}, $i, 1));
         }
-        # file extension
-        for (my $i=0; $i<2; $i=$i+1) {
-            if (defined(substr($dsk[$drive]->{fcb}->[$fcb]->{fext}, $i, 1))) {
-                $data[32 + $FCB_SIZE*$fcb + $i] = substr($dsk[$drive]->{fcb}->[$fcb]->{fext}, $i, 1);
-            }
-            else {
-                $data[32 + $FCB_SIZE*$fcb + $i] = ' ';
-            }
+
+        for (my $i=0; $i<length $dsk[$drive]->{fcb}->[$fcb]->{fext}; $i=$i+1) {
+            $data[32 + $FCB_SIZE*$fcb + $i] = ord (substr($dsk[$drive]->{fcb}->[$fcb]->{fext}, $i, 1));
         }
-        $data[34 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fsfl});
-        $data[35 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fufl});
-        $data[36 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fsec} & 0xff);
-        $data[36 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{fsec} >>8);
-        $data[38 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fnsc} & 0xff);
-        $data[38 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{fnsc} >>8);
-        $data[40 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{flda} & 0xff);
-        $data[40 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{flda} >>8);
-        $data[42 + $FCB_SIZE*$fcb + 0] = ord($dsk[$drive]->{fcb}->[$fcb]->{fexa} & 0xff);
-        $data[42 + $FCB_SIZE*$fcb + 1] = ord($dsk[$drive]->{fcb}->[$fcb]->{fexa} >>8);
+        $data[34 + $FCB_SIZE*$fcb + 0] = $dsk[$drive]->{fcb}->[$fcb]->{fsfl};
+        $data[35 + $FCB_SIZE*$fcb + 0] = $dsk[$drive]->{fcb}->[$fcb]->{fufl};
+        $data[36 + $FCB_SIZE*$fcb + 0] = $dsk[$drive]->{fcb}->[$fcb]->{fsec} & 0xff;
+        $data[36 + $FCB_SIZE*$fcb + 1] = $dsk[$drive]->{fcb}->[$fcb]->{fsec} >>8;
+        $data[38 + $FCB_SIZE*$fcb + 0] = $dsk[$drive]->{fcb}->[$fcb]->{fnsc} & 0xff;
+        $data[38 + $FCB_SIZE*$fcb + 1] = $dsk[$drive]->{fcb}->[$fcb]->{fnsc} >>8;
+        $data[40 + $FCB_SIZE*$fcb + 0] = $dsk[$drive]->{fcb}->[$fcb]->{flda} & 0xff;
+        $data[40 + $FCB_SIZE*$fcb + 1] = $dsk[$drive]->{fcb}->[$fcb]->{flda} >>8;
+        $data[42 + $FCB_SIZE*$fcb + 0] = $dsk[$drive]->{fcb}->[$fcb]->{fexa} & 0xff;
+        $data[42 + $FCB_SIZE*$fcb + 1] = $dsk[$drive]->{fcb}->[$fcb]->{fexa} >>8;
     }
 
     wr_dsec($drive, 0, pack("C*", @data));
 }
-
 
 
 # Given a drive number and (potentially wildcarded) file name/extension,
@@ -2875,6 +2903,21 @@ EOF
     unlock 1.*A*.*
 EOF
     }
+    elsif ($cmd eq 'pack') {
+        print <<EOF
+    pack <virtual drive number>
+
+    When deleted, a file still take up disk space and a directory
+    entry. To free up those resources, the disk must be packed: all
+    of the deleted files are removed and the remaining files (and
+    their directory entries) are shuffled back to free up space
+    for reuse.
+
+    Examples:
+    pack 0
+    pack 1
+EOF
+    }
     elsif ($cmd eq 'truncate') {
         print <<EOF
     truncate <file specifier> <number of sectors>
@@ -3132,6 +3175,7 @@ Commands are:
     delete     - set delete (D) flag on file(s) from virtual drive
     lock       - set lock (L) flag on file(s) from virtual drive
     unlock     - clear lock (L) flag on file(s) from virtual drive
+    pack       - remove deleted files and free up disk space and directory entries
     truncate   - delete sector(s) from file(s) from virtual drive
     create     - create file from sector(s) on the free list
     fix        - perform low-level edit on virtual drive
