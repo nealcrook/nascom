@@ -54,7 +54,7 @@ between PolyDos 2 and PolyDos 3. The ROM source code and format program are
 different, to accommodate the different disk controller/disk drive hardware.
 
  PolyDos2       |   PolyDos3     | Comparison
-----------------|---------------------------
+----------------|----------------|-----------
 BACKUP.GO       |   BACKUP.GO    |    match
 BSdr.BR         |   BSDR.BR      |    match
 BSfh.OV         |   BSFH.OV      |    match
