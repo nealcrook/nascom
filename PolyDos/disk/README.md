@@ -53,25 +53,25 @@ Here is a list of files present on each image. Most of the files are identical
 between PolyDos 2 and PolyDos 3. The ROM source code and format program are
 different, to accommodate the different disk controller/disk drive hardware.
 
-PolyDos2             PolyDos3
---------------------------------------------
-BACKUP.GO            BACKUP.GO         match
-BSdr.BR              BSDR.BR           match
-BSfh.OV              BSFH.OV           match
-Dfun.OV              DFUN.OV           match
-DUMP.GO              DUMP.GO           match
-DUMPS.TX             DUMPS.TX          match
-Ecmd.OV              ECMD.OV           match
-Edit.OV              EDIT.OV           differ
-Emsg.OV              EMSG.OV           match
-Exec.OV              EXEC.OV           differ
-FORMAT.GO            FORMAT.GO         differ
-Info.IN              INFO.IN           match
-PD2S.TX              PD3S.TX           differ
-PTXT.GO
-PZAP.GO              PZAP.GO           match
-SYSEQU.SY            SYSEQU.SY         match
-SZAP.GO              SZAP.GO           match
+ PolyDos2       |   PolyDos3     |
+----------------|---------------------------
+BACKUP.GO       |   BACKUP.GO    |    match
+BSdr.BR         |   BSDR.BR      |    match
+BSfh.OV         |   BSFH.OV      |    match
+Dfun.OV         |   DFUN.OV      |    match
+DUMP.GO         |   DUMP.GO      |    match
+DUMPS.TX        |   DUMPS.TX     |    match
+Ecmd.OV         |   ECMD.OV      |    match
+Edit.OV         |   EDIT.OV      |    differ
+Emsg.OV         |   EMSG.OV      |    match
+Exec.OV         |   EXEC.OV      |    differ
+FORMAT.GO       |   FORMAT.GO    |    differ
+Info.IN         |   INFO.IN      |    match
+PD2S.TX         |   PD3S.TX      |    differ
+PTXT.GO         |                |
+PZAP.GO         |   PZAP.GO      |    match
+SYSEQU.SY       |   SYSEQU.SY    |    match
+SZAP.GO         |   SZAP.GO      |    match
 
 The PolyDos2_files/ and PolyDos3_files/ directories contain set of unmodified
 files extracted from each disk image. In particular, "unmodified" means .TX
@@ -81,7 +81,8 @@ files retain the original Ctrl-M line endings.
 ## Other Stuff
 
 In nascom/converters is a PERL program called polydos_vfs. This allows
-manipulation of PolyDos disk images. It contains extensive built-in help.
+manipulation of PolyDos disk images. It contains extensive built-in help. (As of
+May2018 it is a work-in-progress).
 
 In nascom/converters is a PERL program called sy_extract. This can convert a
 compiled symbol table file written by the PolyZap assembler so that it can be
