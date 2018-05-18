@@ -3,8 +3,8 @@
 ;;; Utility for use with any PolyDos system
 ;;; https://github.com/nealcrook/nascom
 ;;;
-;;; Load and execute at $0c80 -- needs to be somewhere
-;;; out-of-the-way because it stays in memory.
+;;; Load and execute somewhere out-of-the-way because it
+;;; stays in memory.
 ;;;
 ;;; Allows disk load/store for a program that was designed to
 ;;; use the W and R tape routines.
@@ -56,7 +56,10 @@
 ;;;
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-START:  EQU     $0c80
+;;; original plan was $c80 but Level 9 adventures use this area
+;;; so try top-of-RAM instead. YMMV and you may want a couple of
+;;; versions, assembled for different addresses.
+START:  EQU     $bd00
 
 ;;; Macros for using NAS-SYS routines
 SCAL:   MACRO FOO
