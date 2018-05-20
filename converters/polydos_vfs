@@ -25,15 +25,19 @@
 
 
 # next:
-# put framework in place for type/import/export
-# handle case matching
-# update arg routine to support all documented converters.
 
+# all conv_export_* routines need to change file extension BEFORE call to set_file_handle 
+
+
+# DONE put framework in place for type/export
+# - put framework in place for import
+# - rework import to match export stuff
+# - put dummy routines in place for importers
 
 
 # bugette: filter also checks files that are marked as deleted.
 # bugette: polydos will only allow you to delete a file that is unlocked. Should impose and document the same rule
-# bug: lines argument to TYPE is not being picked up
+
 
 # FUTURE: add optional y/n arg to delete.
 # FUTURE: THEN (command separator)
@@ -432,9 +436,9 @@ sub cmd_type {
     return unless defined($fs);
 
     $lpp = defined $lpp ? $lpp : $LINES_PER_PAGE;
-    # defaults for 'type'
-    $conv_ref->{bin} = exists $conv_ref->{bin} ? $conv_ref->{bin} : "record";
-    $conv_ref->{txt} = exists $conv_ref->{txt} ? $conv_ref->{txt} : "expand";
+    # defaults 'type' (unless already set on command-line)
+    $conv_ref->{tx}  = exists $conv_ref->{tx}  ? $conv_ref->{tx}  : "txt";
+    $conv_ref->{go}  = exists $conv_ref->{go}  ? $conv_ref->{go}  : "dump";
     $conv_ref->{xxx} = exists $conv_ref->{xxx} ? $conv_ref->{xxx} : "dump";
 
     type_export_common($fs, $conv_ref, $lpp, "", 0);
@@ -446,10 +450,10 @@ sub cmd_export {
     return unless defined($fs);
 
     $path = defined $path ? $path . "/" : "";
-    # defaults for 'export'
-    $conv_ref->{bin} = exists $conv_ref->{bin} ? $conv_ref->{bin} : "raw";
-    $conv_ref->{txt} = exists $conv_ref->{txt} ? $conv_ref->{txt} : "raw";
-    $conv_ref->{xxx} = exists $conv_ref->{xxx} ? $conv_ref->{xxx} : "raw";
+    # defaults for 'export' (unless already set on command-line)
+    exists $conv_ref->{tx}  or $conv_ref->{tx}  = 'txt';
+    exists $conv_ref->{go}  or $conv_ref->{go}  = 'raw';
+    exists $conv_ref->{xxx} or $conv_ref->{xxx} = 'raw';
 
     type_export_common($fs, $conv_ref, 0, $path, 1);
 }
@@ -482,8 +486,8 @@ sub cmd_import {
         return;
     }
 
-    # defaults for 'import'
-    $conv_ref->{xxx} = exists $conv_ref->{xxx} ? $conv_ref->{xxx} : "raw";
+    # defaults for 'import' (unless already set on command-line)
+    exists $conv_ref->{xxx} or $conv_ref->{xxx} = 'raw';
 
     # which (if any) files already exist? Need to take into account the
     # file name that will be used - which means taking $UPCASE into account
@@ -1087,36 +1091,47 @@ sub check_arg {
         elsif ($f eq 'oec') {
             # Zero or more export conversion rules. Remove
             # them all; replace them with a single value: a hash ref.
+            # An export conversion rule is of the form XXX=YYY where
+            # XXX is any alphanumeric string and is the name of a
+            # conversion supported for export/type. In both cases, the
+            # input text is forced to lower-case.
             my %conv;
             my $first = $i;
-            while ((defined $_[$i]) and ($_[$i] =~ /^(txt|bin|xxx)=/)) {
-                if ($_[$i] =~ /^(\w+)=(raw|record|txt|dump)/) {
+            while ((defined $_[$i]) and ($_[$i] =~ /^\w+=\w+$/)) {
+                # Looks like a conversion rule. Do everything in lower case.
+                my $rule = lc $_[$i];
+                if ($rule =~ /^(\w+)=(raw|txt|dump|nas|nasg|cas|casg)/) { # conversions for export
                     $conv{$1} = $2;
                 }
                 else {
-                    print "No such conversion: $_[$i]\n";
+                    print "ERROR: conversion $_[$i] does not exist or is not supported for export.\n";
                     return;
                 }
                 $i = $i + 1;
             }
+            # replace 1 or more converters with the hash reference.
             splice @_, $first, $i-$first, \%conv;
             $i = $first;
         }
         elsif ($f eq 'oic') {
             # Zero or more import conversion rules. Remove
-            # them all; replace them with a single value: a hash ref.
+            # them all; replace them with a single value: a hash ref. See
+            # comments above on 'oec'.
             my %conv;
             my $first = $i;
-            while ((defined $_[$i]) and ($_[$i] =~ /^(xxx)=/)) {
-                if ($_[$i] =~ /^(\w+)=(raw|compress)/) {
+            while ((defined $_[$i]) and ($_[$i] =~ /^\w+=\w$/)) {
+                # Looks like a conversion rule. Do everything in lower case.
+                my $rule = lc $_[$i];
+                if ($rule =~ /^(\w+)=(raw|txt|nas|cas)/) { # conversions for import
                     $conv{$1} = $2;
                 }
                 else {
-                    print "No such conversion: $_[$i]\n";
+                    print "ERROR: conversion $_[$i] does not exist or is not supported for import.\n";
                     return;
                 }
                 $i = $i + 1;
             }
+            # replace 1 or more converters with the hash reference.
             splice @_, $first, $i-$first, \%conv;
             $i = $first;
         }
@@ -1298,54 +1313,57 @@ sub check_arg {
 # files specified by list of directory indices
 # $export=0 -> type to screen
 # $export=1 -> export to host file system at $path
-# TODO maybe make type_export_common build %f? then the
-# loop here will just change the *variant* parts.
 sub export_files {
     my ($drive, $match, $conv_ref, $lpp, $path, $export) = @_;
 
     foreach my $i (@{$match}) {
         # build a data structure for use by the converter
         my %f;
-        $f{name} = $dsk[$drive]->{fcb}->[$i]->{fnam} . "." .
-            $dsk[$drive]->{fcb}->[$i]->{fext};
-        $f{oname} = $f{name};
-
-        if ($export) {
-            if (not open $f{handle}, '>', "$path$f{name}") {
-                print "ERROR could not open file $path$f{name}\n";
-                next;
-            }
-        }
-        else {
-            print "============= $f{name} =============\n";
-            $f{handle} = \*STDOUT;
-        }
-
-        $f{drive} = $drive;
-        $f{converters} = $conv_ref;
-        $f{converter} = ""; # subroutine ref
-        $f{export} = $export;
-        $f{line} = 1;
-        $f{lpp} = $lpp;
-        $f{eof} = 0;
+        # default name/extension to use for export
+        $f{name} = $dsk[$drive]->{fcb}->[$i]->{fnam};
+        $f{ext}  = $dsk[$drive]->{fcb}->[$i]->{fext};
+        $f{path} = $path;
 
         $f{data} = rd_dsec($drive, $dsk[$drive]->{fcb}->[$i]->{fsec}, $dsk[$drive]->{fcb}->[$i]->{fnsc});
 
-        # select and run the converter
-        # we never know the type..
+        # pager; used if $export = 0
+        $f{export} = $export;
+        $f{line} = 1;
+        $f{lpp} = $lpp;
 
-        ## TODO make the converters work on file extension TX=txt OV=bin GO=bin etc.
-        ## TODO could be much simpler..
+        # if no converter is defined for this file extension, use the default converter
+        my $ext = lc $dsk[$drive]->{fcb}->[$i]->{fext};
+        exists $conv_ref->{$ext}  or $conv_ref->{$ext} = $conv_ref->{xxx};
 
-        $f{converter} = 'conv_export_' . $f{converters}->{xxx};
-        printf "Using converter %s\n", $f{converter};
-
-        &{$f{converter}}(\%f);
+        # run the converter to do the conversion and save/type the result
+        my $conv = 'conv_export_' . $conv_ref->{$ext};
+        &{$conv}(\%f);
 
         if ($export) {
             close $f{handle};
         }
     }
+}
+
+
+# given a reference to an %f, use $f_ref->{name}, $f_ref->{ext}
+# and $f_ref->{export} to open a file handle and set $f_ref->{handle}.
+# on error, $f_ref->{handle} is undef and the caller should return immediately.
+sub set_export_handle {
+    my ($f_ref) = @_;
+
+    my $fname = $f_ref->{path} . $f_ref->{name} . "." . $f_ref->{ext};
+    if ($f_ref->{export}) {
+        if (not open $f_ref->{handle}, '>', $fname) {
+            print "ERROR could not open file $fname\n";
+            $f_ref->{handle} = undef;
+        }
+    }
+    else {
+        print "============= $f_ref->{name} =============\n";
+        $f_ref->{handle} = \*STDOUT;
+    }
+    return $f_ref->{handle};
 }
 
 # compress a byte array using FLEX text compression rules
@@ -1469,13 +1487,14 @@ sub txt_compress {
 }
 
 
-# File export converter. Each has the name conv_export_*
-# and each takes the same argument: a reference to a %f.
-# Each converter does 2 things:
+# File export converter. Each has the name conv_export_* and each takes
+# the same argument: a reference to a %f. Each converter does 3 things:
+# - it optionally modifies the output file name {name} {ext}
 # - it performs the conversion on $f_ref->{data}
-# - it optionally modifies the output file name {oname}
+# - it outputs the resultant data to the file, paging if {export}
 sub conv_export_raw {
     my ($f_ref) = @_;
+    return if not set_export_handle($f_ref);
     my $handle = $f_ref->{handle};
 
     my $count = 0; # for pager
@@ -1495,6 +1514,7 @@ sub conv_export_raw {
 # Text file format. Convert CR (Ctrl-M) line endings to CR/LF
 sub conv_export_txt {
     my ($f_ref) = @_;
+    return if not set_export_handle($f_ref);
     my $handle = $f_ref->{handle};
     my $line = 0;    ## TODO modify to use &page like cmd_export_dump
     my $page = 0;
@@ -1530,6 +1550,7 @@ sub conv_export_txt {
 # Hex and ASCII dump
 sub conv_export_dump {
     my ($f_ref) = @_;
+    return if not set_export_handle($f_ref);
     my $handle = $f_ref->{handle};
     my $num_str = '';
     my $let_str = '';
@@ -1576,6 +1597,7 @@ sub conv_export_dump {
 # Export in nas or nasg format.
 sub conv_export_nasg {
     my ($f_ref) = @_;
+    return if not set_export_handle($f_ref);
     print "TODO conv_export_nasg\n";
 }
 
@@ -1583,6 +1605,7 @@ sub conv_export_nasg {
 # Export in cas or casg format.
 sub conv_export_casg {
     my ($f_ref) = @_;
+    return if not set_export_handle($f_ref);
     print "TODO conv_export_casg\n";
 }
 
@@ -2370,7 +2393,7 @@ EOF
 
     The default conversions are:
     TX=txt
-    GO=raw
+    GO=dump
     xxx=dump
 
     See 'help conversions' for more details. See also 'help export'
