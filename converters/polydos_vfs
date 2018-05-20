@@ -26,8 +26,6 @@
 
 # next:
 
-# all conv_export_* routines need to change file extension BEFORE call to set_file_handle 
-
 
 # DONE put framework in place for type/export
 # - put framework in place for import
@@ -187,13 +185,8 @@ sub cmd_mount {
 
 
 sub cmd_clone {
-    my ($drive, $file) = check_arg('v nh', @_);
+    my ($drive, $file) = check_arg('mv nh', @_);
     return unless defined($drive);
-
-    if (not $dsk[$drive]->{mounted}) {
-        print "ERROR virtual drive $drive is not mounted.\n";
-        return;
-    }
 
     if (open my $handle, '>', $file) {
         seek $dsk[$drive]->{handle}, 0, 0;
@@ -234,14 +227,11 @@ sub cmd_info {
 
 
 sub cmd_umount {
-    my ($drive) = check_arg('v', @_);
+    my ($drive) = check_arg('mv', @_);
     return unless defined($drive);
 
-    # silently ignored if this drive number is not currently in use.
-    if ($dsk[$drive]->{mounted}) {
-        close $dsk[$drive]->{handle};
-        $dsk[$drive]->{mounted} = 0;
-    }
+    close $dsk[$drive]->{handle};
+    $dsk[$drive]->{mounted} = 0;
 }
 
 
@@ -419,15 +409,10 @@ sub cmd_rename {
 
 
 sub cmd_name {
-    my ($drive, $name) = check_arg('v n',@_);
+    my ($drive, $name) = check_arg('mv n',@_);
     return unless defined($drive);
 
-    if ($dsk[$drive]->{mounted}) {
-        $dsk[$drive]->{dname} = $name;
-    }
-    else {
-        print "ERROR virtual drive $drive is not mounted\n";
-    }
+    $dsk[$drive]->{dname} = $name;
 }
 
 
@@ -478,13 +463,8 @@ sub type_export_common {
 
 
 sub cmd_import {
-    my ($dst, $hf_names, $path, $conv_ref) = check_arg('v hfw oic', @_);
+    my ($dst, $hf_names, $path, $conv_ref) = check_arg('mv hfw oic', @_);
     return unless defined($dst);
-
-    if (not $dsk[$dst]->{mounted}) {
-        print "ERROR drive $dst is not mounted\n";
-        return;
-    }
 
     # defaults for 'import' (unless already set on command-line)
     exists $conv_ref->{xxx} or $conv_ref->{xxx} = 'raw';
@@ -741,13 +721,8 @@ sub cmd_unlock {
 
 
 sub cmd_pack {
-    my ($drive) = check_arg('v', @_);
+    my ($drive) = check_arg('mv', @_);
     return unless defined($drive);
-
-    if (not $dsk[$drive]->{mounted}) {
-        print "ERROR drive $drive is not mounted\n";
-        return;
-    }
 
     my $dir_step = 0;
     my $sec_step = 0;
@@ -908,15 +883,8 @@ sub cmd_fix {
 # - sectors are allocated sequentially and contiguously
 # - the free sector follows on from the last allocated sector
 sub cmd_check {
-    my ($drive) = check_arg('v', @_);
+    my ($drive) = check_arg('mv', @_);
     return unless defined($drive);
-
-    # TODO add check_arg of 'vm' - valid, mounted -- then remove
-    # these checks.
-    if (not $dsk[$drive]->{mounted}) {
-        print "ERROR virtual drive $drive is not mounted.\n";
-        return;
-    }
 
     my $error = 0;
     my $sec_expect = 4;
@@ -943,13 +911,8 @@ sub cmd_check {
 
 
 sub cmd_scrub {
-    my ($drive) = check_arg('v', @_);
+    my ($drive) = check_arg('mv', @_);
     return unless defined($drive);
-
-    if (not $dsk[$drive]->{mounted}) {
-        print "ERROR virtual drive $drive is not mounted.\n";
-        return;
-    }
 
     my @data;
     for (my $i=0; $i<$BYTES_SECTOR; $i=$i+1) {
@@ -985,10 +948,10 @@ sub cmd_quit {
 
 
 sub cmd_exit {
-    cmd_umount(0);
-    cmd_umount(1);
-    cmd_umount(2);
-    cmd_umount(3);
+
+    foreach my $drive (0..3) {
+        cmd_umount($drive) if ($dsk[$drive]->{mounted});
+    }
     exit;
 }
 
@@ -1038,6 +1001,7 @@ sub cmd_uppercase {
 #
 # argument formats:
 # v - virtual drive number
+# mv - virtual drive number of mounted drive (error if not mounted)
 # h - existing file in host filesystem
 # hfw - wildcard in host filesystem. Only recognise files that are
 #      valid FLEX file names and non-zero in size. Must match at
@@ -1059,7 +1023,7 @@ sub check_arg {
     my $host_file;  # stored for use by subsequent 'of' argument
     my $i = 0;
     ARG: foreach my $f (@expected) {
-        if ($f eq 'v') {
+        if (($f eq 'v') or ($f eq 'mv')) {
             if (not defined $_[$i]) {
                 print "ERROR missing argument - expected virtual drive number\n";
                 return;
@@ -1067,6 +1031,10 @@ sub check_arg {
             if (($_[$i] ne "0") and ($_[$i] ne "1") and
                 ($_[$i] ne "2") and ($_[$i] ne "3")) {
                 print "ERROR $_[$i] is not a legal virtual drive number\n";
+                return;
+            }
+            if (($f eq 'mv') and not $dsk[$_[$i]]->{mounted}) {
+                print "ERROR drive $_[$i] is not mounted\n";
                 return;
             }
         }
@@ -1488,10 +1456,11 @@ sub txt_compress {
 
 
 # File export converter. Each has the name conv_export_* and each takes
-# the same argument: a reference to a %f. Each converter does 3 things:
+# the same argument: a reference to a %f. Each converter does 4 things:
 # - it optionally modifies the output file name {name} {ext}
-# - it performs the conversion on $f_ref->{data}
-# - it outputs the resultant data to the file, paging if {export}
+# - it calls set_export_handle to get {handle} opened
+# - it performs the conversion on {data}
+# - it outputs the resultant data to {handle}, paging if {export}
 sub conv_export_raw {
     my ($f_ref) = @_;
     return if not set_export_handle($f_ref);
@@ -1550,6 +1519,7 @@ sub conv_export_txt {
 # Hex and ASCII dump
 sub conv_export_dump {
     my ($f_ref) = @_;
+    $f_ref->{ext} = 'DUMP';
     return if not set_export_handle($f_ref);
     my $handle = $f_ref->{handle};
     my $num_str = '';
@@ -1597,6 +1567,7 @@ sub conv_export_dump {
 # Export in nas or nasg format.
 sub conv_export_nasg {
     my ($f_ref) = @_;
+    $f_ref->{ext} = 'NAS';
     return if not set_export_handle($f_ref);
     print "TODO conv_export_nasg\n";
 }
@@ -1605,6 +1576,7 @@ sub conv_export_nasg {
 # Export in cas or casg format.
 sub conv_export_casg {
     my ($f_ref) = @_;
+    $f_ref->{ext} = 'CAS';
     return if not set_export_handle($f_ref);
     print "TODO conv_export_casg\n";
 }
@@ -2431,7 +2403,8 @@ EOF
     See 'help conversions' for more details. See also 'help type'
 
     Example:
-    export 1.*.TXT TX=txt ../files
+    export 1.*.TX TX=txt ../files
+    export 0.*.GO GO=dump
     export 1.*.* TX=raw BS=dump xxx=raw some_subdirectory
 EOF
     }
