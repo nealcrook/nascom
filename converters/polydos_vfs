@@ -26,7 +26,9 @@
 
 # next:
 
-
+# - fix bug with extensions in import.
+# - code importers
+# - make $f_ref == fcb super/sub-set
 
 # bugette: filter also checks files that are marked as deleted.
 # bugette: polydos will only allow you to delete a file that is unlocked. Should impose and document the same rule
@@ -66,12 +68,6 @@ my $BYTES_SECTOR = 256;
 my $SECTORS = 35*2*18;
 
 my $cmdline;
-
-
-# FLEX constants -- TODO delete
-#
-my $DATA_SECTOR = $BYTES_SECTOR - 4;
-my @FLEX_DIR_TS = (0,5); # track/sector of directory
 
 
 # For 'type' command
@@ -467,7 +463,8 @@ sub cmd_import {
 
     # are there enough directory entries for the import?
     if (scalar(@$hf_names) > dir_entries($dst)) {
-        print "ERROR insufficient directory entries for import\n";
+        printf "ERROR insufficient directory entries for import: need %d, only have %d\n",
+            scalar(@$hf_names), dir_entries($dst);
         return;
     }
 
@@ -482,23 +479,27 @@ sub cmd_import {
     # tedious to work out what imported and what did not.
 
     my $skip = 0;
+    my $total_sectors = 0;
     my @ff;
     foreach my $i (@$hf_names) {
         my %f;
         if (open $f{handle} , "$path$i") {
             ($f{name}, $f{ext}) = legalise_filename($i);
-            $f{memld} = 0;
-            $f{memexe} = 0;
+            $f{flda} = 0;
+            $f{fexa} = 0;
+
+            ## TODO bug.. legalise_filename has changed the extension so it may now be wrong.. need to select
+            ## the converter first?? but need the (original) extension to do that. Grr.
 
             # if no converter is defined for this file extension, use the default converter
             my $lc_ext = lc $f{ext};
             exists $conv_ref->{$lc_ext}  or $conv_ref->{$lc_ext} = $conv_ref->{xxx};
 
-            # run the converter to do the conversion and save/type the result
+            # run the converter to populate {data}
             my $conv = 'conv_import_' . $conv_ref->{$lc_ext};
             &{$conv}(\%f);
 
-            # TODO round up the file size
+            $total_sectors = $total_sectors + pad_to_sector(\%f);
             close $f{handle};
             push @ff,\%f;
         }
@@ -507,99 +508,46 @@ sub cmd_import {
             $skip = $skip + 1;
         }
     }
-    printf "INFO %d files imported (%d skipped)\n", scalar(@$hf_names) - $skip, $skip;
 
-    # TODO now calculate total file size and do another loop to write them to disk.. each time,
-    # delete an existing file of the same name, if any.
+    # is there enough space for the import?
+    if ($total_sectors > free_sectors($dst)) {
+        printf "ERROR insufficient space for import: need %d sectors, only have %d\n",
+            $total_sectors, free_sectors($dst);
+        return;
+    }
+
+    # do the import. For each file in turn, delete an existing file of the same name, if any.
+    foreach my $f_ref (@ff) {
+        # build directory entry
+        # TODO make the f_ref keys match the fcb so that there is NO WORK to do here except
+        # for assigning fsec...
+        my %fcb;
+        $fcb{fnam} = $f_ref->{name};
+        $fcb{fext} = $f_ref->{ext};
+        $fcb{fsfl} = 0;
+        $fcb{fufl} = 0;
+        $fcb{fsec} = $dsk[$dst]->{nxtsec};
+        $fcb{fnsc} = $f_ref->{fnsc};
+        $fcb{flda} = $f_ref->{flda};
+        $fcb{fexa} = $f_ref->{fexa};
+
+        if (delete_existing($dst, $f_ref)) {
+            print "INFO delete existing file $fcb{fnam}.$fcb{fext}\n";
+        }
+
+        # add the directory entry and write the data
+        $dsk[$dst]->{fcb}->[$dsk[$dst]->{fcbval}] = \%fcb;
+        $dsk[$dst]->{fcbval} = $dsk[$dst]->{fcbval} + 1;
+        $dsk[$dst]->{nxtfcb} = $dsk[$dst]->{nxtfcb} + $FCB_SIZE;
+        wr_dsec($dst, $fcb{fsec}, $f_ref->{data});
+        $dsk[$dst]->{nxtsec} = $dsk[$dst]->{nxtsec} + $fcb{fnsc};
+    }
+    # Update directory on disk for all the imported files.
+    wr_dir($dst);
+
+    printf "INFO %d files imported (%d skipped), using %d sectors\n",
+        scalar(@$hf_names) - $skip, $skip, $total_sectors;
 }
-
-
-
-
-
-#            my @data = unpack("C*", $data);
-#            my $data_ref = \@data;
-#            if ($conv_ref->{xxx} eq "compress") {
-#                # TODO all importers will be of the form conv_import_XXX
-#                print "TODO no compress any more\n";
-#            }
-
-            # [NAC HACK 2016Oct28] TODO apply other conversions. Currently just support: raw, compress
-            # [NAC HACK 2016Oct28] TODO the $conv_ref is supposed to make it easier to do all this stuff..
-            # [NAC HACK 2016Nov08] review how it's done for export and mimic here.
-
-#            # Pad data to a whole number of sectors
-#            my $runt = scalar(@$data_ref) % $DATA_SECTOR;
-#            if ($runt != 0) {
-#                my @pad = (0) x ($DATA_SECTOR - $runt);
-#                push @$data_ref, @pad;
-#            }
-
-
-
-
-#            my $sectors = scalar(@$data_ref)/$DATA_SECTOR;
-#
-#            # Start with empty directory entry
-#            my $dir_entry_data = empty_dir_entry();
-#
-#            # Populate file name and extension
-#            name_dir_entry($flex_name, $dir_entry_data);
-#
-#            # Populate file length
-#            $dir_entry_data->[21+0-4] = int($sectors/256);
-#            $dir_entry_data->[21+1-4] = $sectors % 256;
-#
-#            # Populate first t/s - imported file starts at
-#            # first sector of destination free-list.
-#            $dir_entry_data->[17-4] = $start_free_tsc[$TRK];
-#            $dir_entry_data->[18-4] = $start_free_tsc[$SCT];
-#
-#            for my $sector (1..$sectors) {
-#                my $dst_data = rd_dts($dst,
-#                                      $start_free_tsc[$TRK],
-#                                      $start_free_tsc[$SCT]);
-#                my @dst_data = unpack("C*", $dst_data);
-
-            #     # import 1 sector of data, leaving existing
-            #     # link (bytes 0,1) intact. Zero-out the reserved
-            #     # (random access) bytes
-            #     $dst_data[2] = 0;
-            #     $dst_data[3] = 0;
-            #     for my $byte (4..($BYTES_SECTOR-1)) {
-            #         $dst_data[$byte] = shift @$data_ref;
-            #     }
-
-            #     my $nxt_trk = $dst_data[0];
-            #     my $nxt_sct = $dst_data[1];
-
-            #     if ($sector == $sectors) {
-            #         # final sector
-
-            #         # Populate last t/s
-            #         $dir_entry_data->[19-4] = $start_free_tsc[$TRK];
-            #         $dir_entry_data->[20-4] = $start_free_tsc[$SCT];
-            #         # break link
-            #         $dst_data[0] = 0;
-            #         $dst_data[1] = 0;
-            #     }
-
-            #     wr_dts($dst, $start_free_tsc[$TRK], $start_free_tsc[$SCT], pack("C*", @dst_data));
-
-            #     # update free list
-            #     $start_free_tsc[$TRK] = $nxt_trk;
-            #     $start_free_tsc[$SCT] = $nxt_sct;
-            #     $start_free_tsc[$SIZ] = $start_free_tsc[$SIZ] - 1;
-            # }
-            # my $index = allocate_dir_entry($dst);
-            # wr_dir_entry($dst, $index, $dir_entry_data);
-
-            # Finally, update the SIR
-##            wr_sir_start_free($dst, @start_free_tsc);
-            # and refresh the local data
-#            rd_dir($dst);
-#        }
-
 
 
 # directory of host - just pass all arguments to host
@@ -1277,7 +1225,7 @@ sub export_files {
 }
 
 
-# given a reference to an %f, use $f_ref->{name}, $f_ref->{ext}
+# given an $f_ref, use $f_ref->{name}, $f_ref->{ext}
 # and $f_ref->{export} to open a file handle and set $f_ref->{handle}.
 # on error, $f_ref->{handle} is undef and the caller should return immediately.
 sub set_export_handle {
@@ -1446,16 +1394,17 @@ sub page {
 
 
 # File import converter. Each has the name conv_import_* and each takes
-# the same argument: a reference to a %f. Each converter does 4 things:
+# the same argument: a $f_ref. Each converter does 4 things:
 # - it optionally modifies the output file name {name} {ext}
 # - it uses {handle} to get the file contents
 # - it builds the converted data as a binary string in {data}
-# - it loads {memld} {memexe} with the load and execute address (or
+# - it loads {flda} {fexa} with the load and execute address (or
 #   leaves then at their default)
 sub conv_import_raw {
     my ($f_ref) = @_;
     # TODO the easy one: do nothing!
     print "TODO conv_import_raw - file is $f_ref->{name}.$f_ref->{ext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_raw");
 }
 
 
@@ -1463,6 +1412,7 @@ sub conv_import_txt {
     my ($f_ref) = @_;
     # TODO strip CR/LF to leave CR ?? Check Polydos files in raw form
     print "TODO conv_import_txt - file is $f_ref->{name}.$f_ref->{ext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_txt");
 }
 
 
@@ -1471,6 +1421,7 @@ sub conv_import_nas {
     $f_ref->{ext} = 'GO';
     # TODO nas to binary; grab load address -- and execution address if it exists
     print "TODO conv_import_nas - file is $f_ref->{name}.$f_ref->{ext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_nas");
 }
 
 
@@ -1479,6 +1430,7 @@ sub conv_import_cas {
     $f_ref->{ext} = 'GO';
     # TODO nas to binary; grab load address -- and execution address if it exists
     print "TODO conv_import_cas - file is $f_ref->{name}.$f_ref->{ext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_cas");
 }
 
 
@@ -1506,7 +1458,9 @@ sub legal_flex_name {
 
 # Given a filename, split it into name and extension and legalise each of them
 # by truncating if necessary and by removing any illegal characters.
-# Q: does PolyDos require exactly 2 char in extension?
+# Q: does PolyDos require exactly 2 char in extension? YES letters and numbers
+# name is 1-8 characters: upper/lower alpha, numbers, not allowed are comma,
+# space, period, colon, semi-colon.
 # finally, honour $UPCASE. Return the name and extension. eg:
 # my ($name, $ext) = legalise_filename("fred.bin");
 sub legalise_filename {
@@ -1523,6 +1477,25 @@ sub legalise_filename {
 
     return ($name, $ext);
 }
+
+
+# Takes a f_ref. Null-pad {data} to a multiple of the sector size. Add an
+# entry {fnsc} with the number of sectors. Return the size of the padded
+# data, in sectors
+sub pad_to_sector {
+    my ($f_ref) = @_;
+
+    my $runt = length($f_ref->{data}) % $BYTES_SECTOR;
+    if ($runt != 0) {
+        my $extra = chr(0) x ($BYTES_SECTOR - $runt);
+        $f_ref->{data} = $f_ref->{data} . $extra;
+    }
+    my $sectors = length($f_ref->{data})/$BYTES_SECTOR;
+    $f_ref->{fnsc} = $sectors;
+
+    return $sectors;
+}
+
 
 # copy zero or more files
 # files specified by list of directory indices
@@ -1701,7 +1674,7 @@ sub rd_dsec {
 
 
 # write one or more sectors. Write data supplied as a string - can be any length
-# (any number of sectors). Sector specified by drive, offset
+# (any number of sectors). Sector specified by drive, sector-offset
 sub wr_dsec {
     my ($drive, $start, $data) = @_;
 
@@ -2129,6 +2102,31 @@ sub dir_entries {
     my ($drive) = @_;
 
     return $FCB_COUNT - $dsk[$drive]->{fcbval};
+}
+
+
+# return the number of free sectors on $drive
+sub free_sectors {
+    my ($drive) = @_;
+
+    return $dsk[$drive]->{blks} - $dsk[$drive]->{nxtsec};
+}
+
+
+# Does this file already exist as an undeleted file on $drive? If so, delete it
+# and return 1. Else, return 0.
+sub delete_existing {
+    my ($drive, $f_ref) = @_;
+
+    for my $i (0..($dsk[$drive]->{fcbval} -1)) {
+        next if $dsk[$drive]->{fcb}->[$i]->{fsfl} & $SFLG_DEL;
+        next if $dsk[$drive]->{fcb}->[$i]->{fnam} ne $f_ref->{name};
+        next if $dsk[$drive]->{fcb}->[$i]->{fext} ne $f_ref->{ext};
+        # Can be at most 1 match, so we're done
+        $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} | $SFLG_DEL;
+        return 1;
+    }
+    return 0;
 }
 
 
