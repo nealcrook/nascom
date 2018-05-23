@@ -1,0 +1,183 @@
+#!/usr/bin/perl
+#
+# script to use the z80 disassembler to reverse the nublo code
+
+use CPU::Z80::Disassembler;
+
+my $file_name = "nublo.bin";
+my $addr = 0x1000;
+my $file = "nublo.txt";
+my $asm_file = "nublo.asm";
+
+
+$dis = CPU::Z80::Disassembler->new;
+$dis->memory->load_file($file_name, $addr);
+$dis->write_dump($file);
+
+# mock up stuff for NAS-SYS RST codes
+
+###########################################
+# RST 0 - START
+
+###########################################
+# RST 8 - RIN
+
+###########################################
+# RST 10 - RCAL
+## TODO put the actual code thread in here so that it can be followed.
+$dis->memory->poke(0x10, 0xc9);
+$dis->code(0x10);
+$dis->set_call(0x10, \&handle_rcal);
+
+# advance return PC past in-line subroutine code
+sub handle_rcal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 18 - SCAL
+$dis->memory->poke(0x18, 0xc9);
+$dis->code(0x18);
+$dis->set_call(0x18, \&handle_scal);
+
+# advance return PC past in-line subroutine code
+sub handle_scal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 20 - BRKPT
+
+###########################################
+# RST 28 - PRS
+$dis->memory->poke(0x28, 0xc9);
+$dis->code(0x28);
+$dis->set_call(0x28, \&handle_prs);
+
+# advance return PC past in-line null-terminated string
+sub handle_prs {
+    my $ref = $_[0];
+    my $addr = $_[1];
+    my $start = $addr;
+    while ($ref->memory->peek($addr) != 0) {
+        ##TODO work out length and use ->defm
+        ##TODO ..not that simple: need to detect CR and other non-printers
+        $dis->defb($addr);
+#        printf("Peek of 0x%04x for prs\n", $addr);
+        $addr = $addr + 1;
+    }
+    # the message and its terminating NULL
+    printf("RST PRS message at 0x%04x, length %d\n",$start, $addr - $start +1);
+#    $dis->defm($start, $addr - $start);
+    $dis->defb($addr);
+
+    # next PC is after NULL
+    return $addr+1;
+}
+
+###########################################
+# RST 30 - ROUT
+$dis->memory->poke(0x30, 0xc9);
+$dis->code(0x30);
+
+###########################################
+# RST 38 - RDEL
+$dis->memory->poke(0x38, 0xc9);
+$dis->code(0x38);
+
+###########################################
+# NAS-SYS initialisation routine
+$dis->memory->poke(0xd, 0xc9);
+$dis->code(0xd,"STMON");
+
+###########################################
+# NAS-SYS entry point
+# Never actually come back from here, but
+# model it as "ret"
+$dis->memory->poke(0x5, 0xc9);
+$dis->code(0x5,"NAS");
+
+
+###########################################
+# Stuff specific to the code being disassembled
+
+
+
+
+# Each ->code() address is followed through to a RET
+$dis->code(0x1000,"START1");
+$dis->code(0x1003,"START2");
+$dis->code(0x111b,"INBYTE");
+$dis->code(0x1125,"ROMCHK");
+$dis->code(0x113b,"ROMT2");
+$dis->code(0x113e);
+$dis->code(0x1148,"INIT");
+$dis->code(0x1156,"DONRAM");
+$dis->code(0x1165,"MBRAM");
+$dis->code(0x1166,"ERROR");
+$dis->code(0x1185,"INCADD");
+$dis->code(0x1191,"DECDE");
+$dis->code(0x1195,"FINISH");
+$dis->code(0x11d3,"PNTHEX");
+$dis->code(0x11e5,"ROMBLO");
+$dis->code(0x11e8,"BLO");
+$dis->code(0x11f8,"CYCL16");
+$dis->code(0x11fa,"ROMBL4");
+$dis->code(0x1210,"ROMBL1");
+$dis->code(0x1212,"ROMBL2");
+$dis->code(0x122c);
+$dis->code(0x1217,"ROMBL3");
+$dis->code(0x1238,"GODEL");
+$dis->code(0x123e,"NODEL");
+$dis->code(0x127b,"ALSET1");
+$dis->code(0x128c,"ALSET2");
+$dis->code(0x129a,"ERASE");
+$dis->code(0x12a0,"INPUT");
+$dis->code(0x12ac,"INPUT2");
+$dis->code(0x12b8,"VERIF1");
+$dis->code(0x12be,"VERIFY");
+$dis->code(0x12c7,"V1");
+$dis->code(0x12ea,"VRAM");
+$dis->code(0x12eb,"V2");
+$dis->code(0x12f8,"CURPOS");
+$dis->code(0x12ff,"ERROR1");
+$dis->code(0x131a,"ERROR2");
+$dis->code(0x1341,"FBLOW");
+$dis->code(0x1383,"TLINE");
+
+$dis->code(0x1391,"PATCH");
+
+
+# in-line string arguments to RST PRS are defined
+# as "defb". Override here for printable text
+$dis->defm(0x1007, 0x101e-0x1007+1);
+$dis->defm(0x1020, 0x103e-0x1020+1);
+$dis->defm(0x1040, 0x1055-0x1040+1);
+$dis->defm(0x1057, 0x1074-0x1057+1);
+$dis->defm(0x1076, 0x1087-0x1076+1);
+$dis->defm(0x1089, 0x10a6-0x1089+1);
+$dis->defm(0x10a8, 0x10c3-0x10a8+1);
+$dis->defm(0x10c5, 0x10d5-0x10c5+1);
+$dis->defm(0x10d7, 0x10f6-0x10d7+1);
+$dis->defm(0x10f8, 0x1116-0x10f8+1);
+
+$dis->defm(0x1168, 0x1180-0x1168+1);
+$dis->defm(0x1198, 0x11b1-0x1198+1);
+$dis->defm(0x11b3, 0x11cd-0x11b3+1);
+
+$dis->defm(0x1347, 0x1364-0x1347+1, "MES1");
+$dis->defm(0x1365, 0x1382-0x1365+1, "MES2");
+
+$dis->defm(0x1250, 0x126e-0x1250+1);
+$dis->defm(0x1301, 0x1315-0x1301+1);
+$dis->defm(0x1322, 0x132c-0x1322+1);
+
+
+# This can optimise code and so it may prevent 100% match
+# on re-assembly.
+##$dis->analyse;
+$dis->write_asm($asm_file);
