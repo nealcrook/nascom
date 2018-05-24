@@ -76,7 +76,7 @@ my $LINES_PER_PAGE = 40;
 # For 'uppercase' command
 my $UPCASE = 0;
 
-# Data structure
+# Main data structure:
 # $dsk[0..3]
 # $dsk[n]->{mounted} boolean
 # $dsk[n]->{handle} file handle
@@ -98,6 +98,15 @@ my $UPCASE = 0;
 # $dsk[n]->{fcb}->[n]->{flda}
 # $dsk[n]->{fcb}->[n]->{fexa}
 my @dsk;
+
+# The other data structure that's used a lot is a hash, %f, which is
+# passed around as a reference, thus "$f_ref". It is used as a temporary
+# thing for storing stuff about a single file.
+# For a file export, %f starts off being populated with stuff from the file's
+# FCB. For a file import, %f ends up being populated with a superset of stuff
+# needed for an FCB; the file creation step of the import involves putting
+# the %f into the $dsk data structure. Thus, the keys of %f are a superset
+# of the keys of an FCB (fnam, fext, fsfl, fufl, fsec, fnsc, flda, fexa)
 
 
 # Command-line interpreter
@@ -484,7 +493,7 @@ sub cmd_import {
     foreach my $i (@$hf_names) {
         my %f;
         if (open $f{handle} , "$path$i") {
-            ($f{name}, $f{ext}) = legalise_filename($i);
+            ($f{fnam}, $f{fext}) = legalise_filename($i);
             $f{flda} = 0;
             $f{fexa} = 0;
 
@@ -492,7 +501,7 @@ sub cmd_import {
             ## the converter first?? but need the (original) extension to do that. Grr.
 
             # if no converter is defined for this file extension, use the default converter
-            my $lc_ext = lc $f{ext};
+            my $lc_ext = lc $f{fext};
             exists $conv_ref->{$lc_ext}  or $conv_ref->{$lc_ext} = $conv_ref->{xxx};
 
             # run the converter to populate {data}
@@ -518,29 +527,21 @@ sub cmd_import {
 
     # do the import. For each file in turn, delete an existing file of the same name, if any.
     foreach my $f_ref (@ff) {
-        # build directory entry
-        # TODO make the f_ref keys match the fcb so that there is NO WORK to do here except
-        # for assigning fsec...
-        my %fcb;
-        $fcb{fnam} = $f_ref->{name};
-        $fcb{fext} = $f_ref->{ext};
-        $fcb{fsfl} = 0;
-        $fcb{fufl} = 0;
-        $fcb{fsec} = $dsk[$dst]->{nxtsec};
-        $fcb{fnsc} = $f_ref->{fnsc};
-        $fcb{flda} = $f_ref->{flda};
-        $fcb{fexa} = $f_ref->{fexa};
+        # build directory entry by adding remaining fcb keys to $f_ref
+        $f_ref->{fsfl} = 0;
+        $f_ref->{fufl} = 0;
+        $f_ref->{fsec} = $dsk[$dst]->{nxtsec};
 
         if (delete_existing($dst, $f_ref)) {
-            print "INFO delete existing file $fcb{fnam}.$fcb{fext}\n";
+            print "INFO delete existing file $f_ref->{fnam}.$f_ref->{fext}\n";
         }
 
         # add the directory entry and write the data
-        $dsk[$dst]->{fcb}->[$dsk[$dst]->{fcbval}] = \%fcb;
+        $dsk[$dst]->{fcb}->[$dsk[$dst]->{fcbval}] = $f_ref;
         $dsk[$dst]->{fcbval} = $dsk[$dst]->{fcbval} + 1;
         $dsk[$dst]->{nxtfcb} = $dsk[$dst]->{nxtfcb} + $FCB_SIZE;
-        wr_dsec($dst, $fcb{fsec}, $f_ref->{data});
-        $dsk[$dst]->{nxtsec} = $dsk[$dst]->{nxtsec} + $fcb{fnsc};
+        wr_dsec($dst, $f_ref->{fsec}, $f_ref->{data});
+        $dsk[$dst]->{nxtsec} = $dsk[$dst]->{nxtsec} + $f_ref->{fnsc};
     }
     # Update directory on disk for all the imported files.
     wr_dir($dst);
@@ -1198,12 +1199,12 @@ sub export_files {
     foreach my $i (@{$match}) {
         # build a data structure for use by the converter
         my %f;
-        # default name/extension to use for export
-        $f{name} = $dsk[$drive]->{fcb}->[$i]->{fnam};
-        $f{ext}  = $dsk[$drive]->{fcb}->[$i]->{fext};
-        $f{path} = $path;
+        foreach my $key (keys %{$dsk[$drive]->{fcb}->[$i]}) {
+            $f{$key} = $dsk[$drive]->{fcb}->[$i]->{$key};
+        }
 
-        $f{data} = rd_dsec($drive, $dsk[$drive]->{fcb}->[$i]->{fsec}, $dsk[$drive]->{fcb}->[$i]->{fnsc});
+        $f{path} = $path;
+        $f{data} = rd_dsec($drive, $f{fsec}, $f{fnsc});
 
         # pager; used if $export = 0
         $f{export} = $export;
@@ -1211,7 +1212,7 @@ sub export_files {
         $f{lpp} = $lpp;
 
         # if no converter is defined for this file extension, use the default converter
-        my $ext = lc $dsk[$drive]->{fcb}->[$i]->{fext};
+        my $ext = lc $f{fext};
         exists $conv_ref->{$ext}  or $conv_ref->{$ext} = $conv_ref->{xxx};
 
         # run the converter to do the conversion and save/type the result
@@ -1225,13 +1226,12 @@ sub export_files {
 }
 
 
-# given an $f_ref, use $f_ref->{name}, $f_ref->{ext}
-# and $f_ref->{export} to open a file handle and set $f_ref->{handle}.
-# on error, $f_ref->{handle} is undef and the caller should return immediately.
+# From $f_ref, use {name}, {ext} and {export} to open a file handle.
+# Set {handle}. On error, {handle} is undef and the caller should return immediately.
 sub set_export_handle {
     my ($f_ref) = @_;
 
-    my $fname = $f_ref->{path} . $f_ref->{name} . "." . $f_ref->{ext};
+    my $fname = $f_ref->{path} . $f_ref->{fnam} . "." . $f_ref->{fext};
     if ($f_ref->{export}) {
         if (not open $f_ref->{handle}, '>', $fname) {
             print "ERROR could not open file $fname\n";
@@ -1247,11 +1247,11 @@ sub set_export_handle {
 
 
 # File export converter. Each has the name conv_export_* and each takes
-# the same argument: a reference to a %f. Each converter does 4 things:
-# - it optionally modifies the output file name {name} {ext}
+# the same argument: an $f_ref. Each converter does 4 things:
+# - it optionally modifies the output file name {fnam} {fext}
 # - it calls set_export_handle to get {handle} opened
 # - it performs the conversion on {data}
-# - it outputs the resultant data to {handle}, paging if {export}
+# - it sends the exported data to {handle}, paging if {export}
 sub conv_export_raw {
     my ($f_ref) = @_;
     return if not set_export_handle($f_ref);
@@ -1310,7 +1310,7 @@ sub conv_export_txt {
 # Hex and ASCII dump
 sub conv_export_dump {
     my ($f_ref) = @_;
-    $f_ref->{ext} = 'DUMP';
+    $f_ref->{fext} = 'DUMP';
     return if not set_export_handle($f_ref);
     my $handle = $f_ref->{handle};
     my $num_str = '';
@@ -1358,7 +1358,7 @@ sub conv_export_dump {
 # Export in NAS or NAS/Generate format.
 sub conv_export_nasg {
     my ($f_ref) = @_;
-    $f_ref->{ext} = 'NAS';
+    $f_ref->{fext} = 'NAS';
     return if not set_export_handle($f_ref);
     print "TODO conv_export_nasg\n";
 }
@@ -1367,15 +1367,15 @@ sub conv_export_nasg {
 # Export in CAS or CAS/Generate format.
 sub conv_export_casg {
     my ($f_ref) = @_;
-    $f_ref->{ext} = 'CAS';
+    $f_ref->{fext} = 'CAS';
     return if not set_export_handle($f_ref);
     print "TODO conv_export_casg\n";
 }
 
 
-# Used by export converters. Takes a %f. Called after each output line
-# to do paging when stdout is in use. Return true if output should be
-# aborted.
+# Used by export converters. Called after each output line to do paging
+# if STDOUT is in use. Return true if output should be aborted.
+# Reads and modifies {line}, {lpp}.
 sub page {
     my ($f_ref) = @_;
 
@@ -1403,34 +1403,34 @@ sub page {
 sub conv_import_raw {
     my ($f_ref) = @_;
     # TODO the easy one: do nothing!
-    print "TODO conv_import_raw - file is $f_ref->{name}.$f_ref->{ext}\n";
-    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_raw");
+    print "TODO conv_import_raw - file is $f_ref->{fnam}.$f_ref->{fext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{fnam}.$f_ref->{fext} by conv_import_raw");
 }
 
 
 sub conv_import_txt {
     my ($f_ref) = @_;
     # TODO strip CR/LF to leave CR ?? Check Polydos files in raw form
-    print "TODO conv_import_txt - file is $f_ref->{name}.$f_ref->{ext}\n";
-    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_txt");
+    print "TODO conv_import_txt - file is $f_ref->{fnam}.$f_ref->{fext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{fnam}.$f_ref->{fext} by conv_import_txt");
 }
 
 
 sub conv_import_nas {
     my ($f_ref) = @_;
-    $f_ref->{ext} = 'GO';
+    $f_ref->{fext} = 'GO';
     # TODO nas to binary; grab load address -- and execution address if it exists
-    print "TODO conv_import_nas - file is $f_ref->{name}.$f_ref->{ext}\n";
-    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_nas");
+    print "TODO conv_import_nas - file is $f_ref->{fnam}.$f_ref->{fext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{fnam}.$f_ref->{fext} by conv_import_nas");
 }
 
 
 sub conv_import_cas {
     my ($f_ref) = @_;
-    $f_ref->{ext} = 'GO';
+    $f_ref->{fext} = 'GO';
     # TODO nas to binary; grab load address -- and execution address if it exists
-    print "TODO conv_import_cas - file is $f_ref->{name}.$f_ref->{ext}\n";
-    $f_ref->{data} = sprintf("Result of import of $f_ref->{name}.$f_ref->{ext} by conv_import_cas");
+    print "TODO conv_import_cas - file is $f_ref->{fnam}.$f_ref->{fext}\n";
+    $f_ref->{data} = sprintf("Result of import of $f_ref->{fnam}.$f_ref->{fext} by conv_import_cas");
 }
 
 
@@ -2120,8 +2120,8 @@ sub delete_existing {
 
     for my $i (0..($dsk[$drive]->{fcbval} -1)) {
         next if $dsk[$drive]->{fcb}->[$i]->{fsfl} & $SFLG_DEL;
-        next if $dsk[$drive]->{fcb}->[$i]->{fnam} ne $f_ref->{name};
-        next if $dsk[$drive]->{fcb}->[$i]->{fext} ne $f_ref->{ext};
+        next if $dsk[$drive]->{fcb}->[$i]->{fnam} ne $f_ref->{fnam};
+        next if $dsk[$drive]->{fcb}->[$i]->{fext} ne $f_ref->{fext};
         # Can be at most 1 match, so we're done
         $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} | $SFLG_DEL;
         return 1;
