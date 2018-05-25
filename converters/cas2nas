@@ -148,7 +148,7 @@ sub process_blk {
     # Verify checksum
     my $sum = 0xff & (($blkaddr & 0xff) + ($blkaddr >>8) + $blklen + $blknum);
     if ($sum != $blkcsum) {
-        printf "ERROR header checksum error in block $blknum - expected 0x%X but got 0x%X\n", $blkcsum, $sum;
+        printf "ERROR bad header checksum in block $blknum - calculated 0x%X but read 0x%X\n", $sum, $blkcsum;
     }
 
     # Verify block number. Block number is an 8-bit value that counts down to 0; the cassette
@@ -165,7 +165,7 @@ sub process_blk {
         }
 
         if ($blknum != $current_blknum) {
-            printf "ERROR header block number error in block $blknum. Expected 0x%X got 0x%X\n", $current_blknum, $blknum;
+            printf "ERROR bad header block number in block $blknum -- expected 0x%X but read 0x%X\n", $current_blknum, $blknum;
         }
     }
 
@@ -206,6 +206,6 @@ sub process_blk {
     my $fsum = get_byte(\&err_blk, "block data checksum");
 
     if ($sum != $fsum) {
-        printf "ERROR data checksum error in block $blknum - expected 0x%02X but got 0x%02X\n",$fsum, $sum;
+        printf "ERROR bad data checksum in block $blknum -- calculated 0x%02X but read 0x%02X\n",$sum, $fsum;
     }
 }

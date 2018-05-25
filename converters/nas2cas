@@ -102,7 +102,7 @@ sub parse_nas {
             }
             if ($asum != $esum ) {
                 # report the error but use the data anyway.
-                printf "ERROR bad checksum at line $. -- got 0x%X but expected 0x%X\n", $asum, $esum;
+                printf "ERROR bad checksum at line $. -- calculated 0x%X but read 0x%X\n", $asum, $esum;
             }
             $count = $count - 1;
         }
