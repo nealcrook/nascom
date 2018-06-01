@@ -135,9 +135,8 @@
 // TODO set geometry command to allow different disk types to be mixed?
 // TODO implement restore_state
 // TODO implement save_state
-// TODO implement file size print in cmd_dir
 // TODO do error checking in n_rd
-// TODO condider removing CMD_DEFAULT as it doesn't seem useful in the way
+// TODO consider removing CMD_DEFAULT as it doesn't seem useful in the way
 // that I orginally expected.
 // TODO could drive CMD=1 during T2H to indicate ABORT but would
 // have to be very careful to ensure both sides can track state.
@@ -432,7 +431,7 @@ void loop() {
       cmd_info();
       break;
     case 0x100 | CMD_STOP:
-      cmd_status();
+      cmd_stop();
       break;
     // These are command that accept a FID in bits [2:0]
     // This is cumbersome but should generate efficient code..
@@ -914,7 +913,14 @@ void cmd_info(void) {
 //
 // RESPONSE: none.
 void cmd_stop(void) {
-  Serial.println("TODO cmd_stop");
+  set_data_dir(INPUT);
+  pinMode(PIN_H2T, INPUT);
+  pinMode(PIN_T2H, INPUT);
+  pinMode(PIN_CMD, INPUT);
+  pinMode(PIN_ERROR, INPUT);
+  Serial.println("cmd_stop - wait for reset");
+  while (1) {
+  }
 }
 
 
