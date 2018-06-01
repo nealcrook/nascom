@@ -8,8 +8,15 @@
 ;;; there. Uses PolyDos SCALs and therefore PolyDos must be
 ;;; booted in order to run this!
 ;;;
+;;; Prompts for a disk in drive 0 then copies all of its sectors
+;;; to an SDcard image with an auto-selected file name of the
+;;; form NASxxx.BIN (where xxx is a 3 digit decimal number: 000,
+;;; 001 and so on).
+;;;
 ;;; Uses PolyDos SCALs to size drive 0 and copy all of its sectors
-;;; write them to an SDcard image with an auto-selected file name.
+;;;
+;;; Format is 35 track DSDD disk with 18 sectors per side, each
+;;; of 256 bytes (so 35*18*2*256=322,560 bytes per disk).
 ;;;
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

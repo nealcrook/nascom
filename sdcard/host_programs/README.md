@@ -32,6 +32,7 @@ retyped in order to run one of the other two programs.
 * setdrv.asm - intended to be run from PolyDos SDcard version. Reports which SDcard files are associated with PolyDos drives, and allows them to be changed.
 * sddir.asm - intended to be run from PolyDos SDcard version. Reports directory listing of the SDcard.
 * cadsk.asm - intended to be run from PolyDos disk or SDcard version. Replaces NAS-SYS R, W commands so that some other program can be tricked into saving/loading to disk instead of to tape.
+* scrape5.asm - intended to be run from PolyDos disk or SDcard version. Copies CP/M physical disk images to SDcard file images; assumes 35 track DSDD disks with 10 sectors per side, each of 512 bytes (so 35*10*2*512=350KBytes per disk).
 
 ## Tools
 
