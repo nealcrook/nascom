@@ -2,8 +2,9 @@
 
 ## Introduction
 
-Although I have stared at thwe N1 and N2 schematics, and understand in general
-terms how the video circuitry works, the fine detail of it has always eluded me.
+Although I have stared at the Nascom 1 and Nascom 2 schematics, and understand
+in general terms how the video circuitry works, the fine detail of it has always
+eluded me.
 
 In particular, I'd like to know: how did we end up with row 16 at the top of the
 screen instead of at the bottom? There is no sensible reason for choosing to do
@@ -166,10 +167,10 @@ I use Linux. Your mileage may vary.
 
 Do this:
 
-  $ ./doitall
-  $ ./nas_vid
-  (wait)
-  (load the .vcd file into GTKWave)
+    $ ./doitall
+    $ ./nas_vid
+    (wait)
+    (load the .vcd file into GTKWave)
 
 
 ## Futures
