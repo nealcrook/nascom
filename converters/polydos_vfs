@@ -15,7 +15,6 @@
 # export - done, but need to code more exporters
 # import  <-- HARD, BUT MOST USEFUL. DO NEXT!
 # undelete - if multiple matches, undeletes oldest first.
-# attrib - to change load address, execution address <-- EASY
 # create?? - probably no use-case but simple and could be useful??
 # fix -- not implemented in flex version
 # wildcarding
@@ -670,6 +669,35 @@ sub cmd_unlock {
 }
 
 
+sub cmd_attrib {
+    my ($fs, $new_fexa, $new_flda) = check_arg('fs hi ohi', @_);
+    return unless defined($new_fexa);
+
+    my ($drive,$file,$ext) = split /\./, $fs;
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext);
+
+    printf " INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+
+    # must have $new_fexa
+    foreach my $i (@{$match}) {
+        $dsk[$drive]->{fcb}->[$i]->{fexa} = hex $new_fexa;
+    }
+    # may have $new_flda;
+    if (defined $new_flda) {
+        foreach my $i (@{$match}) {
+            $dsk[$drive]->{fcb}->[$i]->{flda} = hex $new_flda;
+        }
+    }
+    wr_dir($drive);
+}
+
+
 sub cmd_pack {
     my ($drive) = check_arg('mv', @_);
     return unless defined($drive);
@@ -941,6 +969,8 @@ sub cmd_uppercase {
 # n - disk name (truncated/padded to 20 characters, can
 #     include spaces) - consumes all remaining arguments and so must
 #     be the last entry in the format list.
+# hi - hex value (1-4 characters)
+# ohi - optional hex value (1-4 characters)
 # i - integer
 # oi - optional integer
 # os  - optional sector. If omitted, default value is returned.
@@ -979,6 +1009,24 @@ sub check_arg {
             if (defined $_[$i]) {
                 if ($_[$i] !~ /^\d+$/) {
                     print "ERROR $_[$i] is not an integer\n";
+                    return;
+                }
+            }
+        }
+        elsif ($f eq 'hi') {
+            if (not defined $_[$i]) {
+                print "ERROR missing argument - expected hex value (1-4 digits)\n";
+                return;
+            }
+            if ($_[$i] !~ /^[0-9a-fA-F]{1,4}$/) {
+                print "ERROR $_[$i] is not a hex value or is too large\n";
+                return;
+            }
+        }
+        elsif ($f eq 'ohi') {
+            if (defined $_[$i]) {
+                if ($_[$i] !~ /^[0-9a-fA-F]{1,4}$/) {
+                    print "ERROR $_[$i] is not a hex value or is too large\n";
                     return;
                 }
             }
@@ -2543,6 +2591,23 @@ EOF
     unlock 1.*A*.*
 EOF
     }
+    elsif ($cmd eq 'attrib') {
+        print <<EOF
+    attrib <virtual drive number> | <file specifier> hexval1 [ hexval2 ]
+
+    Change attributes on all of the files on the specified virtual drive,
+    or all of the files that match the file specifier.  The file specifier can
+    include * used as a wildcard.
+
+    hexval1 is the new execution address for the file. hexval2, if present, is
+    the new load address for the file.
+
+    Examples:
+    attrib 2 1000
+    unlock 1.INVADE.GO 1000 1000
+    unlock 1.*.GO 1010 1000
+EOF
+    }
     elsif ($cmd eq 'pack') {
         print <<EOF
     pack <virtual drive number>
@@ -2769,6 +2834,7 @@ Commands are:
     delete     - set delete (D) flag on file(s) from virtual drive
     lock       - set lock (L) flag on file(s) from virtual drive
     unlock     - clear lock (L) flag on file(s) from virtual drive
+    attrib     - change execution/load address on file(s) from virtual drive
     pack       - remove deleted files and free up disk space and directory entries
     create     - create file from sector(s) on the free list
     fix        - perform low-level edit on virtual drive
