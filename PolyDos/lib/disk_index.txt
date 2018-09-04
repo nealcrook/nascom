@@ -1,0 +1,241 @@
+Index of files on polydos disk images
+
+PD000.BIN  - TODO polydos boot disk
+
+PD100.BIN  - Tools
+
+PD200.BIN  - Classic INMC games
+
+PD300.BIN  - Other games
+
+
+PD000 -- PolyDos 2 System disk and SDcard utilities
+=====
+
+   Sect Nsct Load Exec SysFlg   Name
+   0004 0008 c800 0000 L        Exec.OV               PolyDos
+   000c 0005 c800 0000 L        Emsg.OV               "
+   0011 0006 c800 0000 L        Dfun.OV               "
+   0017 0003 c800 0000 L        Ecmd.OV               "
+   001a 0008 c800 0000 L        Edit.OV               "
+   0022 0001 c200 c200 L        Info.IN               "
+   0023 0001 c800 0000 L        BSfh.OV               "
+   0024 0010 b000 b000 L        BSdr.BR               "
+   0034 0005 1000 1000          FORMAT.GO             " DO NOT USE WITH SDCARD
+   0039 0003 1000 1000          BACKUP.GO             " DO NOT USE WITH SDCARD
+   003c 0004 1000 1000          SZAP.GO               "
+   0040 0016 1000 1000          PZAP.GO               "
+   0056 0005 0000 0000          SYSEQU.SY             "
+   005b 0012 0000 0000          DUMPS.TX              "
+   006d 0001 1000 1000          DUMP.GO               "
+   006e 0075 0000 0000          PD2S.TX
+   00e3 0010 1000 1000          PTXT.GO
+   00f8 000b 10d6 0000          DBASE.BS
+   0103 0006 0000 0000          DATA.TX
+   0109 0003 10d6 0000          FOUR.BS
+   010c 004e 1000 101e          PASCAL.GO
+   015a 001d 0000 0000          GETCPM.TX
+   0177 0002 b800 b800          GET30.GO
+   0179 0030 1000 1000          MOVCPM.MC
+   01a9 0001 0000 0000          HELLO.TX
+   01aa 0001 1000 1000          SDDIR.GO              SD utility to show files on SDcard
+   01ab 0002 1000 1000          SETDRV.GO             SD utility to set drive from SDcard file
+   01ad 0002 bd00 bd00          CASDSK.GO             SD utility to redirect tape load/save to disk
+   01af 0004 1000 1000          SCRAPE5.GO            SD utility to scrape CP/M disk to SDcard
+   01b3 0001 0c80 0c80          SD_WR1.GO             SD code to write file to SDcard from RAM
+   01b4 0008 d800 d800          POUTD800.GO           PolyDos/SD utils boot ROM binary
+   01bc 0008 b800 b800          POUTB800.GO           PolyDos/SD utils boot ROM binary
+   01c4 0001 0c80 0c80          SD_RD1.GO             SD code to read file from SDcard to RAM
+   01c5 0001 0000 0000          SDOFF.GO              SD utility to disable SDcard so that PIO can be used for something else
+   01c6 0002 1000 1000          SCRAPE.GO             SD utility to scrape PolyDos disk to SDcard
+
+
+
+
+
+PD100 -- Languages
+==================
+
+forth.cas     HULL Forth, version 1.1              [Origin: virtual-nascom]
+hisoft.cas     E 1000  Hisoft Pascal               [Origin: virtual-nascom]
+blspas12.nas         BLS Pascal 1.2                [Origin: virtual-nascom]
+
+PD200 -- INMC Classics
+======================
+
+pirana.cas     E 1000  Simple but classic, from INMC magazine. [Origin: virtual-nascom]
+ELIZA.nas              Clasic [Origin: virtual-nascom]
+
+
+PD300 -- Games in Danish
+========================
+
+adventur.cas   E 1000  Text-based adventure (Danish language) [Origin: virtual-nascom]
+falling.cas    E 1000  Falling Stones (Danish instructions)   [Origin: virtual-nascom]
+skak.cas       E 1000  Chess (Danish language)                [Origin: virtual-nascom]
+
+
+PD301 -- Level 9 Computing
+==========================
+
+lordtime.cas   E 1000  Lords Of Time, Level 9 Computing.      [Origin: virtual-nascom]
+snowball.cas   E 1000  Text-based space adventure, Level 9 Computing. [Origin: virtual-nascom]
+ASTEROID.NAS           Level 9 Computing. [Origin: virtual-nascom]
+EDEN.NAS               Level 9 Computing. [Origin: virtual-nascom]
+COLOSSAL.NAS           Level 9 Computing. [Origin: virtual-nascom]
+DUNGEON.NAS            Level 9 Computing. [Origin: virtual-nascom]
+DUNGEON.CLU            Clues for DUNGEON    [Origin: virtual-nascom]
+DUNGEON.SOL            Solution for DUNGEON [Origin: virtual-nascom]
+
+
+PD302 -- Blue-label software games
+==================================
+
+breakout.cas   E 1000  Breakout, Blue Label Software.           [Origin: virtual-nascom]
+pacman.cas     E 1000  Pacman, of course. Blue Label Software.  [Origin: virtual-nascom]
+spacezap.cas   E 1000  Shoot-em-up. Blue Label Software.        [Origin: virtual-nascom]
+
+
+PD303 -- Miscellaneous Games
+============================
+
+asteroid.cas   E 1000  Asteroids, Steven Weller                [Origin: virtual-nascom]
+driver.cas     E 1000  Night Driver, OZ1AEX                    [Origin: virtual-nascom]
+enarmet.cas    E 4400  Fruit machine, S.C. Allen               [Origin: virtual-nascom]
+labyrint.cas   E 1000  Walk though a 3D maze                   [Origin: virtual-nascom]
+lumberja.cas   E 1000  Lumberjack. From Program Power.         [Origin: virtual-nascom]
+monster.cas    E 1000  Graphical platform game, SSI Real-time games.          [Origin: virtual-nascom]
+serpent.nas                                                    [Origin: virtual-nascom]
+avalanche.nas                                                  [Origin: virtual-nascom]
+GOLD.NAS                                                       [Origin: virtual-nascom]
+pacman.nas                                                     [Origin: virtual-nascom]
+reversi.nas                                                    [Origin: virtual-nascom]
+hole.nas                                                       [Origin: virtual-nascom]
+spcinv.nas                                                     [Origin: virtual-nascom]
+spacewar.nas                                                   [Origin: virtual-nascom]
+galaxian.nas                                                   [Origin: virtual-nascom]
+jailbrk.nas                                                    [Origin: virtual-nascom]
+GALAXY.NAS                                                     [Origin: virtual-nascom]
+SARGON13.NAS                                                   [Origin: virtual-nascom]
+pacman2.nas                                                    [Origin: virtual-nascom]
+maze3d.nas   KKS-3dmaze.nas                                    [Origin: virtual-nascom]
+
+PD401 -- BASIC Games
+====================
+
+nimbot.cas  [Origin: virtual-nascom]
+lemondade.cas Classic Lemonade Stand simulation [Origin: virtual-nascom]
+invaders.cas Space invaders implemented in BASIC [Origin: virtual-nascom]
+
+PD402 -- BASIC Games (from The Nascom Home Page)
+====================
+
+DQUEST.BS    Dungeon Quest.
+KKRAAL.BS    Keys of Kraal.
+OXO3D.BS     3d Noughts and Crosses.
+ALIENINV.BS  Alien Invaders.
+AMSTRMND.BS  Auto Mastermind.
+BIO.BS       Bio Rhythms.
+BIO2.BS      Bio Rhythms 2.
+DRIVE.BS     Drive.
+HANGMAN.BS   Hangman.
+HELLO.BS     Hello.
+LABYRNTH.BS  Labyrinth.
+LUNAR2.BS    Lunar II.
+MOONBASE.BS  Moonbase.
+OTHELLO.BS   Othello.
+QUEST.BS     Quest.
+SHEEPDOG.BS  Sheepdog.
+SCRAMBLE.BS  Scramble, The Word Computer Game.
+TREK16.BS    Star-Trek for 16KB Nascoms.
+TREK.BS      The classic game Startrek
+WRAPTRAP.BS  WrapTrap.
+LDGOLD.BS    Lost Dutchman's Gold
+SNAILR.BS    Snail Racing from PCW
+SWINGHS.BS   SwingHouse (graphic Animation after 10 min)
+ADVENTR.BS   Adventure Land
+SWORDS.BS    Swords and Sorcery by David Kastrup
+LEMON.BS     Lemonade Stand
+CAMEL.BS     Camel
+INVADERS.BS  The Invaders — from C&VG
+
+
+
+PD403 -- BASIC Games in German (from The Nascom Home Page)
+====================
+
+MALOCHE.BS     Maloche game in german.
+SCRAMBLE.BS    Mini Scramble game in german.
+CHECKERS.BS    Das Dame Spiel (Checkers)
+SCHIFFE.BS     in german: Schiffe versenken
+SYMDIFF.BS     mathematics in german: symbolisches Differenzieren
+VECTOR.BS      mathematics in german: Vektorrechnung
+FILTER.BS      electronics in german: Filterberechnung
+
+
+PD404 -- BASIC Games (from Neal's collection)
+====================
+
+   Sect Nsct Load Exec SysFlg   Name
+   0004 0008 c800 0000 L        Exec.OV
+   000c 0006 c800 0000 L        Dfun.OV
+   0012 0005 c800 0000 L        Emsg.OV
+   0017 0001 c200 0000 L        Info.IN
+   0018 0001 c800 0000 L        BSfh.OV
+   0019 0010 b000 b000 L        BSdr.BR
+   0029 0001 0c90 0c90 L        Init.GO
+   002a 0020 10d6 0000          ELIZA.BS
+   004a 001d 10d6 0000          STOCKMAR.BS
+   0067 0018 10d6 0000          MACRONOI.BS
+   007f 000a 10d6 0000          MOON1NC.BS
+   0089 0006 10d6 0000          MOON2NC.BS
+   008f 001d 10d6 0000          EVEREST.BS
+   00ac 0009 10d6 0000          M-MIND.BS
+   00b5 0009 10d6 0000          ZOMBIES.BS
+   00be 0006 10d6 0000          ADDNTEST.BS
+   00c4 0007 10d6 0000          MULTTEST.BS
+   00cb 0005 10d6 0000          REACTIME.BS
+   00d0 0008 10d6 0000          SUBMARIN.BS
+   00d8 0007 00d6 0000          DRIVING.BS
+   00df 0007 10d6 0000          AMBUSH.BS
+   00e6 0003 10d6 0000          SPACER.BS
+   00e9 000c 10d6 0000          ROADRACE.BS
+   00f5 000b 10d6 0000          STOCKCAR.BS
+   0100 0003 10d6 0000          DICE.BS
+   0103 0012 10d6 0000          AG-FLIER.BS
+   0115 000a 10d6 0000          HANGMAN.BS
+   011f 0015 10d6 0000          ROBOTNIM.BS
+   0134 0033 10d6 0000          B-GAMMON.BS
+   0167 0027 10d6 0000          LABYRINT.BS
+   018e 0009 10d6 0000          CALENDER.BS
+   0197 0011 10d6 0000          LONGADD.BS
+   01a8 0017 10d6 0000          CAMEL.BS
+   01bf 003c 10d6 10d6          ADVENTUR.BS
+   01fb 0020 10d6 10d6          GOLF.BS
+   021b 000f 10d6 0000          FOXHON.BS
+   022a 0061 10d6 0000          VALLEY.BS
+   028b 0039 10d6 0000          ALILAB.BS
+   02c4 0045 0c80 0c80          LUNLAN.BS
+   0309 0044 10d6 0000          QUEST.BS
+   034d 0049 10d6 0000          KRAAL.BS
+   0396 0035 10d6 0000          STARTREK.BS
+   03cb 0035 10d6 0000          TREK.BS
+   0400 0012 10d6 0000          ALIEN.BS
+   0412 003f 10d6 0000          SARAH.BS
+   0451 0010 10d6 0000          SHEEPDOG.BS
+   0461 0009 10d6 0000          MASTERMD.BS
+   046a 000a 10d6 0000          BIO.BS
+   0474 000e 10d6 0000          BATSHIPS.BS
+   0482 0013 10d6 0000          SCI-FI.BS
+
+
+
+
+============= to import from virtual NASCOM
+
+ls e1000/
+CHESS.BAT     dungeon.zip chessv13.zip  ROM?-CGSARGON.NAS
+
+
+======= BASIC programs from the Nascom Home Page
+
