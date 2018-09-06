@@ -23,12 +23,24 @@
 
 
 # next:
-
-
+#
 # - code importers
 # -- do the text one
 # -- tidy up the CAS importer
 # -- and add E detection (and to the stand-alone script, too)
+
+# conv_export_raw DONE
+# conv_export_txt DONE
+# conv_export_dump
+# conv_export_nas
+# conv_export_cas
+# conv_export_nasg
+# conv_export_casg
+# conv_import_raw DONE
+# conv_import_txt PART-DONE
+# conv_import_nas DONE needs tidy
+# conv_import_cas PART-DONE needs tidy
+
 
 # TODO does PolyDos treat foo.txt and FOO.TXT as different files? I think so..
 
@@ -117,6 +129,20 @@ my @dsk;
 # needed for an FCB; the file creation step of the import involves putting
 # the %f into the $dsk data structure. Thus, the keys of %f are a superset
 # of the keys of an FCB (fnam, fext, fsfl, fufl, fsec, fnsc, flda, fexa)
+
+
+if (defined $ARGV[0]) {
+    while (my $file = shift @ARGV) {
+        cmd_mount(0,$file);
+        cmd_info("");
+        cmd_check(0);
+        my $drive = "0"; # gets modified by arg processing
+        cmd_dir($drive);
+        cmd_umount(0);
+        print "\n";
+    }
+    exit;
+}
 
 
 # Command-line interpreter
@@ -222,15 +248,16 @@ sub cmd_clone {
 
 
 sub cmd_info {
+    my $report = 0;
     for my $drive (0..3) {
-        print "Drive $drive: ";
         if ($dsk[$drive]->{mounted}) {
-            print "Host file: $dsk[$drive]->{filename}\n";
+            print "Drive $drive: Host file: $dsk[$drive]->{filename}\n";
             describe($drive);
+            $report++;
         }
-        else {
-            print "not mounted\n";
-        }
+    }
+    if ($report == 0) {
+        print "No drives are mounted\n";
     }
 }
 
@@ -302,6 +329,9 @@ sub cmd_copy {
 
     my ($src,$file,$ext) = split /\./, $fs;
 
+    print "Not yet implemented";
+    return;
+
     if (not $dsk[$src]->{mounted}) {
         print "ERROR source drive $src is not mounted\n";
         return;
@@ -343,6 +373,9 @@ sub cmd_copy {
 sub cmd_rename {
     my ($old, $new) = check_arg('fs fs', @_);
     return unless defined($old);
+
+    print "Not yet implemented";
+    return;
 
     my ($drive, $ofile,$oext) = split /\./, $old;
     my ($ndrive,$nfile,$next) = split /\./, $new;
@@ -439,6 +472,7 @@ sub cmd_type {
 }
 
 
+# The main work is done by subroutines conv_export_<format>
 sub cmd_export {
     my ($fs, $conv_ref, $path) = check_arg('fs oec od', @_);
     return unless defined($fs);
@@ -471,6 +505,7 @@ sub type_export_common {
 }
 
 
+# The main work is done by subroutines conv_import_<format>
 sub cmd_import {
     my ($dst, $hf_names, $path, $conv_ref) = check_arg('mv hfw oic', @_);
     return unless defined($dst);
@@ -1552,7 +1587,7 @@ sub conv_import_cas {
 }
 
 # seek input file to the start of the next block. Return true if found.
-# TODO want to build runt strin for end of file; it might contain execution address.
+# TODO want to build runt string for end of file; it might contain execution address.
 sub find_cas_preamble {
     my ($f_ref) = @_;
     my $h = $f_ref->{handle};
@@ -2310,6 +2345,16 @@ EOF
     umount 2
 EOF
 }
+    elsif ($cmd eq 'info') {
+        print <<EOF
+    info
+
+    Report host file, disk name and disk usage for all mounted disks.
+
+    Examples:
+    info
+EOF
+}
     elsif ($cmd eq 'clone') {
         print <<EOF
     clone <virtual drive number> <file on host filesystem>
@@ -2395,12 +2440,12 @@ EOF
         print <<EOF
     name <virtual drive number> myname
 
-    Change the name for the specified virtual drive number.  label is truncated
-    after 11 characters.
+    Change the name for the specified virtual drive number. The name is truncated
+    after 20 characters.
 
     Example:
-    label 1 mydisk
-    label 0 fooo_by
+    name 1 mydisk
+    name 0 fooo_by
 EOF
     }
     elsif ($cmd eq 'type') {
@@ -2807,14 +2852,23 @@ EOF
 sub help_generic {
     print <<EOF
 
-new for polydos:
-FORMAT
-PACK
-
 polydos_vfs allows manipulation of up to 4 virtual drives, numbered 0 through 3.
 Each drive can be associated with a file on the host filesystem. Files can be
 copied between virtual drives or transferred between virtual drives and the host
 filesystem. Virtual drives can be inspected and manipulated.
+
+Usage:
+
+    polydos_vfs
+    polydos_vfs < script
+    polydos_vfs foo.bin
+    polydos_vfs *.bin
+
+The first form starts an interactive session.
+The second form runs a sequence of commands from a file (See 'help scripts').
+The third form treats foo.bin as a disk image and does a mount/info/check/dir/exit.
+The fourth form treats *.bin as a set of disk images and does a
+mount/info/check/dir/exit on each in turn.
 
 Commands are:
 
