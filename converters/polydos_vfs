@@ -42,13 +42,12 @@
 # conv_import_cas PART-DONE needs tidy
 
 
-# TODO does PolyDos treat foo.txt and FOO.TXT as different files? I think so..
+# TODO does PolyDos treat foo.txt and FOO.TXT as different files? YES
 
 
 # bug: make nascom convert (And others) report file name as they go
 # - looks at bad formats in files and see if it can be accommodated
 # - try to extract execution address
-
 
 # bugette: filter also checks files that are marked as deleted.
 # =>  "type" matches deleted files. It should not.
@@ -98,7 +97,7 @@ my $LINES_PER_PAGE = 40;
 # For 'uppercase' command
 my $UPCASE = 0;
 
-# Main data structure:
+# Main data structure (populated by &rd_dir):
 # $dsk[0..3]
 # $dsk[n]->{mounted} boolean
 # $dsk[n]->{handle} file handle
@@ -2059,9 +2058,12 @@ sub filter_dir {
     my ($drive, $file, $ext) = @_;
     my @matches;
 
-    # turn the file specifier into a legal PERL regex: * -> [-\w]*
-    $file =~ s|\*|\[-\\w\]\*|g;
-    $ext =~  s|\*|\[-\\w\]\*|g;
+    # turn the "all files" specifier, *, into a legal PERL regex.
+    # Fileame can contain \w (a-zA-Z0-9_) and - and /.
+    # so change * -> [/-\w]*
+    # but escaped once for the string here and again for the match below
+    $file =~ s|\*|\[\\/\\-\\w\]\*|g;
+    $ext =~  s|\*|\[\\/\\-\\w\]\*|g;
 
     for my $i (0..($dsk[$drive]->{fcbval} -1)) {
         if (($dsk[$drive]->{fcb}->[$i]->{fnam} =~ /^$file$/)
@@ -2868,7 +2870,8 @@ The first form starts an interactive session.
 The second form runs a sequence of commands from a file (See 'help scripts').
 The third form treats foo.bin as a disk image and does a mount/info/check/dir/exit.
 The fourth form treats *.bin as a set of disk images and does a
-mount/info/check/dir/exit on each in turn.
+mount/info/check/dir/exit
+on each in turn.
 
 Commands are:
 
