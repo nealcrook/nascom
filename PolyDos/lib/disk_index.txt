@@ -1,14 +1,5 @@
 Index of files on polydos disk images
 
-PD000.BIN  - TODO polydos boot disk
-
-PD100.BIN  - Tools
-
-PD200.BIN  - Classic INMC games
-
-PD300.BIN  - Other games
-
-
 PD000 -- PolyDos 2 System disk and SDcard utilities
 =====
 
@@ -91,41 +82,80 @@ DUNGEON.SOL            Solution for DUNGEON [Origin: virtual-nascom]
 PD302 -- Blue-label software games
 ==================================
 
-breakout.cas   E 1000  Breakout, Blue Label Software.           [Origin: virtual-nascom]
-pacman.cas     E 1000  Pacman, of course. Blue Label Software.  [Origin: virtual-nascom]
-spacezap.cas   E 1000  Shoot-em-up. Blue Label Software.        [Origin: virtual-nascom]
+breakout.go   E 1000  Breakout, Blue Label Software.           [Origin: virtual-nascom]
+pacman.go     E 1000  Pacman, of course. Blue Label Software.  [Origin: virtual-nascom]
+spacezap.go   E 1000  Shoot-em-up. Blue Label Software.        [Origin: virtual-nascom]
 
 
 PD303 -- Miscellaneous Games
 ============================
 
-asteroid.cas   E 1000  Asteroids, Steven Weller                [Origin: virtual-nascom]
-driver.cas     E 1000  Night Driver, OZ1AEX                    [Origin: virtual-nascom]
-enarmet.cas    E 4400  Fruit machine, S.C. Allen               [Origin: virtual-nascom]
-labyrint.cas   E 1000  Walk though a 3D maze                   [Origin: virtual-nascom]
-lumberja.cas   E 1000  Lumberjack. From Program Power.         [Origin: virtual-nascom]
-monster.cas    E 1000  Graphical platform game, SSI Real-time games.          [Origin: virtual-nascom]
-serpent.nas                                                    [Origin: virtual-nascom]
-avalanche.nas                                                  [Origin: virtual-nascom]
-GOLD.NAS                                                       [Origin: virtual-nascom]
-pacman.nas                                                     [Origin: virtual-nascom]
-reversi.nas                                                    [Origin: virtual-nascom]
-hole.nas                                                       [Origin: virtual-nascom]
-spcinv.nas                                                     [Origin: virtual-nascom]
-spacewar.nas                                                   [Origin: virtual-nascom]
-galaxian.nas                                                   [Origin: virtual-nascom]
-jailbrk.nas                                                    [Origin: virtual-nascom]
-GALAXY.NAS                                                     [Origin: virtual-nascom]
-SARGON13.NAS                                                   [Origin: virtual-nascom]
-pacman2.nas                                                    [Origin: virtual-nascom]
-maze3d.nas   KKS-3dmaze.nas                                    [Origin: virtual-nascom]
+ASTEROID.GO    E 1000  Asteroids, Steven Weller                [Origin: virtual-nascom]
+DRIVER.GO      E 1000  Night Driver, OZ1AEX                    [Origin: virtual-nascom]
+ENARMET.GO     E 4400  Fruit machine, S.C. Allen               [Origin: virtual-nascom]
+LABYRINT.GO    E 1000  Walk though a 3D maze                   [Origin: virtual-nascom]
+LUMBERJA.GO    E 1000  Lumberjack. From Program Power.         [Origin: virtual-nascom]
+MONSTER.GO     E 1000  Graphical platform game, SSI Real-time games.          [Origin: virtual-nascom]
+SERPENT.GO                                                     [Origin: virtual-nascom]
+AVALANCHE.GO                                                   [Origin: virtual-nascom]
+GOLD.GO                                                        [Origin: virtual-nascom]
+PACMAN.GO                                                      [Origin: virtual-nascom]
+REVERSI.GO                                                     [Origin: virtual-nascom]
+HOLE.GO                                                        [Origin: virtual-nascom]
+SPCINV.GO                                                      [Origin: virtual-nascom]
+SPACEWAR.GO                                                    [Origin: virtual-nascom]
+GALAXIAN.GO                                                    [Origin: virtual-nascom]
+JAILBRK.GO                                                     [Origin: virtual-nascom]
+GALAXY.GO                                                      [Origin: virtual-nascom]
+SARGON13.GO                                                    [Origin: virtual-nascom]
+PACMAN2.GO                                                     [Origin: virtual-nascom]
+MAZE3D.GO    KKS-3dmaze.nas                                    [Origin: virtual-nascom]
 
-PD401 -- BASIC Games
+
+PD304 "M/C Games" -- Miscellaneous machine-code games (from Neal's collection)
+=================
+
+   Sect Nsct Load Exec SysFlg   Name
+   0004 0008 c800 0000 L        Exec.OV
+   000c 0005 c800 0000 L        Emsg.OV
+   0011 0006 c800 0000 L        Dfun.OV
+   0017 0003 c800 0000 L        Ecmd.OV
+   001a 0008 c800 0000 L        Edit.OV
+   0022 0001 c800 0000 L        BSfh.OV
+   0023 0010 b000 b000 L        BSdr.BR
+   0033 0017 1000 1000          GALAXY.GO
+   004a 0009 1000 1000          PIRAN.GO
+   0053 0010 1000 1000          SPCINV.GO
+   0063 0020 e000 e000          MICBAS.MC
+   0083 001d 1000 1000          SARGON.GO
+   00a0 0016 1000 1000          ASTROD.GO
+   00b6 006b 1000 1000          TRAP.GO
+   0121 000e 1000 1000          DEFEND.GO
+   012f 000c 1000 1000          GALINV.GO
+   013b 0004 0c80 0c80          OTHELO.GO
+   013f 0006 1000 1000          3DTTT.GO
+   0145 0004 1000 1000          LOLLIPOP.GO
+   0149 000b 4400 4400          FRUIT.GO
+   0154 0004 1600 1600          RUBIK.GO
+   0158 0009 1000 1000          SIMP.GO
+   0161 0070 1000 1000          ADVENTUR.GO
+   01d1 000e 1000 1000          STARFGHT.GO
+   01df 0043 1000 1000          ELIZA.GO
+
+
+PD304 "More M/C Games" -- Miscellaneous machine-code games
+======================
+
+   Sect Nsct Load Exec SysFlg   Name
+   0004 006b 1000 1000          ASTROTRP.GO  -- Astrotraps, Deep Thought Software, 1982
+
+
+PD400 -- BASIC Games
 ====================
 
-nimbot.cas  [Origin: virtual-nascom]
-lemondade.cas Classic Lemonade Stand simulation [Origin: virtual-nascom]
-invaders.cas Space invaders implemented in BASIC [Origin: virtual-nascom]
+NIMBOT.BS                                       [Origin: virtual-nascom]
+LEMONADE.BS Classic Lemonade Stand simulation   [Origin: virtual-nascom]
+INVADERS.BS Space invaders implemented in BASIC [Origin: virtual-nascom]
 
 PD402 -- BASIC Games (from The Nascom Home Page)
 ====================
@@ -157,7 +187,7 @@ ADVENTR.BS   Adventure Land
 SWORDS.BS    Swords and Sorcery by David Kastrup
 LEMON.BS     Lemonade Stand
 CAMEL.BS     Camel
-INVADERS.BS  The Invaders — from C&VG
+INVADERS.BS  The Invaders -- from C&VG
 
 
 
@@ -229,6 +259,31 @@ PD404 -- BASIC Games (from Neal's collection)
    0482 0013 10d6 0000          SCI-FI.BS
 
 
+PD405 "BASIC games 2" -- More BASIC Games (from Neal's collection)
+=====================
+
+   0035 001b 10d6 0000          MAGICLAB.BS
+   0050 000f 10d6 0000          ZOMBIE.BS
+   005f 000c 10d6 0000          MOONBASE.BS
+   006b 000d 10d6 0000          MAZE-RUN.BS
+   0078 000c 10d6 0000          WRAPTRAP.BS
+   0084 0007 10d6 0000          REVERSAL.BS
+   008b 0004 10d6 0000          NAS-PAT.BS
+   008f 0036 10d6 0000          STONEVIL.BS
+   00c5 000d 10d6 0000          FIGHTER.BS
+
+PD500.BIN "Adventure dev." -- Adventure engine based on article in Practical Computing
+==========================
+
+   0024 0016 1000 1000 L        AS.GO
+   003a 003a 0000 0000          DRIVER.TX
+   0074 003a 0000 0000          ADVENDOC.TX
+   00ae 0007 1000 1000          ADVENT.GO
+   00b5 0005 0000 0000          DRIVER.SY
+   00ba 0007 1676 1006          Q.GO
+   00c1 0001 0000 0000          REDODA.TX
+   00c2 0012 0000 0000          DATABAS.TX
+
 
 
 ============= to import from virtual NASCOM
@@ -239,3 +294,9 @@ CHESS.BAT     dungeon.zip chessv13.zip  ROM?-CGSARGON.NAS
 
 ======= BASIC programs from the Nascom Home Page
 
+TODO - "classic" INMC games onto 1 disk
+
+TODO games from Nascom Home Page
+TODO games from yahoo
+TODO ROM images
+TODO remove duplicates, test everything, better organisation etc..
