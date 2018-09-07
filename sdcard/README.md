@@ -31,14 +31,17 @@ from NASCOM memory, the polydos_util_rom boots PolyDos successfully and supports
 utility dumps PolyDos disk images accurately and the SDDIR/SETDRV utilities are
 working.
 
+07Sep2018 - polydos_vfs is quite functional, with just a couple more commands needed.
+The CASDSK utility is complete. Multiple application disk images are present in the
+PolyDos/libs area. Construction details updated to show how to power the Arduino from
+the NASCOM.
+
 Remaining tasks:
 
 * Complete polydos_vfs, a PERL-based file-system manipulator
 * Write SDSTDIN, to allow import of (eg BASIC) programs in ASCII format
 * Write a print spooler that spools to a file on the SD card
-* Write CASDSK, a utility to intercept NAS-SYS R/W calls in favour of
-a disk file
-* Upload PolyDos material and images
+* Upload PolyDos material and images (scans etc)
 * Upload disk images
 
 
