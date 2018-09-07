@@ -85,6 +85,14 @@ For the Arduino, I recommend getting one with a socketed DIL AVR chip.
 
 Use the notes in nascom_arduino.ino and nascom_pio.pdf and the photos to guide you. There are about 20 wires to connect.
 
+## Powering the Arduino
+
+During development, I powered the Arduino though the USB connection - either from a wall power supply or from a laptop where I was running the Arduino IDE for code development. With the finished system, it's preferable to power it directly from the NASCOM.
+
+There are 2 options:
+
+* The Polite option is to use the DC input jack of the Arduino. This is polite because it can co-exist with the USB input (there is comparator and FET which switches the DC source out when there is power on the USB). This input is regulated on-board and so requires an input of at least 7V. You could wire a barrel connector to the 12V output of the NASCOM PSU and connect it.
+* The Impolite option (which I used) is to pick up +5V from the PIO IDC connector. This needs to be wired into the same power rail as the USB would supply -- so you can NO LONGER ATTACH THE USB (I put some tape over the connector to remind me!). Close to the USB connector on the Arduino is a 2-pin device that looks like a big yellow resistor but which is actually a fuse. Solder the +5V connection to this point (the end down-stream of the fuse, but it doesn't really matter).
 
 ## Arduino prototyping card
 
