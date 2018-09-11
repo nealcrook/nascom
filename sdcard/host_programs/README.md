@@ -33,6 +33,8 @@ retyped in order to run one of the other two programs.
 * sddir.asm - intended to be run from PolyDos SDcard version. Reports directory listing of the SDcard.
 * cadsk.asm - intended to be run from PolyDos disk or SDcard version. Replaces NAS-SYS R, W commands so that some other program can be tricked into saving/loading to disk instead of to tape.
 * scrape5.asm - intended to be run from PolyDos disk or SDcard version. Copies CP/M physical disk images to SDcard file images; assumes 35 track DSDD disks with 10 sectors per side, each of 512 bytes (so 35*10*2*512=350KBytes per disk).
+* sdoff.asm -  intended to be run from PolyDos SDcard version. Puts SDcard interface into a quescent state so that the PIO can be used for something else.
+
 
 ## Tools
 
@@ -146,3 +148,21 @@ above). On reads, this size byte is used to transfer the file size.
 intercepted are limited to a maximum size of 64Kbyte.
 
 3. This utility would work just as well on a real floppy-disk version of PolyDos.
+
+
+### SDOFF
+
+Shut down the SDcard so that it (should be) quiescent on the PIO
+
+    $ SDOFF
+
+The idea is to allow some other piece of hardware to use the PIO. Specifically
+developed and tested with the Bits&PCs EPROM programmer.
+
+Obviously, before running this program you need to get everything you need into
+memory (the EPROM programming software and the data to be programmed).
+
+In order to restart the SDcard you need to reset it then reset the NASCOM and
+re-boot PolyDos. Even if you have (eg) uploaded an EPROM to RAM, it should be
+possible to restart and then save the EPROM image with no risk of corruption -
+certainly this seems to work reliably on my NASCOM 2.
