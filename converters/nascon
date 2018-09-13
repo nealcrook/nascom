@@ -1,0 +1,626 @@
+#!/usr/bin/perl
+#
+# NASCOM file format converter. For usage type:
+#
+# ./nascon -help
+#
+# Send kudos/bug reports/suggestions for improvement/patches to the author.
+#
+# Author: foofoobedoo@gmail.com
+# Licence: GPL V2.
+#
+# Version History
+# 27Sep2018 First version; using elements of nas2cas and cas2nas
+#
+################################################################################
+
+#
+# TODO what to do about special stuff like BASIC file name or extra bits added by G ??
+# TODO not yet implemented:
+# read_as_cas   -- fiddly but I have the code elsewhere
+# write_as_nas  -- straightforeward
+# write_as_hex  -- fiddly-ish
+
+
+use strict;
+use warnings;
+
+# records is a data structure that holds one or more regions of byte sequences
+# together with other meta-data.
+# Regions may or may not
+# - be contiguous
+# - ovelap
+# - be in order
+# However, all well-behaved .nas and .cas files will not have any nast characteristics
+# and so this program will check and may simply reject any badly-behaved data sets.
+#
+# $records[0]->{addr};          -- start address
+# $records[0]->{next_addr};     -- for convenience: addr+len
+# $records[0]->{len};           -- number of bytes
+# $records[0]->{data};          -- byte stream
+# $records[0]->{go};            -- execution address (ONLY in entry [0])
+# $records[0]->{src_line};      -- line number of input associated with start
+#                                  of record; for debug only
+my @records;
+
+my %args;
+$args{infile} = undef;
+$args{outfile} = undef;
+$args{-in} = undef;
+$args{-out} = undef;
+$args{-org} = undef;
+
+################################################################################
+# process command-line
+while (my $arg = shift @ARGV) {
+    if ($arg =~ /^-/) {
+        help_exit() if (($arg eq '-h') or ($arg eq '-help'));
+        if (exists ($args{$arg})) {
+            $args{$arg} = lc(shift @ARGV);
+        }
+        else {
+            die "ERROR: Unrecognised argument: $arg (try -help)\n";
+        }
+    }
+    elsif (not defined $args{infile}) {
+        $args{infile} = $arg;
+    }
+    elsif (not defined $args{outfile}) {
+        $args{outfile} = $arg;
+    }
+    else {
+        die "ERROR: Bad command-line format: $arg\n";
+    }
+}
+
+if (not defined $args{infile}) {
+    help_exit();
+}
+
+if (not defined $args{outfile}) {
+    die "ERROR: no output file specified\n";
+}
+
+
+################################################################################
+# deduce input and output formats from file extension if not set explicitly
+if (not defined $args{-in}) {
+    my @bits = split /\./, $args{infile};
+    if (defined $bits[1]) {
+        $args{-in} = lc $bits[1];
+    }
+}
+if (not defined $args{-out}) {
+    my @bits = split /\./, $args{outfile};
+    if (defined $bits[1]) {
+        $args{-out} = lc $bits[1];
+    }
+}
+
+################################################################################
+# make sure everything is legal:
+# -in/-out formats known and recognised
+# in file exists and can be opened
+# out file can be opened
+# -org specified where required
+
+if ($args{-in} !~ /^(bin|cas|nas|hex|dmp)$/) {
+    die "ERROR input format $args{-in} is not recognised/supported\n";
+}
+if ($args{-out} !~ /^(bin|cas|nas|hex|dmp|dbg)$/) {
+    die "ERROR output format $args{-out} is not recognised/supported\n";
+}
+
+open IN,    $args{infile}   or die "ERROR could not open $args{infile} for input\n";
+open OUT, ">$args{outfile}" or die "ERROR could not open $args{outfile} for output\n";
+
+if ($args{-in} eq 'bin') {
+    if (defined $args{-org}) {
+        # check it's legal
+        if ($args{-org} =~ /^[0-9a-f]+$/) {
+            $args{-org} = hex($args{-org});
+        }
+        else {
+            die "ERROR expected a hexadecimal number but got $args{-org}\n";
+        }
+    }
+    else {
+        die "ERROR when input file is in bin format you must specify -org\n";
+    }
+}
+
+
+################################################################################
+# Input: process input file to internal record format
+no strict 'refs';
+my $sub = "read_as_$args{-in}";
+&$sub();
+
+################################################################################
+# Output: process internal record format to generate output file
+$sub = "write_as_$args{-out}";
+&$sub();
+
+################################################################################
+# Finished.
+close IN;
+close OUT;
+exit 0;
+
+
+################################################################################
+################################################################################
+# subroutines
+################################################################################
+################################################################################
+
+################################################################################
+sub help_exit {
+    print <<'EOF';
+
+nascon converts files between different formats, especially NASCOM formats. The
+following formats are supported:
+
+nas       - format used by NAS-SYS T command and NAS-SYS 1 L command.
+cas       - binary (not audio) format used by NAS-SYS W and R commands.
+bin       - raw binary format.
+hex       - Intel HEX format.
+dmp       - dump format: address, 16-bytes hex, 16-bytes ASCII per line
+dbg       - (output only) human-readable dump of the internal data structure
+
+Usage:
+
+        nascon <infile> <outfile> [-arg1 val1 -arg2 val2..]
+
+Examples:
+        nascon invader.cas invader.nas
+        nascon invader.cas invader.bin
+        nascon invader.bin invader.cas -org 1C00
+        nascon -out bin invader.a   invader.b -in cas
+
+Arguments:
+
+<infile> <outfile> -- the input and output file-names respectively. The input file
+must exist. The output file will be created, over-writing any existing file of the
+same name. The <infile> and <outfile> can appear before or after any arguments.
+
+-in -- input file format. If not specified, will be guessed from the <infile> extension.
+
+-out -- output file format. If not specified, will be guessed from the <outfile> extension.
+
+Legal values for -in and -out are: cas nas bin hex dmp. Additional legal value for -out is dbg.
+Case is ignored so that HEX hex Hex etc. are all considered to be equivalent.
+
+-org -- when the input file is binary (bin) there is no addressing information contained
+in the file. The -org argument is required in this case and specifies the address associated
+with the first data byte.
+
+Legal value for -org is a hexadecimal number (a sequence of hex digits with with no prefix)
+
+EOF
+exit 0;
+}
+
+
+################################################################################
+# TODO
+sub read_as_cas {
+    print "Read as cas\n";
+}
+
+
+################################################################################
+# Read the .nas file and represent it as one or more entries in @records
+sub read_as_nas {
+    my $in_record = 0;  # state
+
+    while (my $line = <IN>) {
+        # By inspection of various .NAS files..
+        # - line endings are inconsistent. Get rid of both CR and LF
+        # - some have nulls before the line-end. Get rid of them.
+        # - some have 0x08 before the line-end. Get rid of them.
+        $line =~ s/[\n\r\x00\x08]//g;
+
+        # Last line should be "." to indicate exit from the L command. Skip it.
+        next if $line =~ /^\.$/;
+
+        # TODO is there sometimes a "E" line? If so, extract the execution address.
+
+        # skip blank lines (there should not be any)
+        next if $line =~ /^\s*$/;
+
+        # Lines look like this:
+        # 1000 3E AA 32 EA 12 AF 32 EC F3
+        #
+        # Must be an address and at least 1 data byte. If there are
+        # 9 bytes, the last one is a checksum of the address/data
+        my @bits = split " ", $line;
+        my $count = scalar(@bits) - 1;
+        my $addr = hex($bits[0]);
+
+        if ($count == 0) {
+            print "ERROR bad format at line $. -- address field but no data\n";
+            next;
+        }
+        if ($count == 9) {
+            # Verify checksum then discard it by bumping $count
+            my $asum = $addr + ($addr >> 8);
+            my $esum = hex($bits[9]); # actual
+            for (my $i=1; $i<9; $i=$i+1) {
+                $asum = ($asum + hex($bits[$i])) & 0xff;
+            }
+            if ($asum != $esum ) {
+                # report the error but use the data anyway.
+                printf "ERROR bad checksum at line $. -- calculated 0x%X but read 0x%X\n", $asum, $esum;
+            }
+            $count = $count - 1;
+        }
+
+        if (($in_record == 0) or ($addr != $records[-1]->{next_addr})) {
+            # This line is the start of a new record. Create an empty record which looks
+            # contiguous so that the data gets filled in by the next if () below.
+            $in_record = 1;
+            my %record;
+            my $rec = \%record;
+
+            $rec->{addr} = $addr;
+            $rec->{len} = 0;
+            $rec->{next_addr} = $addr;
+            $record{data} = "";
+            $record{src_line} = $.;
+            push @records, $rec;
+        }
+
+        if ($in_record == 1) {
+            # incorporate this line in current record
+            my $rec = $records[-1];
+
+            $rec->{len} = $rec->{len} + $count;
+            $rec->{next_addr} = $rec->{addr} + $rec->{len};
+
+            for (my $i=1; $i<($count + 1); $i=$i+1) {
+                my $byte = hex($bits[$i]);
+                $rec->{data} = $rec->{data} . chr($byte);
+            }
+        }
+    }
+}
+
+
+################################################################################
+# Read the Intel HEX file and represent it as one or more entries in @records
+# Only type 0 (Data) and type 1 (End of file) markers are processed. Report a
+# bug if you have a convincing reason for support of any others. A warning will
+# be generated if the file does not end with a type 1 record.
+sub read_as_hex {
+    my $in_record = 0; # state
+
+    while (my $line = <IN>) {
+        $line =~/(\:)([0-9A-F][0-9A-F])([0-9A-F][0-9A-F][0-9A-F][0-9A-F])([0-9A-F][0-9A-F])(\w+)/;
+        my $count = hex($2);
+        my $addr  = hex($3);
+        my $typ   = hex($4);
+        my $dat   = $5; # data and checksum
+        my $sum = $count + ($addr>>8) + ($addr & 0xff) + $typ;
+
+        # support Extended Segment Address (type 2) provided that the 16-bit data field is 0
+        if ($typ == 2) {
+            die "Unsupported type 2 record at line $. - unexpected length:\n$line" if ($count != 2);
+            die "Unsupported type 2 record at line $. - unsupported value:\n$line" if ($dat ne "0000FC");
+            next; # it's a nop
+        }
+
+        # support Start Segment Address (type 3) provided that the length is 0
+        if ($typ == 3) {
+            die "Unsupported type 3 record at line $. - unexpected length:\n$line" if ($count != 0);
+            die "Unsupported type 3 record at line $. - unsupported value:\n$line" if ($dat ne "FD");
+            next; # it's a nop
+        }
+
+        # support Extended Linear Address (type 4) provided that the 16-bit data field is 0
+        if ($typ == 4) {
+            die "Unsupported type 4 record at line $. - unexpected length:\n$line" if ($count != 2);
+            die "Unsupported type 4 record at line $. - unsupported value:\n$line" if ($dat ne "0000FA");
+            next; # it's a nop
+        }
+
+        # ignore type 5 (entry point)
+        if ($typ == 5) {
+            next; # it's a nop
+        }
+
+        # if it's type 1 (end-of-file) we're done
+        if ($typ == 1) {
+            return;
+        }
+
+        # either it's a data record or we don't support it
+        if ($typ != 0) {
+            die "Unsupported record: type $typ at line $. :\n$line";
+        }
+
+        if (($in_record == 0) or ($addr != $records[-1]->{next_addr})) {
+            # This line is the start of a new record. Create an empty record which looks
+            # contiguous so that the data gets filled in by the next if () below.
+            $in_record = 1;
+            my %record;
+            my $rec = \%record;
+
+            $rec->{addr} = $addr;
+            $rec->{len} = 0;
+            $rec->{next_addr} = $addr;
+            $record{data} = "";
+            $record{src_line} = $.;
+            push @records, $rec;
+        }
+
+        if ($in_record == 1) {
+            # incorporate this line in current record
+            my $rec = $records[-1];
+
+            $rec->{len} = $rec->{len} + $count;
+            $rec->{next_addr} = $rec->{addr} + $rec->{len};
+
+            # process $count bytes of data from $dat.
+            for (my $i=0; $i<$count; $i++) {
+                my $byte = hex(substr $dat, 2*$i, 2);
+                $sum = $sum + $byte;
+                $rec->{data} = $rec->{data} . chr($byte);
+            }
+
+            # checksum
+            $sum = $sum + hex(substr $dat, 2*$count, 2);
+
+            if (($sum & 0xff) != 0) {
+                print "ERROR bad checksum in input file at line $.\n";
+            }
+        }
+    }
+    print "WARNING reached end of .hex file with no end-of-file record\n";
+}
+
+
+################################################################################
+# Read as binary file. By definition, the file is contiguous.
+sub read_as_bin {
+    my %record;
+    my $rec = \%record;
+    push @records, $rec;
+
+    $rec->{addr} = $args{-org}; # already checked that this exists
+    $rec->{src_line} = 1;
+    {
+        # slurp
+        local $/=undef;
+        $rec->{data} = <IN>;
+    }
+    $rec->{len} = length $rec->{data};
+}
+
+
+################################################################################
+# Read as dump. Accept either of these two formats:
+# 000001d0: cd 67 10 d9 21 aa 0b d9 - c9 e5 3e 20 23 be 20 1a   .g..!... ..> #. .
+# 0002ac60  48 10 08 42 08 49 24 84  84 09 00 20 10 42 02 12  |H..B.I$.... .B..|
+#
+# And remember that a line (particularly the last line) may be incomplete.
+sub read_as_dmp {
+    my $in_record = 0;  # state
+
+    while (my $line = <IN>) {
+        my @bits;
+        # Get rid of : and - and any line endings or other weird stuff
+        $line =~ s/[\-\:\n\r\x00\x08]//g;
+
+        # skip blank lines (there should not be any)
+        next if $line =~ /^\s*$/;
+
+        if ($line eq '*') {
+            # Indicates discontinuity
+            die "ERROR discontinuity in input data at line $. (use -v option to hexdump)\n";
+        }
+
+        if ($line =~ /|$/) {
+            # for 2nd format, ASCII is separated by | - get rid of it
+            # the $ anchor avoids the case where | occurs in the ASCII field
+            @bits = split /\|/, $line;
+        }
+        elsif ($line =~ /   /) {
+            # for 1st format, ASCII is separated by 3 spaces - get rid of it
+            @bits = split /   /, $line;
+        }
+
+        # break into lumps of hex. Must be an address and between 1 and 16 data bytes.
+        @bits = split ' ', $bits[0];
+
+        my $count = scalar(@bits) - 1;
+        my $addr = hex($bits[0]);
+
+        if ($count == 0) {
+            print "ERROR bad format at line $. -- address field but no data\n";
+            next;
+        }
+
+        if (($in_record == 0) or ($addr != $records[-1]->{next_addr})) {
+            # This line is the start of a new record. Create an empty record which looks
+            # contiguous so that the data gets filled in by the next if () below.
+            $in_record = 1;
+            my %record;
+            my $rec = \%record;
+
+            $rec->{addr} = $addr;
+            $rec->{len} = 0;
+            $rec->{next_addr} = $addr;
+            $record{data} = "";
+            $record{src_line} = $.;
+            push @records, $rec;
+        }
+
+        if ($in_record == 1) {
+            # incorporate this line in current record
+            my $rec = $records[-1];
+
+            $rec->{len} = $rec->{len} + $count;
+            $rec->{next_addr} = $rec->{addr} + $rec->{len};
+
+            for (my $i=1; $i<($count + 1); $i=$i+1) {
+                my $byte = hex($bits[$i]);
+                $rec->{data} = $rec->{data} . chr($byte);
+            }
+        }
+    }
+}
+
+
+################################################################################
+# Write @records in .cas format with initial and inter-block padding.
+sub write_as_cas {
+    if ($#records > 0) {
+        die "ERROR cannot write cas file with discontinuous records; use -dbg to examine input file\n";
+    }
+
+    my $addr = $records[0]->{addr};
+    my $len =  $records[0]->{len};
+    my $maxblk = int(($len+255)/256) - 1; # blocks go maxblk..0
+
+    foreach my $i (0..$maxblk) {
+        printf "Address $addr length $len -- block %d\n", $maxblk - $i;
+        # Output sync pattern
+        print OUT chr(0) . chr(0xff) . chr(0xff) . chr(0xff) . chr(0xff);
+
+        # Output block header and checksum
+        my $csum = ($addr & 0xff) + ($addr >> 8) + $maxblk - $i;
+        my $body;
+        print OUT chr($addr & 0xff);
+        print OUT chr($addr >> 8);
+        if ($len > 255) {
+            $body = substr($records[0]->{data}, 256*$i, 256);
+            print OUT chr(0);
+        }
+        else {
+            $body = substr($records[0]->{data}, 256*$i);
+            print OUT chr($len);
+            $csum = $csum + $len;
+        }
+        print OUT chr($maxblk - $i);
+        print OUT chr($csum & 0xff); # header checksum
+        print OUT $body;
+
+        $csum = 0;
+        foreach my $byte (0..(length($body) -1)) {
+            $csum = $csum + ord(substr($body, $byte, 1));
+        }
+        print OUT chr($csum & 0xff); # body checksum
+
+        # Output 10 nulls
+        print OUT chr(0) x 10;
+
+        # Step to next
+        $addr = $addr + 256;
+        $len = $len - 256;
+    }
+}
+
+
+################################################################################
+# Write @records as a .nas file
+# Easy - don't need to care about the order or any duplication or holes, just
+# spit out each region in turn in the correct format.
+# TODO support "." at end and optional "E" option.
+sub write_as_nas {
+    print "Write as nas -- DO THIS NEXT\n";
+}
+
+
+
+################################################################################
+# TODO
+sub write_as_hex {
+    print "Write as hex\n";
+}
+
+
+################################################################################
+# Write @records as chunk of binary.
+sub write_as_bin {
+    if ($#records > 0) {
+        die "ERROR cannot write bin file with discontinuous records; use -dbg to examine input file\n";
+    }
+    print OUT $records[0]->{data};
+}
+
+
+################################################################################
+# Write @records in dump format with per-record header, for debug
+sub write_as_dbg {
+    foreach my $i (0..$#records) {
+        if ($i > 0) {
+            print OUT "\n";
+        }
+        printf OUT "Record %d, Start at line %d address=0x%04x length=0x%04x execution address=",
+            $i, $records[$i]->{src_line}, $records[$i]->{addr}, $records[$i]->{len};
+        if (defined $records[$i]->{go}) {
+            printf OUT "0x%04x (explicit)\n", $records[$i]->{go};
+        }
+        else {
+            print OUT "Unknown\n";
+        }
+        dmp_common($records[$i]);
+    }
+}
+
+
+################################################################################
+# Write @records in dump format
+sub write_as_dmp {
+    foreach my $i (0..$#records) {
+        dmp_common($records[$i]);
+    }
+}
+
+
+################################################################################
+# Write one record in "canonical dump format" thus:
+# 000002b0: 55 4c 41 4e 43 45 2a 20 - 4c 4f 4c 4c 59 50 4f 50   ULANCE*  LOLLYPOP
+# used by write_as_dmp and write_as_dbg
+sub dmp_common {
+    my $rec_ref = $_[0];
+
+    my $num_str = '';
+    my $let_str = '';
+    my $count = 0;
+    my $offset = 0;
+    foreach my $x (0..$rec_ref->{len}-1) {
+        my $chr = ord(substr $rec_ref->{data}, $x, 1);
+        $num_str = $num_str . ' ' . sprintf("%02x",$chr);
+
+        if (($chr < 0x7F) and ($chr > 0x1f)) {
+            $let_str = $let_str . chr $chr;
+        }
+        else {
+            $let_str = $let_str . '.';
+        }
+        $count = $count + 1;
+
+        if ($count == 8) {
+            $num_str = $num_str . ' -';
+            $let_str = $let_str . ' ';
+        }
+
+        if ($count == 16) {
+            printf OUT "%08x:%s   %s\n", $offset, $num_str, $let_str;
+            $count = 0;
+            $num_str = '';
+            $let_str = '';
+            $offset = $offset + 16;
+        }
+    }
+    # runt
+    if ($count != 0) {
+        my $pad = '   ' x (16 - $count);
+        if ($count < 8) {
+            $pad = $pad . '  ';
+        }
+        printf OUT "%08x:%s $pad  %s\n", $offset, $num_str, $let_str;
+    }
+}
