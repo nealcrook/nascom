@@ -17,8 +17,6 @@
 #
 # TODO what to do about special stuff like BASIC file name or extra bits added by G ??
 # TODO not yet implemented:
-# read_as_cas   -- fiddly but I have the code elsewhere
-# write_as_nas  -- straightforeward
 # write_as_hex  -- fiddly-ish
 
 
@@ -203,9 +201,170 @@ exit 0;
 
 
 ################################################################################
-# TODO
+# Read the .cas file and represent it as one or more entries in @records
+# - a well-formed .cas file will be contiguous and therefore a SINGLE entry.
 sub read_as_cas {
-    print "Read as cas\n";
+    my $current_blknum; # undefined
+
+    while (find_cas_blk_preamble()) {
+        $current_blknum = process_cas_blk($current_blknum);
+    }
+
+    if ($current_blknum != 0) {
+        print "ERROR cas file finished at block $current_blknum - expected it to finish at block 0\n";
+    }
+}
+
+
+################################################################################
+# Helpers for read_as_cas
+
+
+
+# Error when reading block header/data/footer
+sub err_blk {
+    my $msg = $_[0];
+    my $blk = $_[1]; ## TODO HOW??
+    close IN;        ## TODO WTF
+    close OUT;       ## TODO WTF
+    printf "ERROR reached end of file while trying to read $msg for block $blk\n";
+    exit 1;
+}
+
+
+# get a byte from IN. Usage: $byte = get_byte(\&sub , $string)
+# if no byte available execute &sub($string)
+sub get_byte {
+    my $on_error = $_[0];
+    my $on_error_arg = $_[1];
+
+    my $byte;
+    my $ok = read IN, $byte, 1;
+    if ($ok == 1) {
+        return ord $byte;
+    }
+    else {
+        &$on_error($on_error_arg);
+    }
+}
+
+
+
+
+# Discard bytes from input until the sequence "00 ff ff ff ff" is found. Return
+# when found or exit if end of file reached. On return, the next byte to be read
+# is the first byte after the sequence.
+sub find_cas_blk_preamble {
+    my $count = 0;
+    my $byte;
+  BYTE:
+    while (read IN, $byte, 1) {
+        $byte = ord $byte;
+
+        # looking for 0xff
+        if ($byte == 0) {
+            $count = 1;
+            next BYTE;
+        }
+        # looking for 0xff
+        if ($byte == 0xff) {
+            $count = $count + 1;
+            if ($count == 5) {
+                return 1;
+            }
+            next BYTE;
+        }
+        $count = 0;
+  }
+    return 0;
+}
+
+
+# next byte from IN is start of block. Read block header, verify header
+# checksum and block number. Read block body, output equivalent
+# data to OUT and verify block body checksum.
+sub process_cas_blk {
+    my $current_blknum = $_[0];
+
+    # read 5-byte block header:
+    # 2 bytes start address
+    # 1 byte  block length
+    # 1 byte  block number
+    # 1 byte  header checksum
+    # The checksum is the low 8-bits of the sum of the other 4 bytes (NOT, as
+    # would be usual, a value that makes the 5 bytes sum to 0)
+    my $blkaddr = get_byte(\&err_blk, "block address") + (get_byte(\&err_blk, "block address") << 8);
+    my $blklen = get_byte(\&err_blk, "block length");
+    my $blknum = get_byte(\&err_blk, "block number");
+    my $blkcsum = get_byte(\&err_blk, "block header checksum");
+
+    # Verify checksum
+    my $sum = 0xff & (($blkaddr & 0xff) + ($blkaddr >>8) + $blklen + $blknum);
+    if ($sum != $blkcsum) {
+        printf "ERROR bad header checksum in block $blknum - calculated 0x%X but read 0x%X\n", $sum, $blkcsum;
+    }
+
+    if ((!defined $current_blknum) or ($blkaddr != $records[-1]->{next_addr})) {
+        # This block line is the start of a new record (maybe because it's the first).
+        # Create an empty record ready to accept the data payload
+        my %record;
+        my $rec = \%record;
+        $rec->{src_line} = 1;
+        push @records, $rec;
+        $rec->{addr} = $blkaddr;
+        $rec->{next_addr} = $blkaddr;
+        $rec->{len} = 0;
+        $rec->{data} = "";
+    }
+
+    my $rec = $records[-1];
+
+    # Verify block number. Block number is an 8-bit value that counts down to 0; the cassette
+    # read command terminates after block 0 has been processed.
+    # Skip check for 1st block, because block number is unknown.
+    if (defined $current_blknum) {
+        if ($current_blknum == 0) {
+            print "ERROR found block after block 0; block 0 should be the last block\n";
+            # but carry on.. it would need a second R command to get the rest
+            $current_blknum = $blknum;
+        }
+        else {
+            $current_blknum = $current_blknum - 1;
+        }
+
+        if ($blknum != $current_blknum) {
+            printf "ERROR bad header block number in block $blknum -- expected 0x%X but read 0x%X\n", $current_blknum, $blknum;
+        }
+    }
+
+    $current_blknum = $blknum;
+
+    # Fix up byte count
+    $blklen = 256 if ($blklen == 0);
+
+    printf "Found blk %d (0x%X bytes at address 0x%04X)\n", $blknum, $blklen, $blkaddr;
+
+    # Update the record for this new data
+    $rec->{len} += $blklen;
+    $rec->{next_addr} += $blklen;
+    $sum = 0;
+
+    # Read block body and store it, accumulating checksum at the same time.
+    for (my $i=0; $i<$blklen; $i=$i+1) {
+        my $byte = get_byte(\&err_blk, "block data");
+        $sum = 0xff & ($sum + $byte);
+        $rec->{data} = $rec->{data} . chr($byte);
+    }
+
+    # Read block footer:
+    # 1 byte  data checksum
+    my $fsum = get_byte(\&err_blk, "block data checksum");
+
+    if ($sum != $fsum) {
+        printf "ERROR bad data checksum in block $blknum -- calculated 0x%02X but read 0x%02X\n",$sum, $fsum;
+    }
+
+    return $current_blknum;
 }
 
 
@@ -266,8 +425,8 @@ sub read_as_nas {
             $rec->{addr} = $addr;
             $rec->{len} = 0;
             $rec->{next_addr} = $addr;
-            $record{data} = "";
-            $record{src_line} = $.;
+            $rec->{data} = "";
+            $rec->{src_line} = $.;
             push @records, $rec;
         }
 
@@ -349,8 +508,8 @@ sub read_as_hex {
             $rec->{addr} = $addr;
             $rec->{len} = 0;
             $rec->{next_addr} = $addr;
-            $record{data} = "";
-            $record{src_line} = $.;
+            $rec->{data} = "";
+            $rec->{src_line} = $.;
             push @records, $rec;
         }
 
@@ -451,8 +610,8 @@ sub read_as_dmp {
             $rec->{addr} = $addr;
             $rec->{len} = 0;
             $rec->{next_addr} = $addr;
-            $record{data} = "";
-            $record{src_line} = $.;
+            $rec->{data} = "";
+            $rec->{src_line} = $.;
             push @records, $rec;
         }
 
@@ -526,11 +685,32 @@ sub write_as_cas {
 # Write @records as a .nas file
 # Easy - don't need to care about the order or any duplication or holes, just
 # spit out each region in turn in the correct format.
-# TODO support "." at end and optional "E" option.
+# TODO support optional "E" option.
 sub write_as_nas {
-    print "Write as nas -- DO THIS NEXT\n";
-}
+    foreach my $rec_ref (@records) {
+        my $count = 0;
+        my $addr = $rec_ref->{addr};
+        foreach my $x (0..$rec_ref->{len}-1) {
+            if ($count == 0) {
+                printf OUT "%04X", $addr;
+            }
 
+            printf OUT " %02X", ord(substr $rec_ref->{data}, $x, 1);
+            $count = $count + 1;
+            $addr = $addr + 1;
+
+            if ($count == 8) {
+                print OUT "\r\n";
+                $count = 0;
+            }
+        }
+        # runt
+        if ($count != 0) {
+            printf OUT "\r\n";
+        }
+    }
+    print OUT ".\r\n"; # exit the L command in NAS-SYS
+}
 
 
 ################################################################################
@@ -573,8 +753,8 @@ sub write_as_dbg {
 ################################################################################
 # Write @records in dump format
 sub write_as_dmp {
-    foreach my $i (0..$#records) {
-        dmp_common($records[$i]);
+    foreach my $rec_ref (@records) {
+        dmp_common($rec_ref);
     }
 }
 
@@ -589,7 +769,7 @@ sub dmp_common {
     my $num_str = '';
     my $let_str = '';
     my $count = 0;
-    my $offset = 0;
+    my $addr = $rec_ref->{addr};
     foreach my $x (0..$rec_ref->{len}-1) {
         my $chr = ord(substr $rec_ref->{data}, $x, 1);
         $num_str = $num_str . ' ' . sprintf("%02x",$chr);
@@ -608,11 +788,11 @@ sub dmp_common {
         }
 
         if ($count == 16) {
-            printf OUT "%08x:%s   %s\n", $offset, $num_str, $let_str;
+            printf OUT "%08x:%s   %s\n", $addr, $num_str, $let_str;
             $count = 0;
             $num_str = '';
             $let_str = '';
-            $offset = $offset + 16;
+            $addr = $addr + 16;
         }
     }
     # runt
@@ -621,6 +801,6 @@ sub dmp_common {
         if ($count < 8) {
             $pad = $pad . '  ';
         }
-        printf OUT "%08x:%s $pad  %s\n", $offset, $num_str, $let_str;
+        printf OUT "%08x:%s $pad  %s\n", $addr, $num_str, $let_str;
     }
 }
