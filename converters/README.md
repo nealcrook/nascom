@@ -2,8 +2,9 @@
 
 Here are PERL programs for converting NASCOM files between different formats.
 
-* nas2cas - convert .nas format to .cas
-* cas2nas - convert .cas format to .nas (also spits out a binary file)
+* nascon - convert between nas/cas/bin/hex/dmp formats.
+* nas2cas - (obsolete) convert .nas format to .cas
+* cas2nas - (obsolete) convert .cas format to .nas (also spits out a binary file)
 * sy_extract - Polydos allowed creation of a symbol table in a compiled format that could be read in to the polyzap assembler. This program reads a symbol table in this compiled format and writes it out as a set of equates.
 
 
