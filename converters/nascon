@@ -1,8 +1,14 @@
 #!/usr/bin/perl
 #
+# https://github.com/nealcrook/nascom
+#
 # NASCOM file format converter. For usage type:
 #
 # ./nascon -help
+#
+# To run on Windows:
+# - I recommend strawberry PERL (http://www.strawberryperl.com)
+# - you need to name this file nascon.pl
 #
 # Send kudos/bug reports/suggestions for improvement/patches to the author.
 #
@@ -14,10 +20,28 @@
 #
 ################################################################################
 
-#
-# TODO what to do about special stuff like BASIC file name or extra bits added by G ??
-# TODO not yet implemented:
-# write_as_hex  -- fiddly-ish
+# By inspection BASIC file name header is:
+# d3 d3 d3 xx
+# where xx is a single ASCII character, A-Z
+# followed by 16*16=256 NUL characters
+
+# By inspection, self-loading tape (created using "Generate") is
+# 0x0d E0 0x0d R 0x0d
+# followed by 16*16=256 NUL characters
+
+# .. or maybe the 256 NUL characters are at the start of a W before the action
+# starts.
+
+# TODO
+# - detect and report a BASIC header (only for read of CAS file)
+# - detect and report an execution address (only for read of CAS file)
+# - optionally append a BASIC header (only for write of CAS file - and report
+#   warning for a file with the right load address to be a BASIC program)
+# - want a batch mode where a whole tapes-worth of .wav can be processed into
+#   separate files
+# - optionally append an execution address (for write of CAS file) and also
+#   prepend E0 R.. check the documentation for the original format of a G file.
+# - implement write_as_hex  -- fiddly-ish
 
 
 use strict;
