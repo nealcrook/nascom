@@ -1,0 +1,386 @@
+#!/usr/bin/perl
+#
+# https://github.com/nealcrook/nascom
+#
+# Convert wav audio files from NASCOM tape into a byte stream, eg for
+# processing with "nascon" as CAS files.
+#
+# ./wav2bin -help
+#
+# To run on Windows:
+# - I recommend strawberry PERL (http://www.strawberryperl.com)
+# - you need to name this file wav2bin.pl
+#
+# inspired by:
+# http://dabeaz.blogspot.com/2010/08/decoding-superboard-ii-cassette-audio.html
+#
+# concise description of wav format:
+# http://soundfile.sapp.org/doc/WaveFormat/
+#
+# Send kudos/bug reports/suggestions for improvement/patches to the author.
+#
+# Author: foofoobedoo@gmail.com
+# Licence: GPL V2.
+#
+# Version History
+# 25Sep2018 First version
+#
+################################################################################
+
+use strict;
+use warnings;
+
+my %args;
+$args{infile} = undef;
+$args{outfile} = undef;
+$args{-baud300} = 0;
+$args{-debug} = 0;
+
+################################################################################
+# process command-line
+while (my $arg = shift @ARGV) {
+    if ($arg =~ /^-/) {
+        help_exit() if (($arg eq '-h') or ($arg eq '-help'));
+        if (exists ($args{$arg})) {
+            $args{$arg}++;
+        }
+        else {
+            die "ERROR: Unrecognised argument: $arg (try -help)\n";
+        }
+    }
+    elsif (not defined $args{infile}) {
+        $args{infile} = $arg;
+    }
+    elsif (not defined $args{outfile}) {
+        $args{outfile} = $arg;
+    }
+    else {
+        die "ERROR: Bad command-line format: $arg\n";
+    }
+}
+
+if (not defined $args{infile}) {
+    help_exit();
+}
+
+if (not defined $args{outfile}) {
+    die "ERROR: no output file specified\n";
+}
+
+open IN,    $args{infile}   or die "ERROR could not open $args{infile} for input\n";
+open OUT, ">$args{outfile}" or die "ERROR could not open $args{outfile} for output\n";
+
+
+################################################################################
+# Set up constants
+
+# a count higher than this is a low frequency, otherwise it's a high frequency
+my $threshold = 12;
+# number of symbols needed for a 0 or a 1 bit at 1200baud
+my $count0 = 2; # 2 symbols = 1 cycle
+my $count1 = 4; # 4 symbols = 2 cycles
+if ($args{-baud300}) {
+    # 300 baud uses the same frequencies but for longer
+    $count0 = $count0 * 1200/300; # 8 symbols  = 4 cycles
+    $count1 = $count1 * 1200/300; # 16 symbols = 8 cycles
+}
+
+# Size of data buffer. Making this bigger requires more (virtual) memory
+# but makes things run more efficiently. It must be a multiple of 4 so that
+# it is aligned to the size of each sample
+my $want = 1024*64*4;
+
+
+################################################################################
+# Set up variables and state
+
+# Track decode
+my $prev_sign = 0;
+my $count = 0;
+my $prev_symbol = 0;
+my $symbol_count = 0;
+my $bit;
+my $byte;
+my $bit_count = 0;
+my $found_start = 0;
+my $output_byte = 0;
+
+# Track input data
+my $subchunk_remain = 0;
+my $data;
+my $index = 0;
+my $actual = 0;
+
+
+################################################################################
+# Algorithm: Data stream is encoded using frequencies of 1200Hz for a 0
+# and 2400Hz for a 1. At 1200baud, a 0 is 1 cycle of 1200Hz and a 1 is 2 cycles
+# of 2400Hz (so a 0 and a 1 are the same duration).
+#
+# The .wav file is sampled data, and this code is set up for 44100 samples/second.
+# The main "while" loop steps through each SAMPLE in turn. It looks for a
+# zero-crossing which it detects by seeing a sign change in the samples. It counts
+# the number of samples from the previous sign change. That count represents the
+# duration of a half-cycle and I call this a SYMBOL. Since we know the sample rate
+# we *could* use the count to infer the frequency. However, the program is not that
+# sophisticated; it simply uses a hard-wired threshold to decide if the count
+# represents a half-cycle of a low frequency or a high frequency.
+# So, a SYMBOL is a 0 if it represents a half-cycle of a low frequency and a 1 if it
+# represents a half-cycle of a high freuqncy.
+#
+# SYMBOLs are accumulated to form BITs.
+#
+# The BIT-stream is parsed to detect a start BIT and then to accumulate a BYTE and
+# then to check for a stop BIT. Each time a BYTE is accumulated it is written to the
+# output file.
+#
+# A SAMPLE processed by the "while " loop might complete a new SYMBOL which might
+# complete a new BIT which might complete a new BYTE. At any point it might not
+# complete the next step, in which case the loop terminates and goes on to the next
+# sample ("next SAMPLE").
+
+check_wav_header();
+
+SAMPLE:
+while (1) {
+    if ($index >= $actual) {
+        # data buffer is empty.
+
+        if ($subchunk_remain == 0) {
+            print "Look for data sub-chunk\n";
+            $subchunk_remain = read_wav_data_header();
+
+            last SAMPLE if ($subchunk_remain == 0);
+        }
+
+        print "Get more data from current sub-chunk\n" if ($args{-debug} > 0);
+        if ($subchunk_remain < $want) {
+            $actual = read IN, $data, $subchunk_remain;
+        }
+        else {
+            $actual = read IN, $data, $want;
+        }
+
+        $subchunk_remain = $subchunk_remain - $actual;
+        $index = 0;
+
+        if ($actual == 0) {
+            die "ERROR Oops could not read enough data.. unexpected end of file\n";
+        }
+    }
+
+    # Each sample is 4 bytes: 2 bytes for Left then 2 bytes for Right. It's stored
+    # in little-endian byte order in 2's complement format. We only care about the
+    # sign and will only use the left channel. Therefore, we need the byte at offset
+    # 1 within each sample
+    my $sign = (0x80 & ord(substr($data, $index + 1, 1)) )>> 7;
+    $index = $index + 4; # next sample
+
+    print "$sign " if ($args{-debug} > 3);
+
+    # If the sign is the same as the last sample, count it and we're done.
+    if ($sign == $prev_sign) {
+        $count++;
+        next SAMPLE;
+    }
+
+    # Got here with a new symbol.
+    print "$count " if ($args{-debug} > 2);
+    my $symbol = $count > $threshold ? 0 : 1;
+
+    $prev_sign = $sign;
+    $count = 0;
+
+    if ($symbol == $prev_symbol) {
+        $symbol_count++;
+        if ( (($symbol == 1) and ($symbol_count == $count1)) or (($symbol == 0) and ($symbol_count == $count0)) ) {
+            $bit = $symbol;
+            $symbol_count = 0;
+        }
+        else {
+            next SAMPLE;
+        }
+    }
+    else {
+        if ($symbol_count == 0) {
+            $symbol_count = 1;
+            $prev_symbol = $symbol;
+        }
+        else {
+            # bad bit. Reset and restart
+            $symbol_count = 1;
+            $prev_symbol = $symbol;
+            print "Bad symbol at $index after output byte $output_byte\n";
+        }
+        next SAMPLE;
+    }
+
+    # got here with a new bit.
+    print "$bit " if ($args{-debug} > 1);
+
+    if ($found_start) {
+        $bit_count++;
+        if ($bit_count == 8) {
+            # this is the stop bit. We have a whole byte
+            $found_start = 0;
+            if ($bit != 1) {
+                print "Framing error after output byte $output_byte\n";
+            }
+        }
+        else {
+            $byte = $byte | ($bit << $bit_count);
+            next SAMPLE;
+        }
+    }
+    else {
+        if ($bit == 0) {
+            # start bit
+            $found_start = 1;
+            $bit_count = -1;
+            $byte = 0;
+        }
+        next SAMPLE;
+    }
+
+    # got here with a new byte.
+    printf "%02x ", $byte if ($args{-debug} > 0);
+    print OUT chr($byte);
+    $output_byte++;
+}
+
+
+
+# TODO flush any remaining data or report any remaining state?
+
+
+################################################################################
+# Finished.
+close IN;
+close OUT;
+print "\n";
+exit 0;
+
+
+################################################################################
+# subroutines
+################################################################################
+
+################################################################################
+# Validate that this is a wav file and in a format that we know how to handle.
+# Exit with the file seeked to the header of the 1st data subchunk.
+sub check_wav_header {
+    my $header_size = 12 + 24; # RIFF chunk + fmt sub-chunk
+    my $data;
+
+    my $actual = read IN, $data, $header_size;
+    if ($actual != $header_size) {
+        die "ERROR could not read wav header\n";
+    }
+
+    # Sanity - RIFF chunk descriptor
+    if (substr($data, 0, 4) ne 'RIFF') {
+        die "ERROR bad ChunkID in wav header\n";
+    }
+    if (substr($data, 8, 4) ne 'WAVE') {
+        die "ERROR bad Format in wav header\n";
+    }
+
+    # Sanity - fmt sub-chunk
+    if (substr($data, 12, 4) ne 'fmt ') {
+        die "ERROR bad Subchunk1ID in wav header\n";
+    }
+
+    my $siz      = get_num32($data,16);
+    my $fmt      = get_num16($data,20);
+    my $ch       = get_num16($data,22);
+    my $srate    = get_num32($data,24);
+    my $bytrate  = get_num32($data,28);
+    my $blkalign = get_num16($data,32);
+    my $bitpsamp = get_num16($data,34);
+
+    print "Header format: siz=$siz AudioFormat=$fmt NumChannels=$ch SampleRate=$srate ByteRate=$bytrate BlockAlign=$blkalign BitsPerSample=$bitpsamp\n";
+
+    # Only coded for one configuration: stereo PCM @ 44100 samples/s
+    if (($siz != 16) or ($fmt != 1) or ($ch != 2) or ($srate != 44100) or ($bytrate != 176400) or ($blkalign != 4) or ($bitpsamp != 16)) {
+        die "ERROR sorry, only coded to understand stereo PCM @ 44100 samples/s -- report a bug and include your header format\n";
+    }
+}
+
+################################################################################
+# Read a data subchunk header, exit with the file seeked
+# to the 1st data value in that subchunk. Return the number of bytes in the data
+# or 0 if no header was found.
+sub read_wav_data_header {
+    my $header_size = 8; # RIFF chunk + fmt sub-chunk + header of 1st data
+    my $data;
+
+    my $actual = read IN, $data, $header_size;
+    if ($actual == 0) {
+        return 0;
+    }
+    if ($actual != $header_size) {
+        die "ERROR could not read data sub-chunk header\n";
+    }
+
+    # Sanity - first data sub-chunk
+    if (substr($data, 0, 4) ne 'data') {
+        die "ERROR bad Subchunk2ID in wav header\n";
+    }
+    my $dsize = get_num32($data,4);
+
+    print "Data sub-chunk OK size=$dsize\n";
+    return $dsize;
+}
+
+################################################################################
+# extract 4 bytes from the binary string starting at the specified offset and
+# return them as a little-endian number.
+sub get_num32 {
+    my $data = $_[0];
+    my $offset = $_[1];
+
+    my $value = ord(substr($data,$offset));
+    $value = $value | (ord(substr($data,$offset+1)) << 8);
+    $value = $value | (ord(substr($data,$offset+2)) << 16);
+    $value = $value | (ord(substr($data,$offset+3)) << 24);
+    return $value;
+}
+
+################################################################################
+# extract 2 bytes from the binary string starting at the specified offset and
+# return them as a little-endian number.
+sub get_num16 {
+    my $data = $_[0];
+    my $offset = $_[1];
+
+    my $value = ord(substr($data,$offset));
+    $value = $value | (ord(substr($data,$offset+1)) << 8);
+    return $value;
+}
+
+################################################################################
+sub help_exit {
+    print <<'EOF';
+
+wav2bin assumes a wav format audio file created from a NASCOM tape recorded at
+300baud or 1200 baud. It uses zero-crossing detection to infer the bit-stream
+and recreates an equivalent byte stream, discarding line idle, stop bits and
+start bits.
+
+The following options are supported:
+
+-baud300  - default is to expect a 1200baud file. This argument selects 300baud
+            operation
+-debug    - diagnostic output (use -debug -debug etc. to get more and more output)
+
+Usage:
+
+        wav2bin <infile> <outfile> [-arg1 -arg2..]
+
+Examples:
+        wav2bin foo.wav foo.bin
+        wav2bin foo.wav foo.bin -baud300
+
+EOF
+exit 0;
+}
