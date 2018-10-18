@@ -1,0 +1,45 @@
+#!/usr/bin/perl
+#
+# Convert a binary file into a C char array.
+# Assumes that the binary file is a stream of bytes
+#
+# Send kudos/bug reports/suggestions for improvement/patches to the author.
+#
+# Author: foofoobedoo@gmail.com
+# Licence: GPL V2.
+#
+# Version History
+# 03Mar2018 First version
+#
+################################################################################
+
+use strict;
+use warnings;
+my $count = 0;
+my $byte;
+
+open IN, $ARGV[0] or die "Usage: bin2char_array infile.bin > blah.h\n";
+
+# header boilerplate
+print "char bin_data[] = {\n";
+
+while (1 == read IN, $byte, 1) {
+    if ($count == 0) {
+        printf " 0x%02x",ord $byte;
+    }
+    elsif ($count %16 == 0 ) {
+        printf ",\n 0x%02x",ord $byte;
+    }
+    elsif ($count %8 == 0 ) {
+        printf ",   0x%02x",ord $byte;
+    }
+    else {
+        printf ", 0x%02x",ord $byte;
+    }
+    $count += 1;
+}
+
+# footer boilerplate
+print "}\n";
+
+close IN;
