@@ -84,6 +84,7 @@ SCAL:   MACRO FOO
 
 ;;; Equates for communicating with NAS-SYS and NAS-SYS workspace
 PRS:    EQU     $28
+RIN:    EQU     $08
 ROUT:   EQU     $30
 ZMRET:  EQU     $5b
 ZIN:    EQU     $62
@@ -98,11 +99,14 @@ newcmd: rst     PRS
         defm    "SDcard> ", 0
 
         SCAL    ZINLIN          ;DE=start of this line
-        ld      hl,48           ;characters per line
+        ld      hl, PRLEN
+        add     hl,de
+        ex      de,hl           ;DE=1st char of command
+
+        ld      hl,48 - PRLEN   ;48 char per line
         add     hl,de           ;HL=end of this line (first NUL in margin)
 
-;;; find first non-space, non-dot character. Remember whether
-;;; it was a dot
+;;; find first non-space, non-dot character; remember whether it is a dot
 find:   dec     hl              ;move back by one character
         ld      a,(hl)
         cp      $20             ;space?
@@ -110,30 +114,23 @@ find:   dec     hl              ;move back by one character
 
         cp      $2e             ;dot?
         jr      nz, nodot
-        dec     hl              ;skip back over the dot
+        dec     hl              ;skip back over the dot (flags unchanged)
 
-nodot:  push    af              ;save Z. Later, loop if Z
+nodot:  push    af              ;save Z. Later, exit if Z
 
+;;; now, DE= 1st char of command, HL= last char of command. BUT, if the user
+;;; has back-spaced over the prompt, could have HL < DE. Cope with this by
+;;; ignoring the line and re-issuing the prompt.
 
-;;; now, hl-de is the number of characters on the line. First PRLEN characters
-;;; should be the prompt, but the user could have been naughty and back-spaced
-;;; over them. Don't give the user the satisfaction of seeing us crash but
-;;; detect that situation and treat it with distain.
-
-;;; BUG1: actually num char is hl-de+1 so need to increment hl by 1.
-        
         or      a               ;clear carry
         sbc     hl,de
-        ld      a,l             ;count must be <49 so will definitely fit in 8-bits
-        cp      PRLEN-1
-        jr      c,done          ;blank line or corrupted prompt. Need to clean stack
+        jr      z, done         ;blank line. Clean the stack and repeat prompt
+        jr      c, done         ;corrupted prompt. Clean the stack and repeat prompt
 
-        ld      l,PRLEN
-        ;; h=0 from above
-        add     hl,de           ;first char of command
-        or      a
-        sbc     a,PRLEN
-        ld      b,a
+        ld      b, l            ;count is <(48-PRLEN) so fits in 8 bits.
+        inc     b               ;length of command
+
+        ex      de,hl           ;HL=1st char of command
 
 ;;; ready to send line out. B characters from HL onwards
 
@@ -142,10 +139,16 @@ send:   ld      a,(hl)
         inc     hl
         djnz    send
 
-;;; wait for response
-eol:    SCAL     ZIN            ;TODO does this include serial port?
-        jr      nc, eol         ;TODO or maybe just use rst RIN
+;;; nul-terminated
+        xor     a
+        rst     ROUT            ;echo TODO should be to serial port
 
+;;; TODO for debug only
+        SCAL    ZCRLF
+
+
+;;; wait for response
+eol:    RST     RIN
         cp      RSDONE
         jr      z, done         ;ready for next command, if any
         cp      RSMSG
@@ -153,13 +156,11 @@ eol:    SCAL     ZIN            ;TODO does this include serial port?
         cp      RSMOVE
         jr      nz, fatal       ;something's wrong
 
-;;; get new address
-newl:   SCAL    ZIN
-        jr      nc, newl        ;low byte
-        ld      a, e
-newh:   SCAL    ZIN
-        jr      nc, newh        ;high byte
-        ld      a, d
+;;; RSMOVE: get new address
+        RST     RIN
+        ld      a, e            ;low byte
+        RST     RIN
+        ld      a, d            ;high byte
 
         pop     af              ;recover Z flag
         push    de              ;where to restart
@@ -167,16 +168,14 @@ newh:   SCAL    ZIN
         ld      bc, END-START+1 ;image size
         ldir                    ;move ourself
 
-        ;; Z was preserved
-        jr      nz, exit        ;quit using current code
+        ;; AF (and so Z) was not affected by ldir
+        jr      z, exit         ;quit using current code
 
 ;;; restart from the code in its new location, and get a new command
         ret
 
 ;;; print null-terminated string from sdcard
-prmsg:  SCAL    ZIN
-        jr      nc, prmsg
-
+prmsg:  RST     RIN
         or      a               ;is it NUL?
         jr      z, done         ;yes; ready for next command, if any
         rst     ROUT
@@ -184,7 +183,7 @@ prmsg:  SCAL    ZIN
 
 ;;; Recover Z and either exit or get the next command
 done:   pop     af
-        jr      z, newcmd
+        jr      nz, newcmd
 
 ;;; finished
 exit:   SCAL    ZMRET
