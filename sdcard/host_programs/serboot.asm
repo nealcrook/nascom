@@ -91,6 +91,7 @@ ZIN:    EQU     $62
 ZINLIN: EQU     $63
 ZCRLF:  EQU     $6a
 ZERRM:  EQU     $6b
+ZSRLX:  EQU     $6f
 
         ORG     START
 
@@ -135,17 +136,13 @@ nodot:  push    af              ;save Z. Later, exit if Z
 ;;; ready to send line out. B characters from HL onwards
 
 send:   ld      a,(hl)
-        rst     ROUT            ;echo TODO should be to serial port
+        SCAL    ZSRLX            ;send to serial port
         inc     hl
         djnz    send
 
 ;;; nul-terminated
         xor     a
-        rst     ROUT            ;echo TODO should be to serial port
-
-;;; TODO for debug only
-        SCAL    ZCRLF
-
+        SCAL    ZSRLX
 
 ;;; wait for response
 eol:    RST     RIN
