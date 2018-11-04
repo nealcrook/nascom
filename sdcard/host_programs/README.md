@@ -4,7 +4,7 @@ These are programs in z80 assembler intended to run on the NASCOM.
 
 ## Common code
 
-* sd_sub1.asm - common subroutines used by all the other programs. Accesed by "including" this file.
+* sd_sub1.asm - common subroutines used by several other programs. Accessed by "including" this file.
 
 
 ## Development programs
@@ -34,6 +34,10 @@ retyped in order to run one of the other two programs.
 * cadsk.asm - intended to be run from PolyDos disk or SDcard version. Replaces NAS-SYS R, W commands so that some other program can be tricked into saving/loading to disk instead of to tape.
 * scrape5.asm - intended to be run from PolyDos disk or SDcard version. Copies CP/M physical disk images to SDcard file images; assumes 35 track DSDD disks with 10 sectors per side, each of 512 bytes (so 35*10*2*512=350KBytes per disk).
 * sdoff.asm -  intended to be run from PolyDos SDcard version. Puts SDcard interface into a quescent state so that the PIO can be used for something else.
+
+## Other utilities
+
+* serboot.asm - boot loader for NASCOM digital tape recorder. A utility program that is loaded through the serial interface and which provides a simple command-line environment for communicating with the NASCOM digital tape recorder. The NASCOM digital tape recorder uses an ATMEL controller and an SDcard to provide solid-state storage for a NASCOM through an unmodified serial/cassette interface.
 
 
 ## Tools
