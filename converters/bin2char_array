@@ -40,6 +40,6 @@ while (1 == read IN, $byte, 1) {
 }
 
 # footer boilerplate
-print "}\n";
+print "};\n";
 
 close IN;

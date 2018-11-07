@@ -8,6 +8,10 @@ Here are PERL programs for converting NASCOM files between different formats.
 * cas2nas - (obsolete) convert .cas format to .nas (also spits out a binary file)
 * sy_extract - Polydos allowed creation of a symbol table in a compiled format that could be read in to the polyzap assembler. This program reads a symbol table in this compiled format and writes it out as a set of equates.
 
+And miscellaneous/general-purpose converters:
+
+* bin2char_array - convert a binary file to a C char data structure.
+
 
 ## NASCOM File formats
 
