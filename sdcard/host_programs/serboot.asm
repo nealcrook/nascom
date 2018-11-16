@@ -155,9 +155,9 @@ eol:    RST     RIN
 
 ;;; RSMOVE: get new address
         RST     RIN
-        ld      a, e            ;low byte
+        ld      e, a            ;low byte
         RST     RIN
-        ld      a, d            ;high byte
+        ld      d, a            ;high byte
 
         pop     af              ;recover Z flag
         push    de              ;where to restart
