@@ -73,7 +73,7 @@ module nas_vid
        );
 
     // Monostable to generate short load pulse
-    // TODO calculate the time constant and pass as a parameter
+    // dly1 is associated with p1 trigger, dly2 with p10 trigger
     sn74ls123 #(.dly1(100), .dly2(100)) ic18
       (// Out
        .p4  (),
@@ -388,10 +388,9 @@ module nas_vid
        );
 
 
-    // Monostable to generate video blaning
+    // Monostable to generate video blanking
     // Expect: hsync is 4.7us
     // vsync is ~10h
-    // TODO calculate the time constant and pass as a parameter
     // dly1 is associated with p1 trigger, dly2 with p10 trigger
     sn74ls123 #(.dly1(3700), .dly2(246750)) ic7
       (// Out
