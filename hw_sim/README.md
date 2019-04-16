@@ -21,15 +21,15 @@ present the netlist and models in case anyone wants to develop the idea further.
 
 ## Files
 
-* nas_vid.v -- Verilog netlist of the Nascom 1 video sub-system. Created by hand
+* nas1_vid.v -- Verilog netlist of the Nascom 1 video sub-system. Created by hand
   from examination of the schematics. I have named all of the signals. To make
   detailed sense of it you need to print out some N1 schematics and annotate the
   names by inspecting nas_vid.v.
 
-* nas_vid_tb.v -- Verilog test-bench to
+* nas1_vid_tb.v -- Verilog test-bench to
   control the simulation, apply clocks, gather waveforms.
 
-* doitall -- script to rebuild the simulation executable
+* doitall1 -- script to rebuild the simulation executable
 
 * doc/ -- contains .pdf files of waveforms, so that you can see the results of
   the simulation without having to run it yourself. These are described in

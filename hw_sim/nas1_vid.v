@@ -1,6 +1,6 @@
 // Verilog netlist for video circuit of nascom1
 
-module nas_vid
+module nas1_vid
 (
  output       clk_cpu,
  output       to_ic32_p12,
@@ -496,4 +496,4 @@ module nas_vid
        .p9 (div16)
        );
 
-endmodule // nas_vid
+endmodule // nas1_vid

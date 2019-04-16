@@ -1,4 +1,4 @@
-module nas_video_tb
+module nas1_vid_tb
   (
    );
 
@@ -7,7 +7,7 @@ module nas_video_tb
     time frame_start;
 
     // UUT
-    nas_vid u_nas_vid
+    nas1_vid u_nas1_vid
       ( // Out
         .clk_cpu (),
         .to_ic32_p12 (),
@@ -29,7 +29,7 @@ module nas_video_tb
         frame_start = 0;
         reset_n = 1'b0;
         // CHEAT for debug
-//        force u_nas_vid.allow_feedback = 1'b0;
+//        force u_nas1_vid.allow_feedback = 1'b0;
 
         clk = 1'b0;
         #31.250;                 // 16MHz half period is 31.25ns
@@ -48,8 +48,8 @@ module nas_video_tb
 
     integer i;
     initial begin
-        $dumpfile("nas_vid_tb.vcd");
-        $dumpvars(0,nas_video_tb);
+        $dumpfile("nas1_vid_tb.vcd");
+        $dumpvars(0,nas1_vid_tb);
         for (i = 1; i<10; i=i+1) begin
             $display("%d..", i);
             #40000000;
@@ -58,13 +58,11 @@ module nas_video_tb
         $finish();
     end
 
-    always @(posedge u_nas_vid.active_v) begin
+    always @(posedge u_nas1_vid.active_v) begin
         if (frame_start != 0) begin
             $display("Frame period is %t ns",$time - frame_start);
         end
         frame_start = $time;
     end
 
-endmodule // nas_video_tb
-// 199680000000 ns
-// 020000000ns
+endmodule // nas1_vid_tb
