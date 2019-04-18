@@ -34,18 +34,21 @@ int cas_gen_flag(char *buffer, int current, int bit_mask) {
 }
 
 
-// Extract a 16-bit number from the command line.
+// Extract a number from the command line.
+// Designed for 16-bit hex numbers but can also work for small decimal
+// numbers.
 // buffer is null-terminated.
-// parse the buffer. Skip a command delimited by a space. Expect a hex
+// base is 10 or 16.
+// Parse buffer. Skip a command delimited by a space. Expect a numeric
 // string of 1-4 characters. Convert to a 16-bit binary number. If more
 // than 4 characters are present, continue parsing, so that the last
-// 4 are used. If no argument is present or an illegal character is
-// present, return 0.
-// TODO return 0 as error indicator is not wonderful, but works for
-// the one use-case here because we expect a RAM address and there
-// is no RAM at 0.
-int cas_parse_hex(char *buffer) {
-    int arg = 0;
+// 4 are used.
+// The converted number is in result.
+// Return 1 if successful, return 0 if no argument is present or an
+// illegal character present.
+// TODO bug: only works if the number is the last thing on the line. Need to detect whitespace after the number and return
+int cas_parse_num(char *buffer, int* result, int base) {
+    int num = 0;
     int index = 0;
     char val;
 
@@ -59,25 +62,26 @@ int cas_parse_hex(char *buffer) {
         }
         else if (((state == 1) && (val != ' ')) || (state == 2)) {
             state = 2;
-
+            Serial.println(num, HEX);
             if ((val >= '0') && (val <= '9')) {
-                arg = (arg << 4) | (val - '0');
+                num = (num * base) + (val - '0');
             }
-            else if ((val >= 'a') && (val <= 'f')) {
-                arg = (arg << 4) | (val - 'a' + 10);
+            else if ((base==16) && (val >= 'a') && (val <= 'f')) {
+                num = (num << 4) | (val - 'a' + 10);
             }
-            else if ((val >= 'A') && (val <= 'F')) {
-                arg = (arg << 4) | (val - 'A' + 10);
+            else if ((base==16) && (val >= 'A') && (val <= 'F')) {
+                num = (num << 4) | (val - 'A' + 10);
             }
             else {
-                Serial.print(F("Error on cas_parse_hex with "));
+                Serial.print(F("Error on cas_parse_num with "));
                 Serial.println(val);
                 return 0;
             }
         }
     }
-    // ran out of buffer
-    return arg;
+    // ran out of buffer so we must be done
+    *result = num;
+    return 1;
 }
 
 

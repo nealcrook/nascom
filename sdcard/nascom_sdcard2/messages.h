@@ -15,6 +15,7 @@ const char msg_err_fname_bad[]     PROGMEM = "Error - filename missing or wrongl
 const char msg_err_fname_missing[] PROGMEM = "Error - file not found";
 const char msg_err_sd_missing[]    PROGMEM = "Error - SDcard not found";
 const char msg_err_vdisk_missing[] PROGMEM = "Error - No virtual disk mounted";
+const char msg_err_vdisk_bad[]     PROGMEM = "Error - Could not open file for virtual disk";
 const char msg_err_addr_bad[]      PROGMEM = "Error - expected address in hex";
 const char msg_err_try_help[]      PROGMEM = "Error - try typing HELP";
 const char msg_help[]              PROGMEM = "HELP - this is it\r\n"
@@ -28,10 +29,9 @@ const char msg_help[]              PROGMEM = "HELP - this is it\r\n"
                                              "DF DS DV - directory\r\n"
                                              "RF RS RV <file> [AI] [xxxx] [yyyy] - cue read\r\n"
                                              "WS WV <file> [AI] - cue write\r\n"
-                                             "  F/S/V suffices specifies Flash/SDcard/Vdisk\r\n"                                            
+                                             "  F/S/V suffices specifies Flash/SDcard/Vdisk\r\n"
                                              "  arg  AI: auto-increment file names\r\n"
                                              "  args xxxx yyyy: ld/exe addr for binary files";
-                                            
 const char msg_info[]              PROGMEM = "This is NASCOM_SDCARD version X.X";
 
 
