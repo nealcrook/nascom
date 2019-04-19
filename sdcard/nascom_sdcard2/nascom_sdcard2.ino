@@ -3,19 +3,17 @@
 //
 // ARDUINO Uno/ATMEGA328 connected to NASCOM 2 as mass-storage device
 //
-// Connect through UART for the purpose of providing
-// a "virtual cassette interface" in which the NAS-SYS
-// R and W commands (and the equivalent from within BASIC
-// and other applications) are directed to files on SDcard.
+// Connect through UART for the purpose of providing a "virtual cassette
+// interface" in which the NAS-SYS R and W commands (and the equivalent from
+// within BASIC and other applications) are directed to files on SDcard.
 //
-// This is "transparent" to the NASCOM but a utility program
-// "serboot" is executed on the NASCOM to control what file
-// is used for the read/write. serboot is tiny (~103 bytes)
-// and is stored in the Arduino FLASH and automatically
-// bootstrap-loaded through the serial port when the Arduino
+// This is "transparent" to the NASCOM but a utility program "serboot" is
+// executed on the NASCOM to control what file is used for the read/write.
+// serboot is tiny (~103 bytes) and is stored in the Arduino FLASH and
+// automatically bootstrap-loaded through the serial port when the Arduino
 // is reset.
 //
-/////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // WIRING:
 //
 // 1/ connection to uSDcard adaptor (assumes UNO)
@@ -68,27 +66,24 @@
 //
 // 5/ power
 //
-// If you are using the PIO connection you can pick
-// up GND from there. If you are only using the serial
-// connection you will need to add a connection to GND
+// If you are using the PIO connection you can pick up GND from there. If you
+// are only using the serial connection you will need to add a GND connection.
 //
-// If you are powering the Arduino from the NASCOM
-// you will need to set the jumper accordingly and
-// add a connection to +5V
+// If you are powering the Arduino from the NASCOM you will need to set the
+// jumper accordingly and add a connection to +5V.
 //
-/////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // PROTOCOL FOR SERIAL INTERFACE
 //
 // When running serboot (serboot.asm)
 // E 0C80
 // SDcard>
 //
-// NAS-SYS always polls the serial interface as well
-// as the keyboard, so the serial interface can deliver
-// input at any time. By sending R<return> followed
-// by the cas-encoded serboot code, followed by E0C80 <return>
-// the NASCOM will load and execute the serboot binary,
-// which provides a command-line interface.
+// NAS-SYS always polls the serial interface as well as the keyboard, so the
+// serial interface can deliver input at any time. By sending R<return>
+// followed by the CAS-encoded serboot code, followed by E0C80 <return>
+// the NASCOM will load and execute the serboot binary, which provides a
+// command-line interface.
 //
 // Commands from Host (serboot) are between 1 and 39 characters
 // followed/terminated in a NUL (0x00). TODO check that's true ie that a 40 char buffer is enough.
@@ -100,15 +95,50 @@
 // RSMOVE hh ll  (0x55) - relocate serboot to specified address
 // RSMSG         (0xff) - ASCII text follows. Print until NUL.
 //
-/////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// FORMATS
+//
+// Virtual disk is a binary blob stored as an MSDOS file. It uses PolyDos disk
+// format, which is documented in the PolyDos System Programmers Guide.
+// File name is 1-8 prefix, exactly 2 suffix. When stored in a directory entry
+// the name occupies 10 bytes with space characters separating the prefix from
+// the suffix if the prefix is <8 characters.
+//
+// MSDOS files are 1-8 prefix, 1-3 suffix. When accessed using the SD library
+// the filenames are in char buffers with the dot included.
+//
+// At reset or when NEW command is issued, check for SD card. If found, check
+// for directory named NASCOM. If found, all file read/write uses that
+// directory. Otherwise, use the root directory.
+//
+////////////////////////////////////////////////////////////////////////////////
 // COMMANDS
 //
-// Work them out from the comments or refer to separate document
+// Refer to the comments or to the help text in messages.h
 //
-/////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 
-/////////////////////////////////////////////////////
+
+// TODO
+// Code PAUSE, NULLS (trivial)
+// Define how to store src state and remove wotfile in favour
+// - make sure it has a "no file" state - make that abort a R
+// Make read cas handle Vdisk as well as Flash
+// Make parser extension-sensitive so it can choose binary/cas conversion
+// Add routine for serving literal (CAS) files
+// - get it working for SD and vdisk
+// Add commands TV TS for serving text files - should be easy. Add to Help
+// Finally, make read cas handle SD files
+// Code auto-increment on file names.
+// Code write literal to SD
+// Code write literal to Vdisk
+// Code write cas routine
+// Code write cas to SD
+// Code write cas to Vdisk
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Pin assignments (SERIAL)
 #define PIN_DRV 6
 #define PIN_CLK 9
@@ -119,9 +149,10 @@
 #include <SD.h>
 #include <SoftwareSerial.h>
 
-// This is a 20-byte PolyDos directory entry.
+// This is the format of a 20-byte PolyDos directory entry.
 typedef struct DIRENT {
-    char fnam_fext[10]; // 8 char filename, 2 char extension. Blanks in unused positions
+    char fnam_fext[10]; // 8 char filename, 2 char extension.
+                        // Blanks in unused positions, no "."
     uint8_t fsfl;       // system flags
     uint8_t fufl;       // user flags
     int fsec;           // start sector address
@@ -139,16 +170,21 @@ struct Dirent {
 } Dirent;
 
 
-// Prototypes here
+// Prototypes in this here file
 void cmd_cass(void);
 void cmd_cass_rd(void);
 void cmd_cass_wr(void);
 void open_sdcard(void);
 
 // Stuff provided by parser.ino
+extern char to_upper(char c);
+extern int legal_char(char c);
 extern int cas_gen_flag(char *buffer, int current, int bit_mask);
-extern int cas_parse_num(char *buffer, int* result, int base);
-extern void cas_parse_name(char *buffer, char *result);
+extern int parse_leading(char **buf);
+extern int parse_num(char **buf, int* result, int base);
+extern int parse_ai(char **buf);
+extern int parse_fname_msdos(char **buf, char * dest);
+extern int parse_fname_polydos(char **buf, char * dest);
 
 
 // Only ever have 1 file open at a time
@@ -177,9 +213,9 @@ File handle;
 
 // TODO eg for SPEED or for AUTO-INC
 #define F_SPARE1  (0x0080)
-#define F_SPAhRE1  (0x0040)
-#define F_SPARE1  (0x0020)
-#define F_SPARE1  (0x0010)
+#define F_SPARE2  (0x0040)
+#define F_SPARE3  (0x0020)
+#define F_SPARE4  (0x0010)
 
 #define F_SD_FOUND (0x08)
 #define F_NASDIR_FOUND (0x04)
@@ -201,7 +237,7 @@ int cas_wr_state=0;
 // When the NASCOM/ directory exists, the name will be used directly
 // When it does not, start at offset 6 instead
 #define STR_PATH_OFFSET ((cas_flags & F_NASDIR_FOUND) ? 0 : 7)
-// sometimes I just need just the string NASCOM and change the / to a NUL at offset STR_SLASH_OFFSET
+// sometimes just need the string NASCOM - temporarily change the / to a NUL at offset STR_SLASH_OFFSET
 #define STR_SLASH_OFFSET (6)
 // where to start when filling in the name
 #define STR_FILE_OFFSET (7)
@@ -215,23 +251,9 @@ char cas_vdisk_name[] = "NASCOM/NAS-XX00.DSK";
 //char cas_wr_num = 0;
 
 
-// TODO mechanism for auto-reset of stuff.. 
-
-
-// NEXT
-//
-// FAT files are 8.3 names -- at least 1 char before the dot, at least 1 after maybe have 4 non-volatile names and share with // stuff.
-// Polydos files are 8.2 -- at least 1 char before the dot, always 2 after
-
-
-// parse_name(buf)
-// 1-8 char of prefix
-// dot
-// 1-3 char of suffix
-// return length of prefix, length of suffix and flag to show that it was well-formed or not.
-
-// this is effectively rd_dirent
-int wotfile;
+// this is effectively rd_dirent. Boot device is Flash and 0 means the first
+// file: SERBOOT.GO
+int wotfile = 0;
 
 // state for loop()
 unsigned long drive_on = 0;
@@ -253,8 +275,6 @@ void pr_freeRAM(void) {
 
 void setup()   {
     Serial.begin(115200);  // for Debug
-
-    wotfile = 0;
 
     open_sdcard();
 
@@ -385,7 +405,7 @@ void pr_msg(int msg, char flags) {
     }
 
     if (flags & F_MSG_CR) {
-        mySerial.println(); // TODO maybe do this explicitly. What does NASCOM need? CR LF or both?
+        mySerial.println(); // TODO maybe do this explicitly. What does NASCOM need? CR LF or both? this does \r\n
     }
 
     if (flags & F_MSG_NULLTERM) {
@@ -416,6 +436,11 @@ int pr_dirent(union Dirent *d, char *dummy) {
         len--;
     }
     // TODO it would be nice if there were leading zeroes
+    // I think that's easy to add to Print.cpp in the install directory..
+    // Change Print::print(unsigned int n, base)
+    // so that it checks for base 16 and uses a different print routine
+    // OR add another parameter "width" that, in Print::printNumber prefills the buffer with
+    // space or 0 and pulls str count back accordingly.
     mySerial.print("SIZE=0x");
     mySerial.print((uint16_t)d->f.flen, HEX);
     mySerial.print(" LOAD=0x");
@@ -436,7 +461,7 @@ int find_dirent(union Dirent *d, char *name) {
     Serial.print("<-- and -->");
     Serial.write(name, 10);
     Serial.println("<--");
-    
+
     for (int i=0; i<10; i++) {
         if (d->b[i] != name[i]) {
             return 0; // Force iterator to continue
@@ -457,7 +482,7 @@ int foreach_flash_dir(void *fn, char * fname) {
         // read the 18-byte FDIRENT into a 20-byte DIRENT by padding
         // in the middle so that all the fields we care about line up.
         union Dirent dirent;
-        
+
         int base = &romdir[i].fnam_fext;
         for (int j=0; j<20; j++) {
             if ((j==10) | (j==11)) {
@@ -523,21 +548,6 @@ int foreach_vdisk_dir(void *fn, char * fname) {
 }
 
 
-// Next:
-//
-// Make the routine that copies filenames have a 2nd argument that determines MSDOS or PolyDos format
-// then the search will be trivial.
-
-
-
-// If c is a lower-case alphabetic character, return the upper-case equivalent.
-// Otherwise return c unchanged.
-char to_upper(char c) {
-    if (c >= 'a' && c <= 'z') {
-         c = c - 32;
-    }
-    return c;
-}
 
 
 // Check for SDcard and (if present) check for existence of NASCOM directory.
@@ -571,6 +581,7 @@ void open_sdcard(void) {
 // subsequently.
 void cmd_cass(void) {
     char buf[40]; // TODO I think the maximum incoming line is 40 + NUL. May need to make this 1 byte larger. Test.
+    char * pbuf = &buf[0];
     char res[4];
     int index = 0;
     int cmd = 0;
@@ -592,56 +603,6 @@ void cmd_cass(void) {
     Serial.print(F("Rx cmd line of "));
     Serial.print(index);
     Serial.println(F(" char"));
-
-
-// RF RS RV <file> [AI] [xxxx] [yyyy] - cue file from flash/SDcard/virtual disk for read
-// WS WV <file> [AI] - cue file for write to SDcard/virtual disk
-// Optional AI auto-increment file names.
-// Optional xxxx yyyy are load/execute address for binary files
-// PAUSE nn - delay before supplying text file
-// NULLS nn - delay between lines of text file
-//
-
-// HELP   - done
-// INFO   - done
-// TO     - done
-// NEW    - done
-// AUTOGO - done
-// DF     - done
-// DS     - done
-// DV     - done
-
-// MO     - done
-// RF
-// RS
-// RV
-// WS
-// WV
-// PAUSE
-// NULLS
-
-// TODO
-// Code WS and RS hard-code for literal (CAS) files
-// - test read binary
-// - test read BASIC
-// - test write binary
-// - test write BASIC
-// Code directory from Flash and vdisk
-// - test for flash
-// - test for vdisk
-// Code cli parser to extract other arguments and to infer file type
-// - test
-// Code vdisk read
-// - test
-// Code vdisk write
-// - test
-// Code auto-inc
-// - test
-// Code text file handling
-// Code PAUSE
-// Code NULLS
-// - test
-
 
     // The line is guaranteed to be at least 1 char + 1 NUL and to start with a non-blank. Only the first 2 characters
     // of a command are significant, so it's always OK simply to blindly check the first 2 characters
@@ -666,7 +627,7 @@ void cmd_cass(void) {
 
     case ('T'<<8 | 'O'):      // TO xxxx - relocate boot loader to xxxx.
         int destination;
-        if (cas_parse_num(buf, &destination, 16)) {
+        if (parse_leading(&pbuf) && parse_num(&pbuf, &destination, 16)) {
             mySerial.write((byte)0x55); // indicate to host that relocation will occur
             mySerial.write((byte)(destination & 0xff));      // low part
             mySerial.write((byte)((destination>>8) & 0xff)); // high
@@ -693,14 +654,7 @@ void cmd_cass(void) {
 
     case ('M'<<8 | 'O'): // MO <8.3> - Mount virtual disk from FAT file-system. In PolyDos format
         if (cas_flags & F_SD_FOUND) {
-            cas_parse_name(buf, res);
-            // All FAT files are 1-8 characters and a 1-3-character extension
-            if ((res[0] == 0) || (res[2] > 8) || (res[3] > 3)) {
-                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
-            }
-            else {
-                cas_cp_filename(buf, &cas_vdisk_name[STR_FILE_OFFSET], res[1], 1 + res[2] + res[3], 0); // Final 0 means MSDOS format
-
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, &cas_vdisk_name[STR_FILE_OFFSET])) {
                 // Don't want to create a file, so check existence first
                 if ( (SD.exists(&cas_vdisk_name[STR_PATH_OFFSET])) && (handle = SD.open(&cas_vdisk_name[STR_PATH_OFFSET], FILE_WRITE)) ) {
                     handle.close();
@@ -709,6 +663,9 @@ void cmd_cass(void) {
                 else {
                     pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
                 }
+            }
+            else {
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
             }
         }
         else {
@@ -768,39 +725,33 @@ void cmd_cass(void) {
         break;
 
     case ('R'<<8 | 'F'): // RF <8.2> - Read specified file from flash file-system. Convert binary->cas
-        cas_parse_name(buf, res);
-        // All flash files are 1-8 characters and a 2-character extension: GO
-        if ((res[0] == 0) || (res[2] > 8) || (res[3] != 2)) {
-            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
-        }
-        else {
+        if (parse_leading(&pbuf) && parse_fname_polydos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
             // try to find it..
-            cas_cp_filename(buf, &cas_rd_name[STR_FILE_OFFSET], res[1], 1 + res[2] + res[3], 1); // final 1 means "PolyDos padding"
             wotfile = foreach_flash_dir(&find_dirent, &cas_rd_name[STR_FILE_OFFSET]);
             if (wotfile == -1) {
                 pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
             }
             // TODO also need to set or clear some other flags to show the source and that it's all valid
         }
+        else {
+            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+        }
         break;
 
     case ('R'<<8 | 'V'): // RV <8.2> - Read specified file from virtual file-system. Convert binary->cas
         if (cas_flags & F_SD_FOUND) {
              if (cas_flags & F_VDISK_MOUNT) {
-                 cas_parse_name(buf, res);
-                 // All vdisk files are 1-8 characters and a 2-character extension
-                 if ((res[0] == 0) || (res[2] > 8) || (res[3] != 2)) {
-                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
-                 }
-                 else {
+                 if (parse_leading(&pbuf) && parse_fname_polydos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
                      // try to find it..
-                     cas_cp_filename(buf, &cas_rd_name[STR_FILE_OFFSET], res[1], 1 + res[2] + res[3], 1); // final 1 means "PolyDos padding"
                      wotfile = foreach_vdisk_dir(&find_dirent, &cas_rd_name[STR_FILE_OFFSET]);
                      if (wotfile == -1) {
                          pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
                      }
                      // TODO also need to set or clear some other flags to show the source and that it's all valid
-                     // TODO there's no point in setting wotfile, or course!!
+                     // TODO there's no point in setting wotfile, of course!!
+                 }
+                 else {
+                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
                  }
              }
              else {
@@ -1031,40 +982,3 @@ void cmd_cass_wr(void) {
         mySerial.read();
     }
 }
-
-// Copy a well-formed filename (includes name, dot and extension)
-// from offset start in src to dst for length char. Null terminate it.
-// format = 0  -- MSDOS format; filename and extension are left-justified and dot is included
-// format = 1  -- PolyDos format; filename is left-justified, extension is right justified, spaces in between, no dot
-// eg FOO.BA
-// 0123456712
-// FOO.BA           -- MSDOS
-// FOO     BA       -- PolyDos
-void cas_cp_filename(char *src, char *dst, int start, int length, int format) {
-// TODO tidy up!! Or simply make 2 versions.
-    if (format == 0) {
-        for (int i=0; i<length; i++) {
-            dst[i] = src[start + i];
-        }
-        dst[length] = 0;
-    }
-    else {
-        // copy prefix
-        for (int i=0; i<8; i++) {
-            if (src[start] != '.') {
-                dst[i] = src[start++];
-            }
-            else {
-                dst[i] = ' ';
-            }
-        }
-        // step past '.' and copy extension
-        dst[8] = src[start+1];
-        dst[9] = src[start+2];
-        dst[10] = 0;
-        // since we already checked the name was valid, we never needed to use "length"
-        Serial.print("Got filename ");
-        Serial.println(dst);
-    }
-}
-
