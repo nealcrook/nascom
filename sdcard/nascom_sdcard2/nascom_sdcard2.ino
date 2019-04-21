@@ -121,22 +121,35 @@
 
 
 // TODO
-// Code PAUSE, NULLS (trivial)
-// Define how to store src state and remove wotfile in favour
-// - make sure it has a "no file" state - make that abort a R
+//
+
+// currently..
+// RF works
+// WS will save a CAS file literally
+// RS will read a CAS file literally
+//
+// WS does not seem to store the same amount of data as the write command instructed??
+// -> my guess is that the file delete is too slow, and we're missing ~3 blocks while it
+// is happening. Move it to the setup phase.
+
+
+
+
 // Make read cas handle Vdisk as well as Flash
+// Make read cas handle SD files
+
+// code set/clear of ai flag - by a handler that is processed in the right place
+// on the command-line and sets the flag accordingly
+
 // Make parser extension-sensitive so it can choose binary/cas conversion
-// Add routine for serving literal (CAS) files
-// - get it working for SD and vdisk
-// Add commands TV TS for serving text files - should be easy. Add to Help
-// Finally, make read cas handle SD files
+// Add routine for serving literal (CAS) files -- for SD and vdisk
+// Implement txt player for TV TS - should be easy.
 // Code auto-increment on file names.
-// Code write literal to SD
 // Code write literal to Vdisk
 // Code write cas routine
 // Code write cas to SD
 // Code write cas to Vdisk
-
+// Add leading 0 to hex print - tried and my mod compiled but had no effect. Did not get invoked?
 
 ////////////////////////////////////////////////////////////////////////////////
 // Pin assignments (SERIAL)
@@ -179,7 +192,6 @@ void open_sdcard(void);
 // Stuff provided by parser.ino
 extern char to_upper(char c);
 extern int legal_char(char c);
-extern int cas_gen_flag(char *buffer, int current, int bit_mask);
 extern int parse_leading(char **buf);
 extern int parse_num(char **buf, int* result, int base);
 extern int parse_ai(char **buf);
@@ -197,66 +209,85 @@ File handle;
 #include "messages.h"
 
 
-// 16-bit flags/state.
 
-// 0 = FLASH
-// 1 = SD
-// 2 = DISK IMAGE
-#define F_RD_SRC   (0xc000)
-#define F_WR_SRC   (0x3000)
+// 16-bit flags/state.
+// FM_ -- mask
+// FS_ -- shift for LS bit of the field
+
+// 0 = None/Not defined
+// 1 = FLASH
+// 2 = SD
+// 3 = VDISK IMAGE
+#define FS_RD_SRC   (14)
+#define FS_WR_SRC   (12)
+#define FM_RD_SRC   (3 << FS_RD_SRC)
+#define FM_WR_SRC   (3 << FS_WR_SRC)
 
 // 0 = store binary file, convert to/from cas
 // 1 = store file literally
 // 3, 4 reserved
-#define F_RD_CONV (0x0c00)
-#define F_WR_CONV (0x0300)
+#define FS_RD_CONV (10)
+#define FS_WR_CONV (8)
+#define FM_RD_CONV (3 << FS_RD_CONV)
+#define FM_WR_CONV (3 << FS_WR_CONV)
 
 // TODO eg for SPEED or for AUTO-INC
-#define F_SPARE1  (0x0080)
-#define F_SPARE2  (0x0040)
-#define F_SPARE3  (0x0020)
-#define F_SPARE4  (0x0010)
+#define FS_SPARE7  (7)
+#define FS_SPARE6  (6)
+#define FS_SPARE5  (5)
+#define FS_SPARE4  (4)
+#define FM_SPARE7  (1 << FS_SPARE7)
+#define FM_SPARE6  (1 << FS_SPARE6)
+#define FM_SPARE5  (1 << FS_SPARE5)
+#define FM_SPARE4  (1 << FS_SPARE4)
 
-#define F_SD_FOUND (0x08)
-#define F_NASDIR_FOUND (0x04)
-#define F_VDISK_MOUNT (0x02)
+#define FS_SD_FOUND (3)
+#define FM_SD_FOUND (1 << FS_SD_FOUND)
+#define FS_NASDIR_FOUND (2)
+#define FM_NASDIR_FOUND (1 << FS_NASDIR_FOUND)
+#define FS_VDISK_MOUNT (1)
+#define FM_VDISK_MOUNT (1 << FS_VDISK_MOUNT)
 // 0 do not auto-go, 1 automatically execute program if possible
-#define F_AUTO_GO   (0x01)
+#define FS_AUTO_GO   (0)
+#define FM_AUTO_GO   (1 << FS_AUTO_GO)
 
 // Startup defaults: read from Flash and auto-go.
 // This works because flash is always present and becasue 0 is an illegal destination for writes.
-int cas_flags = F_AUTO_GO;
+int cas_flags = (1 << FS_RD_SRC) | FM_AUTO_GO;
 
 
-// code these away
-int cas_rd_state=0;
-int cas_wr_state=0;
-
-
-// These are automatically null-terminated
-// When the NASCOM/ directory exists, the name will be used directly
-// When it does not, start at offset 6 instead
-#define STR_PATH_OFFSET ((cas_flags & F_NASDIR_FOUND) ? 0 : 7)
-// sometimes just need the string NASCOM - temporarily change the / to a NUL at offset STR_SLASH_OFFSET
+// Space for storing file-names: each is initialised as a
+// a null-terminated string that's the maximum size for an
+// MSDOS (8.3) filename.
+// The "NASCOM" part is never (over)written; writes start
+// at offset STR_FILE_OFFSET (after the slash).
+// SDcard writes use the root directory or (if it exists)
+// the NASCOM directory - determined by a bit in cas_flags.
+// When passing the string to SDcard open etc. the start
+// point of the string is selected using STR_PATH_OFFSET.
+// Some operations just need the string NASCOM and the trick
+// in those cases is to temporarily change the / to a NUL
+// at offset STR_SLASH_OFFSET.
+#define STR_PATH_OFFSET ((cas_flags & FM_NASDIR_FOUND) ? 0 : 7)
 #define STR_SLASH_OFFSET (6)
-// where to start when filling in the name
 #define STR_FILE_OFFSET (7)
-char cas_rd_name[]  = "NASCOM/NAS-RD00.CAS";
-char cas_wr_name[]  = "NASCOM/NAS-WR00.CAS";
+//                       01234567
+char cas_rd_name[]    = "NASCOM/NAS-RD00.CAS";
+char cas_wr_name[]    = "NASCOM/NAS-WR00.CAS";
 char cas_vdisk_name[] = "NASCOM/NAS-XX00.DSK";
 
-// numbers (BCD) for auto-inc rd/wr
-// TODO don't need these because I can do the name change in-situ.
-//char cas_rd_num = 0;
-//char cas_wr_num = 0;
-
-
-// this is effectively rd_dirent. Boot device is Flash and 0 means the first
-// file: SERBOOT.GO
-int wotfile = 0;
+// Directory entry for next Flash/Vdisk operation. At reset, the boot
+// device is Flash and 0 means the first file: SERBOOT.GO
+int dirent = 0;
 
 // state for loop()
 unsigned long drive_on = 0;
+
+// state for PAUSE/NULLS commands
+unsigned int pause_delay = 4;
+unsigned int nulls_delay = 4;
+
+
 
 
 // arduino clock is 16MHz
@@ -337,7 +368,7 @@ void setup()   {
 
     // Bootstrap the CLI on the host. Sending R causes the NASCOM to start a READ which will
     // cause loop() to call cmd_cass_rd which will load file from Flash directory index given
-    // by 'wotfile' and, provided the auto-execute flag is set, it will go ahead and execute it.
+    // by 'dirent' and, provided the auto-execute flag is set, it will go ahead and execute it.
     mySerial.println(F("R"));
 
     Serial.println(F(".init"));
@@ -442,11 +473,11 @@ int pr_dirent(union Dirent *d, char *dummy) {
     // OR add another parameter "width" that, in Print::printNumber prefills the buffer with
     // space or 0 and pulls str count back accordingly.
     mySerial.print("SIZE=0x");
-    mySerial.print((uint16_t)d->f.flen, HEX);
+    mySerial.print((unsigned int)d->f.flen, HEX);
     mySerial.print(" LOAD=0x");
-    mySerial.print((uint16_t)d->f.flda, HEX);
+    mySerial.print((unsigned int)d->f.flda, HEX);
     mySerial.print(" EXE=0x");
-    mySerial.println((uint16_t)d->f.fexa, HEX); 
+    mySerial.println((unsigned int)d->f.fexa, HEX); 
     return 0; // Force the interator to run to completion
 }
 
@@ -560,13 +591,13 @@ int foreach_vdisk_dir(void *fn, char * fname) {
 // root.close(); before the "return".
 void open_sdcard(void) {
     Serial.print(F("SDcard flags: 0x"));
-    // Build the nul-terminated string "NASCOM"
+    // Build the null-terminated string "NASCOM"
     cas_vdisk_name[STR_SLASH_OFFSET] = 0;
-    cas_flags &= ~(F_SD_FOUND | F_NASDIR_FOUND | F_VDISK_MOUNT);
+    cas_flags &= ~(FM_SD_FOUND | FM_NASDIR_FOUND | FM_VDISK_MOUNT);
     if (SD.begin()) {
-        cas_flags |= F_SD_FOUND;
+        cas_flags |= FM_SD_FOUND;
         if (SD.exists(cas_vdisk_name)) {
-            cas_flags |= F_NASDIR_FOUND;
+            cas_flags |= FM_NASDIR_FOUND;
         }
     }
     // Restore original string
@@ -576,7 +607,7 @@ void open_sdcard(void) {
 
 
 // Come here when DRIVE is off and there is a serial character available. Infer that a
-// nul-terminated string is going to be delivered. Receive the string into a buffer
+// null-terminated string is going to be delivered. Receive the string into a buffer
 // and process it to completion -- for example, by setting up state that will be used
 // subsequently.
 void cmd_cass(void) {
@@ -585,10 +616,11 @@ void cmd_cass(void) {
     char res[4];
     int index = 0;
     int cmd = 0;
+    int destination;
     File entry; // for DIR command
     Serial.println(F("Get cmd line"));
 
-    // Receive a NUL-terminated string from the Host into buf[]
+    // Receive a null-terminated string from the Host into buf[]
     while (1) {
         if (mySerial.available()) {
             buf[index] = mySerial.read();
@@ -616,7 +648,7 @@ void cmd_cass(void) {
     case ('I'<<8 | 'N'):      // INFO - version and status
         pr_msg(msg_info, F_MSG_RESPONSE + F_MSG_CR);
         mySerial.print("Flags: 0x");  // TODO decode it??
-        mySerial.println(cas_flags, HEX);
+        mySerial.println((uint16_t)cas_flags, HEX);
         mySerial.print(F("Read  name: "));
         mySerial.println(&cas_rd_name[STR_PATH_OFFSET]);
         mySerial.print(F("Write name: "));
@@ -626,17 +658,16 @@ void cmd_cass(void) {
         break;
 
     case ('T'<<8 | 'O'):      // TO xxxx - relocate boot loader to xxxx.
-        int destination;
         if (parse_leading(&pbuf) && parse_num(&pbuf, &destination, 16)) {
             mySerial.write((byte)0x55); // indicate to host that relocation will occur
             mySerial.write((byte)(destination & 0xff));      // low part
             mySerial.write((byte)((destination>>8) & 0xff)); // high
             Serial.print(F("TO to 0x"));
             Serial.println(destination, HEX);
-            // break from here will result in an unneeded NULL being sent but
+            // break from here will result in an unneeded NUL being sent but
             // that is not a problem because the Host is in ZINLIN (either from
             // the NAS-SYS or the SDCard command loops) which accepts data from
-            // from serial or keyboard and will simply gobble and discard NULLs.
+            // from serial or keyboard and will simply gobble and discard NULs.
         }
         else {
             // bad argument
@@ -644,21 +675,54 @@ void cmd_cass(void) {
         }
         break;
 
-    case ('A'<<8 | 'U'): // AUTOGO [0 | 1] - execute a file after loading
-        cas_flags = cas_gen_flag(buf, cas_flags, F_AUTO_GO);
+    case ('P'<<8 | 'A'): // PAUSE nn - delay before supplying text file
+        if (parse_leading(&pbuf) && parse_num(&pbuf, &pause_delay, 10)) {
+            // all done
+        }
+        else {
+            // bad argument
+            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_CR);
+        }
+        break;
+
+    case ('N'<<8 | 'U'): // NULLS nn - delay between lines of text file
+        if (parse_leading(&pbuf) && parse_num(&pbuf, &nulls_delay, 10)) {
+            // all done
+        }
+        else {
+            // bad argument
+            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_CR);
+        }
         break;
 
     case ('N'<<8 | 'E'): // NEW - (re)read SDcard
         open_sdcard();
         break;
 
+    case ('A'<<8 | 'U'): // AUTOGO [0 | 1] - execute a file after loading
+        if (parse_leading(&pbuf)) {
+            if (parse_num(&pbuf, &destination, 10)) {
+                // set or clear the flag
+                cas_flags = (cas_flags & ~FM_AUTO_GO) | (destination? 1 << FS_AUTO_GO : 0);
+            }
+            else {
+            // bad argument
+            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_CR);
+            }
+        }
+        else {
+            // no argument, simply toggle the flag
+            cas_flags = cas_flags ^ FM_AUTO_GO;
+        }
+        break;
+
     case ('M'<<8 | 'O'): // MO <8.3> - Mount virtual disk from FAT file-system. In PolyDos format
-        if (cas_flags & F_SD_FOUND) {
+        if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, &cas_vdisk_name[STR_FILE_OFFSET])) {
                 // Don't want to create a file, so check existence first
                 if ( (SD.exists(&cas_vdisk_name[STR_PATH_OFFSET])) && (handle = SD.open(&cas_vdisk_name[STR_PATH_OFFSET], FILE_WRITE)) ) {
                     handle.close();
-                    cas_flags |= F_VDISK_MOUNT;
+                    cas_flags |= FM_VDISK_MOUNT;
                 }
                 else {
                     pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
@@ -677,9 +741,9 @@ void cmd_cass(void) {
         // TODO need a 2-column or 3-column format. Do I need a pager? I hope not
         // tho I already have it on my wish-list and it would only require
         // counting lines here and issuing the extra response byte..
-        if (cas_flags & F_SD_FOUND) {
-            if (cas_flags & F_NASDIR_FOUND) {
-                // Build the nul-terminated string "NASCOM"
+        if (cas_flags & FM_SD_FOUND) {
+            if (cas_flags & FM_NASDIR_FOUND) {
+                // Build the null-terminated string "NASCOM"
                 cas_vdisk_name[STR_SLASH_OFFSET] = 0;
                 handle = SD.open(cas_vdisk_name);
                 // Restore original string
@@ -702,53 +766,75 @@ void cmd_cass(void) {
         }
         break;
 
-    case ('D'<<8 | 'F'):  // DF - directory of Flash
-        // TODO there are only a few so can print name and meta-data
-        mySerial.write((byte)0xff); // indicate to host that a message is coming
-        foreach_flash_dir(&pr_dirent, 0);
-        break;
-
     case ('D'<<8 | 'V'):  // DV - directory of Virtual disk
         // TODO may want a pager
-        if (cas_flags & F_SD_FOUND) {
-             if (cas_flags & F_VDISK_MOUNT) {
-                 mySerial.write((byte)0xff); // indicate to host that a message is coming
-                 foreach_vdisk_dir(&pr_dirent, 0);
-             }
-             else {
-                 pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
-             }
+        if (cas_flags & FM_SD_FOUND) {
+            if (cas_flags & FM_VDISK_MOUNT) {
+                mySerial.write((byte)0xff); // indicate to host that a message is coming
+                foreach_vdisk_dir(&pr_dirent, 0);
+            }
+            else {
+                pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
+            }
         }
         else {
             pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
         }
         break;
 
-    case ('R'<<8 | 'F'): // RF <8.2> - Read specified file from flash file-system. Convert binary->cas
-        if (parse_leading(&pbuf) && parse_fname_polydos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
-            // try to find it..
-            wotfile = foreach_flash_dir(&find_dirent, &cas_rd_name[STR_FILE_OFFSET]);
-            if (wotfile == -1) {
-                pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+    case ('D'<<8 | 'F'):  // DF - directory of Flash
+        mySerial.write((byte)0xff); // indicate to host that a message is coming
+        foreach_flash_dir(&pr_dirent, 0);
+        break;
+
+    case ('R'<<8 | 'S'):  // RS <8.3> [AI] [xxxx] [yyyy] - Read specified file from FAT file-system.
+        cas_flags &= ~ FM_RD_SRC; // default to error case
+        if (cas_flags & FM_SD_FOUND) {
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
+                Serial.print("->");
+                Serial.print(&cas_rd_name[STR_PATH_OFFSET]);
+                Serial.println("<-");
+
+                if (SD.exists(&cas_rd_name[STR_PATH_OFFSET])) {
+                    Serial.println(F("RS file OK"));
+                }
+                else {
+                    pr_msg(msg_warn_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                }
+
+                // there are cases where the file does not exist yet because we'll write it before
+                // reading it, it's up to the user to decide if that's really an error. Therefore,
+                // 1/ we cannot rely on opening the file now; need to defer until it's needed
+                // 2/ need to set flags as though this was successful
+
+                // Indicate SDcard as the source.
+                cas_flags |= (2 << FS_RD_SRC);
+                // TODO need to set or clear F_RD_CONV bit.
             }
-            // TODO also need to set or clear some other flags to show the source and that it's all valid
+            else {
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+            }
         }
         else {
-            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
         }
         break;
 
-    case ('R'<<8 | 'V'): // RV <8.2> - Read specified file from virtual file-system. Convert binary->cas
-        if (cas_flags & F_SD_FOUND) {
-             if (cas_flags & F_VDISK_MOUNT) {
+    case ('R'<<8 | 'V'): // RV <8.2> [AI] - Read specified file from virtual file-system.
+        cas_flags &= ~ FM_RD_SRC; // default to error case
+        if (cas_flags & FM_SD_FOUND) {
+             if (cas_flags & FM_VDISK_MOUNT) {
                  if (parse_leading(&pbuf) && parse_fname_polydos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
                      // try to find it..
-                     wotfile = foreach_vdisk_dir(&find_dirent, &cas_rd_name[STR_FILE_OFFSET]);
-                     if (wotfile == -1) {
+                     dirent = foreach_vdisk_dir(&find_dirent, &cas_rd_name[STR_FILE_OFFSET]);
+                     if (dirent == -1) {
                          pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
                      }
-                     // TODO also need to set or clear some other flags to show the source and that it's all valid
-                     // TODO there's no point in setting wotfile, of course!!
+                     else {
+                         // dirent is set up for the read. Indicate Vdisk as the source.
+                         cas_flags |= (3 << FS_RD_SRC);
+                         // TODO need to set or clear F_RD_CONV bit.
+                     }
                  }
                  else {
                      pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
@@ -763,68 +849,119 @@ void cmd_cass(void) {
         }
         break;
 
-
-/*    case ('W'<<8 | 'V'): // WV <8.2> - Write specified file to virtual file-system. Convert cas->binary.
-        Serial.println(F("Wr Virt file"));
-        // TODO need flag to show that virtual file system is mounted. Error if not
-        cas_parse_name(buf, res);
-        // All flash files are 1-8 characters and a 2-character extension: GO
-        if ((res[0] == 0) || (res[2] > 8) || (res[3] != 2)) {
-            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
-        }
-        else {
-            // try to find it TODO.
-            // at the end need to leave flags showing the data source and the index, so that the
-            // read command knows where to get the data and that it has to do the binary->cas conversion
-            pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
-        }
-        break;
-*/
-
-/*    case ('R'<<8 | 'C'): // RC <8.3> - Read specified file from FAT file-system. Already in CAS format
-        Serial.println(F("Rd CAS"));
-        cas_parse_name(buf, res);
-        // All FAT files are 1-8 characters and a 1-3-character extension
-        if ((res[0] == 0) || (res[2] > 8) || (res[3] > 3)) {
-            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
-        }
-        else {
-            cas_cp_filename(buf, cas_rd_name, res[1], 1 + res[2] + res[3], 0); // Final 0 means MSDOS format
-            Serial.println(cas_rd_name);
-            if ( SD.exists(cas_rd_name) ) {
-                Serial.println(F("CAS file OK"));
-
-                // there are cases where the file does not exist yet because we'll write it before
-                // reading it, it's up to the user to decide if that's really an error. Therefore,
-                // 1/ we cannot rely on opening the file now; need to defer until it's needed
-                // 2/ need to set flags as though this was successful
-            }
-            else {
+    case ('R'<<8 | 'F'): // RF <8.2> - Read specified file from flash file-system.
+        cas_flags &= ~ FM_RD_SRC; // default to error case
+        if (parse_leading(&pbuf) && parse_fname_polydos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
+            // try to find it..
+            dirent = foreach_flash_dir(&find_dirent, &cas_rd_name[STR_FILE_OFFSET]);
+            if (dirent == -1) {
                 pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
             }
-
-            cas_rd_state = 1;
-        }
-        break;
-*/
-
-/*    case ('W'<<8 | 'C'): // WC <8.3> - Write specified file to FAT file-system. Already in CAS format
-        Serial.println(F("Wr CAS"));
-        cas_parse_name(buf, res);
-
-        // All FAT files are 1-8 characters and a 1-3-character extension
-        if ((res[0] == 0) || (res[2] > 8) || (res[3] > 3)) {
-            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+            else {
+                // dirent is set up for the read. Indicate Flash as the source.
+                cas_flags |= (1 << FS_RD_SRC);
+                // TODO need to set or clear F_RD_CONV bit.
+            }
         }
         else {
-            cas_cp_filename(buf, cas_wr_name, res[1], 1 + res[2] + res[3], 0); // Final 0 means MSDOS format
-            // TODO need to document that [0] is disk, [1] is read [2] is write
-
-            // The file does not exist yet so nothing to do here except remember state
-            cas_wr_state = 1;
+            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
         }
         break;
-*/
+
+    case ('W'<<8 | 'S'): // WC <8.3> [AI] - Write specified file to FAT file-system.
+        cas_flags &= ~ FM_WR_SRC; // default to error case
+        if (cas_flags & FM_SD_FOUND) {
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, &cas_wr_name[STR_FILE_OFFSET])) {
+                // The file need not exist yet so nothing to do here except remember state
+
+                // Indicate SDcard as the destination
+                cas_flags |= (2 << FS_WR_SRC);
+                // TODO need to set or clear WR_CONV flag.
+            }
+            else {
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+            }
+        }
+        else {
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+        }
+        break;
+
+    case ('W'<<8 | 'V'): // WV <8.2> [AI] - Write specified file to virtual file-system.
+        cas_flags &= ~ FM_WR_SRC; // default to error case
+        if (cas_flags & FM_SD_FOUND) {
+            if (cas_flags & FM_VDISK_MOUNT) {
+                if (parse_leading(&pbuf) && parse_fname_polydos(&pbuf, &cas_wr_name[STR_FILE_OFFSET])) {
+                    // The file need not exist yet so nothing to do here except remember state
+
+                    // Indicate Vdisk as the destination
+                    cas_flags |= (3 << FS_WR_SRC);
+                    // TODO need to set or clear WR_CONV flag.
+                }
+                else {
+                    pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                }
+            }
+            else {
+                pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
+            }
+        }
+        else {
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+        }
+        break;
+
+    case ('T'<<8 | 'S'):  // TS <8.3> - Read specified file from FAT file-system as text.
+        cas_flags &= ~ FM_RD_SRC; // default to error case
+        if (cas_flags & FM_SD_FOUND) {
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
+                if (SD.exists(&cas_rd_name[STR_PATH_OFFSET])) {
+                    Serial.println(F("TS file OK"));
+                    // Ready to do the read. Read it now. No need to change
+                    // cas_flags or F_RD_CONV bit
+                    // TODO do it..
+                }
+                else {
+                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                }
+            }
+            else {
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+            }
+        }
+        else {
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+        }
+        break;
+
+    case ('T'<<8 | 'V'): // TV <8.2> [AI] - Read specified file from virtual file-system as text.
+        cas_flags &= ~ FM_RD_SRC; // default to error case
+        if (cas_flags & FM_SD_FOUND) {
+             if (cas_flags & FM_VDISK_MOUNT) {
+                 if (parse_leading(&pbuf) && parse_fname_polydos(&pbuf, &cas_rd_name[STR_FILE_OFFSET])) {
+                     // try to find it..
+                     dirent = foreach_vdisk_dir(&find_dirent, &cas_rd_name[STR_FILE_OFFSET]);
+                     if (dirent == -1) {
+                         pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                     }
+                     else {
+                         // dirent is set up for the read. Read it now. No need to change
+                         // cas_flags or F_RD_CONV bit
+                         // TODO do it..
+                     }
+                 }
+                 else {
+                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                 }
+             }
+             else {
+                 pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
+             }
+        }
+        else {
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+        }
+        break;
 
     default:
         pr_msg(msg_err_try_help, F_MSG_RESPONSE + F_MSG_CR);
@@ -842,32 +979,48 @@ void cmd_cass(void) {
 // End by waiting for DRIVE light to go off
 // TODO other formats
 void cmd_cass_rd() {
-    if ( ((cas_rd_state & 0xf) == 1) && (handle = SD.open(cas_rd_name, FILE_READ)) ) {
-        // have a file name and can open the file -> good to go!
-        // while drive light is on, grab bytes and send them to serial
-        Serial.println(F("file from disk"));
-        char c;
-        while (handle.read(&c, 1)) {
-            mySerial.print(c);
-        }
-        handle.close();
-    }
-    else if ( ((cas_rd_state & 0xf) == 0) ) {
-        // CAS-encode a binary file from Flash
-         Serial.println(F("file from Flash"));
+    switch (cas_flags & FM_RD_SRC) {
+
+    case (1 << FS_RD_SRC):  // CAS-encode a binary file from Flash
+        Serial.println(F("file from Flash"));
         cass_bin2cas();
-    }
-    else {
-        Serial.println(F("Error")); //no file name or unsupported destination" 0- should abort tape and send rto Host
+        break;
+
+    case (3 << FS_RD_SRC):  // CAS-encode a binary file from Vdisk
+        Serial.println(F("CAS-encode a binary file from vdisk - don't know how to do this yet"));
+        break;
+
+    case (2 << FS_RD_SRC):  // CAS-encode a binary file from SD
+        // TODO for now, assume it's a LITERAL from SD (ie, already a CAS format file)
+        if (handle = SD.open(&cas_rd_name[STR_PATH_OFFSET], FILE_READ)) {
+            // have a file name and can open the file -> good to go!
+            // while drive light is on, grab bytes and send them to serial
+            Serial.println(F("file from SD"));
+            char c;
+            while (handle.read(&c, 1)) {
+                mySerial.print(c);
+            }
+            handle.close();
+        }
+        else {
+            pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+        }
+        break;
+
+    default:
+        // TODO need to send the right stream to the NASCOM to abort
+        // the read before reporting the error.
+        //pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+        Serial.println(F("BAD BAD BAD Attempted read when no file cued"));
     }
 
-    // wait for pin to negate
+    // wait for DRIVE pin to negate
     while (digitalRead(PIN_DRV) == 0) {
     }
 }
 
 
-// For now, this just means delivering a file (from on-chip ROM) selected by wotfile - converting
+// For now, this just means delivering a file (from on-chip ROM) selected by dirent - converting
 // it on-the-fly from binary to CAS format
 void cass_bin2cas() {
     int remain;// total number of data bytes left to send
@@ -887,11 +1040,11 @@ void cass_bin2cas() {
     // loop until block reaches 0
     // do a block
 
-    remain = pgm_read_word(&romdir[wotfile].flen);
-    addr =   pgm_read_word(&romdir[wotfile].flda);
+    remain = pgm_read_word(&romdir[dirent].flen);
+    addr =   pgm_read_word(&romdir[dirent].flda);
 
     // address of first byte of code
-    index = pgm_read_word(&romdir[wotfile].fptr);
+    index = pgm_read_word(&romdir[dirent].fptr);
 
     // total number of blocks needed to send remain bytes
     block = ((remain + 0xff) & 0xff00) >> 8;
@@ -939,18 +1092,18 @@ void cass_bin2cas() {
         }
         mySerial.write(csum & 0xff); // body checksum
  
-        // inter-block gap -- 10 nul characters
+        // inter-block gap -- 10 NUL characters
         for (csum = 0; csum < 10; csum++) {
             mySerial.write((byte)0);
         }
     }
 
 
-    if (cas_flags & F_AUTO_GO) {
+    if (cas_flags & FM_AUTO_GO) {
         mySerial.print("E");
-        mySerial.println(pgm_read_word(&romdir[wotfile].fexa), HEX);
+        mySerial.println(pgm_read_word(&romdir[dirent].fexa), HEX);
     }
-    Serial.println(pgm_read_word(&romdir[wotfile].fexa), HEX);
+    Serial.println(pgm_read_word(&romdir[dirent].fexa), HEX);
     Serial.print(F(".cass_bin2cas"));
 }
 
@@ -960,7 +1113,10 @@ void cass_bin2cas() {
 // After DRIVE goes off, disard any remaining/buffered data
 // TODO other formats.
 void cmd_cass_wr(void) {
-    if ( ((cas_wr_state & 0xf) == 1) && (handle = SD.open(cas_wr_name, FILE_WRITE)) ) {
+    // Currently assuming WS and the "literal" case . Need to handle the other FS and the "convert" case as well and use the WR_SRC and WR_CONV flag to choose which to implement
+    // No option to overwrite, so delete any existing file of this name.
+    SD.remove(&cas_wr_name[STR_PATH_OFFSET]);
+    if ( (handle = SD.open(&cas_wr_name[STR_PATH_OFFSET], FILE_WRITE)) ) {
         // have a file name and can open the file -> good to go!
         // while drive light is on, grab bytes and send them to disk
         while (digitalRead(PIN_DRV) == 0) {
@@ -973,9 +1129,10 @@ void cmd_cass_wr(void) {
     }
     else {
         Serial.println(F("Error")); //no file name or unsupported destination" TODO should be to CLI
-        // wait for pin to negate
-        while (digitalRead(PIN_DRV) == 0) { }
     }
+
+    // wait for pin to negate
+    while (digitalRead(PIN_DRV) == 0) { }
 
     // empty any rogue characters TODO do I still need this?
     while (mySerial.available()) {

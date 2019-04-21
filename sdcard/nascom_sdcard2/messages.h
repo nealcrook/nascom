@@ -11,28 +11,30 @@
 #define F_MSG_NULLTERM (2)
 #define F_MSG_CR       (4)
 
-const char msg_err_fname_bad[]     PROGMEM = "Error - filename missing or wrongly formed or wrong length";
-const char msg_err_fname_missing[] PROGMEM = "Error - file not found";
-const char msg_err_sd_missing[]    PROGMEM = "Error - SDcard not found";
-const char msg_err_vdisk_missing[] PROGMEM = "Error - No virtual disk mounted";
-const char msg_err_vdisk_bad[]     PROGMEM = "Error - Could not open file for virtual disk";
-const char msg_err_addr_bad[]      PROGMEM = "Error - expected address in hex";
-const char msg_err_try_help[]      PROGMEM = "Error - try typing HELP";
-const char msg_help[]              PROGMEM = "HELP - this is it\r\n"
-                                             "INFO - version and status\r\n"
-                                             "TO xxxx - relocate boot loader to xxxx\r\n"
-                                             "PAUSE nn - delay before supplying text file\r\n"
-                                             "NULLS nn - delay between lines of text file\r\n"
-                                             "NEW - re-read SDcard\r\n"
-                                             "AUTOGO [0 | 1] - execute a file after loading\r\n"
-                                             "MO <file> - mount virtual disk from SDcard\r\n"
-                                             "DF DS DV - directory\r\n"
-                                             "RF RS RV <file> [AI] [xxxx] [yyyy] - cue read\r\n"
-                                             "WS WV <file> [AI] - cue write\r\n"
-                                             "  F/S/V suffices specifies Flash/SDcard/Vdisk\r\n"
-                                             "  arg  AI: auto-increment file names\r\n"
-                                             "  args xxxx yyyy: ld/exe addr for binary files";
-const char msg_info[]              PROGMEM = "This is NASCOM_SDCARD version X.X";
+const char msg_err_fname_bad[]      PROGMEM = "Error - filename missing or wrongly formed or wrong length";
+const char msg_err_fname_missing[]  PROGMEM = "Error - file not found";
+const char msg_warn_fname_missing[] PROGMEM = "Warning - file not found. At your risk.";
+const char msg_err_sd_missing[]     PROGMEM = "Error - SDcard not found";
+const char msg_err_vdisk_missing[]  PROGMEM = "Error - No virtual disk mounted";
+const char msg_err_vdisk_bad[]      PROGMEM = "Error - Could not open file for virtual disk";
+const char msg_err_addr_bad[]       PROGMEM = "Error - expected address in hex";
+const char msg_err_num_bad[]        PROGMEM = "Error - expected number in decimal";
+const char msg_err_try_help[]       PROGMEM = "Error - try typing HELP";
+const char msg_help[]               PROGMEM = "INFO - version and status\r\n"
+                                              "TO xxxx - relocate boot loader to xxxx\r\n"
+                                              "PAUSE nn - delay before supplying text file\r\n"
+                                              "NULLS nn - delay between lines of text file\r\n"
+                                              "NEW - re-read SDcard\r\n"
+                                              "AUTOGO [0 | 1] - execute a file after loading\r\n"
+                                              "MO <file> - mount virtual disk from SDcard\r\n"
+                                              "DS DV DF - directory\r\n"
+                                              "RS RV RF <file> [AI] [xxxx] [yyyy] - cue read\r\n"
+                                              "WS WV <file> [AI] - cue write\r\n"
+                                              "TS TV <file> - send text file now\r\n"
+                                              "  F/S/V versions specify Flash/SDcard/Vdisk\r\n"
+                                              "  arg  AI: auto-increment file names\r\n"
+                                              "  args xxxx yyyy: ld/exe addr for binary files";
+const char msg_info[]               PROGMEM = "This is NASCOM_SDCARD version X.X";
 
 
 /*

@@ -21,37 +21,6 @@ int legal_char(char c) {
 }
 
 
-// Use an argument (or lack thereof) to set/clear or toggle a flag.
-// buffer is null-terminated.
-// parse the buffer. Skip a command delimited by space. Look for 1st character
-// of argument.
-// No argument:                          return current with bit_mask toggled
-// 1st character of argument is ASCII 0: return current with bit_mask cleared
-// 1st character of argument is ASCII 1: return current with bit_mask set
-// any other argument:                   return current unchanged
-int cas_gen_flag(char *buffer, int current, int bit_mask) {
-    int index = 0;
-    char val;
-
-    // 0 -> skip command (non white-space) looking for white-space
-    // 1 -> skip white-space looking for argument)
-    int state = 0;
-    while (val = buffer[index++]) {
-        if ((state == 0) && (val == ' ')) {
-            state = 1;
-        }
-        else if ((state == 1) && (val != ' ')) {
-            if (val == '0') { return current & ~bit_mask; }
-            if (val == '1') { return current |  bit_mask; }
-            // illegal argument; flag unchanged
-            return current;
-        }
-    }
-    // ran out of buffer: toggle flag
-    return current ^ bit_mask;
-}
-
-
 // Each routine parses 1 space-delimited token
 // Return 0 for failure, 1 for success
 // In general, they move to the next token whether they
