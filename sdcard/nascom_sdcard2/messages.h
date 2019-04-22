@@ -14,6 +14,7 @@
 const char msg_err_fname_bad[]      PROGMEM = "Error - filename missing or wrongly formed or wrong length";
 const char msg_err_fname_missing[]  PROGMEM = "Error - file not found";
 const char msg_warn_fname_missing[] PROGMEM = "Warning - file not found. At your risk.";
+const char msg_info_deleted[]       PROGMEM = "Info - existing file deleted.";
 const char msg_err_sd_missing[]     PROGMEM = "Error - SDcard not found";
 const char msg_err_vdisk_missing[]  PROGMEM = "Error - No virtual disk mounted";
 const char msg_err_vdisk_bad[]      PROGMEM = "Error - Could not open file for virtual disk";
@@ -29,8 +30,8 @@ const char msg_help[]               PROGMEM = "INFO - version and status\r\n"
                                               "MO <file> - mount virtual disk from SDcard\r\n"
                                               "DS DV DF - directory\r\n"
                                               "RS RV RF <file> [AI] [xxxx] [yyyy] - cue read\r\n"
-                                              "WS WV <file> [AI] - cue write\r\n"
-                                              "TS TV <file> - send text file now\r\n"
+                                              "WS <file> [AI] - cue write\r\n"
+                                              "TS <file> - send text file now\r\n"
                                               "  F/S/V versions specify Flash/SDcard/Vdisk\r\n"
                                               "  arg  AI: auto-increment file names\r\n"
                                               "  args xxxx yyyy: ld/exe addr for binary files";

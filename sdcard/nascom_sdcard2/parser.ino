@@ -72,8 +72,6 @@ int parse_num(char **buf, int* result, int base) {
 
     *result = 0;
     while ((**buf != '\0') && (**buf != ' ')) {
-        Serial.print("Result: ");
-        Serial.println(*result, HEX);
         if ((**buf >= '0') && (**buf <= '9')) {
             *result = (*result * base) + (**buf - '0');
             digits_converted++;
