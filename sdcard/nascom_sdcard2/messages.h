@@ -14,7 +14,7 @@
 const char msg_err_fname_bad[]      PROGMEM = "Error - filename missing or wrongly formed or wrong length";
 const char msg_err_fname_missing[]  PROGMEM = "Error - file not found";
 const char msg_warn_fname_missing[] PROGMEM = "Warning - file not found. At your risk.";
-const char msg_info_deleted[]       PROGMEM = "Info - existing file deleted.";
+const char msg_info_2bdeleted[]     PROGMEM = "Info - existing file will be deleted.";
 const char msg_err_sd_missing[]     PROGMEM = "Error - SDcard not found";
 const char msg_err_vdisk_missing[]  PROGMEM = "Error - No virtual disk mounted";
 const char msg_err_vdisk_bad[]      PROGMEM = "Error - Could not open file for virtual disk";
