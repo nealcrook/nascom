@@ -77,7 +77,7 @@
 //
 // When running serboot (serboot.asm)
 // E 0C80
-// SDcard>
+// NASCAS>
 //
 // NAS-SYS always polls the serial interface as well as the keyboard, so the
 // serial interface can deliver input at any time. By sending R<return>
@@ -222,14 +222,15 @@
 // WS will save a CAS file literally
 // RS will read a CAS file literally
 
-// Probably want to add ES (Erase file from SD)
-
 // Make read cas handle Vdisk as well as Flash
 
 // Make parser extension-sensitive so it can choose binary/cas conversion -> don't need that any more
 // Add routine for serving literal (CAS) files -- for SD and vdisk
 // Implement txt player for TV TS - should be easy.
 // Add leading 0 to hex print - tried and my mod compiled but had no effect. Did not get invoked?
+// Change name of prompt and in help from SDcard to NASCAS>
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Pin assignments (SERIAL)
@@ -346,6 +347,7 @@ int cas_flags = (1 << FS_RD_SRC) | FM_AUTO_GO;
 char cas_rd_name[]    = "NAS-RD00.CAS";
 char cas_wr_name[]    = "NAS-WR00.CAS";
 char cas_vdisk_name[] = "NAS-XX00.DSK";
+char cas_erase_name[] = "NAS-XX00.TMP";
 
 // Directory entry for next Flash/Vdisk operation. At reset, the boot
 // device is Flash and 0 means the first file: SERBOOT.GO
@@ -436,8 +438,6 @@ void setup()   {
     pinMode(PIN_NTXD, INPUT_PULLUP);
 
     mySerial.begin(2400); // 1200 is default baud rate on NASCOM
-    // Need the leading space so that NAS-SYS will ignore the line
-    mySerial.println(F(" Hello NASCOM this is the Arduino"));
 
     // Bootstrap the CLI on the host. Sending R causes the NASCOM to start a READ which will
     // cause loop() to call cmd_cass_rd which will load file from Flash directory index given
@@ -662,7 +662,7 @@ void open_sdcard(void) {
     cas_flags &= ~(FM_SD_FOUND | FM_NASDIR_FOUND | FM_VDISK_MOUNT);
     if (SD.begin(10, SPI_SPEED)) {
         cas_flags |= FM_SD_FOUND;
-        if (SD.chdir(F("NASCOM"))) {
+        if (SD.chdir("NASCOM"), 1) {
             cas_flags |= FM_NASDIR_FOUND;
         }
 
@@ -675,7 +675,7 @@ void open_sdcard(void) {
         handle.close();
     }
 
-    Serial.print(F("SDcard flags: 0x"));
+    Serial.print(F("flags: 0x"));
     Serial.println(cas_flags, HEX);
 }
 
@@ -721,13 +721,13 @@ void cmd_cass(void) {
 
     case ('I'<<8 | 'N'):      // INFO - version and status
         pr_msg(msg_info, F_MSG_RESPONSE + F_MSG_CR);
-        mySerial.print("Flags: 0x");  // TODO decode it??
+        mySerial.print("Flags:      0x");  // TODO decode it??
         mySerial.println((uint16_t)cas_flags, HEX);
         if (cas_flags & FM_NASDIR_FOUND) {
-            mySerial.print(F("Directory: /NASCOM"));
+            mySerial.println(F("Directory:  /NASCOM"));
         }
         else {
-            mySerial.print(F("Directory: /"));
+            mySerial.println(F("Directory:  /"));
         }
         mySerial.print(F("Read  name: "));
         mySerial.println(cas_rd_name);
@@ -746,7 +746,7 @@ void cmd_cass(void) {
             Serial.println(destination, HEX);
             // break from here will result in an unneeded NUL being sent but
             // that is not a problem because the Host is in ZINLIN (either from
-            // the NAS-SYS or the SDCard command loops) which accepts data from
+            // the NAS-SYS or the NASCAS command loops) which accepts data from
             // from serial or keyboard and will simply gobble and discard NULs.
         }
         else {
@@ -851,7 +851,24 @@ void cmd_cass(void) {
         foreach_flash_dir(&pr_dirent, 0);
         break;
 
-    case ('R'<<8 | 'S'):  // RS <8.3> [AI] [xxxx] [yyyy] - Read specified file from FAT file-system.
+    case ('E'<<8 | 'S'):  // ES <8.3> - Erase file from FAT file-system
+        if (cas_flags & FM_SD_FOUND) {
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, cas_erase_name)) {
+
+                if (!SD.remove(cas_erase_name)) {
+                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                }
+            }
+            else {
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+            }
+        }
+        else {
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+        }
+        break;
+
+    case ('R'<<8 | 'S'):  // RS <8.3> [AI] - Read specified file from FAT file-system.
         cas_flags &= ~ (FM_RD_SRC | FM_RD_AI); // default to error case, no AI
         if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, cas_rd_name)) {
@@ -860,10 +877,7 @@ void cmd_cass(void) {
                     cas_flags |= FM_RD_AI;
                 }
 
-                if (SD.exists(cas_rd_name)) {
-                    Serial.println(F("RS file OK"));
-                }
-                else {
+                if (!SD.exists(cas_rd_name)) {
                     pr_msg(msg_warn_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
                 }
 

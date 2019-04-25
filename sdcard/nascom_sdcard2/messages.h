@@ -29,13 +29,13 @@ const char msg_help[]               PROGMEM = "INFO - version and status\r\n"
                                               "AUTOGO [0 | 1] - execute a file after loading\r\n"
                                               "MO <file> - mount virtual disk from SDcard\r\n"
                                               "DS DV DF - directory\r\n"
-                                              "RS RV RF <file> [AI] [xxxx] [yyyy] - cue read\r\n"
+                                              "ES <file>  - erase file\r\n"
+                                              "RS RV RF <file> [AI] - cue read\r\n"
                                               "WS <file> [AI] - cue write\r\n"
                                               "TS <file> - send text file now\r\n"
                                               "  F/S/V versions specify Flash/SDcard/Vdisk\r\n"
-                                              "  arg  AI: auto-increment file names\r\n"
-                                              "  args xxxx yyyy: ld/exe addr for binary files";
-const char msg_info[]               PROGMEM = "This is NASCOM_SDCARD version X.X";
+                                              "  AI to auto-increment file names";
+const char msg_info[]               PROGMEM = "This is NASCAS version 1.0";
 
 
 /*
