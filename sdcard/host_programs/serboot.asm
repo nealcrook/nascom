@@ -18,9 +18,9 @@
 ;;;
 ;;; When executed, it responds with a command prompt:
 ;;;
-;;; SDcard>
+;;; NASCAS>
 ;;;
-;;; Every command is sent directly to the nascom_sdcard hardware across the
+;;; Every command is sent directly to the NASCAS hardware across the
 ;;; serial interface. Type "." to exit the command loop (either at the end
 ;;; of a line or on a line by itself).
 ;;;
@@ -31,8 +31,7 @@
 ;;;
 ;;; The NASCOM should be configured for cassette operation with 1 stop bit.
 ;;; Various baud rates are supported. The baud rate is set by a jumper on the
-;;; nascom_sdcard, and a configuration file on the SDcard determines the baud
-;;; rates associated with the jumper settings.
+;;; NASCAS hardware and/or a configuration file or NVRAM setting
 ;;;
 ;;; Protocol
 ;;; --------
@@ -41,7 +40,7 @@
 ;;; serial interface. The command is the whole line upto the last non-blank or
 ;;; dot character. The line is terminated with a NUL (0x00).
 ;;;
-;;; nascom_sdcard responds with one of three codes:
+;;; NASCAS responds with one of three codes:
 ;;; RSDONE - command complete. No response.
 ;;; RSMOVE hh ll - relocate the address given by following two bytes
 ;;; RSMSG - print NUL-terminated text.
@@ -49,11 +48,12 @@
 ;;; This code remembers whether the last command was terminated with a . or not.
 ;;; If no . then the prompt is displayed for another command. Otherwise, the
 ;;; program returns to NAS-SYS.
-;;; A blank line results in a new prompt with no communication with nascom_sdcard.
+;;; A blank line results in a new prompt with no communication with the NASCAS
+;;; hardware
 
 START:        EQU     $0c80
 
-;;; length of the prompt "SDcard> "
+;;; length of the prompt "NASCAS> "
 PRLEN:  EQU     8
 
 ;;; response values
@@ -83,7 +83,7 @@ ZSRLX:  EQU     $6f
 
 ;;; print command prompt
 newcmd: rst     PRS
-        defm    "SDcard> ", 0
+        defm    "NASCAS> ", 0
 
         SCAL    ZINLIN          ;DE=start of this line
         ld      hl, PRLEN
@@ -167,7 +167,7 @@ move2:  ld      de,move2 - START;offset from start
         ret                     ;jump to start of code at new location
 
 
-;;; RSMSG: print null-terminated string from sdcard
+;;; RSMSG: print null-terminated string from NASCAS hardware
 prmsg:  RST     RIN
         or      a               ;is it NUL?
         jr      z, done         ;yes; ready for next command, if any
