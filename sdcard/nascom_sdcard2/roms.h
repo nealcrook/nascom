@@ -999,7 +999,7 @@ typedef struct FDIRENT {
     char fnam_fext[10]; // 8 char filename, 2 char extension. Blanks in unused positions
     uint8_t * fptr;     // point to data bytestream
     int flen;           // length of data in bytes
-    int flda;           // load address on target  
+    int flda;           // load address on target
     int fexa;           // entry/execution address on target
 } FDIRENT;
 
