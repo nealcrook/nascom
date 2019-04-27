@@ -1,4 +1,4 @@
-// parser etc. - part of nascom_sdcard2                             -*- c -*-
+// parser etc. - part of NAScas                             -*- c -*-
 // https://github.com/nealcrook/nascom
 //
 

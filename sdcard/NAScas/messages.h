@@ -1,4 +1,4 @@
-// messages.h - part of nascom_sdcard2                             -*- c -*-
+// messages.h - part of NAScas                             -*- c -*-
 // https://github.com/nealcrook/nascom
 //
 // with thanks to

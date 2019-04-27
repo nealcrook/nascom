@@ -1,4 +1,4 @@
-;;; Boot/command-line Utility for nascom_sdcard serial interface
+;;; Boot/command-line Utility for the NAScas serial interface
 ;;;
 ;;; https://github.com/nealcrook/nascom
 ;;;
@@ -18,9 +18,9 @@
 ;;;
 ;;; When executed, it responds with a command prompt:
 ;;;
-;;; NASCAS>
+;;; NAScas>
 ;;;
-;;; Every command is sent directly to the NASCAS hardware across the
+;;; Every command is sent directly to the NAScas hardware across the
 ;;; serial interface. Type "." to exit the command loop (either at the end
 ;;; of a line or on a line by itself).
 ;;;
@@ -31,7 +31,7 @@
 ;;;
 ;;; The NASCOM should be configured for cassette operation with 1 stop bit.
 ;;; Various baud rates are supported. The baud rate is set by a jumper on the
-;;; NASCAS hardware and/or a configuration file or NVRAM setting
+;;; NAScas hardware and/or a configuration file or NVRAM setting
 ;;;
 ;;; Protocol
 ;;; --------
@@ -40,7 +40,7 @@
 ;;; serial interface. The command is the whole line upto the last non-blank or
 ;;; dot character. The line is terminated with a NUL (0x00).
 ;;;
-;;; NASCAS responds with one of three codes:
+;;; NAScas responds with one of three codes:
 ;;; RSDONE - command complete. No response.
 ;;; RSMOVE hh ll - relocate the address given by following two bytes
 ;;; RSMSG - print NUL-terminated text.
@@ -48,12 +48,12 @@
 ;;; This code remembers whether the last command was terminated with a . or not.
 ;;; If no . then the prompt is displayed for another command. Otherwise, the
 ;;; program returns to NAS-SYS.
-;;; A blank line results in a new prompt with no communication with the NASCAS
+;;; A blank line results in a new prompt with no communication with the NAScas
 ;;; hardware
 
 START:        EQU     $0c80
 
-;;; length of the prompt "NASCAS> "
+;;; length of the prompt "NAScas> "
 PRLEN:  EQU     8
 
 ;;; response values
@@ -83,7 +83,7 @@ ZSRLX:  EQU     $6f
 
 ;;; print command prompt
 newcmd: rst     PRS
-        defm    "NASCAS> ", 0
+        defm    "NAScas> ", 0
 
         SCAL    ZINLIN          ;DE=start of this line
         ld      hl, PRLEN
@@ -167,7 +167,7 @@ move2:  ld      de,move2 - START;offset from start
         ret                     ;jump to start of code at new location
 
 
-;;; RSMSG: print null-terminated string from NASCAS hardware
+;;; RSMSG: print null-terminated string from NAScas hardware
 prmsg:  RST     RIN
         or      a               ;is it NUL?
         jr      z, done         ;yes; ready for next command, if any

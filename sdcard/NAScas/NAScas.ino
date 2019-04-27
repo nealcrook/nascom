@@ -1,4 +1,4 @@
-// nascom_sdcard2                             -*- c -*-
+// NAScas                             -*- c -*-
 // https://github.com/nealcrook/nascom
 //
 // ARDUINO Uno/ATMEGA328 connected to NASCOM 2 as mass-storage device
@@ -77,7 +77,7 @@
 //
 // When running serboot (serboot.asm)
 // E 0C80
-// NASCAS>
+// NAScas>
 //
 // NAS-SYS always polls the serial interface as well as the keyboard, so the
 // serial interface can deliver input at any time. By sending R<return>
@@ -738,7 +738,7 @@ void cmd_cass(void) {
             Serial.println(destination, HEX);
             // break from here will result in an unneeded NUL being sent but
             // that is not a problem because the Host is in ZINLIN (either from
-            // the NAS-SYS or the NASCAS command loops) which accepts data from
+            // the NAS-SYS or the NAScas command loops) which accepts data from
             // from serial or keyboard and will simply gobble and discard NULs.
         }
         else {
