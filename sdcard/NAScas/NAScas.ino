@@ -27,50 +27,31 @@
 // 5  SCK                  DIG13  (also ARDUINO's on-board LED)
 // 6  CS                   DIG10
 //
-// 2/ connection to NASCOM PIO PL4 via 26-way ribbon
+// 2/ connection to NASCOM 2 serial interface PL2 via 16-way ribbon
 //
-// Name   Direction   ARDUINO   NASCOM
-// -----------------------------------
-// T2H    OUT          ANA1     B0 (pin 10)
-// H2T    IN           ANA0     B1 (pin 8)
-// CMD    IN           ANA4     B2 (pin 6)
-// XD7    IN/OUT       DIG9     A7 (pin 24)  *** CHANGE TO ANA5 ***
-// XD6    IN/OUT       DIG8     A6 (pin 25)
-// XD5    IN/OUT       DIG7     A5 (pin 23)
-// XD4    IN/OUT       DIG6     A4 (pin 21)
-// XD3    IN/OUT       DIG5     A3 (pin 19)
-// XD2    IN/OUT       DIG4     A2 (pin 17)
-// XD1    IN/OUT       DIG3     A1 (pin 15)
-// XD0    IN/OUT       DIG2     A0 (pin 13)
+// Name   Direction   ARDUINO   NASCOM 2
+// ---------------------------------------------------------------
+// TDRIVE IN           DIG6     pin 1       DRIVE
+// NASTXD IN           DIG7     pin 12      20mA OUT
+// NASRXD OUT          DIG8     pin 9       20mA IN
+// NASSCK OUT          DIG9     pin 4 & 5   EXT TX CLK, EXT RX CLK
+// GND                          pin 11 & 15 GND
+// 5V                           pin 2       5V   (NOTE)
 //
-//                     GND      GND (pins 16,18)
+// And set all DIL switches to UP/ON
+// And add a 1K resistor from pin 12 to 5V
 //
-// 3/ connection to NASCOM serial interface PL2 via 16-way ribbon
+// NOTE: Power
 //
-// Name   Direction   ARDUINO   NASCOM
-// -----------------------------------
-// TDRIVE IN           ??       DRIVE (pin1)                             ANA3 .. but DIG6 for debug
-// NASTXD IN                    20mA OUT (pin 12)                        DIG0 .. but DIG7 for debug
-// NASRXD OUT                   20mA IN (pin 9)                          DIG1 .. but DIG8 for debug
-// NASSCK OUT                   EXT TX CLK, EXT RX CLK (pin4, pin5)      DIG9
-// GND                          GND (pin 11,15)
-// 5V                           5V  (pin 2)
+// If you have the Arduino Uno connected to a computer on its USB port
+// it will also get power from there, do NOT also connect to power on the
+// NASCOM.
 //
-//
-// 4/ connection to LED
-//
-// Name   Direction   ARDUINO   Notes
-// -----------------------------------
-// ERROR  OUT         ANA2      To LED. Other end of LED via resistor to GND
-//
-//
-// 5/ power
-//
-// If you are using the PIO connection you can pick up GND from there. If you
-// are only using the serial connection you will need to add a GND connection.
-//
-// If you are powering the Arduino from the NASCOM you will need to set the
-// jumper accordingly and add a connection to +5V.
+// To power an Arduino Uno directly from 5V on the NASCOM you need to add
+// a wire down-stream of the regulator. I connected to the 2-pin device that
+// looks like a big resistor but is actually a fuse. Refer to the Arduino Uno
+// schematics for details. To power an Arduino Nano directly from 5V it's
+// far more straightforward. Again, refer to the schematics for details.
 //
 ////////////////////////////////////////////////////////////////////////////////
 // PROTOCOL FOR SERIAL INTERFACE
@@ -151,6 +132,7 @@
 // - Write CAS file
 // - Read CAS file
 // - Read ASCII (text) file
+// - Erase file
 // - Change disk
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -211,14 +193,15 @@
 // to be specified. The existing number parser could be used to check for
 // these; it needs no modification for this task.
 
-
-
-
 // TODO
 
-// Make parser extension-sensitive so it can choose binary/cas conversion -> don't need that any more
-// Add leading 0 to hex print - tried and my mod compiled but had no effect. Did not get invoked?
-
+// Add leading 0 to hex print - tried and my mod compiled but had no effect.
+// Did not get invoked?
+// Make it work with serial comms faster than 2400bd. At one point I thought
+// the "softserial" library was the limiting factor but I read that it should
+// work OK at up to 9600bd with a 16MHz processor. Alternative is to switch to
+// using the hardware UART but then I need to add a hardware inverter to the
+// data signals.
 
 ////////////////////////////////////////////////////////////////////////////////
 // Pin assignments (SERIAL)
