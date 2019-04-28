@@ -248,7 +248,7 @@ Remaining tasks:
 
 ## Contents
 
-* photos/         -- not yet done
+* photos/         -- photos of the hardware and of SERBOOT in operation
 * doc/            -- not yet done
 * NAScas.ino      -- the C code for the Arduino (includes wiring instructions)
 * messages.h      -- "
