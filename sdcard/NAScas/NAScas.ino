@@ -31,7 +31,7 @@
 //
 // Name   Direction   ARDUINO   NASCOM 2
 // ---------------------------------------------------------------
-// TDRIVE IN           DIG6     pin 1       DRIVE
+// TDRIVE IN           DIG6     pin 1       DRIVE OUT
 // NASTXD IN           DIG7     pin 12      20mA OUT
 // NASRXD OUT          DIG8     pin 9       20mA IN
 // NASSCK OUT          DIG9     pin 4 & 5   EXT TX CLK, EXT RX CLK
@@ -39,7 +39,7 @@
 // 5V                           pin 2       5V   (NOTE)
 //
 // And set all DIL switches to UP/ON
-// And add a 1K resistor from pin 12 to 5V
+// And add a 1OOK resistor from pin 12 to 5V
 //
 // NOTE: Power
 //
@@ -204,6 +204,45 @@
 // data signals.
 
 ////////////////////////////////////////////////////////////////////////////////
+
+
+// If defined:
+// - uses SoftwareSerial to communicate, on pins 7,8. Maximum baud rate is
+//   4800 baud, inversion is done in software, hardware UART is used for debug
+//   messages across USB via Arduino GUI console
+// If not defined:
+// - uses hardware UART to communicate, on pins 1, 2. Maximum baud rate is
+//   ??? baud, need external inverter between Arduino and NASCOM (and need
+//   to disconnect it before reprogramming the Arduino). No debug messages.
+#define SOFTSERIAL
+
+// If defined, builds a code variant that helps with hardware debug
+//#define HWDEBUG
+
+
+// Arduio generates 16x clock for the NASCOM UART.
+// For 1200 baud need divide by 417 (19208Hz)
+//     2400                     208  <-- seems to work OK
+//     4800                     104  <-- seems to work OK on small blocks but not reliable
+//     9600                      52  <-- does not work; bad data at NASCOM
+//    19200                      26
+//
+// The value of BAUD_RATE and BAUD_DIVISOR must always be consistent!
+#ifdef SOFTSERIAL
+#define BAUD_RATE (2400)
+#define BAUD_DIVISOR (208)
+#define NASSERIAL mySerial
+#define DEBSERIAL Serial
+#else
+#define BAUD_RATE (2400)
+#define BAUD_DIVISOR (208)
+#define NASSERIAL Serial
+#define DEBSERIAL mySerial
+#endif
+
+
+
+
 // Pin assignments (SERIAL)
 #define PIN_DRV 6
 #define PIN_CLK 9
@@ -338,8 +377,6 @@ unsigned long drive_on = 0;
 unsigned int pause_delay = 10; // in seconds
 unsigned int nulls_delay = 100; // in milliseconds
 
-
-
 // arduino clock is 16MHz
 SoftwareSerial mySerial(PIN_NTXD, PIN_NRXD, 1); // RX, TX, INVERSE_LOGIC on pin
 
@@ -351,22 +388,13 @@ SdFat SD;
 void pr_freeRAM(void) {
   extern int __heap_start, *__brkval;
   int v;
-  Serial.print(F("Bytes of free RAM = "));
-  Serial.println((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
+  DEBSERIAL.print(F("Bytes of free RAM = "));
+  DEBSERIAL.println((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
 }
 
 
 void setup()   {
-    Serial.begin(115200);  // for Debug
-
-    open_sdcard();
-
     pinMode(PIN_DRV, INPUT);
-
-    // TODO not yet complete..
-    // Choose a pin
-    // set up accordingly
-    // set the divider correctly for the required baud rate
 
     // Generate output clock that will be used as 16x clock for the NASCOM UART.
     // The output pin options are shown in the I/O Multiplexing table of the data sheet
@@ -382,17 +410,8 @@ void setup()   {
     // and need 2 toggles for 1Hz. Therefore, for a baud rate B need a divide
     // value of D = 16E6/(16 * 2 * B). Frequency should then be 16E6/D
 
-
     // TODO determine what the critical factor is in the baud rate. Is it really that
     // the nascom cannot keep up? If so, would see an overrun error on the NASCOM UART.
-
-    // For 1200 baud need divide by 417 (19208Hz)
-    //     2400                     208  <-- seems to work OK
-    //     4800                     104  <-- seems to work OK on small blocks but not reliable
-    //     9600                      52  <-- does not work; bad data at NASCOM
-    //    19200                      26
-    //
-    // For a divider of N, OCR1 is set to N-1.
 
     PRR  &= ~(1 << PRTIM1);                         // Ensure Timer1 is enabled
 
@@ -406,7 +425,8 @@ void setup()   {
     //
     TCCR1A |= (1 <<  COM1A0);                       // Set "toggle on compare match"
     TCCR1A &= ~(1 << COM1A1);
-    OCR1A = 208-1;                                  // Set the compare value to toggle OC1A
+    // For a divider of N, OCR1 is set to N-1.
+    OCR1A = BAUD_DIVISOR -1;                        // Set the compare value to toggle OC1A
     // bits in TCCR select OC unit as source of output, but still need to set the pin to the
     // output direction so that the clock is available at the output
     pinMode(PIN_CLK, OUTPUT);
@@ -414,15 +434,45 @@ void setup()   {
     // should not need this?
     pinMode(PIN_NTXD, INPUT_PULLUP);
 
-    mySerial.begin(2400); // 1200 is default baud rate on NASCOM
+    DEBSERIAL.begin(115200);  // for Debug
+    NASSERIAL.begin(BAUD_RATE); // 1200 is default baud rate on NASCOM
+
+
+#ifdef HWDEBUG
+    // TEST1: Loop printing to the NASCOM. Since the NASCOM always monitors
+    // for incoming characters, it should be echoed to the screen, verifying
+    // the NAScas -> NASCOM data path and serial bit clock.
+    // The pattern repeats every 48 characters and so, if there is no
+    // "staircasing" of the output on the screen this suggests that data
+    // is being transferred without corruption
+    for (int j=0; j<50; j++) {
+        // start with a space so NAS-SYS will ignore it
+        NASSERIAL.write(' ');
+        for (int i=65; i<65+47; i++) {
+            NASSERIAL.write(i);
+        }
+    }
+    NASSERIAL.println();
+    NASSERIAL.println("X0"); // put NAS-SYS into echo mode
+    NASSERIAL.println(" Type some characters");
+    for (int i=0; i<10; i++) {
+        while (! NASSERIAL.available()) {
+        }
+        NASSERIAL.print(" Read ");
+        NASSERIAL.println(NASSERIAL.read());
+    }
+    NASSERIAL.println("Thanks, bye.");
+#endif
+
+    open_sdcard();
+
 
     // Bootstrap the CLI on the host. Sending R causes the NASCOM to start a READ which will
     // cause loop() to call cmd_cass_rd which will load file from Flash using the directory
     // index given by 'dirindex' and, provided the auto-execute flag is set, it will go
     // ahead and execute it.
-    mySerial.println(F("R"));
-
-    Serial.println(F(".init"));
+    NASSERIAL.println(F("R"));
+    DEBSERIAL.println(F(".init"));
 }
 
 
@@ -449,16 +499,16 @@ void loop() {
         drive_on = 0;
     }
 
-    if (mySerial.available()) {
+    if (NASSERIAL.available()) {
         if (drive_on == 0) {
             // Receive and process a command
-            Serial.println(F(">cmd_cass"));
+            DEBSERIAL.println(F(">cmd_cass"));
             cmd_cass();
         }
         else {
             // File save
-            Serial.print(F(">cmd_cass_wr count= "));
-            Serial.println(drive_on);
+            DEBSERIAL.print(F(">cmd_cass_wr count= "));
+            DEBSERIAL.println(drive_on);
             drive_on = 0;
             // Write
             cmd_cass_wr();
@@ -466,7 +516,7 @@ void loop() {
     }
     else if (drive_on > 66000) {
         // File Load
-        Serial.println(F(">cmd_cass_rd"));
+        DEBSERIAL.println(F(">cmd_cass_rd"));
         drive_on = 0;
         cmd_cass_rd();
     }
@@ -478,19 +528,19 @@ void loop() {
 // and whether a trailing NUL is sent (refer to the protocol description).
 void pr_msg(int msg, char flags) {
     if (flags & F_MSG_RESPONSE) {
-        mySerial.write((byte)0xff); // indicate to host that a message is coming
+        NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
     }
 
     while ((pgm_read_byte(msg) != 0)) {
-        mySerial.write(pgm_read_byte(msg++));
+        NASSERIAL.write(pgm_read_byte(msg++));
     }
 
     if (flags & F_MSG_CR) {
-        mySerial.println(); // TODO maybe do this explicitly. What does NASCOM need? CR LF or both? this does \r\n
+        NASSERIAL.println(); // TODO maybe do this explicitly. What does NASCOM need? CR LF or both? this does \r\n
     }
 
     if (flags & F_MSG_NULLTERM) {
-        mySerial.write((byte)0x00); // indicate to host that a message is coming
+        NASSERIAL.write((byte)0x00); // indicate to host that a message is coming
     }
 }
 
@@ -505,15 +555,15 @@ int pr_dirent(union Dirent *d, char *dummy) {
     int len=12;
     for (int i=0; i<10; i++) {
         if (i==8) {
-            mySerial.print(".");
+            NASSERIAL.print(".");
         }
         if (d->b[i] != ' ') {
             len--;
-            mySerial.print(d->b[i]);
+            NASSERIAL.print(d->b[i]);
         }
     }
     while (len>0) {
-        mySerial.print(" ");
+        NASSERIAL.print(" ");
         len--;
     }
     // TODO it would be nice if there were leading zeroes
@@ -522,12 +572,12 @@ int pr_dirent(union Dirent *d, char *dummy) {
     // so that it checks for base 16 and uses a different print routine
     // OR add another parameter "width" that, in Print::printNumber prefills the buffer with
     // space or 0 and pulls str count back accordingly.
-    mySerial.print("SIZE=0x");
-    mySerial.print((unsigned int)d->f.flen, HEX);
-    mySerial.print(" LOAD=0x");
-    mySerial.print((unsigned int)d->f.flda, HEX);
-    mySerial.print(" EXE=0x");
-    mySerial.println((unsigned int)d->f.fexa, HEX);
+    NASSERIAL.print("SIZE=0x");
+    NASSERIAL.print((unsigned int)d->f.flen, HEX);
+    NASSERIAL.print(" LOAD=0x");
+    NASSERIAL.print((unsigned int)d->f.flda, HEX);
+    NASSERIAL.print(" EXE=0x");
+    NASSERIAL.println((unsigned int)d->f.fexa, HEX);
     return 0; // Force the interator to run to completion
 }
 
@@ -652,8 +702,8 @@ void open_sdcard(void) {
         handle.close();
     }
 
-    Serial.print(F("flags: 0x"));
-    Serial.println(cas_flags, HEX);
+    DEBSERIAL.print(F("flags: 0x"));
+    DEBSERIAL.println(cas_flags, HEX);
 }
 
 
@@ -671,8 +721,8 @@ void cmd_cass(void) {
 
     // Receive a null-terminated string from the Host into buf[]
     while (1) {
-        if (mySerial.available()) {
-            buf[index] = mySerial.read();
+        if (NASSERIAL.available()) {
+            buf[index] = NASSERIAL.read();
             if (buf[index] == 0) {
                 break;
             }
@@ -681,9 +731,9 @@ void cmd_cass(void) {
             }
         }
     }
-    Serial.print(F("Rx cmd line of "));
-    Serial.print(index);
-    Serial.println(F(" char"));
+    DEBSERIAL.print(F("Rx cmd line of "));
+    DEBSERIAL.print(index);
+    DEBSERIAL.println(F(" char"));
 
     // The line is guaranteed to be at least 1 char + 1 NUL and to start with a non-blank. Only the first 2 characters
     // of a command are significant, so it's always OK simply to blindly check the first 2 characters
@@ -696,29 +746,29 @@ void cmd_cass(void) {
 
     case ('I'<<8 | 'N'):      // INFO - version and status
         pr_msg(msg_info, F_MSG_RESPONSE + F_MSG_CR);
-        mySerial.print("Flags:      0x");  // TODO decode it??
-        mySerial.println((uint16_t)cas_flags, HEX);
+        NASSERIAL.print("Flags:      0x");  // TODO decode it??
+        NASSERIAL.println((uint16_t)cas_flags, HEX);
         if (cas_flags & FM_NASDIR_FOUND) {
-            mySerial.println(F("Directory:  /NASCOM"));
+            NASSERIAL.println(F("Directory:  /NASCOM"));
         }
         else {
-            mySerial.println(F("Directory:  /"));
+            NASSERIAL.println(F("Directory:  /"));
         }
-        mySerial.print(F("Read  name: "));
-        mySerial.println(cas_rd_name);
-        mySerial.print(F("Write name: "));
-        mySerial.println(cas_wr_name);
-        mySerial.print(F("Vdisk name: "));
-        mySerial.println(cas_vdisk_name);
+        NASSERIAL.print(F("Read  name: "));
+        NASSERIAL.println(cas_rd_name);
+        NASSERIAL.print(F("Write name: "));
+        NASSERIAL.println(cas_wr_name);
+        NASSERIAL.print(F("Vdisk name: "));
+        NASSERIAL.println(cas_vdisk_name);
         break;
 
     case ('T'<<8 | 'O'):      // TO xxxx - relocate boot loader to xxxx.
         if (parse_leading(&pbuf) && parse_num(&pbuf, &destination, 16)) {
-            mySerial.write((byte)0x55); // indicate to host that relocation will occur
-            mySerial.write((byte)(destination & 0xff));      // low part
-            mySerial.write((byte)((destination>>8) & 0xff)); // high
-            Serial.print(F("TO to 0x"));
-            Serial.println(destination, HEX);
+            NASSERIAL.write((byte)0x55); // indicate to host that relocation will occur
+            NASSERIAL.write((byte)(destination & 0xff));      // low part
+            NASSERIAL.write((byte)((destination>>8) & 0xff)); // high
+            DEBSERIAL.print(F("TO to 0x"));
+            DEBSERIAL.println(destination, HEX);
             // break from here will result in an unneeded NUL being sent but
             // that is not a problem because the Host is in ZINLIN (either from
             // the NAS-SYS or the NAScas command loops) which accepts data from
@@ -797,8 +847,8 @@ void cmd_cass(void) {
         // tho I already have it on my wish-list and it would only require
         // counting lines here and issuing the extra response byte..
         if (cas_flags & FM_SD_FOUND) {
-            mySerial.write((byte)0xff); // indicate to host that a message is coming
-            SD.ls(&mySerial, LS_SIZE);
+            NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
+            SD.ls(&NASSERIAL, LS_SIZE);
         }
         else {
             pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
@@ -809,7 +859,7 @@ void cmd_cass(void) {
         // TODO may want a pager
         if (cas_flags & FM_SD_FOUND) {
             if (cas_flags & FM_VDISK_MOUNT) {
-                mySerial.write((byte)0xff); // indicate to host that a message is coming
+                NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
                 foreach_vdisk_dir(&pr_dirent, 0);
             }
             else {
@@ -822,7 +872,7 @@ void cmd_cass(void) {
         break;
 
     case ('D'<<8 | 'F'):      // DF - directory of Flash
-        mySerial.write((byte)0xff); // indicate to host that a message is coming
+        NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
         foreach_flash_dir(&pr_dirent, 0);
         break;
 
@@ -979,14 +1029,14 @@ void cmd_cass(void) {
         if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, cas_rd_name)) {
                 if (handle = SD.open(cas_rd_name, FILE_READ)) {
-                    Serial.println(F("TS file OK"));
+                    DEBSERIAL.println(F("TS file OK"));
                     // Send response "done" to exit the NAScas> loop
-                    mySerial.write((byte)0x00);
+                    NASSERIAL.write((byte)0x00);
                     // Ready to go. No need to change cas_flags or F_RD_CONV bit
                     delay(1000 * pause_delay);
                     char c;
                     while (handle.read(&c, 1)) {
-                        mySerial.write(c);
+                        NASSERIAL.write(c);
                         // TODO on \r or on \n? To give BASIC time to tokenize
                         if (c == '\r') {
                               delay(nulls_delay);
@@ -1043,7 +1093,7 @@ void cmd_cass(void) {
     }
 
     // Send response "done"
-    mySerial.write((byte)0x00);
+    NASSERIAL.write((byte)0x00);
 }
 
 
@@ -1083,66 +1133,66 @@ void cass_bin2cas(int remain, int addr, int exe_addr, void *getch) {
     if (addr == 0x10d6) {
         // looks like a BASIC program. Start with a header that
         // will allow CLOAD to recognise the file
-        mySerial.write((byte)0xd3);
-        mySerial.write((byte)0xd3);
-        mySerial.write((byte)0xd3);
-        mySerial.write((byte)0x41); // "A", the "filename"
+        NASSERIAL.write((byte)0xd3);
+        NASSERIAL.write((byte)0xd3);
+        NASSERIAL.write((byte)0xd3);
+        NASSERIAL.write((byte)0x41); // "A", the "filename"
     }
 
     while (block != 0) {
         block--;  // the new block number
-        Serial.print(F("Block="));
-        Serial.println(block);
-        Serial.print(F("Remain="));
-        Serial.println(remain);
+        DEBSERIAL.print(F("Block="));
+        DEBSERIAL.println(block);
+        DEBSERIAL.print(F("Remain="));
+        DEBSERIAL.println(remain);
         // output sync pattern
-        mySerial.write((byte)0x00);
-        mySerial.write((byte)0xff);
-        mySerial.write((byte)0xff);
-        mySerial.write((byte)0xff);
-        mySerial.write((byte)0xff);
+        NASSERIAL.write((byte)0x00);
+        NASSERIAL.write((byte)0xff);
+        NASSERIAL.write((byte)0xff);
+        NASSERIAL.write((byte)0xff);
+        NASSERIAL.write((byte)0xff);
 
         // output block header and checksum
         csum = (addr & 0xff) + (addr >> 8) + block;
-        mySerial.write(addr & 0xff);
-        mySerial.write(addr >> 8);
+        NASSERIAL.write(addr & 0xff);
+        NASSERIAL.write(addr >> 8);
         if (remain > 255) {
             count = 256;
-            mySerial.write((byte)0); // means 256 bytes
+            NASSERIAL.write((byte)0); // means 256 bytes
             // do not need to accumulate count (0) in checksum
         }
         else {
             count = remain;
-            mySerial.write(count);
+            NASSERIAL.write(count);
             csum = csum + count;
         }
-        mySerial.write(block);
-        mySerial.write(csum); // 8-bit header checksum
+        NASSERIAL.write(block);
+        NASSERIAL.write(csum); // 8-bit header checksum
 
         // output block body
         csum = 0;
         while (count !=0) {
             c = (*getch_fn_ptr)();
             csum = csum + c;
-            mySerial.write(c);
+            NASSERIAL.write(c);
 
             count--;
             remain--; // TODO simply subtract count
             addr++; // TODO simply add count
         }
-        mySerial.write(csum); // 8-bit body checksum
+        NASSERIAL.write(csum); // 8-bit body checksum
 
         // inter-block gap -- 10 NUL characters
         for (csum = 0; csum < 10; csum++) {
-            mySerial.write((byte)0);
+            NASSERIAL.write((byte)0);
         }
     }
 
     if (cas_flags & FM_AUTO_GO) {
-        mySerial.print("E");
-        mySerial.println(exe_addr, HEX);
+        NASSERIAL.print("E");
+        NASSERIAL.println(exe_addr, HEX);
     }
-    Serial.print(F(".cass_bin2cas"));
+    DEBSERIAL.print(F(".cass_bin2cas"));
 }
 
 
@@ -1156,7 +1206,7 @@ void cmd_cass_rd() {
     switch (cas_flags & FM_RD_SRC) {
 
     case (1 << FS_RD_SRC):  // CAS-encode a binary file from Flash
-        Serial.println(F("CAS-encode a binary file from Flash"));
+        DEBSERIAL.println(F("CAS-encode a binary file from Flash"));
 
         // address of first byte of code -- index is a GLOBAL
         index = pgm_read_word(&romdir[dirindex].fptr);
@@ -1168,7 +1218,7 @@ void cmd_cass_rd() {
         break;
 
     case (3 << FS_RD_SRC):  // CAS-encode a binary file from Vdisk
-        Serial.println(F("CAS-encode a binary file from vdisk"));
+        DEBSERIAL.println(F("CAS-encode a binary file from vdisk"));
 
         if (handle = SD.open(cas_vdisk_name, FILE_READ)) {
             union Dirent dirent;
@@ -1196,10 +1246,10 @@ void cmd_cass_rd() {
         if (handle = SD.open(cas_rd_name, FILE_READ)) {
             // have a file name and can open the file -> good to go!
             // while drive light is on, grab bytes and send them to serial
-            Serial.println(F("file from SD"));
+            DEBSERIAL.println(F("file from SD"));
             char c;
             while (handle.read(&c, 1)) {
-                mySerial.print(c);
+                NASSERIAL.print(c);
             }
             handle.close();
 
@@ -1217,7 +1267,8 @@ void cmd_cass_rd() {
         // TODO need to send the right stream to the NASCOM to abort
         // the read before reporting the error.
         //pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
-        Serial.println(F("BAD BAD BAD Attempted read when no file cued"));
+        DEBSERIAL.println(F("BAD BAD BAD Attempted read when no file cued"));
+        break;
     }
 
     // wait for DRIVE pin to negate
@@ -1278,16 +1329,15 @@ void cmd_cass_wr(void) {
     // TODO Currently assuming WS and the "literal" case . Need to handle the other FS
     // and the "convert" case as well and use the WR_SRC and WR_CONV flag to choose which to implement
 
-
     if ( (handle = SD.open(cas_wr_name, FILE_WRITE | O_TRUNC)) ) {
         // have a file name and can open the file -> good to go!
         // while drive light is on, grab bytes and send them to disk
         while (digitalRead(PIN_DRV) == 0) {
-            if (mySerial.available()) {
-                handle.write(mySerial.read());
+            if (NASSERIAL.available()) {
+                handle.write(NASSERIAL.read());
 
                 if (done == 0) { // TODO DEBUG.. add an error check
-                    Serial.println(millis() - start);
+                    DEBSERIAL.println(millis() - start);
                     done = 1;
                 }
             }
@@ -1300,14 +1350,14 @@ void cmd_cass_wr(void) {
         }
     }
     else {
-        Serial.println(F("Error")); //no file name or unsupported destination" TODO should be to CLI
+        DEBSERIAL.println(F("Error")); //no file name or unsupported destination" TODO should be to CLI
     }
 
     // wait for pin to negate
     while (digitalRead(PIN_DRV) == 0) { }
 
     // empty any rogue characters TODO do I still need this?
-    while (mySerial.available()) {
-        mySerial.read();
+    while (NASSERIAL.available()) {
+        NASSERIAL.read();
     }
 }
