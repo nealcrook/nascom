@@ -38,8 +38,10 @@
 // GND                          pin 11 & 15 GND
 // 5V                           pin 2       5V   (NOTE)
 //
-// And set all DIL switches to UP/ON
-// And add a 1OOK resistor from pin 12 to 5V
+// - Set all LSW2 switches to UP/ON, Set LSW1/5 to UP (1 stop bit)
+// - Fit a 1OOK resistor from DIG 7/ pin 12 to 5V
+// - Fit a 33R series resistor on the DIG9 connection, at the Arduino end,
+//   to reduce overshoot on the bit clock to the NASCOM.
 //
 // NOTE: Power
 //
@@ -233,7 +235,9 @@
 #define BAUD_DIVISOR (208)
 #define NASSERIAL mySerial
 #define DEBSERIAL Serial
+#define DELAY (0)
 #else
+// EXPERIMENTAL - DO NOT USE
 #define BAUD_RATE (2400)
 #define BAUD_DIVISOR (208)
 #define NASSERIAL Serial
@@ -1167,7 +1171,9 @@ void cass_bin2cas(int remain, int addr, int exe_addr, void *getch) {
             csum = csum + count;
         }
         NASSERIAL.write(block);
+        delayMicroseconds(DELAY); // For faster comms need a delay here
         NASSERIAL.write(csum); // 8-bit header checksum
+        delayMicroseconds(DELAY); // For faster comms need a delay here
 
         // output block body
         csum = 0;
@@ -1343,6 +1349,9 @@ void cmd_cass_wr(void) {
             }
         }
         handle.close();
+        if (NASSERIAL.overflow()) {
+            NASSERIAL.println(F(" NAScas ERROR: overflow on write to SD"));
+        }
 
         // prepare for next write
         if (cas_flags & FM_WR_AI) {
@@ -1350,11 +1359,11 @@ void cmd_cass_wr(void) {
         }
     }
     else {
-        DEBSERIAL.println(F("Error")); //no file name or unsupported destination" TODO should be to CLI
-    }
+         // wait for pin to negate
+        while (digitalRead(PIN_DRV) == 0) { }
 
-    // wait for pin to negate
-    while (digitalRead(PIN_DRV) == 0) { }
+        NASSERIAL.println(F(" NAScas ERROR: file open failed"));
+    }
 
     // empty any rogue characters TODO do I still need this?
     while (NASSERIAL.available()) {
