@@ -67,7 +67,7 @@ int parse_leading(char **buf) {
 // Designed for +ve 16-bit numbers but there is no overflow detection
 // so will parse an arbitrarily long numeric string and return the
 // low 16-bits of the result.
-int parse_num(char **buf, int* result, int base) {
+int parse_num(char **buf, unsigned int *result, int base) {
     int digits_converted = 0;
 
     *result = 0;

@@ -991,6 +991,9 @@ uint8_t PROGMEM const nasdis[] = {
  0x4e, 0xc8, 0xdf, 0x6f, 0xc9, 0x10, 0x00, 0x00,   0x00, 0x20, 0x20, 0x20, 0x50, 0x41, 0x47, 0x45,
  0x20, 0x30, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20,   0x45, 0x51, 0x55, 0x20, 0x20, 0xc3, 0x3e, 0xc4};
 
+// Each of the strings is 11 bytes long because using "" implicitly null-terminates them. However,
+// the directory format requires them NOT to be null-terminated and reserves 10 bytes for each of
+// them. As a result, everythng is initialised as required, but gcc generates a warning.
 const FDIRENT romdir[] PROGMEM = {  { "SERBOOT GO", serboot,  sizeof(serboot),  0x0c80, 0x0c80},
                                     { "INVADERSGO", invaders, sizeof(invaders), 0x1000, 0x1000},
                                     { "LOLLIPOPGO", lollipop, sizeof(lollipop), 0x1000, 0x1000},

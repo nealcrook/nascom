@@ -269,10 +269,10 @@ typedef struct DIRENT {
                         // Blanks in unused positions, no "."
     uint8_t fsfl;       // system flags
     uint8_t fufl;       // user flags
-    int fsec;           // start sector address
-    int flen;           // length of data in 256-byte sectors
-    int flda;           // load address on target
-    int fexa;           // entry/execution address on target
+    unsigned int fsec;  // start sector address
+    unsigned int flen;  // length of data in 256-byte sectors
+    unsigned int flda;  // load address on target
+    unsigned int fexa;  // entry/execution address on target
 } DIRENT;
 
 // An 18-byte cut-down PolyDos directory entry, used for the Flash filesystem.
@@ -280,12 +280,12 @@ typedef struct DIRENT {
 // - FSEC (start sector) is replaced by FPTR (pointer to the byte stream)
 // - FLEN (number of sectors) is replaced by FLEN (number of bytes)
 typedef struct FDIRENT {
-    char fnam_fext[10]; // 8 char filename, 2 char extension.
-                        // Blanks in unused positions, no "."
-    uint8_t * fptr;     // point to data bytestream
-    int flen;           // length of data in bytes
-    int flda;           // load address on target
-    int fexa;           // entry/execution address on target
+    const char         fnam_fext[10]; // 8 char filename, 2 char extension.
+                                      // Blanks in unused positions, no "."
+    const uint8_t *    fptr;          // point to data bytestream
+    const unsigned int flen;          // length of data in bytes
+    const unsigned int flda;          // load address on target
+    const unsigned int fexa;          // entry/execution address on target
 } FDIRENT;
 
 
@@ -307,7 +307,7 @@ void open_sdcard(void);
 extern char to_upper(char c);
 extern int legal_char(char c);
 extern int parse_leading(char **buf);
-extern int parse_num(char **buf, int* result, int base);
+extern int parse_num(char **buf, unsigned int *result, int base);
 extern int parse_ai(char **buf);
 extern int parse_fname_msdos(char **buf, char * dest);
 extern int parse_fname_polydos(char **buf, char * dest);
@@ -539,7 +539,7 @@ void loop() {
 // Print a message to the Host through the serial port. The message is stored
 // in Flash. Flags determine what prefix/suffix bytes are sent (refer to the
 // protocol description).
-void pr_msg(int msg, char flags) {
+void pr_msg(const char *msg, char flags) {
     if (flags & F_MSG_RESPONSE) {
         NASSERIAL.write((byte)0xff); // tell host: a message is coming
     }
@@ -624,16 +624,13 @@ int find_dirent(UDIRENT *d, char *name) {
 // Return: -1 the iterator ran to completion
 //         >=0 the iterator aborted. The return value is the iteration number
 //         which is the directory index of the entry that aborted.
-int foreach_flash_dir(void *fn, char * fname) {
-    int (*fn_ptr)(UDIRENT *d, char * buf2);
-    fn_ptr = fn;
-
-    for (int i=0; i<sizeof(romdir)/sizeof(struct DIRENT); i++) {
+int foreach_flash_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
+    for (unsigned int i=0; i<sizeof(romdir)/sizeof(struct DIRENT); i++) {
         // read the 18-byte FDIRENT into a 20-byte DIRENT by padding
         // in the middle so that all the fields we care about line up.
         UDIRENT dirent;
 
-        int base = &romdir[i].fnam_fext;
+        int base = (int) &romdir[i].fnam_fext;
         for (int j=0; j<20; j++) {
             if ((j==10) | (j==11)) {
                 // the flag fields don't exist in the FDIRENT
@@ -643,7 +640,7 @@ int foreach_flash_dir(void *fn, char * fname) {
         }
         // Now it looks like a DIRENT so we can use common routines
         // for both
-        if ( fn_ptr(&dirent, fname) ) {
+        if ( fn(&dirent, fname) ) {
             return i;
         }
     }
@@ -657,10 +654,7 @@ int foreach_flash_dir(void *fn, char * fname) {
 // Return: -1 the iterator ran to completion
 //         >=0 the iterator aborted. The return value is the iteration number
 //         which is the directory index of the entry that aborted.
-int foreach_vdisk_dir(void *fn, char * fname) {
-    int (*fn_ptr)(UDIRENT *d, char * buf2);
-    fn_ptr = fn;
-
+int foreach_vdisk_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
     if ( (SD.exists(cas_vdisk_name)) && (handle = SD.open(cas_vdisk_name, FILE_READ)) ) {
         UDIRENT dirent;
 
@@ -696,17 +690,17 @@ int foreach_vdisk_dir(void *fn, char * fname) {
             dirent.f.flen *= POLYDOS_BYTES_PER_SECTOR;
 
             // invoke the callback
-            if ( fn_ptr(&dirent, fname) ) {
+            if ( fn(&dirent, fname) ) {
                 handle.close();
                 return i;
             }
         }
         handle.close();
-        return -1; // Iterator ran to completion
     }
     else {
         pr_msg(msg_err_vdisk_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
     }
+    return -1; // Iterator ran to completion or aborted on error
 }
 
 
@@ -744,7 +738,7 @@ void cmd_cass(void) {
     char erase_name[13]; // 8 + 1 + 3 + 1 bytes for null-terminated FAT file name
     int index = 0;
     int cmd = 0;
-    int destination;
+    unsigned int destination;
 
     // Receive a null-terminated string from the Host into buf[]
     while (1) {
@@ -1148,10 +1142,7 @@ char sdcard_fs_getch_cback(void) {
 // addr - initial value is the load address for the first byte of the binary
 // exe_addr - the entry point/execution address
 // *getch - function pointer that will deliver each byte of the file in turn
-void cass_bin2cas(int remain, int addr, int exe_addr, void *getch) {
-    char  (*getch_fn_ptr)(void);
-    getch_fn_ptr = getch;
-
+void cass_bin2cas(int remain, int addr, int exe_addr, char (*getch)(void)) {
     int block; // current block number.
     int count; // bytes in this block
     char c;    // next byte
@@ -1204,7 +1195,7 @@ void cass_bin2cas(int remain, int addr, int exe_addr, void *getch) {
         // output block body
         csum = 0;
         while (count !=0) {
-            c = getch_fn_ptr();
+            c = getch();
             csum = csum + c;
             NASSERIAL.write(c);
 
@@ -1234,8 +1225,8 @@ void cass_bin2cas(int remain, int addr, int exe_addr, void *getch) {
 // - print a message prefix " NAScas "
 // - print the message at FLASH address msg
 // - print a CR/LF
-void abort_rd(int msg) {
-    NASSERIAL.write(F("\x1b\x1b\x1b\x1b"));
+void abort_rd(const char * msg) {
+    NASSERIAL.write("\x1b\x1b\x1b\x1b"); // F() doesn't work here, for some reason
 
     // wait for DRIVE pin to negate
     while (digitalRead(PIN_DRV) == 0) {
