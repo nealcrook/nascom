@@ -69,7 +69,8 @@
 // command-line interface.
 //
 // Commands from Host (serboot) are between 1 and 39 characters
-// followed/terminated in a NUL (0x00). TODO check that's true ie that a 40 char buffer is enough.
+// followed/terminated in a NUL (0x00). TODO check that's true ie that a 40
+// char buffer is enough.
 // Document this detail in serboot.asm code.
 //
 // Responses to the Host (by this program) are:
@@ -252,8 +253,8 @@
 #define PIN_NTXD 7
 #define PIN_NRXD 8
 
-// Upgraded to SdFat after finding some weird performance problems with the
-// standard SD library
+// *not* the standard Arduino library (which has some bugs and performance
+// problems). Download from https://github.com/greiman/SdFat
 #define SPI_SPEED SD_SCK_MHZ(50)
 #include <SdFat.h>
 
@@ -288,14 +289,12 @@ typedef struct FDIRENT {
 } FDIRENT;
 
 
-// TODO don't need to wrap this in a "struct"
-// This represents a char buffer overlayed on a PolyDos directory entry
-struct Dirent {
-  union {
+// Sometimes it's conventient to access a directory entry as a byte
+// stream, so overlay it with a char array.
+typedef union UDIRENT {
     struct DIRENT f;
     char b[20];
-  };
-};
+} UDIRENT;
 
 
 // Prototypes for stuff in this file
@@ -368,7 +367,8 @@ File handle;
 #define FM_AUTO_GO   (1 << FS_AUTO_GO)
 
 // Startup defaults: read from Flash and auto-go.
-// This works because flash is always present and becasue 0 is an illegal destination for writes.
+// This works because flash is always present and becasue 0 is an illegal
+// destination for writes.
 int cas_flags = (1 << FS_RD_SRC) | FM_AUTO_GO;
 
 
@@ -390,8 +390,8 @@ int index;
 unsigned long drive_on = 0;
 
 // state for PAUSE/NULLS commands
-// (need to issue X0 before starting BASIC else lines cannot exceed 48 char. Later use N to
-//  restore normal operation)
+// (need to issue X0 before starting BASIC else lines cannot exceed 48 char.
+// Later use N to restore normal operation)
 unsigned int pause_delay = 10; // in seconds
 unsigned int nulls_delay = 100; // in milliseconds
 
@@ -415,12 +415,12 @@ void setup()   {
     pinMode(PIN_DRV, INPUT);
 
     // Generate output clock that will be used as 16x clock for the NASCOM UART.
-    // The output pin options are shown in the I/O Multiplexing table of the data sheet
-    // ..need to select an Output Compare unit from one of the timers.
+    // The output pin options are shown in the I/O Multiplexing table of the
+    // data sheet ..need to select an Output Compare unit from one of the timers.
     // OC2B PD[3] = DIG3
     // OC2A PB[3] = DIG11 -- used for SDcard
     // OC1B PB[2] = DIG10 -- used for SDcard
-    // OC1A PB[1] = DIG9  -- best candidate and already assigned for output clock.
+    // OC1A PB[1] = DIG9  -- best candidate; already assigned for output clock.
     //
     // => use Timer1
 
@@ -428,23 +428,20 @@ void setup()   {
     // and need 2 toggles for 1Hz. Therefore, for a baud rate B need a divide
     // value of D = 16E6/(16 * 2 * B). Frequency should then be 16E6/D
 
-    // TODO determine what the critical factor is in the baud rate. Is it really that
-    // the nascom cannot keep up? If so, would see an overrun error on the NASCOM UART.
+    PRR  &= ~(1 << PRTIM1);              // Ensure Timer1 is enabled
 
-    PRR  &= ~(1 << PRTIM1);                         // Ensure Timer1 is enabled
-
-    TCCR1B |= (1 << CS10);                          // Set Timer1 clock to "no prescaling"
+    TCCR1B |= (1 << CS10);               // Set Timer1 clock to "no prescaling"
     TCCR1B &= ~((1 << CS11) | (1 << CS12));
 
-    TCCR1B &= ~(1 << WGM13);                        // Set Timer1 CTC mode=4
+    TCCR1B &= ~(1 << WGM13);             // Set Timer1 CTC mode=4
     TCCR1B |=  (1 << WGM12);
     TCCR1A &= ~(1 << WGM11);
     TCCR1A &= ~(1 << WGM10);
     //
-    TCCR1A |= (1 <<  COM1A0);                       // Set "toggle on compare match"
+    TCCR1A |= (1 <<  COM1A0);            // Set "toggle on compare match"
     TCCR1A &= ~(1 << COM1A1);
     // For a divider of N, OCR1 is set to N-1.
-    OCR1A = BAUD_DIVISOR -1;                        // Set the compare value to toggle OC1A
+    OCR1A = BAUD_DIVISOR -1;             // Set the compare value to toggle OC1A
     // bits in TCCR select OC unit as source of output, but still need to set the pin to the
     // output direction so that the clock is available at the output
     pinMode(PIN_CLK, OUTPUT);
@@ -484,11 +481,10 @@ void setup()   {
 
     open_sdcard();
 
-
-    // Bootstrap the CLI on the host. Sending R causes the NASCOM to start a READ which will
-    // cause loop() to call cmd_cass_rd which will load file from Flash using the directory
-    // index given by 'dirindex' and, provided the auto-execute flag is set, it will go
-    // ahead and execute it.
+    // Bootstrap the CLI on the host. Sending R causes the NASCOM to start a
+    // READ which will cause loop() to call cmd_cass_rd which will load file
+    // from Flash using the directory index given by 'dirindex' and, provided
+    // the auto-execute flag is set, it will go ahead and execute it.
     NASSERIAL.println(F("R"));
     DEBSERIAL.println(F(".init"));
 }
@@ -508,7 +504,6 @@ void loop() {
     //   takes for write data to arrive and longer than it would be on if
     //   it was being toggled in order to play a tune(!!)), it's a READ;
     //   supply the data from the specified place.
-    //
 
     if (digitalRead(PIN_DRV) == 0) {
         drive_on++;
@@ -541,20 +536,22 @@ void loop() {
 }
 
 
-// Print a message to the Host through the serial port. The message is stored in Flash.
-// Flags determine what prefix/suffix bytes are sent
-// (refer to the protocol description).
+// Print a message to the Host through the serial port. The message is stored
+// in Flash. Flags determine what prefix/suffix bytes are sent (refer to the
+// protocol description).
 void pr_msg(int msg, char flags) {
     if (flags & F_MSG_RESPONSE) {
-        NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
+        NASSERIAL.write((byte)0xff); // tell host: a message is coming
     }
 
+    // use this prefix when reporting an error outside the command loop
     if (flags & F_MSG_NASCAS) {
-        NASSERIAL.print(F(" NAScas ")); // use this prefix if we report an error outside the command loop
+        NASSERIAL.print(F(" NAScas "));
     }
 
+    // use this prefix rather than repeating this common string in Flash storage
     if (flags & F_MSG_ERROR) {
-        NASSERIAL.print(F("Error - ")); // save repeating this common string in Flash storage
+        NASSERIAL.print(F("Error - "));
     }
 
     while ((pgm_read_byte(msg) != 0)) {
@@ -566,26 +563,25 @@ void pr_msg(int msg, char flags) {
     }
 
     if (flags & F_MSG_NULLTERM) {
-        NASSERIAL.write((byte)0x00); // indicate to host that a message is coming
+        NASSERIAL.write((byte)0x00); // tell host: a message is coming
     }
 }
 
-
-// Used by iterator. Print a directory entry, contained in b.
-// 2nd argument is unused but needed so the signature matches for all functions
-// called by the iterator.
-// Always returns 0, which forces the iterator to run to completion.
-int pr_dirent(union Dirent *d, char *dummy) {
-    // format name at start of buf by removing spaces and adding a "." and by
-    // padding afterwards to a 13-character field
+// Used by iterator. Print a directory entry, d.
+// argument 'dummy' is unused but needed so that all functions called by
+// the iterator have the same prototype.
+// Return: 0 (always), which forces the iterator to run to completion.
+int pr_dirent(UDIRENT *d, char *dummy) {
+    // Print filename, formatting it by removing spaces, adding a "."
+    // and space-padding to a 13-character field
     int len=12;
     for (int i=0; i<10; i++) {
         if (i==8) {
             NASSERIAL.print(".");
         }
-        if (d->b[i] != ' ') {
+        if (d->f.fnam_fext[i] != ' ') {
             len--;
-            NASSERIAL.print(d->b[i]);
+            NASSERIAL.print(d->f.fnam_fext[i]);
         }
     }
     while (len>0) {
@@ -596,8 +592,8 @@ int pr_dirent(union Dirent *d, char *dummy) {
     // I think that's easy to add to Print.cpp in the install directory..
     // Change Print::print(unsigned int n, base)
     // so that it checks for base 16 and uses a different print routine
-    // OR add another parameter "width" that, in Print::printNumber prefills the buffer with
-    // space or 0 and pulls str count back accordingly.
+    // OR add another parameter "width" that, in Print::printNumber prefills
+    // the buffer with space or 0 and pulls str count back accordingly.
     NASSERIAL.print("SIZE=0x");
     NASSERIAL.print((unsigned int)d->f.flen, HEX);
     NASSERIAL.print(" LOAD=0x");
@@ -608,13 +604,14 @@ int pr_dirent(union Dirent *d, char *dummy) {
 }
 
 
-// Used by iterator. Look for string match in the 10 characters
-// of buf and name.
-// return 0 if no match (to make the iterator move on)
-// returm 1 if match (to make the iterator terminate)
-int find_dirent(union Dirent *d, char *name) {
+// Used by iterator. Given a directory entry, d and a string,
+// name, look for string match between the 10 characters of
+// name and the file name within d.
+// Return: 0 if no match (to make the iterator move on)
+//         1 if match (to make the iterator terminate)
+int find_dirent(UDIRENT *d, char *name) {
     for (int i=0; i<10; i++) {
-        if (d->b[i] != name[i]) {
+        if (d->f.fnam_fext[i] != name[i]) {
             return 0; // Force iterator to continue
         }
     }
@@ -622,17 +619,19 @@ int find_dirent(union Dirent *d, char *name) {
 }
 
 
-// Iterator. fn is called for each valid flash directory entry. If fn returns 1,
-// the iterator aborts and returns the iteration number (which is the dirindex),
-// otherwise the iterator continues to completion.
+// Iterator. Calls fn for each flash directory entry. If fn returns 1,
+// the iterator aborts, otherwise the iterator continues to completion.
+// Return: -1 the iterator ran to completion
+//         >=0 the iterator aborted. The return value is the iteration number
+//         which is the directory index of the entry that aborted.
 int foreach_flash_dir(void *fn, char * fname) {
-    int (*fn_ptr)(union Dirent *d, char * buf2);
+    int (*fn_ptr)(UDIRENT *d, char * buf2);
     fn_ptr = fn;
 
     for (int i=0; i<sizeof(romdir)/sizeof(struct DIRENT); i++) {
         // read the 18-byte FDIRENT into a 20-byte DIRENT by padding
         // in the middle so that all the fields we care about line up.
-        union Dirent dirent;
+        UDIRENT dirent;
 
         int base = &romdir[i].fnam_fext;
         for (int j=0; j<20; j++) {
@@ -642,7 +641,9 @@ int foreach_flash_dir(void *fn, char * fname) {
             }
             dirent.b[j] = pgm_read_byte(base++);
         }
-        if ( (*fn_ptr)(&dirent, fname) ) {
+        // Now it looks like a DIRENT so we can use common routines
+        // for both
+        if ( fn_ptr(&dirent, fname) ) {
             return i;
         }
     }
@@ -650,20 +651,30 @@ int foreach_flash_dir(void *fn, char * fname) {
 }
 
 
-// Iterator. fn is called for each valid vdisk directory entry. If fn returns 1,
-// the iterator aborts and returns the iteration number (which is the dirent
-// number), otherwise the iterator continues to completion.
+// Iterator. Calls fn for each valid (non-deleted) vdisk directory entry.
+// If fn returns 1, the iterator aborts, otherwise the iterator continues
+// to completion.
+// Return: -1 the iterator ran to completion
+//         >=0 the iterator aborted. The return value is the iteration number
+//         which is the directory index of the entry that aborted.
 int foreach_vdisk_dir(void *fn, char * fname) {
-    int (*fn_ptr)(union Dirent *d, char * buf2);
+    int (*fn_ptr)(UDIRENT *d, char * buf2);
     fn_ptr = fn;
 
     if ( (SD.exists(cas_vdisk_name)) && (handle = SD.open(cas_vdisk_name, FILE_READ)) ) {
-        union Dirent dirent;
+        UDIRENT dirent;
 
         pr_freeRAM();
 
+        // Format of first 4 sectors (1024 bytes) of PolyDos disk image:
+        // 20 bytes - disk volume name
+        // 2 bytes - next free sector (linear block addressing)
+        // 2 bytes - next free file control block (FCB) address
+        // 1000 bytes - 50, 20-byte FCB entries
+        // Instead of FCB, this code uses the term 'directory entry' or
+        // dirent.
         handle.read(dirent.b, 20); // read and discard disk volume name
-        handle.read(dirent.b, 4);  // read next free sector addr, next free fcb addr
+        handle.read(dirent.b, 4);  // read next free sector, next free FCB addr
 
         // In PolyDos this structure is stored in RAM at 0xc418 and the
         // "next free FCB" address is relative to that, so rebase to 0
@@ -685,7 +696,7 @@ int foreach_vdisk_dir(void *fn, char * fname) {
             dirent.f.flen *= POLYDOS_BYTES_PER_SECTOR;
 
             // invoke the callback
-            if ( (*fn_ptr)(&dirent, fname) ) {
+            if ( fn_ptr(&dirent, fname) ) {
                 handle.close();
                 return i;
             }
@@ -699,18 +710,8 @@ int foreach_vdisk_dir(void *fn, char * fname) {
 }
 
 
-
 // Check for SDcard and (if present) check for existence of NASCOM directory.
 // Update cas_flags accordingly. Used at startup and after NEw command.
-//
-// LIBRARY BUG: as described here http://forum.arduino.cc/index.php/topic,66415.0.html
-// the SD library only allows you to call SD.begin() onece. Subsequent times,
-// it reports "fail". The fix is to switch to https://github.com/greiman/SdFat
-// or to edit the library code: in libraries/SD/src/SD.cpp SDClass::begin, add
-// root.close(); before the "return".
-// .. switching to the greiman's code turned out to be simple and to solve other
-// problems (and to have a much smaller memory footprint.. space invaders now fits
-// in the Flash again).
 void open_sdcard(void) {
     cas_flags &= ~(FM_SD_FOUND | FM_NASDIR_FOUND | FM_VDISK_MOUNT);
     if (SD.begin(10, SPI_SPEED)) {
@@ -719,10 +720,10 @@ void open_sdcard(void) {
             cas_flags |= FM_NASDIR_FOUND;
         }
 
-        // the very first write after initialising a card takes significantly longer
-        // than other writes, and it can cause the first blocks of write data to get
-        // lost (and you cannot tell until you go to read it back). Hacky solution
-        // is to do a dummy file write here..
+        // the very first write after initialising a card takes significantly
+        // longer than other writes, and it can cause the first blocks of write
+        // data to get lost (and you cannot tell until you go to read it back).
+        // Hacky solution is to do a dummy file write here..
         handle = SD.open("NASCAS.TMP", FILE_WRITE | O_TRUNC);
         handle.write('X');
         handle.close();
@@ -733,10 +734,10 @@ void open_sdcard(void) {
 }
 
 
-// Come here when DRIVE is off and there is a serial character available. Infer that a
-// null-terminated string is going to be delivered. Receive the string into a buffer
-// and process it to completion -- for example, by setting up state that will be used
-// subsequently.
+// Come here when DRIVE is off and there is a serial character available. Infer
+// that a null-terminated string is going to be delivered. Receive the string
+// into a buffer and process it to completion -- for example, by setting up
+// state that will be used subsequently.
 void cmd_cass(void) {
     char buf[40]; // TODO I think the maximum incoming line is 40 + NUL. May need to make this 1 byte larger. Test.
     char * pbuf = &buf[0];
@@ -761,8 +762,9 @@ void cmd_cass(void) {
     DEBSERIAL.print(index);
     DEBSERIAL.println(F(" char"));
 
-    // The line is guaranteed to be at least 1 char + 1 NUL and to start with a non-blank. Only the first 2 characters
-    // of a command are significant, so it's always OK simply to blindly check the first 2 characters
+    // The line is guaranteed to be at least 1 char + 1 NUL and to start with a
+    // non-blank. Only the first 2 characters of a command are significant, so
+    // it's always OK simply to blindly check the first 2 characters
     cmd = (to_upper(buf[0]) << 8) | to_upper(buf[1]);
     switch (cmd) {
 
@@ -790,7 +792,7 @@ void cmd_cass(void) {
 
     case ('T'<<8 | 'O'):      // TO xxxx - relocate boot loader to xxxx.
         if (parse_leading(&pbuf) && parse_num(&pbuf, &destination, 16)) {
-            NASSERIAL.write((byte)0x55); // indicate to host that relocation will occur
+            NASSERIAL.write((byte)0x55); // tell host: relocation will occur
             NASSERIAL.write((byte)(destination & 0xff));      // low part
             NASSERIAL.write((byte)((destination>>8) & 0xff)); // high
             DEBSERIAL.print(F("TO to 0x"));
@@ -873,7 +875,7 @@ void cmd_cass(void) {
         // tho I already have it on my wish-list and it would only require
         // counting lines here and issuing the extra response byte..
         if (cas_flags & FM_SD_FOUND) {
-            NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
+            NASSERIAL.write((byte)0xff); // tell host: a message is coming
             SD.ls(&NASSERIAL, LS_SIZE);
         }
         else {
@@ -885,7 +887,7 @@ void cmd_cass(void) {
         // TODO may want a pager
         if (cas_flags & FM_SD_FOUND) {
             if (cas_flags & FM_VDISK_MOUNT) {
-                NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
+                NASSERIAL.write((byte)0xff); // tell host: a message is coming
                 foreach_vdisk_dir(&pr_dirent, 0);
             }
             else {
@@ -898,7 +900,7 @@ void cmd_cass(void) {
         break;
 
     case ('D'<<8 | 'F'):      // DF - directory of Flash
-        NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
+        NASSERIAL.write((byte)0xff); // tell host: a message is coming
         foreach_flash_dir(&pr_dirent, 0);
         break;
 
@@ -932,9 +934,11 @@ void cmd_cass(void) {
                     pr_msg(msg_warn_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
                 }
 
-                // there are cases where the file does not exist yet because we'll write it before
-                // reading it, it's up to the user to decide if that's really an error. Therefore,
-                // 1/ we cannot rely on opening the file now; need to defer until it's needed
+                // there are cases where the file does not exist yet because
+                // we'll write it before reading it, it's up to the user to
+                // decide if that's really an error. Therefore,
+                // 1/ we cannot rely on opening the file now; need to defer
+                //    until it's needed
                 // 2/ need to set flags as though this was successful
 
                 // Indicate SDcard as the source.
@@ -1200,7 +1204,7 @@ void cass_bin2cas(int remain, int addr, int exe_addr, void *getch) {
         // output block body
         csum = 0;
         while (count !=0) {
-            c = (*getch_fn_ptr)();
+            c = getch_fn_ptr();
             csum = csum + c;
             NASSERIAL.write(c);
 
@@ -1266,7 +1270,7 @@ void cmd_cass_rd() {
         DEBSERIAL.println(F("CAS-encode a binary file from vdisk"));
 
         if (handle = SD.open(cas_vdisk_name, FILE_READ)) {
-            union Dirent dirent;
+            UDIRENT dirent;
 
             // seek to start of directory entry
             handle.seek((long)24 + (long)dirindex*(long)sizeof(struct DIRENT));
@@ -1320,7 +1324,7 @@ void cmd_cass_rd() {
 
 
 // buf is a null-terminated string containing a filename
-// If the last 2 characters of the filename are numeric, increment them modulo 100.
+// If the last 2 characters of the filename are numeric, increment modulo 100.
 // If either is not numeric, change it to a 0.
 // If the filename is only 1 character long, increment it modulo 10.
 void ai_filename(char *buf) {
@@ -1360,16 +1364,18 @@ void ai_filename(char *buf) {
 }
 
 
-// Respond to DRIVE light being on and rx data being available -> infer a "W"rite command.
+// Respond to DRIVE light being on and rx data being available -> infer a
+// "W"rite command.
 // CAS format: store byte stream to file on SD until DRIVE goes off.
-// After DRIVE goes off, disard any remaining/buffered data
+// After DRIVE goes off, discard any remaining/buffered data
 // TODO other formats.
 void cmd_cass_wr(void) {
     unsigned long start=millis();
     int done = 0;
 
-    // TODO Currently assuming WS and the "literal" case . Need to handle the other FS
-    // and the "convert" case as well and use the WR_SRC and WR_CONV flag to choose which to implement
+    // TODO Currently assuming WS and the "literal" case . Need to handle the
+    // other filesystems and the "convert" case as well and use the WR_SRC and
+    // WR_CONV flag to choose which to implement
 
     if ( (handle = SD.open(cas_wr_name, FILE_WRITE | O_TRUNC)) ) {
         // have a file name and can open the file -> good to go!
