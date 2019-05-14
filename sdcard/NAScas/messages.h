@@ -10,17 +10,24 @@
 #define F_MSG_RESPONSE (1)
 #define F_MSG_NULLTERM (2)
 #define F_MSG_CR       (4)
+#define F_MSG_NASCAS   (8)
+#define F_MSG_ERROR    (16)
 
-const char msg_err_fname_bad[]      PROGMEM = "Error - filename missing or wrongly formed or wrong length";
-const char msg_err_fname_missing[]  PROGMEM = "Error - file not found";
-const char msg_warn_fname_missing[] PROGMEM = "Warning - file not found. At your risk.";
-const char msg_info_2bdeleted[]     PROGMEM = "Info - existing file will be deleted.";
-const char msg_err_sd_missing[]     PROGMEM = "Error - SDcard not found";
-const char msg_err_vdisk_missing[]  PROGMEM = "Error - No virtual disk mounted";
-const char msg_err_vdisk_bad[]      PROGMEM = "Error - Could not open file for virtual disk";
-const char msg_err_addr_bad[]       PROGMEM = "Error - expected address in hex";
-const char msg_err_num_bad[]        PROGMEM = "Error - expected number in decimal";
-const char msg_err_try_help[]       PROGMEM = "Error - try typing HELP";
+// pr_msg has an option (expected to be used with the "msg_err" strings) to add
+// the prefix "Error - " which saves the waste of duplicating it here.
+const char msg_err_fname_bad[]      PROGMEM = "filename missing/badly formed";
+const char msg_err_fname_missing[]  PROGMEM = "file not found";
+const char msg_err_open_fail[]      PROGMEM = "file open failed";
+const char msg_warn_fname_missing[] PROGMEM = "Warning - file not found. At your risk";
+const char msg_info_2bdeleted[]     PROGMEM = "Info - existing file will be deleted";
+const char msg_err_sd_missing[]     PROGMEM = "SDcard not found";
+const char msg_err_bad_src[]        PROGMEM = "bad source or missing filename";
+const char msg_err_vdisk_missing[]  PROGMEM = "no virtual disk mounted";
+const char msg_err_vdisk_bad[]      PROGMEM = "could not open file for virtual disk";
+const char msg_err_addr_bad[]       PROGMEM = "expected address in hex";
+const char msg_err_num_bad[]        PROGMEM = "expected number in decimal";
+const char msg_err_overflow[]       PROGMEM = "overflow on write to SD";
+const char msg_err_try_help[]       PROGMEM = "try typing HELP";
 const char msg_help[]               PROGMEM = "INFO - version and status\r\n"
                                               "TO xxxx - relocate boot loader to xxxx\r\n"
                                               "PAUSE nn - delay before supplying text file\r\n"

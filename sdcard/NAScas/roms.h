@@ -991,18 +991,6 @@ uint8_t PROGMEM const nasdis[] = {
  0x4e, 0xc8, 0xdf, 0x6f, 0xc9, 0x10, 0x00, 0x00,   0x00, 0x20, 0x20, 0x20, 0x50, 0x41, 0x47, 0x45,
  0x20, 0x30, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20,   0x45, 0x51, 0x55, 0x20, 0x20, 0xc3, 0x3e, 0xc4};
 
-
-// This is a 18-byte cut-down PolyDos directory entry. The FSFL and FUSL fields
-// are absent. The FSEC (start sector) field is replaced by FPTR (pointer to the byte stream)
-// and FNSC (number of sectors) is replaced by FLEN (number of bytes)
-typedef struct FDIRENT {
-    char fnam_fext[10]; // 8 char filename, 2 char extension. Blanks in unused positions
-    uint8_t * fptr;     // point to data bytestream
-    int flen;           // length of data in bytes
-    int flda;           // load address on target
-    int fexa;           // entry/execution address on target
-} FDIRENT;
-
 const FDIRENT romdir[] PROGMEM = {  { "SERBOOT GO", serboot,  sizeof(serboot),  0x0c80, 0x0c80},
                                     { "INVADERSGO", invaders, sizeof(invaders), 0x1000, 0x1000},
                                     { "LOLLIPOPGO", lollipop, sizeof(lollipop), 0x1000, 0x1000},

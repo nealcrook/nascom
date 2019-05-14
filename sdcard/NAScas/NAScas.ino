@@ -207,7 +207,6 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
-
 // If defined:
 // - uses SoftwareSerial to communicate, on pins 7,8. Maximum baud rate is
 //   4800 baud, inversion is done in software, hardware UART is used for debug
@@ -223,7 +222,7 @@
 
 
 // Arduio generates 16x clock for the NASCOM UART.
-// For 1200 baud need divide by 417 (19208Hz)
+// For 1200 baud need divide by 417 (19208Hz) <-- default on NASCOM 2
 //     2400                     208  <-- seems to work OK
 //     4800                     104  <-- seems to work OK on small blocks but not reliable
 //     9600                      52  <-- does not work; bad data at NASCOM
@@ -260,7 +259,10 @@
 
 #include <SoftwareSerial.h>
 
-// This is the format of a 20-byte PolyDos directory entry.
+// Virtual disks use the PolyDos file structure
+#define POLYDOS_BYTES_PER_SECTOR (256)
+
+// The format of a 20-byte PolyDos directory entry.
 typedef struct DIRENT {
     char fnam_fext[10]; // 8 char filename, 2 char extension.
                         // Blanks in unused positions, no "."
@@ -272,19 +274,31 @@ typedef struct DIRENT {
     int fexa;           // entry/execution address on target
 } DIRENT;
 
+// An 18-byte cut-down PolyDos directory entry, used for the Flash filesystem.
+// - FSFL and FUSL are absent.
+// - FSEC (start sector) is replaced by FPTR (pointer to the byte stream)
+// - FLEN (number of sectors) is replaced by FLEN (number of bytes)
+typedef struct FDIRENT {
+    char fnam_fext[10]; // 8 char filename, 2 char extension.
+                        // Blanks in unused positions, no "."
+    uint8_t * fptr;     // point to data bytestream
+    int flen;           // length of data in bytes
+    int flda;           // load address on target
+    int fexa;           // entry/execution address on target
+} FDIRENT;
+
+
+// TODO don't need to wrap this in a "struct"
 // This represents a char buffer overlayed on a PolyDos directory entry
 struct Dirent {
   union {
     struct DIRENT f;
     char b[20];
   };
-} Dirent;
-
-#define POLYDOS_BYTES_PER_SECTOR (256)
+};
 
 
-
-// Prototypes in this here file
+// Prototypes for stuff in this file
 void cmd_cass(void);
 void cmd_cass_rd(void);
 void cmd_cass_wr(void);
@@ -439,7 +453,7 @@ void setup()   {
     pinMode(PIN_NTXD, INPUT_PULLUP);
 
     DEBSERIAL.begin(115200);  // for Debug
-    NASSERIAL.begin(BAUD_RATE); // 1200 is default baud rate on NASCOM
+    NASSERIAL.begin(BAUD_RATE);
 
 
 #ifdef HWDEBUG
@@ -528,11 +542,19 @@ void loop() {
 
 
 // Print a message to the Host through the serial port. The message is stored in Flash.
-// Flags determine whether a leading 0xff is sent, whether a trailing CR is sent
-// and whether a trailing NUL is sent (refer to the protocol description).
+// Flags determine what prefix/suffix bytes are sent
+// (refer to the protocol description).
 void pr_msg(int msg, char flags) {
     if (flags & F_MSG_RESPONSE) {
         NASSERIAL.write((byte)0xff); // indicate to host that a message is coming
+    }
+
+    if (flags & F_MSG_NASCAS) {
+        NASSERIAL.print(F(" NAScas ")); // use this prefix if we report an error outside the command loop
+    }
+
+    if (flags & F_MSG_ERROR) {
+        NASSERIAL.print(F("Error - ")); // save repeating this common string in Flash storage
     }
 
     while ((pgm_read_byte(msg) != 0)) {
@@ -672,7 +694,7 @@ int foreach_vdisk_dir(void *fn, char * fname) {
         return -1; // Iterator ran to completion
     }
     else {
-        pr_msg(msg_err_vdisk_bad, F_MSG_RESPONSE + F_MSG_CR);
+        pr_msg(msg_err_vdisk_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
     }
 }
 
@@ -780,7 +802,7 @@ void cmd_cass(void) {
         }
         else {
             // bad argument
-            pr_msg(msg_err_addr_bad, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_addr_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -790,7 +812,7 @@ void cmd_cass(void) {
         }
         else {
             // bad argument
-            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -800,7 +822,7 @@ void cmd_cass(void) {
         }
         else {
             // bad argument
-            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -816,7 +838,7 @@ void cmd_cass(void) {
             }
             else {
             // bad argument
-            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_num_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
@@ -834,15 +856,15 @@ void cmd_cass(void) {
                     cas_flags |= FM_VDISK_MOUNT;
                 }
                 else {
-                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                 }
             }
             else {
-                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -855,7 +877,7 @@ void cmd_cass(void) {
             SD.ls(&NASSERIAL, LS_SIZE);
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -867,11 +889,11 @@ void cmd_cass(void) {
                 foreach_vdisk_dir(&pr_dirent, 0);
             }
             else {
-                pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -885,15 +907,15 @@ void cmd_cass(void) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, erase_name)) {
 
                 if (!SD.remove(erase_name)) {
-                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                 }
             }
             else {
-                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -920,11 +942,11 @@ void cmd_cass(void) {
                 // TODO need to set or clear F_RD_CONV bit.
             }
             else {
-                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -936,7 +958,7 @@ void cmd_cass(void) {
                      // try to find it..
                      dirindex = foreach_vdisk_dir(&find_dirent, cas_rd_name);
                      if (dirindex == -1) {
-                         pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                         pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                      }
                      else {
                          // dirindex is set up for the read. Indicate Vdisk as the source.
@@ -945,15 +967,15 @@ void cmd_cass(void) {
                      }
                  }
                  else {
-                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                  }
              }
              else {
-                 pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
+                 pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
              }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -963,7 +985,7 @@ void cmd_cass(void) {
             // try to find it..
             dirindex = foreach_flash_dir(&find_dirent, cas_rd_name);
             if (dirindex == -1) {
-                pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
             else {
                 // dirindex is set up for the read. Indicate Flash as the source.
@@ -972,7 +994,7 @@ void cmd_cass(void) {
             }
         }
         else {
-            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -994,11 +1016,11 @@ void cmd_cass(void) {
                 // TODO need to set or clear WR_CONV flag.
             }
             else {
-                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -1015,15 +1037,15 @@ void cmd_cass(void) {
                     // TODO need to set or clear WR_CONV flag.
                 }
                 else {
-                    pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                    pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                 }
             }
             else {
-                pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
         */
@@ -1049,15 +1071,15 @@ void cmd_cass(void) {
                     handle.close();
                 }
                 else {
-                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                    pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                 }
             }
             else {
-                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
             }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
 
@@ -1070,7 +1092,7 @@ void cmd_cass(void) {
                      // try to find it..
                      dirindex = foreach_vdisk_dir(&find_dirent, cas_rd_name);
                      if (dirindex == -1) {
-                         pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+                         pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                      }
                      else {
                          // dirindex is set up for the read. Read it now. No need to change
@@ -1079,21 +1101,21 @@ void cmd_cass(void) {
                      }
                  }
                  else {
-                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_CR);
+                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                  }
              }
              else {
-                 pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_CR);
+                 pr_msg(msg_err_vdisk_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
              }
         }
         else {
-            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_CR);
+            pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
         }
         break;
         */
 
     default:
-        pr_msg(msg_err_try_help, F_MSG_RESPONSE + F_MSG_CR);
+        pr_msg(msg_err_try_help, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
     }
 
     // Send response "done"
@@ -1202,6 +1224,23 @@ void cass_bin2cas(int remain, int addr, int exe_addr, void *getch) {
 }
 
 
+// Abort a tape read pre/post block:
+// - print 4 ESC characters
+// - wait for Drive to negate
+// - print a message prefix " NAScas "
+// - print the message at FLASH address msg
+// - print a CR/LF
+void abort_rd(int msg) {
+    NASSERIAL.write(F("\x1b\x1b\x1b\x1b"));
+
+    // wait for DRIVE pin to negate
+    while (digitalRead(PIN_DRV) == 0) {
+    }
+
+    pr_msg(msg, F_MSG_NASCAS + F_MSG_ERROR + F_MSG_CR);
+}
+
+
 // Respond to DRIVE light being on and timeout being reached without any rx data
 // -> infer a "R"ead command.
 // CAS format: supply bytes from file on SD until it's empty.
@@ -1243,7 +1282,7 @@ void cmd_cass_rd() {
             handle.close();
         }
         else {
-            pr_msg(msg_err_vdisk_bad, F_MSG_RESPONSE + F_MSG_CR);
+            abort_rd(msg_err_vdisk_bad);
         }
         break;
 
@@ -1255,7 +1294,7 @@ void cmd_cass_rd() {
             DEBSERIAL.println(F("file from SD"));
             char c;
             while (handle.read(&c, 1)) {
-                NASSERIAL.print(c);
+                NASSERIAL.write(c);
             }
             handle.close();
 
@@ -1265,19 +1304,16 @@ void cmd_cass_rd() {
             }
         }
         else {
-            pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
+            abort_rd(msg_err_fname_missing);
         }
         break;
 
     default:
-        // TODO need to send the right stream to the NASCOM to abort
-        // the read before reporting the error.
-        //pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
-        DEBSERIAL.println(F("BAD BAD BAD Attempted read when no file cued"));
+        abort_rd(msg_err_bad_src);
         break;
     }
 
-    // wait for DRIVE pin to negate
+    // wait for DRIVE pin to negate (on error, will already have done this)
     while (digitalRead(PIN_DRV) == 0) {
     }
 }
@@ -1350,7 +1386,7 @@ void cmd_cass_wr(void) {
         }
         handle.close();
         if (NASSERIAL.overflow()) {
-            NASSERIAL.println(F(" NAScas ERROR: overflow on write to SD"));
+            pr_msg(msg_err_overflow, F_MSG_NASCAS + F_MSG_ERROR + F_MSG_CR);
         }
 
         // prepare for next write
@@ -1361,8 +1397,7 @@ void cmd_cass_wr(void) {
     else {
          // wait for pin to negate
         while (digitalRead(PIN_DRV) == 0) { }
-
-        NASSERIAL.println(F(" NAScas ERROR: file open failed"));
+        pr_msg(msg_err_open_fail, F_MSG_NASCAS + F_MSG_ERROR + F_MSG_CR);
     }
 
     // empty any rogue characters TODO do I still need this?
