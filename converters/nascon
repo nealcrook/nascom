@@ -71,6 +71,7 @@ $args{outfile} = undef;
 $args{-in} = undef;
 $args{-out} = undef;
 $args{-org} = undef;
+$args{-csum} = 0;
 
 ################################################################################
 # process command-line
@@ -78,7 +79,12 @@ while (my $arg = shift @ARGV) {
     if ($arg =~ /^-/) {
         help_exit() if (($arg eq '-h') or ($arg eq '-help'));
         if (exists ($args{$arg})) {
-            $args{$arg} = lc(shift @ARGV);
+            if ($arg eq '-csum') {
+                $args{-csum} = 1;
+            }
+            else {
+                $args{$arg} = lc(shift @ARGV);
+            }
         }
         else {
             die "ERROR: Unrecognised argument: $arg (try -help)\n";
@@ -216,6 +222,9 @@ Case is ignored so that HEX hex Hex etc. are all considered to be equivalent.
 -org -- when the input file is binary (bin) there is no addressing information contained
 in the file. The -org argument is required in this case and specifies the address associated
 with the first data byte.
+
+-csum -- when the output file is .nas adds a 9th byte to each line which is the
+checksum, and ends the line with 08 08 0D 0A (^H ^H CR LF) like NAS-SYS 1.
 
 Legal value for -org is a hexadecimal number (a sequence of hex digits with with no prefix)
 
@@ -712,18 +721,25 @@ sub write_as_cas {
 # TODO support optional "E" option.
 sub write_as_nas {
     foreach my $rec_ref (@records) {
+        my $csum;
         my $count = 0;
         my $addr = $rec_ref->{addr};
         foreach my $x (0..$rec_ref->{len}-1) {
             if ($count == 0) {
                 printf OUT "%04X", $addr;
+                $csum = ($addr & 0xff) + ($addr >> 8);
             }
 
-            printf OUT " %02X", ord(substr $rec_ref->{data}, $x, 1);
+            my $byte = ord(substr $rec_ref->{data}, $x, 1);
+            printf OUT " %02X", $byte;
+            $csum = $csum + $byte;
             $count = $count + 1;
             $addr = $addr + 1;
 
             if ($count == 8) {
+                if ($args{-csum}) {
+                    printf OUT " %02X%c%c", 0xff & $csum, 8, 8;
+                }
                 print OUT "\r\n";
                 $count = 0;
             }
