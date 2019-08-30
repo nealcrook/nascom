@@ -1,7 +1,7 @@
 // NAScas                             -*- c -*-
 // https://github.com/nealcrook/nascom
 //
-// ARDUINO Uno/ATMEGA328 connected to NASCOM 2 as mass-storage device
+// ARDUINO Uno/Nano (ATMEGA328) connected to NASCOM 2 as mass-storage device
 //
 // Connect through UART for the purpose of providing a "virtual cassette
 // interface" in which the NAS-SYS R and W commands (and the equivalent from
@@ -13,10 +13,15 @@
 // automatically bootstrap-loaded through the serial port when the Arduino
 // is reset.
 //
+// ** By default the Nano ships with a larger boot loader than the Uno and
+// ** this code will not fit. Best solution is to reprogram the Nano boot
+// ** loader with the Uno code, then treat it as an Uno forever after.
+// ** Alternative solution is to comment out one of the ROM images.
+//
 ////////////////////////////////////////////////////////////////////////////////
 // WIRING:
 //
-// 1/ connection to uSDcard adaptor (assumes UNO)
+// 1/ connection to uSDcard adaptor (assumes Uno/Nano)
 //
 // uSD                     ARDUINO
 // -------------------------------
@@ -25,16 +30,16 @@
 // 3  MISO                 DIG12
 // 4  MOSI                 DIG11
 // 5  SCK                  DIG13  (also ARDUINO's on-board LED)
-// 6  CS                   DIG10
+// 6  CS_N                 DIG10
 //
 // 2/ connection to NASCOM 2 serial interface PL2 via 16-way ribbon
 //
 // Name   Direction   ARDUINO   NASCOM 2
 // ---------------------------------------------------------------
-// TDRIVE IN           DIG6     pin 1       DRIVE OUT
-// NASTXD IN           DIG7     pin 12      20mA OUT
-// NASRXD OUT          DIG8     pin 9       20mA IN
-// NASSCK OUT          DIG9     pin 4 & 5   EXT TX CLK, EXT RX CLK
+// NAS_DRIVE  IN       DIG6     pin 1       DRIVE OUT
+// NAS_TXD    IN       DIG7     pin 12      20mA OUT
+// RXD_NAS    OUT      DIG8     pin 9       20mA IN
+// SERCLK_NAS OUT      DIG9     pin 4 & 5   EXT TX CLK, EXT RX CLK
 // GND                          pin 11 & 15 GND
 // 5V                           pin 2       5V   (NOTE)
 //
@@ -45,15 +50,19 @@
 //
 // NOTE: Power
 //
-// If you have the Arduino Uno connected to a computer on its USB port
-// it will also get power from there, do NOT also connect to power on the
+// - If you have the Arduino Uno connected to a computer on its USB port
+// it will also get power from there: do NOT also connect to power on the
 // NASCOM.
 //
-// To power an Arduino Uno directly from 5V on the NASCOM you need to add
+// - To power an Arduino Uno directly from 5V on the NASCOM you need to add
 // a wire down-stream of the regulator. I connected to the 2-pin device that
 // looks like a big resistor but is actually a fuse. Refer to the Arduino Uno
-// schematics for details. To power an Arduino Nano directly from 5V it's
-// far more straightforward. Again, refer to the schematics for details.
+// schematics for details.
+//
+// - If you use an Arduino Nano, things are more straightforward as the
+// Nano has a 5V input and a regulator arrangement that allows the Nano to
+// draw power from the USB or the NASCOM. Refer to the schematics for details.
+// I have NOT tried powering both at the same time.
 //
 ////////////////////////////////////////////////////////////////////////////////
 // PROTOCOL FOR SERIAL INTERFACE
@@ -202,9 +211,11 @@
 // Did not get invoked?
 // Make it work with serial comms faster than 2400bd. At one point I thought
 // the "softserial" library was the limiting factor but I read that it should
-// work OK at up to 9600bd with a 16MHz processor. Alternative is to switch to
-// using the hardware UART but then I need to add a hardware inverter to the
-// data signals.
+// work OK at up to 9600bd with a 16MHz processor, and I tried using the
+// hardware UART (with a hardware inverter in the data signals) but it gave
+// no improvement. Full discussion here:
+// https://github.com/nealcrook/nascom/blob/master/sdcard/NAScas/NASCOM_UART_performance.pdf
+//
 
 ////////////////////////////////////////////////////////////////////////////////
 
