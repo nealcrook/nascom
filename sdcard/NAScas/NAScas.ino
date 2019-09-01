@@ -13,6 +13,10 @@
 // automatically bootstrap-loaded through the serial port when the Arduino
 // is reset.
 //
+// ** This software relies on the SdFat implementation. Download it
+// ** into your Arduino/libraries area and then edit SdFat/src/SdFatConfig.h
+// ** to change "#define USE_LONG_FILE_NAMES" from 1 to 0.
+//
 // ** By default the Nano ships with a larger boot loader than the Uno and
 // ** this code will not fit. Best solution is to reprogram the Nano boot
 // ** loader with the Uno code, then treat it as an Uno forever after.
