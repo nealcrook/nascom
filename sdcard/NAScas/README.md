@@ -12,6 +12,19 @@ the default setup is to generate a bit clock from the NAScas hardware in order
 to run the UART as fast as it and NAS-SYS can go. The current design runs at
 2400bd.
 
+## Contents
+
+* photos/         -- photos of the hardware and of SERBOOT in operation
+* doc/            -- not yet done
+* NAScas.ino      -- the C code for the Arduino (includes wiring instructions)
+* messages.h      -- "
+* roms.h          -- "
+* parser.ino      -- "
+
+See also:
+
+* nascom/host_programs/ which contains associated Z80 code for the NASCOM.
+
 ## CAS format
 
 I use the term "CAS format" to refer to the block-based binary format that
@@ -236,39 +249,29 @@ ribbon cable. The interface connects to:
 ## Current Status And Plans
 
 27Apr2019 - using the code here, all functions are working.
+20Sep2019 - I have designed a PCB and am awaiting its arrival from manufacture
 
 
 Remaining tasks:
 
 * Make a smaller version
-* Create conenction diagrams for NASCOM1 and NASCOM2
-* Take some photos
+* Create connection diagrams for NASCOM1 and NASCOM2
+* More photos
 * Youtube video?
 
 
-## Contents
-
-* photos/         -- photos of the hardware and of SERBOOT in operation
-* doc/            -- not yet done
-* NAScas.ino      -- the C code for the Arduino (includes wiring instructions)
-* messages.h      -- "
-* roms.h          -- "
-* parser.ino      -- "
-
-See also:
-
-* nascom/host_programs/ which contains associated Z80 code for the NASCOM. A "library" of subroutines and some example programs for using them.
 
 
 ## Construction
 
 You will need:
 
-* Arduino uno
-* Arduino prototyping card
+* Arduino Uno and Arduino prototyping card
+* or, Arduino Nano and Veroboard
+* or, Arduino Nano and my PCB
 * SDcard adaptor
 * Header pins for connecting the Uno to the prototyping card
-* Polarised 16-way IDC connector (male pin, female shroud)
+* NASCOM2: Polarised 16-way IDC connector (male pin, female shroud)
 * 1 270 ohm resistor
 * Thin hookup wire (I use wire-wrap wire)
 * Thick hookup wire (for power connection on SDcard adaptor)
@@ -283,16 +286,23 @@ The first four are easy and cheap to source from Banggood or Aliexpress For exam
 For the Arduino, I recommend getting one with a socketed DIL AVR chip.
 
 
-Use the notes in nascom_arduino.ino and nascom_pio.pdf and the photos to guide you. There are about 20 wires to connect.
+Use the notes in NAScas.ino and the photos to guide you. There are about 15 wires to connect.
 
 ## Powering the Arduino
 
-During development, I powered the Arduino though the USB connection - either from a wall power supply or from a laptop where I was running the Arduino IDE for code development. With the finished system, it's preferable to power it directly from the NASCOM.
+If you use an Arduino Nano, it contains circuitry to allow it to automatically
+draw 5V power either from the USB or from the connected system (the NASCOM in
+this case).
+
+The Arduino Uno is not so flexible. During development, I powered the Arduino
+Uno though the USB connection - either from a wall power supply or from a laptop
+where I was running the Arduino IDE for code development. With the finished
+system, it's preferable to power it directly from the NASCOM.
 
 There are 2 options:
 
 * The Polite option is to use the DC input jack of the Arduino. This is polite because it can co-exist with the USB input (there is comparator and FET which switches the DC source out when there is power on the USB). This input is regulated on-board and so requires an input of at least 7V. You could wire a barrel connector to the 12V output of the NASCOM PSU and connect it.
-* The Impolite option (which I used) is to pick up +5V from the PIO IDC connector. This needs to be wired into the same power rail as the USB would supply -- so you can NO LONGER ATTACH THE USB (I put some tape over the connector to remind me!). Close to the USB connector on the Arduino is a 2-pin device that looks like a big yellow resistor but which is actually a fuse. Solder the +5V connection to this point (the end down-stream of the fuse, but it doesn't really matter).
+* The Impolite option (which I used) is to pick up +5V from the NASCOM Serial connector and wire it into the same power rail as the USB would supply -- so you can NO LONGER ATTACH THE USB (I put some tape over the connector to remind me!). Close to the USB connector on the Arduino is a 2-pin device that looks like a big yellow resistor but which is actually a fuse. Solder the +5V connection to this point (preferably the end down-stream of the fuse, but it doesn't really matter).
 
 ## Arduino prototyping card
 
@@ -304,4 +314,46 @@ Arduino (otherwise you will short the power rails).
 
 * The power tracks marked "GND" and "5V" are randomly wrong. Buzz each one out
   to see what it connects to before using it!
+
+## Connecting to a NASCOM1
+
+The tidiest way to connect is to add 4 wires to the back of the N1, connecting
+the required signals to unused pins of the Serial Data Socket (SK2). The pinout
+of this connector is as follows (in/out is with respect to NASCOM):
+
+````
+                           1   U   16 +5V
+                RS232  In  2       15
+                           3       14 Out RS232 Out
+                 KBD-  In  4       13
+                 KBD+  In  5       12 Out PTR+
+     NEW   Tape DRIVE Out  6       11 Out PTR-
+     NEW      LK3 Uart In  7       10 Out Uart Out (IC29/25) NEW
+            RS232 COM GND  8       9  In  Ext Cl P1 (LK4)    NEW
+````
+
+Tape DRIVE is connected to IC41/12
+
+With these wires added configure the links as follows:
+
+* LK3: disconnect (so that the new pin 7 connection can drive serial data into the NASCOM)
+* LK4: set to "Ext Cl" position (so that the new pin 9 connection can drive a serial clock into the NASCOM)
+* LK2: fitted (single stop bit)
+
+Now connect NASCAS using a flying lead connected to SK2. 6 Connections are required:
+
+* Drive (out from NASCOM)
+* Serial clock (in to NASCOM)
+* TxD (out from NASCOM)
+* RxD (in to NASCOM)
+* +5V (power from NASCOM)
+* Gnd (common ground)
+
+## Connecting to a NASCOM2
+
+I recommend adding a wire from the DRIVE signal to the spare pin XXX on the
+Serial connector, then connecting directly using a 16-way IDC ribbon cable.
+
+Configure the NASCOM jumpers as follows: TODO
+
 
