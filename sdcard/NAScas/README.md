@@ -318,23 +318,22 @@ Arduino (otherwise you will short the power rails).
 ## Connecting to a NASCOM1
 
 The tidiest way to connect is to add 4 wires to the back of the N1, connecting
-the required signals to unused pins of the Serial Data Socket (SK2). The pinout
-of this connector is as follows (in/out is with respect to NASCOM):
+the required signals to unused pins of the 16-way Serial Data Socket (SK2). The
+modified pinout of this connector is as follows (In/Out are shown with respect
+to the NASCOM):
 
 ````
-                           1   U   16 +5V
-                RS232  In  2       15
-                           3       14 Out RS232 Out
-                 KBD-  In  4       13
-                 KBD+  In  5       12 Out PTR+
-     NEW   Tape DRIVE Out  6       11 Out PTR-
-     NEW      LK3 Uart In  7       10 Out Uart Out (IC29/25) NEW
-            RS232 COM GND  8       9  In  Ext Cl P1 (LK4)    NEW
+                             1   U   16 +5V
+                  RS232  In  2       15
+                             3       14 Out RS232 Out
+                   KBD-  In  4       13
+                   KBD+  In  5       12 Out PTR+
+ NEW Tape DRIVE (TR2/C) Out  6       11 Out PTR-
+ NEW    Uart In (LK3/In) In  7       10 Out Uart Out (IC29/25) NEW
+              RS232 COM GND  8       9  In  Ext Cl P1 (LK4/P1) NEW
 ````
 
-Tape DRIVE is connected to IC41/12
-
-With these wires added configure the links as follows:
+With these wires added, configure the links as follows:
 
 * LK3: disconnect (so that the new pin 7 connection can drive serial data into the NASCOM)
 * LK4: set to "Ext Cl" position (so that the new pin 9 connection can drive a serial clock into the NASCOM)
@@ -351,9 +350,18 @@ Now connect NASCAS using a flying lead connected to SK2. 6 Connections are requi
 
 ## Connecting to a NASCOM2
 
-I recommend adding a wire from the DRIVE signal to the spare pin XXX on the
-Serial connector, then connecting directly using a 16-way IDC ribbon cable.
+All of the connections required are available on the 16-way Serial connector
+(PL2). The connection can be made using a 16-way IDC ribbon cable.
 
-Configure the NASCOM jumpers as follows: TODO
+Configure the NASCOM jumpers as follows: LSW1/5: Up (1 stop bit), LSW2: all
+switches to Up/On.
+
+## Programming the Arduino/Nano
+
+Edit the source file to set the appropriate #define to select NASCOM 1 or
+NASCOM2. This sets the serial data rate and controls whether the serial data is
+inverted.
+
+
 
 
