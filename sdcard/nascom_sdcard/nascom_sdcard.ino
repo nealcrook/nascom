@@ -24,9 +24,13 @@
 // Can read/write by sector or by specified byte count.
 //
 /////////////////////////////////////////////////////
-// WIRING:
+// WIRING (assumes Arduino Uno/Nano)
 //
-// 1/ connection to uSDcard adaptor (assumes UNO)
+// ANA6/ANA7 ARE INPUT ONLY *AND* YOU CANNOT USE
+// digitalRead ON THEM - ONLY analogRead.
+//
+//
+// 1/ connection to uSDcard adaptor
 //
 // uSD                     ARDUINO
 // -------------------------------
@@ -42,12 +46,12 @@
 // Name   Direction   ARDUINO   NASCOM
 // -----------------------------------
 // T2H    OUT          ANA1     B0 (pin 10)
-// H2T    IN           ANA0     B1 (pin 8)
-// CMD    IN           ANA4     B2 (pin 6)
-// XD7    IN/OUT       DIG9     A7 (pin 24)
-// XD6    IN/OUT       DIG8     A6 (pin 25)
-// XD5    IN/OUT       DIG7     A5 (pin 23)
-// XD4    IN/OUT       DIG6     A4 (pin 21)
+// H2T    IN           ANA7     B1 (pin 8)
+// CMD    IN           ANA3     B2 (pin 6)
+// XD7    IN/OUT       ANA0     A7 (pin 24)
+// XD6    IN/OUT       DIG6     A6 (pin 25)
+// XD5    IN/OUT       ANA5     A5 (pin 23)
+// XD4    IN/OUT       ANA4     A4 (pin 21)
 // XD3    IN/OUT       DIG5     A3 (pin 19)
 // XD2    IN/OUT       DIG4     A2 (pin 17)
 // XD1    IN/OUT       DIG3     A1 (pin 15)
@@ -59,7 +63,7 @@
 //
 // Name   Direction   ARDUINO   Notes
 // -----------------------------------
-// ERROR  OUT         A2        To LED. Other end of LED via resistor to GND
+// ERROR  OUT         ANA2      To LED. Other end of LED via resistor to GND
 //
 /////////////////////////////////////////////////////
 // PROTOCOL
@@ -149,13 +153,13 @@
 /////////////////////////////////////////////////////
 // Pin assignments
 #define PIN_T2H A1
-#define PIN_H2T A0
-#define PIN_CMD A4
+#define PIN_H2T A7
+#define PIN_CMD A3
 #define PIN_ERROR A2
-#define PIN_XD7 9
-#define PIN_XD6 8
-#define PIN_XD5 7
-#define PIN_XD4 6
+#define PIN_XD7 A0
+#define PIN_XD6 6
+#define PIN_XD5 A5
+#define PIN_XD4 A4
 #define PIN_XD3 5
 #define PIN_XD2 4
 #define PIN_XD1 3
@@ -300,7 +304,7 @@ void setup()   {
   }
 
   // wait until handshake from host is idle
-  while (0 != digitalRead(PIN_H2T)) {
+  while (0 != rd_h2t()) {
   }
 
   Serial.println("Start command loop");
@@ -406,8 +410,8 @@ void loop() {
   // Turn off the ERROR LED in anticipation
   digitalWrite(PIN_ERROR, 0);
 
-  //Serial.print("Command ");
-  //Serial.println(cmd_data,HEX);
+  Serial.print("Command ");
+  Serial.println(cmd_data,HEX);
 
   switch (cmd_data) {
     case 0x100 | CMD_NOP:
@@ -555,11 +559,18 @@ void loop() {
 ////////////////////////////////////////////////////////////////
 // Stuff that waggles pins
 
+// get value of H2T. My current implementation maps this to A7
+// which can only be read using analogRead
+int rd_h2t(void) {
+    return analogRead(PIN_H2T) > 500;
+}
+
+
 // wait until incoming handshake differs from our value. During
 // transfers initiated by the Host (cmd/parameters/data and got2h)
 // it's an indication that we need to do something.
 void wait4_hs_differ(void) {
-  while (my_t2h == digitalRead(PIN_H2T)) {
+  while (my_t2h == rd_h2t()) {
   }
 }
 
@@ -569,7 +580,7 @@ void wait4_hs_differ(void) {
 // it's an indication that the transfer we initiated has been
 // acknowledged by the host.
 void wait4_hs_match(void) {
-  while (my_t2h != digitalRead(PIN_H2T)) {
+  while (my_t2h != rd_h2t()) {
   }
 }
 
@@ -581,7 +592,7 @@ void wait4_hs_match(void) {
 // Theoretically we don't need to read the other handshake, we can rely
 // on our own copy. However, it seems more robust to do it like this.
 void set_hs_match(void) {
-  my_t2h = digitalRead(PIN_H2T);
+  my_t2h = rd_h2t();
   digitalWrite(PIN_T2H, my_t2h);
 }
 
@@ -591,7 +602,7 @@ void set_hs_match(void) {
 // theoretically we don't need to read the other handshake, we can rely
 // on our own copy. However, it seems more robust to do it like this.
 void set_hs_differ(void) {
-  my_t2h = 1 ^ digitalRead(PIN_H2T);
+  my_t2h = 1 ^ rd_h2t();
   digitalWrite(PIN_T2H, my_t2h);
 }
 
@@ -777,7 +788,7 @@ int restore_state(int auto_restore) {
   handles[2] = SD.open(buf, FILE_WRITE);
   buf[3] = '3';
   handles[3] = SD.open(buf, FILE_WRITE);
-  return 1;
+  return (handles[0] && handles[1] && handles[2] && handles[3]);
 }
 
 // save configuration to file
