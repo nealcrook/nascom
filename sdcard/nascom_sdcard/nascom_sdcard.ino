@@ -1,4 +1,4 @@
-// nascom_sdcard
+// nascom_sdcard                             -*- c -*-
 // https://github.com/nealcrook/nascom
 //
 // ARDUINO connected to NASCOM 2 PIO to act as mass-storage
@@ -276,169 +276,169 @@ int my_t2h;
 char direction;
 
 void setup()   {
-  Serial.begin(115200);  // for Debug
+    Serial.begin(115200);  // for Debug
 
-  flags = 0;
-  buf[0] = 0;
-  my_t2h = 0;
-  next_file = 0;
-  direction = INPUT;
+    flags = 0;
+    buf[0] = 0;
+    my_t2h = 0;
+    next_file = 0;
+    direction = INPUT;
 
-  // H2T, T2H, CMD have fixed direction
-  pinMode(PIN_H2T, INPUT);
-  pinMode(PIN_T2H, OUTPUT);
-  pinMode(PIN_CMD, INPUT);
-  pinMode(PIN_ERROR, OUTPUT);
+    // H2T, T2H, CMD have fixed direction
+    pinMode(PIN_H2T, INPUT);
+    pinMode(PIN_T2H, OUTPUT);
+    pinMode(PIN_CMD, INPUT);
+    pinMode(PIN_ERROR, OUTPUT);
 
-  set_data_dir(direction);
-  digitalWrite(PIN_T2H, my_t2h);
-  digitalWrite(PIN_ERROR, 0);
+    set_data_dir(direction);
+    digitalWrite(PIN_T2H, my_t2h);
+    digitalWrite(PIN_ERROR, 0);
 
-  status = SD.begin();
+    status = SD.begin();
 
-  Serial.println("Init SD card");
-  Serial.print(status);
+    Serial.println("Init SD card");
+    Serial.print(status);
 
-  if (status) {
-    restore_state(1);
-  }
+    if (status) {
+        restore_state(1);
+    }
 
-  // wait until handshake from host is idle
-  while (0 != rd_h2t()) {
-  }
+    // wait until handshake from host is idle
+    while (0 != rd_h2t()) {
+    }
 
-  Serial.println("Start command loop");
+    Serial.println("Start command loop");
 }
 
 #ifdef DEBUG
 // Simple test for read/write access to SD card. It all seems to work exactly as expected!
 void loop() {
-  buf[0] = 'A';
-  buf[1] = '.';
-  buf[2] = 'T';
-  buf[3] = 'X';
-  buf[4] = 'T';
-  buf[5] = 0;
-  handles[0] = SD.open(buf, FILE_WRITE);
-  buf[0] = 'B';
-  handles[1] = SD.open(buf, FILE_WRITE);
-  buf[0] = 'C';
-  handles[2] = SD.open(buf, FILE_WRITE);
-  buf[0] = 'D';
-  handles[3] = SD.open(buf, FILE_WRITE);
-  buf[0] = 'X';
-  handles[4] = SD.open(buf, FILE_READ);
-  if (handles[0]) Serial.println("Open OK for A.TXT");
-  if (handles[1]) Serial.println("Open OK for B.TXT");
-  if (handles[2]) Serial.println("Open OK for C.TXT");
-  if (handles[3]) Serial.println("Open OK for D.TXT");
-  if (handles[4]) Serial.println("Open OK for X.TXT");
-  // all of these will succeed except for X.TXT because
-  // the others are all open for FILE_WRITE and so will create a file if it does not exist
-  // X.TXT is open for FILE_READ. Since it does not exist it will fail.
-  Serial.println("Finished open test");
-
-  // Try reading first few bytes from each file
-  for (int i=0; i<5; i++) {
-    Serial.print("Read from file ");
-    Serial.print(i);
-    Serial.print(": ");
-    handles[i].seek(0L);
-    for (int j=0; j<16; j++) {
-      Serial.write(handles[i].read());
-    }
-    Serial.println();
-  }
-
-  // Replace some bytes in A.TXT
-  handles[0].seek(5L);
-  handles[0].write('I');
-  handles[0].write('S');
-  handles[0].flush();
-
-  // Try reading first few bytes from each file again
-  for (int i=0; i<5; i++) {
-    Serial.print("Read from file ");
-    Serial.print(i);
-    Serial.print(": ");
-    handles[i].seek(0L);
-    for (int j=0; j<16; j++) {
-      Serial.write(handles[i].read());
-    }
-    Serial.println();
-  }
-
-  // Restore bytes in A.TXT
-  handles[0].seek(5L);
-  handles[0].write('i');
-  handles[0].write('s');
-  handles[0].flush();
-
-  for (int i=0; i<5; i++) {
-    handles[i].close();
-  }
-
-  // try some auto-generated file names
-  // ..this is pretty slow. May want to restrict it to 100 files. BUT
-  // there is no failure mechanism..
-  for (int i=0; i<5; i++) {
-    buf[0] = 0;
-    auto_name(buf);
-    Serial.println(buf);
+    buf[0] = 'A';
+    buf[1] = '.';
+    buf[2] = 'T';
+    buf[3] = 'X';
+    buf[4] = 'T';
+    buf[5] = 0;
     handles[0] = SD.open(buf, FILE_WRITE);
-    if (handles[0]) {
-      handles[0].write('x');
-      handles[0].flush();
-      handles[0].close();
+    buf[0] = 'B';
+    handles[1] = SD.open(buf, FILE_WRITE);
+    buf[0] = 'C';
+    handles[2] = SD.open(buf, FILE_WRITE);
+    buf[0] = 'D';
+    handles[3] = SD.open(buf, FILE_WRITE);
+    buf[0] = 'X';
+    handles[4] = SD.open(buf, FILE_READ);
+    if (handles[0]) Serial.println("Open OK for A.TXT");
+    if (handles[1]) Serial.println("Open OK for B.TXT");
+    if (handles[2]) Serial.println("Open OK for C.TXT");
+    if (handles[3]) Serial.println("Open OK for D.TXT");
+    if (handles[4]) Serial.println("Open OK for X.TXT");
+    // all of these will succeed except for X.TXT because
+    // the others are all open for FILE_WRITE and so will create a file if it does not exist
+    // X.TXT is open for FILE_READ. Since it does not exist it will fail.
+    Serial.println("Finished open test");
+
+    // Try reading first few bytes from each file
+    for (int i=0; i<5; i++) {
+        Serial.print("Read from file ");
+        Serial.print(i);
+        Serial.print(": ");
+        handles[i].seek(0L);
+        for (int j=0; j<16; j++) {
+            Serial.write(handles[i].read());
+        }
+        Serial.println();
     }
-    else {
-      Serial.print("Tried to open ");
-      Serial.print(buf);
-      Serial.println(" but open failed");
+
+    // Replace some bytes in A.TXT
+    handles[0].seek(5L);
+    handles[0].write('I');
+    handles[0].write('S');
+    handles[0].flush();
+
+    // Try reading first few bytes from each file again
+    for (int i=0; i<5; i++) {
+        Serial.print("Read from file ");
+        Serial.print(i);
+        Serial.print(": ");
+        handles[i].seek(0L);
+        for (int j=0; j<16; j++) {
+            Serial.write(handles[i].read());
+        }
+        Serial.println();
     }
-  }
-  while (1) {}
+
+    // Restore bytes in A.TXT
+    handles[0].seek(5L);
+    handles[0].write('i');
+    handles[0].write('s');
+    handles[0].flush();
+
+    for (int i=0; i<5; i++) {
+        handles[i].close();
+    }
+
+    // try some auto-generated file names
+    // ..this is pretty slow. May want to restrict it to 100 files. BUT
+    // there is no failure mechanism..
+    for (int i=0; i<5; i++) {
+        buf[0] = 0;
+        auto_name(buf);
+        Serial.println(buf);
+        handles[0] = SD.open(buf, FILE_WRITE);
+        if (handles[0]) {
+            handles[0].write('x');
+            handles[0].flush();
+            handles[0].close();
+        }
+        else {
+            Serial.print("Tried to open ");
+            Serial.print(buf);
+            Serial.println(" but open failed");
+        }
+    }
+    while (1) {}
 }
 
 #else
 // Each pass through loop handles 1 command to completion
 // and leaves the Target set up as a receiver.
 void loop() {
-  //Serial.println("Start command wait");
+    //Serial.println("Start command wait");
 
-  int cmd_data = get_value();
-  // Turn off the ERROR LED in anticipation
-  digitalWrite(PIN_ERROR, 0);
+    int cmd_data = get_value();
+    // Turn off the ERROR LED in anticipation
+    digitalWrite(PIN_ERROR, 0);
 
-  Serial.print("Command ");
-  Serial.println(cmd_data,HEX);
+    Serial.print("Command ");
+    Serial.println(cmd_data,HEX);
 
-  switch (cmd_data) {
+    switch (cmd_data) {
     case 0x100 | CMD_NOP:
-      break; // let Host decide that we're alive
+        break; // let Host decide that we're alive
     case 0x100 | CMD_RESTORE_STATE:
-      cmd_restore_state();
-      break;
+        cmd_restore_state();
+        break;
     case 0x100 | CMD_SAVE_STATE:
-      cmd_save_state();
-      break;
+        cmd_save_state();
+        break;
     case 0x100 | CMD_LOOP:
-      cmd_loop();
-      break;
+        cmd_loop();
+        break;
     case 0x100 | CMD_DIR:
-      cmd_dir();
-      break;
+        cmd_dir();
+        break;
     case 0x100 | CMD_STATUS:
-      cmd_status();
-      break;
+        cmd_status();
+        break;
     case 0x100 | CMD_INFO:
-      cmd_info();
-      break;
+        cmd_info();
+        break;
     case 0x100 | CMD_STOP:
-      cmd_stop();
-      break;
-    // These are command that accept a FID in bits [2:0]
-    // This is cumbersome but should generate efficient code..
+        cmd_stop();
+        break;
+        // These are command that accept a FID in bits [2:0]
+        // This is cumbersome but should generate efficient code..
     case 0x100 | CMD_OPEN | 0:
     case 0x100 | CMD_OPEN | 1:
     case 0x100 | CMD_OPEN | 2:
@@ -446,8 +446,8 @@ void loop() {
     case 0x100 | CMD_OPEN | 4:
     case 0x100 | CMD_OPEN | 5:
     case 0x100 | CMD_OPEN | 7:
-      cmd_open(fid(cmd_data & 0x7), FILE_WRITE);
-      break;
+        cmd_open(fid(cmd_data & 0x7), FILE_WRITE);
+        break;
     case 0x100 | CMD_OPENR | 0:
     case 0x100 | CMD_OPENR | 1:
     case 0x100 | CMD_OPENR | 2:
@@ -455,8 +455,8 @@ void loop() {
     case 0x100 | CMD_OPENR | 4:
     case 0x100 | CMD_OPENR | 5:
     case 0x100 | CMD_OPENR | 7:
-      cmd_open(fid(cmd_data & 0x7), FILE_READ);
-      break;
+        cmd_open(fid(cmd_data & 0x7), FILE_READ);
+        break;
     case 0x100 | CMD_CLOSE | 0:
     case 0x100 | CMD_CLOSE | 1:
     case 0x100 | CMD_CLOSE | 2:
@@ -464,8 +464,8 @@ void loop() {
     case 0x100 | CMD_CLOSE | 4:
     case 0x100 | CMD_CLOSE | 5:
     case 0x100 | CMD_CLOSE | 7:
-      cmd_close(fid(cmd_data & 0x7));
-      break;
+        cmd_close(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_SEEK | 0:
     case 0x100 | CMD_SEEK | 1:
     case 0x100 | CMD_SEEK | 2:
@@ -473,8 +473,8 @@ void loop() {
     case 0x100 | CMD_SEEK | 4:
     case 0x100 | CMD_SEEK | 5:
     case 0x100 | CMD_SEEK | 7:
-      cmd_seek(fid(cmd_data & 0x7));
-      break;
+        cmd_seek(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_TS_SEEK | 0:
     case 0x100 | CMD_TS_SEEK | 1:
     case 0x100 | CMD_TS_SEEK | 2:
@@ -482,8 +482,8 @@ void loop() {
     case 0x100 | CMD_TS_SEEK | 4:
     case 0x100 | CMD_TS_SEEK | 5:
     case 0x100 | CMD_TS_SEEK | 7:
-      cmd_ts_seek(fid(cmd_data & 0x7));
-      break;
+        cmd_ts_seek(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_SECT_RD | 0:
     case 0x100 | CMD_SECT_RD | 1:
     case 0x100 | CMD_SECT_RD | 2:
@@ -491,8 +491,8 @@ void loop() {
     case 0x100 | CMD_SECT_RD | 4:
     case 0x100 | CMD_SECT_RD | 5:
     case 0x100 | CMD_SECT_RD | 7:
-      cmd_sect_rd(fid(cmd_data & 0x7));
-      break;
+        cmd_sect_rd(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_SECT_WR | 0:
     case 0x100 | CMD_SECT_WR | 1:
     case 0x100 | CMD_SECT_WR | 2:
@@ -500,8 +500,8 @@ void loop() {
     case 0x100 | CMD_SECT_WR | 4:
     case 0x100 | CMD_SECT_WR | 5:
     case 0x100 | CMD_SECT_WR | 7:
-      cmd_sect_wr(fid(cmd_data & 0x7));
-      break;
+        cmd_sect_wr(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_N_RD | 0:
     case 0x100 | CMD_N_RD | 1:
     case 0x100 | CMD_N_RD | 2:
@@ -509,8 +509,8 @@ void loop() {
     case 0x100 | CMD_N_RD | 4:
     case 0x100 | CMD_N_RD | 5:
     case 0x100 | CMD_N_RD | 7:
-      cmd_n_rd(fid(cmd_data & 0x7));
-      break;
+        cmd_n_rd(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_N_WR | 0:
     case 0x100 | CMD_N_WR | 1:
     case 0x100 | CMD_N_WR | 2:
@@ -518,8 +518,8 @@ void loop() {
     case 0x100 | CMD_N_WR | 4:
     case 0x100 | CMD_N_WR | 5:
     case 0x100 | CMD_N_WR | 7:
-      cmd_n_wr(fid(cmd_data & 0x7));
-      break;
+        cmd_n_wr(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_DEFAULT | 0:
     case 0x100 | CMD_DEFAULT | 1:
     case 0x100 | CMD_DEFAULT | 2:
@@ -527,8 +527,8 @@ void loop() {
     case 0x100 | CMD_DEFAULT | 4:
     case 0x100 | CMD_DEFAULT | 5:
     case 0x100 | CMD_DEFAULT | 7:
-      cmd_default(fid(cmd_data & 0x7));
-      break;
+        cmd_default(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_SIZE | 0:
     case 0x100 | CMD_SIZE | 1:
     case 0x100 | CMD_SIZE | 2:
@@ -536,8 +536,8 @@ void loop() {
     case 0x100 | CMD_SIZE | 4:
     case 0x100 | CMD_SIZE | 5:
     case 0x100 | CMD_SIZE | 7:
-      cmd_size(fid(cmd_data & 0x7));
-      break;
+        cmd_size(fid(cmd_data & 0x7));
+        break;
     case 0x100 | CMD_SIZE_RD | 0:
     case 0x100 | CMD_SIZE_RD | 1:
     case 0x100 | CMD_SIZE_RD | 2:
@@ -545,14 +545,14 @@ void loop() {
     case 0x100 | CMD_SIZE_RD | 4:
     case 0x100 | CMD_SIZE_RD | 5:
     case 0x100 | CMD_SIZE_RD | 7:
-      cmd_size_rd(fid(cmd_data & 0x7));
-      break;
+        cmd_size_rd(fid(cmd_data & 0x7));
+        break;
     default:
-      // Not a command or not a recognised command.
-      // Light the ERROR LED.
-      digitalWrite(PIN_ERROR, 1);
-      break;
-  }
+        // Not a command or not a recognised command.
+        // Light the ERROR LED.
+        digitalWrite(PIN_ERROR, 1);
+        break;
+    }
 }
 #endif
 
@@ -570,8 +570,8 @@ int rd_h2t(void) {
 // transfers initiated by the Host (cmd/parameters/data and got2h)
 // it's an indication that we need to do something.
 void wait4_hs_differ(void) {
-  while (my_t2h == rd_h2t()) {
-  }
+    while (my_t2h == rd_h2t()) {
+    }
 }
 
 
@@ -580,8 +580,8 @@ void wait4_hs_differ(void) {
 // it's an indication that the transfer we initiated has been
 // acknowledged by the host.
 void wait4_hs_match(void) {
-  while (my_t2h != rd_h2t()) {
-  }
+    while (my_t2h != rd_h2t()) {
+    }
 }
 
 
@@ -592,8 +592,8 @@ void wait4_hs_match(void) {
 // Theoretically we don't need to read the other handshake, we can rely
 // on our own copy. However, it seems more robust to do it like this.
 void set_hs_match(void) {
-  my_t2h = rd_h2t();
-  digitalWrite(PIN_T2H, my_t2h);
+    my_t2h = rd_h2t();
+    digitalWrite(PIN_T2H, my_t2h);
 }
 
 
@@ -602,8 +602,8 @@ void set_hs_match(void) {
 // theoretically we don't need to read the other handshake, we can rely
 // on our own copy. However, it seems more robust to do it like this.
 void set_hs_differ(void) {
-  my_t2h = 1 ^ rd_h2t();
-  digitalWrite(PIN_T2H, my_t2h);
+    my_t2h = 1 ^ rd_h2t();
+    digitalWrite(PIN_T2H, my_t2h);
 }
 
 
@@ -613,14 +613,14 @@ void set_hs_differ(void) {
 // byte (ie, bit8=0). Maybe should check this (eg by adding a parameter)
 // and erroring/recovering if it's not.
 unsigned int get_value(void) {
-  int value;
+    int value;
 
-  wait4_hs_differ(); // See initiation from Host
-  value = (digitalRead(PIN_CMD) << 8) |
-  (digitalRead(PIN_XD7) << 7) | (digitalRead(PIN_XD6) << 6) | (digitalRead(PIN_XD5) << 5) | (digitalRead(PIN_XD4) << 4) |
-  (digitalRead(PIN_XD3) << 3) | (digitalRead(PIN_XD2) << 2) | (digitalRead(PIN_XD1) << 1) | (digitalRead(PIN_XD0));
-  set_hs_match(); // Ack to Host
-  return value;
+    wait4_hs_differ(); // See initiation from Host
+    value = (digitalRead(PIN_CMD) << 8) |
+        (digitalRead(PIN_XD7) << 7) | (digitalRead(PIN_XD6) << 6) | (digitalRead(PIN_XD5) << 5) | (digitalRead(PIN_XD4) << 4) |
+        (digitalRead(PIN_XD3) << 3) | (digitalRead(PIN_XD2) << 2) | (digitalRead(PIN_XD1) << 1) | (digitalRead(PIN_XD0));
+    set_hs_match(); // Ack to Host
+    return value;
 }
 
 
@@ -630,31 +630,31 @@ unsigned int get_value(void) {
 // at the end: if final_direction==INPUT, do a bus turn-around
 // at the end.
 void put_value(unsigned char val, char final_direction) {
-  if (direction == INPUT) {
-    // Start of GoT2H cell. Start with handshakes match, end with handshakes differ
-    wait4_hs_differ(); // See initiation from Host
-    direction = OUTPUT;
-    set_data_dir(direction);
-  }
+    if (direction == INPUT) {
+        // Start of GoT2H cell. Start with handshakes match, end with handshakes differ
+        wait4_hs_differ(); // See initiation from Host
+        direction = OUTPUT;
+        set_data_dir(direction);
+    }
 
-  // Start of Target->Host cell. Start and end with handshakes differ
-  digitalWrite(PIN_XD7, 1 & (val>>7));
-  digitalWrite(PIN_XD6, 1 & (val>>6));
-  digitalWrite(PIN_XD5, 1 & (val>>5));
-  digitalWrite(PIN_XD4, 1 & (val>>4));
-  digitalWrite(PIN_XD3, 1 & (val>>3));
-  digitalWrite(PIN_XD2, 1 & (val>>2));
-  digitalWrite(PIN_XD1, 1 & (val>>1));
-  digitalWrite(PIN_XD0, 1 & (val>>0));
+    // Start of Target->Host cell. Start and end with handshakes differ
+    digitalWrite(PIN_XD7, 1 & (val>>7));
+    digitalWrite(PIN_XD6, 1 & (val>>6));
+    digitalWrite(PIN_XD5, 1 & (val>>5));
+    digitalWrite(PIN_XD4, 1 & (val>>4));
+    digitalWrite(PIN_XD3, 1 & (val>>3));
+    digitalWrite(PIN_XD2, 1 & (val>>2));
+    digitalWrite(PIN_XD1, 1 & (val>>1));
+    digitalWrite(PIN_XD0, 1 & (val>>0));
 
-  set_hs_match(); // Initiate
-  wait4_hs_differ(); // See ack from Host
-  if (final_direction == INPUT) {
-    // Start of GoH2T cell. Start with handshakes differ, end with handshakes match.
-    direction = INPUT;
-    set_data_dir(direction);
-    set_hs_match();
-  }
+    set_hs_match(); // Initiate
+    wait4_hs_differ(); // See ack from Host
+    if (final_direction == INPUT) {
+        // Start of GoH2T cell. Start with handshakes differ, end with handshakes match.
+        direction = INPUT;
+        set_data_dir(direction);
+        set_hs_match();
+    }
 }
 
 
@@ -664,7 +664,7 @@ void put_value(unsigned char val, char final_direction) {
 // given a fid, see wherher it references the default fid and,
 // if so, replace it
 char fid(char fid) {
-  return (fid == 7) ? default_fid : fid;
+    return (fid == 7) ? default_fid : fid;
 }
 
 
@@ -673,27 +673,27 @@ char fid(char fid) {
 // By using next_file as a hint we only have to do the (slow)
 // search for the first free file once per boot.
 void auto_name(char *buffer) {
-  if (buffer[0] == 0) {
-    buffer[0] = 'N';
-    buffer[1] = 'A';
-    buffer[2] = 'S';
-    buffer[6] = '.';
-    buffer[7] = 'B';
-    buffer[8] = 'I';
-    buffer[9] = 'N';
-    buffer[10] = 0;
-    while (next_file<1000) {
-      buffer[3] = '0' + int(next_file/100);
-      buffer[4] = '0' + ((int(next_file/10)) %10);
-      buffer[5] = '0' + (next_file %10);
-      next_file++;
-      if (! SD.exists(buffer)) {
-        // does not exist; just what we're looking for
-        return;
-      }
-      // give up. File open will fail.
+    if (buffer[0] == 0) {
+        buffer[0] = 'N';
+        buffer[1] = 'A';
+        buffer[2] = 'S';
+        buffer[6] = '.';
+        buffer[7] = 'B';
+        buffer[8] = 'I';
+        buffer[9] = 'N';
+        buffer[10] = 0;
+        while (next_file<1000) {
+            buffer[3] = '0' + int(next_file/100);
+            buffer[4] = '0' + ((int(next_file/10)) %10);
+            buffer[5] = '0' + (next_file %10);
+            next_file++;
+            if (! SD.exists(buffer)) {
+                // does not exist; just what we're looking for
+                return;
+            }
+            // give up. File open will fail.
+        }
     }
-  }
 }
 
 
@@ -703,48 +703,48 @@ void auto_name(char *buffer) {
 // form NASxxx.BIN
 // ASSUME: direction is INPUT
 void get_filename(char *buffer) {
-  int index = 0;
-  char val;
+    int index = 0;
+    char val;
 
-  while (1) {
-    val = get_value();
-    buffer[index++] = val;
-    if ((val == 0) | (index == BUFFER)) {
+    while (1) {
+        val = get_value();
+        buffer[index++] = val;
+        if ((val == 0) | (index == BUFFER)) {
 
-      // truncate the string in the case where the buffer is
-      // full. Redundant if the buffer is not full or if the
-      // buffer is exactly full (in which case, val==0)
-      buffer[BUFFER-1] = 0;
-      auto_name(buffer);
-      Serial.println(buffer);
-      return;
+            // truncate the string in the case where the buffer is
+            // full. Redundant if the buffer is not full or if the
+            // buffer is exactly full (in which case, val==0)
+            buffer[BUFFER-1] = 0;
+            auto_name(buffer);
+            Serial.println(buffer);
+            return;
+        }
     }
-  }
 }
 
 
 // Get a 32-bit value from the host.
 long get_value32(void) {
-  long offset;
+    long offset;
 
-  offset = (long)get_value();
-  offset = offset | ((long)get_value() << 8);
-  offset = offset | ((long)get_value() << 16);
-  offset = offset | ((long)get_value() << 24);
-  return offset;
+    offset = (long)get_value();
+    offset = offset | ((long)get_value() << 8);
+    offset = offset | ((long)get_value() << 16);
+    offset = offset | ((long)get_value() << 24);
+    return offset;
 }
 
 
 // set direction to OUTPUT (T2H) or INPUT (H2T)
 void set_data_dir(int my_dir) {
-  pinMode(PIN_XD7, my_dir);
-  pinMode(PIN_XD6, my_dir);
-  pinMode(PIN_XD5, my_dir);
-  pinMode(PIN_XD4, my_dir);
-  pinMode(PIN_XD3, my_dir);
-  pinMode(PIN_XD2, my_dir);
-  pinMode(PIN_XD1, my_dir);
-  pinMode(PIN_XD0, my_dir);
+    pinMode(PIN_XD7, my_dir);
+    pinMode(PIN_XD6, my_dir);
+    pinMode(PIN_XD5, my_dir);
+    pinMode(PIN_XD4, my_dir);
+    pinMode(PIN_XD3, my_dir);
+    pinMode(PIN_XD2, my_dir);
+    pinMode(PIN_XD1, my_dir);
+    pinMode(PIN_XD0, my_dir);
 }
 
 
@@ -756,8 +756,8 @@ void set_data_dir(int my_dir) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_restore_state(void) {
-  status = restore_state(0);
-  put_value(status, INPUT);
+    status = restore_state(0);
+    put_value(status, INPUT);
 }
 
 
@@ -769,26 +769,26 @@ void cmd_restore_state(void) {
 // return TRUE if file exists and readable
 // return FALSE otherwise
 int restore_state(int auto_restore) {
-  Serial.println("TODO restore_state");
+    Serial.println("TODO restore_state");
 
-  // TODO for now, just attempt to load DSK0.BIN etc.
-  buf[0] = 'D';
-  buf[1] = 'S';
-  buf[2] = 'K';
-  buf[3] = '0';
-  buf[4] = '.';
-  buf[5] = 'B';
-  buf[6] = 'I';
-  buf[7] = 'N';
-  buf[8] = 0;
-  handles[0] = SD.open(buf, FILE_WRITE);
-  buf[3] = '1';
-  handles[1] = SD.open(buf, FILE_WRITE);
-  buf[3] = '2';
-  handles[2] = SD.open(buf, FILE_WRITE);
-  buf[3] = '3';
-  handles[3] = SD.open(buf, FILE_WRITE);
-  return (handles[0] && handles[1] && handles[2] && handles[3]);
+    // TODO for now, just attempt to load DSK0.BIN etc.
+    buf[0] = 'D';
+    buf[1] = 'S';
+    buf[2] = 'K';
+    buf[3] = '0';
+    buf[4] = '.';
+    buf[5] = 'B';
+    buf[6] = 'I';
+    buf[7] = 'N';
+    buf[8] = 0;
+    handles[0] = SD.open(buf, FILE_WRITE);
+    buf[3] = '1';
+    handles[1] = SD.open(buf, FILE_WRITE);
+    buf[3] = '2';
+    handles[2] = SD.open(buf, FILE_WRITE);
+    buf[3] = '3';
+    handles[3] = SD.open(buf, FILE_WRITE);
+    return (handles[0] && handles[1] && handles[2] && handles[3]);
 }
 
 // save configuration to file
@@ -812,8 +812,8 @@ int restore_state(int auto_restore) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_save_state(void) {
-  Serial.println("TODO cmd_save_state");
-  put_value(1, INPUT);
+    Serial.println("TODO cmd_save_state");
+    put_value(1, INPUT);
 }
 
 
@@ -822,7 +822,7 @@ void cmd_save_state(void) {
 //
 // RESPONSE: 1 byte. Does not update global status
 void cmd_loop(void) {
-  put_value(0xff ^ get_value(), INPUT);
+    put_value(0xff ^ get_value(), INPUT);
 }
 
 
@@ -831,60 +831,60 @@ void cmd_loop(void) {
 //
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_dir(void) {
-  File root = SD.open("/");
-  root.rewindDirectory();
-  File entry;
+    File root = SD.open("/");
+    root.rewindDirectory();
+    File entry;
 
-  while (entry = root.openNextFile()) {
-    int len = 15;
-    char * name = entry.name();
-    while (*name != 0) {
-      put_value(*name++, OUTPUT);
-      len--;
-    }
+    while (entry = root.openNextFile()) {
+        int len = 15;
+        char * name = entry.name();
+        while (*name != 0) {
+            put_value(*name++, OUTPUT);
+            len--;
+        }
 
-    if (entry.isDirectory()) {
-      put_value('/', OUTPUT);
-    }
-    else {
-      // Print file size in bytes. Max file size is 2gb ie 10 digits
-      int pad=0;
-      long i=1000000000;
-      long n = entry.size();
-      long dig;
-      
-      while (len > 0) {
-        put_value(' ', OUTPUT);
-        len--;
-      }
-
-      while (i > 0) {
-        dig = n/i; // integer division with truncation
-        n = n % i; // remainder
-        if ((dig > 0) | (pad==1) | (i==1)) {
-            pad = 1;
-            put_value('0'+dig, OUTPUT);
+        if (entry.isDirectory()) {
+            put_value('/', OUTPUT);
         }
         else {
+            // Print file size in bytes. Max file size is 2gb ie 10 digits
+            int pad=0;
+            long i=1000000000;
+            long n = entry.size();
+            long dig;
+      
+            while (len > 0) {
+                put_value(' ', OUTPUT);
+                len--;
+            }
+
+            while (i > 0) {
+                dig = n/i; // integer division with truncation
+                n = n % i; // remainder
+                if ((dig > 0) | (pad==1) | (i==1)) {
+                    pad = 1;
+                    put_value('0'+dig, OUTPUT);
+                }
+                else {
+                    put_value(' ', OUTPUT);
+                }
+                i = i/10;
+            }
             put_value(' ', OUTPUT);
+            put_value('b', OUTPUT);
+            put_value('y', OUTPUT);
+            put_value('t', OUTPUT);
+            put_value('e', OUTPUT);
+            put_value('s', OUTPUT);
         }
-        i = i/10;
-      }
-      put_value(' ', OUTPUT);
-      put_value('b', OUTPUT);
-      put_value('y', OUTPUT);
-      put_value('t', OUTPUT);
-      put_value('e', OUTPUT);
-      put_value('s', OUTPUT);
+        put_value(0x0d, OUTPUT);
+        put_value(0x0a, OUTPUT);
+        entry.close();
     }
-    put_value(0x0d, OUTPUT);
-    put_value(0x0a, OUTPUT);
-    entry.close();
-  }
-  // Tidy up and finish
-  put_value(0,INPUT);
-  root.close();
-  return;
+    // Tidy up and finish
+    put_value(0,INPUT);
+    root.close();
+    return;
 }
 
 
@@ -893,29 +893,29 @@ void cmd_dir(void) {
 //
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_info(void) {
-  Serial.println("Info");
-  for (int i=0; i<5; i++) {
-    put_value(0x30 + i,OUTPUT);
-    put_value(':',OUTPUT);
-    put_value(' ',OUTPUT);
-    Serial.print(i);
-    Serial.print(": ");
-    if (handles[i]) {
-      char * name = handles[i].name();
-      while (*name != 0) {
-        Serial.print(*name);
-        put_value(*name++, OUTPUT);
-      }
+    Serial.println("Info");
+    for (int i=0; i<5; i++) {
+        put_value(0x30 + i,OUTPUT);
+        put_value(':',OUTPUT);
+        put_value(' ',OUTPUT);
+        Serial.print(i);
+        Serial.print(": ");
+        if (handles[i]) {
+            char * name = handles[i].name();
+            while (*name != 0) {
+                Serial.print(*name);
+                put_value(*name++, OUTPUT);
+            }
+        }
+        else {
+            put_value('-',OUTPUT);
+            Serial.print('-');
+        }
+        Serial.println();
+        put_value(0x0d,OUTPUT);
+        put_value(0x0a,OUTPUT);
     }
-    else {
-      put_value('-',OUTPUT);
-      Serial.print('-');
-    }
-    Serial.println();
-    put_value(0x0d,OUTPUT);
-    put_value(0x0a,OUTPUT);
-  }
-  put_value(0,INPUT);
+    put_value(0,INPUT);
 }
 
 
@@ -924,14 +924,14 @@ void cmd_info(void) {
 //
 // RESPONSE: none.
 void cmd_stop(void) {
-  set_data_dir(INPUT);
-  pinMode(PIN_H2T, INPUT);
-  pinMode(PIN_T2H, INPUT);
-  pinMode(PIN_CMD, INPUT);
-  pinMode(PIN_ERROR, INPUT);
-  Serial.println("cmd_stop - wait for reset");
-  while (1) {
-  }
+    set_data_dir(INPUT);
+    pinMode(PIN_H2T, INPUT);
+    pinMode(PIN_T2H, INPUT);
+    pinMode(PIN_CMD, INPUT);
+    pinMode(PIN_ERROR, INPUT);
+    Serial.println("cmd_stop - wait for reset");
+    while (1) {
+    }
 }
 
 
@@ -939,10 +939,10 @@ void cmd_stop(void) {
 //
 // RESPONSE: none. Does not update global status
 void cmd_close(char fid) {
-  if (handles[fid]) {
-    // file handle is currently in use
-    handles[fid].close();
-  }
+    if (handles[fid]) {
+        // file handle is currently in use
+        handles[fid].close();
+    }
 }
 
 
@@ -961,21 +961,21 @@ void cmd_close(char fid) {
 // with a file) or FALSE on error (fid is now unused)
 // Updates global status
 void cmd_open(char fid, int mode) {
-  status = 0;
+    status = 0;
 
-  get_filename(buf);
+    get_filename(buf);
 
-  if (handles[fid]) {
-    // file handle is currently in use
-    handles[fid].close();
-  }
+    if (handles[fid]) {
+        // file handle is currently in use
+        handles[fid].close();
+    }
 
-  handles[fid] = SD.open(buf, mode);
-  if (handles[fid]) {
-    status = handles[fid].seek(0);
-  }
+    handles[fid] = SD.open(buf, mode);
+    if (handles[fid]) {
+        status = handles[fid].seek(0);
+    }
 
-  put_value(status, INPUT);
+    put_value(status, INPUT);
 }
 
 
@@ -988,21 +988,21 @@ void cmd_open(char fid, int mode) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_ts_seek(char fid) {
-  status = 0;
-  int track = get_value();
-  int sector = get_value();
-  if (handles[fid]) {
-//    Serial.print("Seek to track ");
-//    Serial.print(track,HEX);
-//    Serial.print(" sector" );
-//    Serial.println(sector,HEX);
-    long offset = ((long)SECTORS_PER_TRACK * (long)track + (long)sector) * (long)BYTES_PER_SECTOR;
-    status = handles[fid].seek(offset);
-  }
-  else {
-    Serial.print("Seek to track but no disk");
-  }
-  put_value(status, INPUT);
+    status = 0;
+    int track = get_value();
+    int sector = get_value();
+    if (handles[fid]) {
+        //    Serial.print("Seek to track ");
+        //    Serial.print(track,HEX);
+        //    Serial.print(" sector" );
+        //    Serial.println(sector,HEX);
+        long offset = ((long)SECTORS_PER_TRACK * (long)track + (long)sector) * (long)BYTES_PER_SECTOR;
+        status = handles[fid].seek(offset);
+    }
+    else {
+        Serial.print("Seek to track but no disk");
+    }
+    put_value(status, INPUT);
 }
 
 
@@ -1013,37 +1013,37 @@ void cmd_ts_seek(char fid) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_seek(char fid) {
-  status = 0;
+    status = 0;
 
-  if (handles[fid]) {
-    status = handles[fid].seek(get_value32());
-  }
-  put_value(status, INPUT);
+    if (handles[fid]) {
+        status = handles[fid].seek(get_value32());
+    }
+    put_value(status, INPUT);
 }
 
 
 // Helper for cmd_n_wr(), cmd_sect_wr()
 void n_wr(char fid, long count) {
-  long written = 0L;
-  status = 0;
+    long written = 0L;
+    status = 0;
 
-//  Serial.print("Write byte count ");
-//  Serial.println(count,HEX);
+    //  Serial.print("Write byte count ");
+    //  Serial.println(count,HEX);
 
-  if (handles[fid]) {
-     for (long i = 0L; i< count; i++) {
-      written = written + handles[fid].write(get_value());
-     }
-     status = written == count;
-     // polite and rugged to do this
-     handles[fid].flush();
-  }
-  else {
-     for (long i = 0L; i< count; i++) {
-       get_value(); // need this NOT to get optimised away
-     }
-  }
-  put_value(status, INPUT);
+    if (handles[fid]) {
+        for (long i = 0L; i< count; i++) {
+            written = written + handles[fid].write(get_value());
+        }
+        status = written == count;
+        // polite and rugged to do this
+        handles[fid].flush();
+    }
+    else {
+        for (long i = 0L; i< count; i++) {
+            get_value(); // need this NOT to get optimised away
+        }
+    }
+    put_value(status, INPUT);
 }
 
 
@@ -1053,8 +1053,8 @@ void n_wr(char fid, long count) {
 //
 // RESPONSE: send TRUE or FALSE response to host. Updates global status
 void cmd_n_wr(char fid) {
-  Serial.println("CMD_N_WR");
-  n_wr(fid, get_value32());
+    Serial.println("CMD_N_WR");
+    n_wr(fid, get_value32());
 }
 
 
@@ -1063,33 +1063,33 @@ void cmd_n_wr(char fid) {
 //
 // RESPONSE: send TRUE or FALSE response to host. Updates global status
 void cmd_sect_wr(char fid) {
-  n_wr(fid, BYTES_PER_SECTOR);
+    n_wr(fid, BYTES_PER_SECTOR);
 }
 
 
 // helper for cmd_n_rd(), cmd_sect_rd(), cmd_size_rd()
 void n_rd(char fid, long count) {
-  status = 0;
+    status = 0;
 
-//  Serial.print("Read for fid ");
-//  Serial.print(fid,HEX);
-//  Serial.print(" and byte count ");
-//  Serial.println(count,HEX);
+    //  Serial.print("Read for fid ");
+    //  Serial.print(fid,HEX);
+    //  Serial.print(" and byte count ");
+    //  Serial.println(count,HEX);
 
-  if (handles[fid]) {
-    for (long i = 0L; i< count; i++) {
-      // TODO should check for -1
-      // TODO probably better.. much faster.. to pass a buffer.
-      put_value(handles[fid].read(), OUTPUT);
+    if (handles[fid]) {
+        for (long i = 0L; i< count; i++) {
+            // TODO should check for -1
+            // TODO probably better.. much faster.. to pass a buffer.
+            put_value(handles[fid].read(), OUTPUT);
+        }
+        status = 1;
     }
-    status = 1;
-  }
-  else {
-    for (long i = 0L; i< count; i++) {
-      put_value(0, OUTPUT);
+    else {
+        for (long i = 0L; i< count; i++) {
+            put_value(0, OUTPUT);
+        }
     }
-  }
-  put_value(status, INPUT);
+    put_value(status, INPUT);
 }
 
 
@@ -1099,7 +1099,7 @@ void n_rd(char fid, long count) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_n_rd(char fid) {
-  n_rd(fid, get_value32());
+    n_rd(fid, get_value32());
 }
 
 
@@ -1108,7 +1108,7 @@ void cmd_n_rd(char fid) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_sect_rd(char fid) {
-  n_rd(fid, BYTES_PER_SECTOR);
+    n_rd(fid, BYTES_PER_SECTOR);
 }
 
 
@@ -1118,7 +1118,7 @@ void cmd_sect_rd(char fid) {
 // RESPONSE: sends TRUE or FALSE to host - value of global status
 // from most recent command that updates it
 void cmd_status(void) {
-  put_value(status, INPUT);
+    put_value(status, INPUT);
 }
 
 
@@ -1126,7 +1126,7 @@ void cmd_status(void) {
 //
 // RESPONSE: none.
 void cmd_default(char fid) {
-  default_fid = fid;
+    default_fid = fid;
 }
 
 
@@ -1135,12 +1135,12 @@ void cmd_default(char fid) {
 // RESPONSE: 4 bytes (file size, LS byte first),
 // followed by 1 status byte.
 void cmd_size(char fid) {
-   long size = handles[fid].size();
-   put_value( size        & 0xff, OUTPUT);
-   put_value((size >> 8)  & 0xff, OUTPUT);
-   put_value((size >> 16) & 0xff, OUTPUT);
-   put_value((size >> 24) & 0xff, OUTPUT);
-   put_value(0, INPUT); // TODO get status
+    long size = handles[fid].size();
+    put_value( size        & 0xff, OUTPUT);
+    put_value((size >> 8)  & 0xff, OUTPUT);
+    put_value((size >> 16) & 0xff, OUTPUT);
+    put_value((size >> 24) & 0xff, OUTPUT);
+    put_value(0, INPUT); // TODO get status
 }
 
 
@@ -1151,10 +1151,10 @@ void cmd_size(char fid) {
 // by all the bytes of the file, in order, followed by 1
 // status byte.
 void cmd_size_rd(char fid) {
-   long size = handles[fid].size();
-   put_value( size        & 0xff, OUTPUT);
-   put_value((size >> 8)  & 0xff, OUTPUT);
-   put_value((size >> 16) & 0xff, OUTPUT);
-   put_value((size >> 24) & 0xff, OUTPUT);
-   n_rd(fid, size);
+    long size = handles[fid].size();
+    put_value( size        & 0xff, OUTPUT);
+    put_value((size >> 8)  & 0xff, OUTPUT);
+    put_value((size >> 16) & 0xff, OUTPUT);
+    put_value((size >> 24) & 0xff, OUTPUT);
+    n_rd(fid, size);
 }
