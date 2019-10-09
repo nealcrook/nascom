@@ -9,7 +9,7 @@ These are programs in z80 assembler intended to run on the NASCOM.
 
 ## Development programs
 
-* sd_loop.asm - test program that uses the loopback command to send values and check that they are received back correclty.
+* sd_loop.asm - test program that uses the loopback command to send values and check that they are received back correctly.
 * sd_rd1.asm - test program for reading a file from SDcard into RAM
 * sd_wr1.asm - test program for writing RAM to SDcard
 
@@ -25,15 +25,57 @@ retyped in order to run one of the other two programs.
 * polydos_rom.asm - version of the PolyDos boot ROM that accesses the SDcard. Can be executed from RAM or ROM. 2Kbytes.
 * polydos_util_rom.asm - version of the PolyDos boot ROM that accesses the SDcard, combined with a cut-down version of the utils (so that they still fit in 2K). Can be executed from RAM or ROM. 2Kbytes.
 
+The (rom-based) utilities executed through a jump-table at the end of the ROM. The execution addresses shown below assume a ROM assembled at address $D800
+
+* E DFF4 -- CSUM
+* E DFF7 -- RDFILE
+* E DFFA -- WRFILE
+* E DFFD -- SCRAPE
+
+Examples:
+
+````
+E DFF4 1000 800
+````
+
+Calculate and report a checksum of the 800 (hex) bytes starting at address 1000 (hex).
+
+````
+E DFF7 1000 1234
+````
+
+Read file from SDcard into memory starting at address 1000 (hex). The transfer
+size is equal to the file size. The filename is NAS234.BIN - all but the number
+is hard-wired, and the number comes from the three digits come from the last 3
+digits of the argument (1234 in this example).
+
+````
+E DFFA 1000 800 2345
+E DFFA 1000 800
+````
+
+Write 800 (hex) bytes from memory to SDcard, starting at address 1000 (hex). In
+the first form, the filename is NAS345.BIN (see description above). In the
+second form, the filename is "auto-picked" -- the next free name of the form
+NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
+
+````
+E DFFD
+````
+
+Access the PolyDos floppy disk in drive 0 and copy its contents to a file on
+SDcard. The filename is "auto-picked" -- the next free name of the form
+NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
+
 
 ## PolyDos utilities
 
 * scrape.asm - intended to be run from PolyDos disk version. Copies physical disk images to SDcard file images
 * setdrv.asm - intended to be run from PolyDos SDcard version. Reports which SDcard files are associated with PolyDos drives, and allows them to be changed.
 * sddir.asm - intended to be run from PolyDos SDcard version. Reports directory listing of the SDcard.
-* cadsk.asm - intended to be run from PolyDos disk or SDcard version. Replaces NAS-SYS R, W commands so that some other program can be tricked into saving/loading to disk instead of to tape.
+* casdsk.asm - intended to be run from PolyDos disk or SDcard version. Replaces NAS-SYS R, W commands so that some other program can be tricked into saving/loading to disk instead of to tape.
 * scrape5.asm - intended to be run from PolyDos disk or SDcard version. Copies CP/M physical disk images to SDcard file images; assumes 35 track DSDD disks with 10 sectors per side, each of 512 bytes (so 35*10*2*512=350KBytes per disk).
-* sdoff.asm -  intended to be run from PolyDos SDcard version. Puts SDcard interface into a quescent state so that the PIO can be used for something else.
+* sdoff.asm -  intended to be run from PolyDos SDcard version. Puts SDcard interface into a quiescent state so that the PIO can be used for something else.
 
 ## Other utilities
 
