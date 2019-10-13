@@ -323,14 +323,14 @@ modified pinout of this connector is as follows (In/Out are shown with respect
 to the NASCOM):
 
 ````
-                             1   U   16 +5V
-                  RS232  In  2       15
-                             3       14 Out RS232 Out
-                   KBD-  In  4       13
-                   KBD+  In  5       12 Out PTR+
- NEW Tape DRIVE (TR2/C) Out  6       11 Out PTR-
- NEW    Uart In (LK3/In) In  7       10 Out Uart Out (IC29/25) NEW
-              RS232 COM GND  8       9  In  Ext Cl P1 (LK4/P1) NEW
+                               1   U   16 +5V
+                    RS232  In  2       15
+                               3       14 Out RS232 Out
+                     KBD-  In  4       13
+                     KBD+  In  5       12 Out PTR+
+ NEW Tape DRIVE (IC41/12) Out  6       11 Out PTR-
+ NEW      Uart In (LK3/In) In  7       10 Out Uart Out (IC29/25) NEW
+                RS232 COM GND  8       9  In  Ext Cl P1 (LK4/P1) NEW
 ````
 
 With these wires added, configure the links as follows:
