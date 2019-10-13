@@ -23,9 +23,13 @@
 // ** Alternative solution is to comment out one of the ROM images.
 //
 ////////////////////////////////////////////////////////////////////////////////
-// WIRING:
+// WIRING (assumes Arduino Uno/Nano)
 //
-// 1/ connection to uSDcard adaptor (assumes Uno/Nano)
+// ANA6/ANA7 ARE INPUT ONLY *AND* YOU CANNOT USE
+// digitalRead ON THEM - ONLY analogRead.
+//
+//
+// 1/ connection to uSDcard adaptor
 //
 // uSD                     ARDUINO
 // -------------------------------
@@ -40,7 +44,7 @@
 //
 // Name   Direction   ARDUINO   NASCOM 2
 // ---------------------------------------------------------------
-// NAS_DRIVE  IN       DIG6     pin 1       DRIVE OUT
+// NAS_DRIVE  IN       ANA6     pin 1       DRIVE OUT
 // NAS_TXD    IN       DIG7     pin 12      20mA OUT
 // RXD_NAS    OUT      DIG8     pin 9       20mA IN
 // SERCLK_NAS OUT      DIG9     pin 4 & 5   EXT TX CLK, EXT RX CLK
@@ -51,6 +55,12 @@
 // - Fit a 1OOK resistor from DIG 7/ pin 12 to 5V
 // - Fit a 33R series resistor on the DIG9 connection, at the Arduino end,
 //   to reduce overshoot on the bit clock to the NASCOM.
+//
+// 3/ connection to LED (optional)
+//
+// Name   Direction   ARDUINO   Notes
+// -----------------------------------
+// DRIVE  OUT         ANA2      To LED. Copies state of DRIVE
 //
 // NOTE: Power
 //
@@ -223,6 +233,15 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// Define for use on NASCOM1, comment out for use on NASCOM2
+// If defined:
+// - baud rate reduced from 1200 to 600
+// - serial comms is non-inverted.
+#define NASCOM1
+
+
+
+
 // If defined:
 // - uses SoftwareSerial to communicate, on pins 7,8. Maximum baud rate is
 //   4800 baud, inversion is done in software, hardware UART is used for debug
@@ -238,6 +257,7 @@
 
 
 // Arduio generates 16x clock for the NASCOM UART.
+//      600 baud need divide by 834
 // For 1200 baud need divide by 417 (19208Hz) <-- default on NASCOM 2
 //     2400                     208  <-- seems to work OK
 //     4800                     104  <-- seems to work OK on small blocks but not reliable
@@ -246,8 +266,19 @@
 //
 // The value of BAUD_RATE and BAUD_DIVISOR must always be consistent!
 #ifdef SOFTSERIAL
+#ifdef NASCOM1
+// NASCOM1 defaults
+#define BAUD_RATE (600)
+#define BAUD_DIVISOR (834)
+#define COUNT_FOR_RD (50000)
+#define SOFTSERIAL_INVERT (0)
+#else
+// NASCOM2 defaults
 #define BAUD_RATE (2400)
 #define BAUD_DIVISOR (208)
+#define COUNT_FOR_RD (66000)
+#define SOFTSERIAL_INVERT (1)
+#endif
 #define NASSERIAL mySerial
 #define DEBSERIAL Serial
 #define DELAY (0)
@@ -260,13 +291,12 @@
 #endif
 
 
-
-
 // Pin assignments (SERIAL)
-#define PIN_DRV 6
+#define PIN_DRV A6
 #define PIN_CLK 9
 #define PIN_NTXD 7
 #define PIN_NRXD 8
+#define PIN_LED A2
 
 // *not* the standard Arduino library (which has some bugs and performance
 // problems). Download from https://github.com/greiman/SdFat
@@ -411,7 +441,7 @@ unsigned int pause_delay = 10; // in seconds
 unsigned int nulls_delay = 100; // in milliseconds
 
 // arduino clock is 16MHz
-SoftwareSerial mySerial(PIN_NTXD, PIN_NRXD, 1); // RX, TX, INVERSE_LOGIC on pin
+SoftwareSerial mySerial(PIN_NTXD, PIN_NRXD, SOFTSERIAL_INVERT); // RX, TX, control INVERSE_LOGIC on pin
 
 SdFat SD;
 
@@ -425,8 +455,23 @@ void pr_freeRAM(void) {
   DEBSERIAL.println((int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
 }
 
+// get value of DRIVE. My current implementation maps this to A6
+// which can only be read using analogRead.
+// Echo its value on the LED (labelled "protocol error"..)
+int rd_drive(void) {
+    if (analogRead(PIN_DRV) > 500) {
+        digitalWrite(PIN_LED, 1);
+        return 0;
+    }
+    else {
+        digitalWrite(PIN_LED, 0);
+        return 1;
+    }
+}
+
 
 void setup()   {
+    pinMode(PIN_LED, OUTPUT);
     pinMode(PIN_DRV, INPUT);
 
     // Generate output clock that will be used as 16x clock for the NASCOM UART.
@@ -520,11 +565,11 @@ void loop() {
     //   it was being toggled in order to play a tune(!!)), it's a READ;
     //   supply the data from the specified place.
 
-    if (digitalRead(PIN_DRV) == 0) {
-        drive_on++;
+    if (rd_drive()) {
+        drive_on = 0;
     }
     else {
-        drive_on = 0;
+        drive_on++;
     }
 
     if (NASSERIAL.available()) {
@@ -542,7 +587,7 @@ void loop() {
             cmd_cass_wr();
         }
     }
-    else if (drive_on > 66000) {
+    else if (drive_on > COUNT_FOR_RD) {
         // File Load
         DEBSERIAL.println(F(">cmd_cass_rd"));
         drive_on = 0;
@@ -1244,7 +1289,7 @@ void abort_rd(const char * msg) {
     NASSERIAL.write("\x1b\x1b\x1b\x1b"); // F() doesn't work here, for some reason
 
     // wait for DRIVE pin to negate
-    while (digitalRead(PIN_DRV) == 0) {
+    while (!rd_drive()) {
     }
 
     pr_msg(msg, F_MSG_NASCAS + F_MSG_ERROR + F_MSG_CR);
@@ -1324,7 +1369,7 @@ void cmd_cass_rd() {
     }
 
     // wait for DRIVE pin to negate (on error, will already have done this)
-    while (digitalRead(PIN_DRV) == 0) {
+    while (!rd_drive()) {
     }
 }
 
@@ -1386,7 +1431,7 @@ void cmd_cass_wr(void) {
     if ( (handle = SD.open(cas_wr_name, FILE_WRITE | O_TRUNC)) ) {
         // have a file name and can open the file -> good to go!
         // while drive light is on, grab bytes and send them to disk
-        while (digitalRead(PIN_DRV) == 0) {
+        while (!rd_drive()) {
             if (NASSERIAL.available()) {
                 handle.write(NASSERIAL.read());
 
@@ -1408,7 +1453,7 @@ void cmd_cass_wr(void) {
     }
     else {
          // wait for pin to negate
-        while (digitalRead(PIN_DRV) == 0) { }
+        while (!rd_drive()) { }
         pr_msg(msg_err_open_fail, F_MSG_NASCAS + F_MSG_ERROR + F_MSG_CR);
     }
 
