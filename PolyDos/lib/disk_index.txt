@@ -40,10 +40,7 @@ PD000 -- PolyDos 2 System disk and SDcard utilities
    01c5 0001 0000 0000          SDOFF.GO              SD utility to disable SDcard so that PIO can be used for something else
    01c6 0002 1000 1000          SCRAPE.GO             SD utility to scrape PolyDos disk to SDcard
 
-
-
-
-
+--------------------------------------------------------------------------------------
 PD100 -- Languages
 ==================
 
@@ -51,6 +48,7 @@ forth.cas     HULL Forth, version 1.1              [Origin: virtual-nascom]
 hisoft.cas     E 1000  Hisoft Pascal               [Origin: virtual-nascom]
 blspas12.nas         BLS Pascal 1.2                [Origin: virtual-nascom]
 
+--------------------------------------------------------------------------------------
 PD200 -- INMC Classics
 ======================
 
@@ -58,6 +56,7 @@ pirana.cas     E 1000  Simple but classic, from INMC magazine. [Origin: virtual-
 ELIZA.nas              Clasic [Origin: virtual-nascom]
 
 
+--------------------------------------------------------------------------------------
 PD300 -- Games in Danish
 ========================
 
@@ -150,6 +149,7 @@ PD304 "More M/C Games" -- Miscellaneous machine-code games
    0004 006b 1000 1000          ASTROTRP.GO  -- Astrotraps, Deep Thought Software, 1982
 
 
+--------------------------------------------------------------------------------------
 PD400 -- BASIC Games
 ====================
 
@@ -272,6 +272,7 @@ PD405 "BASIC games 2" -- More BASIC Games (from Neal's collection)
    008f 0036 10d6 0000          STONEVIL.BS
    00c5 000d 10d6 0000          FIGHTER.BS
 
+--------------------------------------------------------------------------------------
 PD500.BIN "Adventure dev." -- Adventure engine based on article in Practical Computing
 ==========================
 
@@ -283,6 +284,108 @@ PD500.BIN "Adventure dev." -- Adventure engine based on article in Practical Com
    00ba 0007 1676 1006          Q.GO
    00c1 0001 0000 0000          REDODA.TX
    00c2 0012 0000 0000          DATABAS.TX
+
+--------------------------------------------------------------------------------------
+PD600.BIN NASCOM ROMs
+=====================
+
+Sect Nsct Load Exec SysFlg   Name
+   0004 0008 c800 0000 L        Exec.OV
+   000c 0005 c800 0000 L        Emsg.OV
+   0011 0006 c800 0000 L        Dfun.OV
+   0017 0003 c800 0000 L        Ecmd.OV
+   001a 0008 c800 0000 L        Edit.OV
+   0022 0001 c200 c200 L        Info.IN
+   0023 0001 c800 0000 L        BSfh.OV
+   0024 0010 b000 b000 L        BSdr.BR
+   0034 000d 0000 0000          CHARGEN.TX
+   0041 0008 0000 0000          README.TX
+   0049 0010 0000 0000          CHARGEN.GO
+   0059 0020 0000 0000          BASIC.GO
+   0079 0008 0000 0000          NASSYS3.GO
+   0081 0008 0000 0000          NASSYS3A.GO
+   0089 0008 0000 0000          NASSYS3N.GO
+   0091 0008 0000 0000          NASSYS3X.GO
+   0099 0008 0000 0000          NASPEN.GO
+   00a1 0008 0000 0000          POLY2.GO
+   00a9 0007 0000 0000          POLY3.GO
+
+
+PD601.BIN NAS-DOS ROMs
+======================
+
+  Sect Nsct Load Exec SysFlg   Name
+   0004 0008 c800 0000 L        Exec.OV
+   000c 0005 c800 0000 L        Emsg.OV
+   0011 0006 c800 0000 L        Dfun.OV
+   0017 0003 c800 0000 L        Ecmd.OV
+   001a 0008 c800 0000 L        Edit.OV
+   0022 0001 c200 c200 L        Info.IN
+   0023 0001 c800 0000 L        BSfh.OV
+   0024 0010 b000 b000 L        BSdr.BR
+   0034 0004 0000 0000          NASDOSDC.GO
+   0038 0004 0000 0000          NASDOSD8.GO
+   003c 0004 0000 0000          NASDOSD0.GO
+   0040 0004 0000 0000          NASDOSD4.GO
+   0044 0004 0000 0000          ND14MDC.GO
+   0048 0004 0000 0000          ND14DD0.GO
+   004c 0004 0000 0000          ND14MD0.GO
+   0050 0004 0000 0000          ND14DD8.GO
+   0054 0004 0000 0000          ND14DD4.GO
+   0058 0004 0000 0000          ND14MD8.GO
+   005c 0004 0000 0000          ND14DDC.GO
+   0060 0004 0000 0000          ND14MD4.GO
+   0064 0008 0000 0000          README.TX
+
+README.TX
+NASCOM ROM Images
+
+BASIC.GO    - (8Kb) NASCOM 8K ROM BASIC, load at £E000
+CHARGEN.GO  - (4Kb) NASCOM main and graphics character set
+CHARGEN.TX  -       Format of CHARGEN.GO
+NASSYS3.GO  - (2Kb) NAS-SYS 3, load at £0000
+NASSYS3A.GO - (2Kb) NAS-SYS 3A, load at £0000. As sold with
+                    NASCOM3 to provide AVC Disable
+NASSYS3N.GO - (2Kb) NAS-SYS 3N, load at £0000. For networked
+                    system?
+NASSYS3X.GO - (2Kb) NAS-SYS 3, load at £0000. Of unknown
+                    provenance
+NASPEN.GO   - (2Kb) NASPEN, load at £B800
+NASDOSD0.GO - (1Kb) NAS-DOS 1.2, load at £D000
+NASDOSD4.GO - (1Kb) NAS-DOS 1.2, load at £D400
+NASDOSD8.GO - (1Kb) NAS-DOS 1.2, load at £D800
+NASDOSDC.GO - (1Kb) NAS-DOS 1.2, load at £DC00
+                    Images dumped by Mike Strange
+                    Include Lucas copyright message
+
+ND14MD0.GO  - (1Kb) NAS-DOS 1.4, load at £D000
+ND14MD4.GO  - (1Kb) NAS-DOS 1.4, load at £D400
+ND14MD8.GO  - (1Kb) NAS-DOS 1.4, load at £D800
+ND14MDC.GO  - (1Kb) NAS-DOS 1.4, load at £DC00
+                    Images from "nasdos-1.4.rom" dumped
+                    by Malkavian "as found on a NASCOM 3".
+                    Different copyright dates from the
+                    other set but both announce themselves
+                    as "NAS-DOS 1"
+                    Include Lucas copyright message
+
+ND14DD0.GO  - (1Kb) NAS-DOS 1.4, load at £D000
+ND14DD4.GO  - (1Kb) NAS-DOS 1.4, load at £D400
+ND14DD8.GO  - (1Kb) NAS-DOS 1.4, load at £D800
+ND14DDC.GO  - (1Kb) NAS-DOS 1.4, load at £DC00
+                    Images from "Nasdos-disassembled.zip"
+                    by Malkavian.
+                    Identical to images from "Nas-Dos.zip"
+                    by Mike Strange.
+                    (ND14DDC.GO matches ND14MDC.GO)
+                    No Lucas copyright message
+
+POLY2.GO    - (2Kb) POLYDOS 2 boot ROM, load at £D000
+POLY3.GO    - (2Kb) POLYDOS 3 boot ROM, load at £D000 -- only
+                    1720 bytes. I assume the rest is unused
+
+--------------------------------------------------------------------------------------
+
 
 
 
