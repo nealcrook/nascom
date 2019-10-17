@@ -237,7 +237,7 @@
 // If defined:
 // - baud rate reduced from 1200 to 600
 // - serial comms is non-inverted.
-#define NASCOM1
+//#define NASCOM1
 
 
 
@@ -272,12 +272,14 @@
 #define BAUD_DIVISOR (834)
 #define COUNT_FOR_RD (50000)
 #define SOFTSERIAL_INVERT (0)
+#define DRIVE_INVERT (0)
 #else
 // NASCOM2 defaults
 #define BAUD_RATE (2400)
 #define BAUD_DIVISOR (208)
-#define COUNT_FOR_RD (66000)
+#define COUNT_FOR_RD (15000)
 #define SOFTSERIAL_INVERT (1)
+#define DRIVE_INVERT (1)
 #endif
 #define NASSERIAL mySerial
 #define DEBSERIAL Serial
@@ -460,12 +462,12 @@ void pr_freeRAM(void) {
 // Echo its value on the LED (labelled "protocol error"..)
 int rd_drive(void) {
     if (analogRead(PIN_DRV) > 500) {
-        digitalWrite(PIN_LED, 1);
-        return 0;
+        digitalWrite(PIN_LED, 1^DRIVE_INVERT);
+        return 0^DRIVE_INVERT;
     }
     else {
-        digitalWrite(PIN_LED, 0);
-        return 1;
+        digitalWrite(PIN_LED, 0^DRIVE_INVERT);
+        return 1^DRIVE_INVERT;
     }
 }
 
