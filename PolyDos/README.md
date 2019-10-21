@@ -1,5 +1,6 @@
 # PolyDos
 
+There is material here (ROM, disk images and documentation) for PolyDos 2 and PolyDos 3.
 
 ## Versions
 
@@ -14,7 +15,18 @@ Each version requires a different ROM. The ROM code is slightly less than
 2Kbytes, and was supplied in 2, 2708 parts assembled to be decoded at a start
 address of $D000.
 
-There is material here (ROM, disk images and documentation) for PolyDos 2 and PolyDos 3.
+* The PolyDos 2 35-track double-sided single-density format used 2 sides of 35 tracks of 10 sectors of 256 bytes (175Kbytes/disk)
+* The PolyDos 2 35-track double-sided double-density format used 2 sides of 35 tracks of 18 sectors of 256 bytes (315Kbytes/disk)
+* The PolyDos 3 80-track ??
+
+PolyDos uses linear block addressing, converted to tracks/sectors in the
+ROM. Sectors are allocated starting from the first track and allocating both
+sides before moving to the next track. The same format is used for the disk
+images here.
+
+The disk structure (directory format, file format etc.) is documented in the
+PolyDos system programmers guide, which is part of the .pdf bundle here.
+
 
 ## PolyDos-related material elsewhere
 
