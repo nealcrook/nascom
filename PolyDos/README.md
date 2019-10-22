@@ -17,7 +17,7 @@ address of $D000.
 
 * The PolyDos 2 35-track double-sided single-density format used 2 sides of 35 tracks of 10 sectors of 256 bytes (175Kbytes/disk)
 * The PolyDos 2 35-track double-sided double-density format used 2 sides of 35 tracks of 18 sectors of 256 bytes (315Kbytes/disk)
-* The PolyDos 3 80-track ??
+* The PolyDos 3 80-track single-sided double-density format used 1 side  of 80 tracks of 18 sectors of 256 bytes (360Kbytes/disk)
 
 PolyDos uses linear block addressing, converted to tracks/sectors in the
 ROM. Sectors are allocated starting from the first track and allocating both
