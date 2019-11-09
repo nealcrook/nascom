@@ -737,7 +737,7 @@ int foreach_vdisk_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
         // then convert to number of dirents at 20 bytes per entry.
         // Finally, this was the address of the first free entry and
         // so step back by 1 to get to the last used entry.
-        int last = (dirent.b[2] | (dirent.b[3] << 8)) - 0xc418;
+        unsigned int last = ((dirent.b[2] & 0xff) | (dirent.b[3] << 8)) - 0xc418;
         last = (last/sizeof(struct DIRENT)) - 1;
 
         for (int i=0; i<last; i++) {
