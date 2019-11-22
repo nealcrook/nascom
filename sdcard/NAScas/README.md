@@ -53,7 +53,7 @@ starting the bootstrap program.
 
 (the source code is here: https://github.com/nealcrook/nascom/sdcard/host_programs/serboot.asm)
 
-SERBOOT is tiny (~103 bytes). It provides a prompt and command loop. Its
+SERBOOT is tiny (~110 bytes). It provides a prompt and command loop. Its
 function is to relay commands to NAScas and to report responses. The prompt
 looks like this:
 
@@ -135,8 +135,8 @@ TO xxxx - relocate program to specified address.
 
 ````
 DF - directory of Flash
-DV - directory of virtual disk. Error if no virtual disk mounted.
-DS - directory of SDcard. Error if no SDcard present.
+DV - directory of virtual disk (with pager). Error if no virtual disk mounted.
+DS - directory of SDcard (with pager). Error if no SDcard present.
 ````
 
 ````
@@ -146,7 +146,7 @@ Otherwise, all file operations use the root directory of the SDcard.
 ````
 
 ````
-MO <file.xxx> - mount file as virtual disk. File can have any legal DOS 8.3 name. Error if no SDcard 
+MO <file.xxx> - mount file as virtual disk. File can have any legal DOS 8.3 name. Error if no SDcard
 present. Error if illegal file name. Error if file not found.
 ````
 
@@ -248,17 +248,16 @@ ribbon cable. The interface connects to:
 
 ## Current Status And Plans
 
-27Apr2019 - using the code here, all functions are working.
-20Sep2019 - I have designed a PCB and am awaiting its arrival from manufacture
+* 27Apr2019 - using the code here, all functions are working.
+* 20Sep2019 - I have designed a PCB and am awaiting its arrival from manufacture
+* 01Oct2019 - The PCB is up and running! I created a user guide.
+* 16Nov2019 - I reworked the serboot code to add a pager so (it grew from 103 to 110 bytes) and reworked the NAScas.ino to page directory listings for SDcard and Virtual Disk. Bumped revision number from 1.0 to 1.1
 
 
 Remaining tasks:
 
-* Make a smaller version
-* Create connection diagrams for NASCOM1 and NASCOM2
 * More photos
 * Youtube video?
-
 
 
 

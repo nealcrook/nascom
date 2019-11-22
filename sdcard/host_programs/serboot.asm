@@ -1,4 +1,4 @@
-;;; Boot/command-line Utility for the NAScas serial interface
+;;; NASCOM-resident code for the NAScas serial interface
 ;;;
 ;;; https://github.com/nealcrook/nascom
 ;;;
@@ -7,7 +7,7 @@
 ;;; be put in any convenient location.
 ;;;
 ;;; It provides a prompt and command loop and acts as a console, relaying
-;;; commands to the nascom_sdcard and reporting responses.
+;;; commands to the NAScas hardware and reporting responses.
 ;;;
 ;;; By default it is assembled to load at location 0c80 because there is RAM
 ;;; there on NASCOM 1 and NASCOM 2 systems.
@@ -30,24 +30,26 @@
 ;;; -------------
 ;;;
 ;;; The NASCOM should be configured for cassette operation with 1 stop bit.
-;;; Various baud rates are supported. The baud rate is set by a jumper on the
-;;; NAScas hardware and/or a configuration file or NVRAM setting
 ;;;
 ;;; Protocol
 ;;; --------
 ;;;
-;;; There is a command loop. When RETURN is pressed, the command is send on the
-;;; serial interface. The command is the whole line upto the last non-blank or
-;;; dot character. The line is terminated with a NUL (0x00).
+;;; serboot implements a command loop. When RETURN is pressed, the line (upto
+;;; the last non-blank or dot character, and terminated with a NUL (0x00))
+;;; is sent to NAScas across the serial interface. NAScas responds with one
+;;; of three codes:
 ;;;
-;;; NAScas responds with one of three codes:
 ;;; RSDONE - command complete. No response.
 ;;; RSMOVE hh ll - relocate the address given by following two bytes
-;;; RSMSG - print NUL-terminated text.
+;;; RSMSG - print byte string with pager:
+;;; - 0x00 : terminate string. Not echoed.
+;;; - 0x01 : message paused. Not echoed. Serboot waits for a key press
+;;;          which it sends to NAScas
+;;; - 0xNN : (any other byte) echoed.
 ;;;
-;;; This code remembers whether the last command was terminated with a . or not.
-;;; If no . then the prompt is displayed for another command. Otherwise, the
-;;; program returns to NAS-SYS.
+;;; serboot remembers whether the last command was terminated with a . or not.
+;;; If no . then the prompt is displayed for another command. Otherwise,
+;;; serboot terminates and returns to NAS-SYS.
 ;;; A blank line results in a new prompt with no communication with the NAScas
 ;;; hardware
 
@@ -121,7 +123,7 @@ nodot:  push    af              ;save Z. Later, exit if Z
 ;;; ready to send line out. B characters from HL onwards
 
 send:   ld      a,(hl)
-        SCAL    ZSRLX            ;send to serial port
+        SCAL    ZSRLX           ;send to serial port
         inc     hl
         djnz    send
 
@@ -166,13 +168,19 @@ move2:  ld      de,move2 - START;offset from start
         jr      z, exit         ;quit using code at current location
         ret                     ;jump to start of code at new location
 
+xprmsg: RST     ROUT            ;echo and drop through for more
 
-;;; RSMSG: print null-terminated string from NAScas hardware
-prmsg:  RST     RIN
+;;; RSMSG: print pageable null-terminated string from NAScas hardware
+prmsg:  RST     RIN             ;get character (from serial interface)
         or      a               ;is it NUL?
         jr      z, done         ;yes; ready for next command, if any
-        rst     ROUT
-        jr      prmsg           ;carry on with string
+        cp      1               ;is it PAUSE
+        jr      nz, xprmsg      ;anything else is echoed
+
+;;; pause/pager within RSMSG
+        RST     RIN             ;get character (from NASCOM keyboard)
+        SCAL    ZSRLX           ;and send to serial port
+        jr      prmsg           ;continue with print message
 
 ;;; RSDONE: recover Z and either exit or get the next command
 done:   pop     af

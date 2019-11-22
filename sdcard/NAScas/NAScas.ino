@@ -18,7 +18,7 @@
 // ** to change "#define USE_LONG_FILE_NAMES" from 1 to 0.
 //
 // ** By default the Nano ships with a larger boot loader than the Uno and
-// ** this code will not fit. Best solution is to reprogram the Nano boot
+// ** this code may not fit. Best solution is to reprogram the Nano boot
 // ** loader with the Uno code, then treat it as an Uno forever after.
 // ** Alternative solution is to comment out one of the ROM images.
 //
@@ -164,8 +164,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 // SD CARD FORMAT
 //
-// The SD card uses MSDOS FAT format. Store files either in the root directory
-// or in a directory named NASCOM.
+// The SD card uses MSDOS FAT format, with 8.3 filenames. This means that all
+// names must be in UPPER CASE. Store files either in the root directory or in
+// a directory named NASCOM.
 //
 // At reset or when the NEW command is issued, a check is made for the presence
 // of an SD card and, if one is found, the presence of a NASCOM directory.
@@ -220,9 +221,10 @@
 // these; it needs no modification for this task.
 
 // TODO
-
-// Add leading 0 to hex print - tried and my mod compiled but had no effect.
-// Did not get invoked?
+// "erase" could use the command-line buffer instead of parsing into a new buffer.
+// currently 31880 bytes rom 1112 bytes ram
+//           31404           1054           after change to FatFile etc.
+//
 // Make it work with serial comms faster than 2400bd. At one point I thought
 // the "softserial" library was the limiting factor but I read that it should
 // work OK at up to 9600bd with a 16MHz processor, and I tried using the
@@ -230,7 +232,6 @@
 // no improvement. Full discussion here:
 // https://github.com/nealcrook/nascom/blob/master/sdcard/NAScas/NASCOM_UART_performance.pdf
 //
-
 ////////////////////////////////////////////////////////////////////////////////
 
 // Define for use on NASCOM1, comment out for use on NASCOM2
@@ -360,8 +361,11 @@ extern int parse_fname_msdos(char **buf, char * dest);
 extern int parse_fname_polydos(char **buf, char * dest);
 
 
+// Maintained by open_sdcard()
+FatFile *working_dir;
+
 // Only ever have 1 file open at a time
-File handle;
+FatFile handle;
 
 
 // Boot ROM and some applications/games - stored in FLASH to save resources.
@@ -405,8 +409,7 @@ File handle;
 
 #define FS_SD_FOUND (3)
 #define FM_SD_FOUND (1 << FS_SD_FOUND)
-#define FS_NASDIR_FOUND (2)
-#define FM_NASDIR_FOUND (1 << FS_NASDIR_FOUND)
+// bit 2 is SPARE
 #define FS_VDISK_MOUNT (1)
 #define FM_VDISK_MOUNT (1 << FS_VDISK_MOUNT)
 // 0 do not auto-go, 1 automatically execute program if possible
@@ -429,6 +432,10 @@ char cas_vdisk_name[] = "NAS-XX00.DSK";
 // Index of directory entry for next Flash/Vdisk operation. At reset, the
 // boot device is Flash and 0 means the first file: SERBOOT.GO
 int dirindex = 0;
+
+// Used by screen_page_quit() to track lines output to the NASCOM during
+// directory listings
+int lines;
 
 // state for reading from Flash file-system
 int index;
@@ -577,12 +584,12 @@ void loop() {
     if (NASSERIAL.available()) {
         if (drive_on == 0) {
             // Receive and process a command
-            DEBSERIAL.println(F(">cmd_cass"));
+            DEBSERIAL.println(F("cmd_cas"));
             cmd_cass();
         }
         else {
             // File save
-            DEBSERIAL.print(F(">cmd_cass_wr count= "));
+            DEBSERIAL.print(F("wr. Count= "));
             DEBSERIAL.println(drive_on);
             drive_on = 0;
             // Write
@@ -591,10 +598,45 @@ void loop() {
     }
     else if (drive_on > COUNT_FOR_RD) {
         // File Load
-        DEBSERIAL.println(F(">cmd_cass_rd"));
+        DEBSERIAL.println(F("rd."));
         drive_on = 0;
         cmd_cass_rd();
     }
+}
+
+
+// After each line of output for the directory listing (the only thing that
+// can extend beyond 1 screen) this gets called. It returns TRUE if the
+// operation should be aborted, FALSE if it should continue.
+// It tracks output lines. When the bottom of the screen is reached it
+// pauses the output and gets a keypress from the NASCOM keyboard, which
+// determines whether to continue or not.
+char screen_page_quit()  {
+    char key;
+
+    lines = (lines + 1) % 14; // GLOBAL
+
+    if (lines == 0) {
+        // print message, cursor home (to start of line) then pause
+        NASSERIAL.print(F("Press [SPACE] to continue\x17\x01"));
+        // wait for keypress from NASCOM
+        while (!NASSERIAL.available()) {
+        }
+        key = NASSERIAL.read();
+
+        // clear the line then send cursor home
+        for (int i = 0; i< 45; i++) {
+            NASSERIAL.write(' ');
+        }
+        NASSERIAL.write((byte)0x17);
+
+        // what key was pressed?
+        if (key != ' ') {
+            NASSERIAL.write((byte)0x00); // end of message
+            return 1; // abort
+        }
+    }
+    return 0; // continue
 }
 
 
@@ -625,14 +667,38 @@ void pr_msg(const char *msg, char flags) {
     }
 
     if (flags & F_MSG_NULLTERM) {
-        NASSERIAL.write((byte)0x00); // tell host: a message is coming
+        NASSERIAL.write((byte)0x00); // tell host: the message is complete
     }
 }
+
+
+// print as 4-digit hex with optional leading 0x and optional trailing crlf
+// eg: 0x1234
+void pr_hex4(unsigned int val, int leading_0x, int trailing_crlf) {
+    if (leading_0x) {
+        NASSERIAL.write("0x");
+    }
+    for (int i=12; i>=0; i=i-4) {
+        char c = 0xf & (val>>i);
+
+        if (c>9) {
+            c=c + 'A' - 10;
+        }
+        else {
+            c=c + '0';
+        }
+        NASSERIAL.write((byte)c);
+    }
+    if (trailing_crlf) {
+        NASSERIAL.write("\x0d\x0a");
+    }
+}
+
 
 // Used by iterator. Print a directory entry, d.
 // argument 'dummy' is unused but needed so that all functions called by
 // the iterator have the same prototype.
-// Return: 0 (always), which forces the iterator to run to completion.
+// Return: 0 to continue, 1 to abort the listing
 int pr_dirent(UDIRENT *d, char *dummy) {
     // Print filename, formatting it by removing spaces, adding a "."
     // and space-padding to a 13-character field
@@ -650,19 +716,14 @@ int pr_dirent(UDIRENT *d, char *dummy) {
         NASSERIAL.print(" ");
         len--;
     }
-    // TODO it would be nice if there were leading zeroes
-    // I think that's easy to add to Print.cpp in the install directory..
-    // Change Print::print(unsigned int n, base)
-    // so that it checks for base 16 and uses a different print routine
-    // OR add another parameter "width" that, in Print::printNumber prefills
-    // the buffer with space or 0 and pulls str count back accordingly.
-    NASSERIAL.print("SIZE=0x");
-    NASSERIAL.print((unsigned int)d->f.flen, HEX);
-    NASSERIAL.print(" LOAD=0x");
-    NASSERIAL.print((unsigned int)d->f.flda, HEX);
-    NASSERIAL.print(" EXE=0x");
-    NASSERIAL.println((unsigned int)d->f.fexa, HEX);
-    return 0; // Force the interator to run to completion
+
+    NASSERIAL.print(F("Size="));
+    pr_hex4((unsigned int)d->f.flen, 1, 0);
+    NASSERIAL.print(F(" Load="));
+    pr_hex4((unsigned int)d->f.flda, 1, 0);
+    NASSERIAL.print(F(" Exe="));
+    pr_hex4((unsigned int)d->f.fexa, 1, 1);
+    return screen_page_quit(); // Pager can continue/abort the interator
 }
 
 
@@ -717,7 +778,7 @@ int foreach_flash_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
 //         >=0 the iterator aborted. The return value is the iteration number
 //         which is the directory index of the entry that aborted.
 int foreach_vdisk_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
-    if ( (SD.exists(cas_vdisk_name)) && (handle = SD.open(cas_vdisk_name, FILE_READ)) ) {
+    if ( (working_dir->exists(cas_vdisk_name)) && (handle.open(cas_vdisk_name, FILE_READ)) ) {
         UDIRENT dirent;
 
         pr_freeRAM();
@@ -766,27 +827,86 @@ int foreach_vdisk_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
 }
 
 
-// Check for SDcard and (if present) check for existence of NASCOM directory.
+// Check for SDcard and (if present) move to the NASCOM directory.
 // Update cas_flags accordingly. Used at startup and after NEw command.
 void open_sdcard(void) {
-    cas_flags &= ~(FM_SD_FOUND | FM_NASDIR_FOUND | FM_VDISK_MOUNT);
+    cas_flags &= ~(FM_SD_FOUND | FM_VDISK_MOUNT);
     if (SD.begin(10, SPI_SPEED)) {
         cas_flags |= FM_SD_FOUND;
-        if (SD.chdir("NASCOM"), 1) {
-            cas_flags |= FM_NASDIR_FOUND;
-        }
+        // move to NASCOM directory, if it exists.
+        SD.chdir("NASCOM", 1);
+        working_dir = SD.vwd();
 
         // the very first write after initialising a card takes significantly
         // longer than other writes, and it can cause the first blocks of write
         // data to get lost (and you cannot tell until you go to read it back).
         // Hacky solution is to do a dummy file write here..
-        handle = SD.open("NASCAS.TMP", FILE_WRITE | O_TRUNC);
+        handle.open("NASCAS.TMP", FILE_WRITE | O_TRUNC);
         handle.write('X');
         handle.close();
     }
 
     DEBSERIAL.print(F("flags: 0x"));
     DEBSERIAL.println(cas_flags, HEX);
+}
+
+
+// print directory of files on SDcard, in current directory (which will either
+// be root or the directory named NASCOM). Originally, did this using
+// "SD.ls(&NASSERIAL, LS_SIZE)" but this hand-cranked version has the advantage
+// that it can use the pager at the NASCOM end.
+void dir_sdcard(void) {
+    char txtbuf[13];
+    char * txt = txtbuf;
+
+    NASSERIAL.write((byte)0xff); // tell host: a message is coming
+
+    working_dir->rewind();
+    while (handle.openNext(working_dir, O_RDONLY)) {
+        int len;
+        handle.getSFN(txt);
+        len = 15 - NASSERIAL.write(txt);
+
+        if (handle.isDir()) {
+            NASSERIAL.write('/');
+        }
+        else {
+            while (len > 0) {
+                NASSERIAL.write(' ');
+                len--;
+            }
+
+            // Print file size in bytes. Max file size is 2gb ie 10 digits
+            int pad=0;
+            long i=1000000000;
+            long n = handle.fileSize();
+            long dig;
+
+            while (i > 0) {
+                dig = n/i; // integer division with truncation
+                n = n % i; // remainder
+                if ((dig > 0) | (pad==1) | (i==1)) {
+                    pad = 1;
+                    NASSERIAL.write('0'+dig);
+                }
+                else {
+                    NASSERIAL.write(' ');
+                }
+                i = i/10;
+            }
+            NASSERIAL.write(" bytes");
+        }
+        NASSERIAL.write("\x0d\x0a");
+        handle.close();
+
+        if (screen_page_quit()) {
+            // in this case, response "done" has already been sent but
+            // the additional NUL will just be gobbled up and thrown away
+            break;
+        }
+    }
+    // Send response "done"
+    NASSERIAL.write((byte)0x00);
 }
 
 
@@ -814,9 +934,11 @@ void cmd_cass(void) {
             }
         }
     }
-    DEBSERIAL.print(F("Rx cmd line of "));
-    DEBSERIAL.print(index);
-    DEBSERIAL.println(F(" char"));
+    //DEBSERIAL.print(F("Rx cmd line of "));
+    //DEBSERIAL.print(index);
+    //DEBSERIAL.println(F(" char"));
+
+    lines = 0; // Reset in case the pager is needed, GLOBAL
 
     // The line is guaranteed to be at least 1 char + 1 NUL and to start with a
     // non-blank. Only the first 2 characters of a command are significant, so
@@ -830,14 +952,14 @@ void cmd_cass(void) {
 
     case ('I'<<8 | 'N'):      // INFO - version and status
         pr_msg(msg_info, F_MSG_RESPONSE + F_MSG_CR);
-        NASSERIAL.print("Flags:      0x");  // TODO decode it??
-        NASSERIAL.println((uint16_t)cas_flags, HEX);
-        if (cas_flags & FM_NASDIR_FOUND) {
-            NASSERIAL.println(F("Directory:  /NASCOM"));
-        }
-        else {
-            NASSERIAL.println(F("Directory:  /"));
-        }
+        NASSERIAL.print("Flags:      ");  // TODO decode it??
+        pr_hex4((uint16_t)cas_flags, 1, 1);
+
+        // report current working directory (/ or NASCOM)
+        working_dir->getSFN(pbuf);
+        NASSERIAL.print(F("Directory:  "));
+        NASSERIAL.println(pbuf);
+
         NASSERIAL.print(F("Read  name: "));
         NASSERIAL.println(cas_rd_name);
         NASSERIAL.print(F("Write name: "));
@@ -909,7 +1031,7 @@ void cmd_cass(void) {
         if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, cas_vdisk_name)) {
                 // Don't want to create a file, so check existence first
-                if ( (SD.exists(cas_vdisk_name)) && (handle = SD.open(cas_vdisk_name, FILE_READ)) ) {
+                if ( (working_dir->exists(cas_vdisk_name)) && handle.open(cas_vdisk_name, FILE_READ) ) {
                     handle.close();
                     cas_flags |= FM_VDISK_MOUNT;
                 }
@@ -927,12 +1049,8 @@ void cmd_cass(void) {
         break;
 
     case ('D'<<8 | 'S'):      // DS - directory of SDcard
-        // TODO need a 2-column or 3-column format. Do I need a pager? I hope not
-        // tho I already have it on my wish-list and it would only require
-        // counting lines here and issuing the extra response byte..
         if (cas_flags & FM_SD_FOUND) {
-            NASSERIAL.write((byte)0xff); // tell host: a message is coming
-            SD.ls(&NASSERIAL, LS_SIZE);
+            dir_sdcard();
         }
         else {
             pr_msg(msg_err_sd_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
@@ -940,7 +1058,6 @@ void cmd_cass(void) {
         break;
 
     case ('D'<<8 | 'V'):      // DV - directory of Virtual disk
-        // TODO may want a pager
         if (cas_flags & FM_SD_FOUND) {
             if (cas_flags & FM_VDISK_MOUNT) {
                 NASSERIAL.write((byte)0xff); // tell host: a message is coming
@@ -963,8 +1080,9 @@ void cmd_cass(void) {
     case ('E'<<8 | 'S'):      // ES <8.3> - Erase file from FAT file-system
         if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, erase_name)) {
-
-                if (!SD.remove(erase_name)) {
+                // "handle" is undefined; it's just needed to allow the
+                // method to be called. SD.remove() is actually slightly smaller..
+                if (!handle.remove(working_dir, erase_name)) {
                     pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                 }
             }
@@ -986,7 +1104,7 @@ void cmd_cass(void) {
                     cas_flags |= FM_RD_AI;
                 }
 
-                if (!SD.exists(cas_rd_name)) {
+                if (!working_dir->exists(cas_rd_name)) {
                     pr_msg(msg_warn_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
                 }
 
@@ -1067,7 +1185,7 @@ void cmd_cass(void) {
                     cas_flags |= FM_WR_AI;
                 }
 
-                if (SD.exists(cas_wr_name)) {
+                if (working_dir->exists(cas_wr_name)) {
                     pr_msg(msg_info_2bdeleted, F_MSG_RESPONSE + F_MSG_CR);
                 }
 
@@ -1114,7 +1232,7 @@ void cmd_cass(void) {
         cas_flags &= ~ FM_RD_SRC; // default to error case
         if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, cas_rd_name)) {
-                if (handle = SD.open(cas_rd_name, FILE_READ)) {
+                if (handle.open(cas_rd_name, FILE_READ)) {
                     DEBSERIAL.println(F("TS file OK"));
                     // Send response "done" to exit the NAScas> loop
                     NASSERIAL.write((byte)0x00);
@@ -1190,6 +1308,7 @@ char flash_fs_getch_cback(void) {
     return pgm_read_byte(index++);
 }
 
+
 // Call-back for cass_bin2cas: provides next byte from SDcard
 // uses global file-handle handle which is initialised by cmd_cass_rd
 // before the call-back is used for the first time (file is also
@@ -1216,10 +1335,7 @@ void cass_bin2cas(int remain, int addr, int exe_addr, char (*getch)(void)) {
     if (addr == 0x10d6) {
         // looks like a BASIC program. Start with a header that
         // will allow CLOAD to recognise the file
-        NASSERIAL.write((byte)0xd3);
-        NASSERIAL.write((byte)0xd3);
-        NASSERIAL.write((byte)0xd3);
-        NASSERIAL.write((byte)0x41); // "A", the "filename"
+        NASSERIAL.write("\xd3\xd3\xd3\x41"); // 41 is "A", the "filename"
     }
 
     while (block != 0) {
@@ -1230,10 +1346,7 @@ void cass_bin2cas(int remain, int addr, int exe_addr, char (*getch)(void)) {
         DEBSERIAL.println(remain);
         // output sync pattern
         NASSERIAL.write((byte)0x00);
-        NASSERIAL.write((byte)0xff);
-        NASSERIAL.write((byte)0xff);
-        NASSERIAL.write((byte)0xff);
-        NASSERIAL.write((byte)0xff);
+        NASSERIAL.write("\xff\xff\xff\xff");
 
         // output block header and checksum
         csum = (addr & 0xff) + (addr >> 8) + block;
@@ -1274,10 +1387,9 @@ void cass_bin2cas(int remain, int addr, int exe_addr, char (*getch)(void)) {
     }
 
     if (cas_flags & FM_AUTO_GO) {
-        NASSERIAL.print("E");
-        NASSERIAL.println(exe_addr, HEX);
+        NASSERIAL.write('E');
+        pr_hex4(exe_addr, 0, 1);
     }
-    DEBSERIAL.print(F(".cass_bin2cas"));
 }
 
 
@@ -1308,7 +1420,7 @@ void cmd_cass_rd() {
     switch (cas_flags & FM_RD_SRC) {
 
     case (1 << FS_RD_SRC):  // CAS-encode a binary file from Flash
-        DEBSERIAL.println(F("CAS-encode a binary file from Flash"));
+        DEBSERIAL.println(F("CAS-encode from Flash"));
 
         // address of first byte of code -- index is a GLOBAL
         index = pgm_read_word(&romdir[dirindex].fptr);
@@ -1322,15 +1434,15 @@ void cmd_cass_rd() {
     case (3 << FS_RD_SRC):  // CAS-encode a binary file from Vdisk
         DEBSERIAL.println(F("CAS-encode a binary file from vdisk"));
 
-        if (handle = SD.open(cas_vdisk_name, FILE_READ)) {
+        if (handle.open(cas_vdisk_name, FILE_READ)) {
             UDIRENT dirent;
 
             // seek to start of directory entry
-            handle.seek((long)24 + (long)dirindex*(long)sizeof(struct DIRENT));
+            handle.seekSet((long)24 + (long)dirindex*(long)sizeof(struct DIRENT));
             handle.read(dirent.b, sizeof(struct DIRENT));
 
             // seek to start of file, all ready for the callback to use
-            handle.seek((long)dirent.f.fsec * (long)POLYDOS_BYTES_PER_SECTOR);
+            handle.seekSet((long)dirent.f.fsec * (long)POLYDOS_BYTES_PER_SECTOR);
 
             cass_bin2cas(dirent.f.flen * POLYDOS_BYTES_PER_SECTOR,
                          dirent.f.flda,
@@ -1345,7 +1457,7 @@ void cmd_cass_rd() {
 
     case (2 << FS_RD_SRC):  // Send an already-CAS-encoded file from SD
         // TODO for now, assume it's a LITERAL from SD (ie, already a CAS format file)
-        if (handle = SD.open(cas_rd_name, FILE_READ)) {
+        if (handle.open(cas_rd_name, FILE_READ)) {
             // have a file name and can open the file -> good to go!
             // while drive light is on, grab bytes and send them to serial
             DEBSERIAL.println(F("file from SD"));
@@ -1430,7 +1542,7 @@ void cmd_cass_wr(void) {
     // other filesystems and the "convert" case as well and use the WR_SRC and
     // WR_CONV flag to choose which to implement
 
-    if ( (handle = SD.open(cas_wr_name, FILE_WRITE | O_TRUNC)) ) {
+    if ( (handle.open(cas_wr_name, FILE_WRITE | O_TRUNC)) ) {
         // have a file name and can open the file -> good to go!
         // while drive light is on, grab bytes and send them to disk
         while (!rd_drive()) {

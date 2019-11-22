@@ -42,7 +42,7 @@ const char msg_help[]               PROGMEM = "INFO - version and status\r\n"
                                               "TS <file> - send text file now\r\n"
                                               "  F/S/V versions specify Flash/SDcard/Vdisk\r\n"
                                               "  AI to auto-increment file names";
-const char msg_info[]               PROGMEM = "This is NASCAS version 1.0";
+const char msg_info[]               PROGMEM = "This is NAScas version 1.1";
 
 
 /*
