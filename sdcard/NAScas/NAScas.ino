@@ -1333,6 +1333,7 @@ void cass_bin2cas(int remain, int addr, int exe_addr, char (*getch)(void)) {
     int count; // bytes in this block
     char c;    // next byte
     char csum; // accumulated 8-bit checksum
+    char auto_go;
 
     // total number of blocks needed to send remain bytes
     block = ((remain + 0xff) & 0xff00) >> 8;
@@ -1341,14 +1342,22 @@ void cass_bin2cas(int remain, int addr, int exe_addr, char (*getch)(void)) {
         // looks like a BASIC program. Start with a header that
         // will allow CLOAD to recognise the file
         NASSERIAL.write("\xd3\xd3\xd3\x41"); // 41 is "A", the "filename"
+        NASSERIAL.write((byte)0x00);
+        NASSERIAL.write((byte)0x00);
+        auto_go = 0;
+    }
+    else {
+        auto_go = cas_flags & FM_AUTO_GO;
     }
 
     while (block != 0) {
         block--;  // the new block number
+        DEBSERIAL.print(F("Addr="));
+        DEBSERIAL.println(addr, HEX);
         DEBSERIAL.print(F("Block="));
-        DEBSERIAL.println(block);
+        DEBSERIAL.println(block, HEX);
         DEBSERIAL.print(F("Remain="));
-        DEBSERIAL.println(remain);
+        DEBSERIAL.println(remain, HEX);
         // output sync pattern
         NASSERIAL.write((byte)0x00);
         NASSERIAL.write("\xff\xff\xff\xff");
@@ -1391,7 +1400,7 @@ void cass_bin2cas(int remain, int addr, int exe_addr, char (*getch)(void)) {
         }
     }
 
-    if (cas_flags & FM_AUTO_GO) {
+    if (auto_go) {
         NASSERIAL.write('E');
         pr_hex4(exe_addr, 0, 1);
     }
