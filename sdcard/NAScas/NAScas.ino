@@ -18,8 +18,8 @@
 // ** to change "#define USE_LONG_FILE_NAMES" from 1 to 0.
 //
 // ** By default the Nano ships with a larger boot loader than the Uno and
-// ** this code may not fit. Best solution is to reprogram the Nano boot
-// ** loader with the Uno code, then treat it as an Uno forever after.
+// ** this code may not fit. Best solution is to reprogram the Nano with
+// ** the Uno bootloader code, then treat it as an Uno forever after.
 // ** Alternative solution is to comment out one of the ROM images.
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +161,8 @@
 // - Erase file
 // - Change disk
 //
+// Refer to the built-in help (which you can see in file messages.h)
+//
 ////////////////////////////////////////////////////////////////////////////////
 // SD CARD FORMAT
 //
@@ -176,6 +178,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // RESOURCES
+//
+// Detailed documentation:
+// https://github.com/nealcrook/nascom/blob/master/sdcard/nascom_sdcard/doc/nascom_sdcard_user_guide.pdf
 //
 // PolyDos manual set, including PolyDos System Programmers Guide:
 // https://github.com/nealcrook/nascom/tree/master/PolyDos/doc
@@ -195,7 +200,7 @@
 // Refer to the comments or to the help text in messages.h
 //
 ////////////////////////////////////////////////////////////////////////////////
-
+//
 // Missing commands..
 //
 // It would be possible to add these, but probably not useful. Just in case,
@@ -388,6 +393,12 @@ FatFile handle;
 #define FM_RD_SRC   (3 << FS_RD_SRC)
 #define FM_WR_SRC   (3 << FS_WR_SRC)
 
+// RESERVED/Unused. At one point I thought I would read a file
+// in one format at serve it to the NASCOM in another. For
+// example, store binary files on SDcard and serve them to the
+// NASCOM as CAS. In the end I chose not do to that. Instead
+// all the conversions are implicit eg binary file from Virtual
+// disk served to the NASCOM as CAS.
 // 0 = store binary file, convert to/from cas
 // 1 = store file literally
 // 3, 4 reserved
@@ -416,9 +427,8 @@ FatFile handle;
 #define FS_AUTO_GO   (0)
 #define FM_AUTO_GO   (1 << FS_AUTO_GO)
 
-// Startup defaults: read from Flash and auto-go.
-// This works because flash is always present and becasue 0 is an illegal
-// destination for writes.
+// Startup defaults: read from Flash and auto-go. This works because
+// (1) flash is always present and (2) 0 is an illegal destination for writes.
 int cas_flags = (1 << FS_RD_SRC) | FM_AUTO_GO;
 
 
@@ -1117,7 +1127,6 @@ void cmd_cass(void) {
 
                 // Indicate SDcard as the source.
                 cas_flags |= (2 << FS_RD_SRC);
-                // TODO need to set or clear F_RD_CONV bit.
             }
             else {
                 pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
@@ -1141,7 +1150,6 @@ void cmd_cass(void) {
                      else {
                          // dirindex is set up for the read. Indicate Vdisk as the source.
                          cas_flags |= (3 << FS_RD_SRC);
-                         // TODO need to set or clear F_RD_CONV bit.
                      }
                  }
                  else {
@@ -1168,7 +1176,6 @@ void cmd_cass(void) {
             else {
                 // dirindex is set up for the read. Indicate Flash as the source.
                 cas_flags |= (1 << FS_RD_SRC);
-                // TODO need to set or clear F_RD_CONV bit.
             }
         }
         else {
@@ -1191,7 +1198,6 @@ void cmd_cass(void) {
 
                 // Indicate SDcard as the destination
                 cas_flags |= (2 << FS_WR_SRC);
-                // TODO need to set or clear WR_CONV flag.
             }
             else {
                 pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
@@ -1212,7 +1218,6 @@ void cmd_cass(void) {
 
                     // Indicate Vdisk as the destination
                     cas_flags |= (3 << FS_WR_SRC);
-                    // TODO need to set or clear WR_CONV flag.
                 }
                 else {
                     pr_msg(msg_err_fname_bad, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
@@ -1236,7 +1241,7 @@ void cmd_cass(void) {
                     DEBSERIAL.println(F("TS file OK"));
                     // Send response "done" to exit the NAScas> loop
                     NASSERIAL.write((byte)0x00);
-                    // Ready to go. No need to change cas_flags or F_RD_CONV bit
+                    // Ready to go. No need to change cas_flags
                     delay(1000 * pause_delay);
                     char c;
                     while (handle.read(&c, 1)) {
@@ -1274,7 +1279,7 @@ void cmd_cass(void) {
                      }
                      else {
                          // dirindex is set up for the read. Read it now. No need to change
-                         // cas_flags or F_RD_CONV bit
+                         // cas_flags
                          // TODO do it..
                      }
                  }
@@ -1318,7 +1323,7 @@ char sdcard_fs_getch_cback(void) {
 }
 
 
-// Convert a binary blob into CAS format
+// Convert a binary blob into CAS format and feed it to the NASCOM
 // remain - initial value is total length of the binary (in bytes)
 // addr - initial value is the load address for the first byte of the binary
 // exe_addr - the entry point/execution address
@@ -1531,16 +1536,12 @@ void ai_filename(char *buf) {
 
 // Respond to DRIVE light being on and rx data being available -> infer a
 // "W"rite command.
-// CAS format: store byte stream to file on SD until DRIVE goes off.
-// After DRIVE goes off, discard any remaining/buffered data
-// TODO other formats.
+// *Only* support saving files in the format that the NASCOM presents them
+// (usually, CAS format). Store the byte stream to the file on SD until
+// DRIVE goes off. After DRIVE goes off, discard any remaining/buffered data
 void cmd_cass_wr(void) {
     unsigned long start=millis();
     int done = 0;
-
-    // TODO Currently assuming WS and the "literal" case . Need to handle the
-    // other filesystems and the "convert" case as well and use the WR_SRC and
-    // WR_CONV flag to choose which to implement
 
     if ( (handle.open(cas_wr_name, FILE_WRITE | O_TRUNC)) ) {
         // have a file name and can open the file -> good to go!
