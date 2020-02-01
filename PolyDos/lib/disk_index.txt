@@ -309,6 +309,7 @@ Sect Nsct Load Exec SysFlg   Name
    0099 0008 0000 0000          NASPEN.GO
    00a1 0008 0000 0000          POLY2.GO
    00a9 0007 0000 0000          POLY3.GO
+   00b0 0008 0000 0000          NASSYS1.GO
 
 
 PD601.BIN NAS-DOS ROMs
@@ -344,6 +345,8 @@ BASIC.GO    - (8Kb) NASCOM 8K ROM BASIC, load at £E000
 CHARGEN.GO  - (4Kb) NASCOM main and graphics character set
 CHARGEN.TX  -       Format of CHARGEN.GO
 NASSYS3.GO  - (2Kb) NAS-SYS 3, load at £0000
+NASSYS1.GO  - (2Kb) NAS-SYS 1, load at £0000. As dumped from
+                    Neal's original N2 masked ROM
 NASSYS3A.GO - (2Kb) NAS-SYS 3A, load at £0000. As sold with
                     NASCOM3 to provide AVC Disable
 NASSYS3N.GO - (2Kb) NAS-SYS 3N, load at £0000. For networked
@@ -368,6 +371,8 @@ ND14MDC.GO  - (1Kb) NAS-DOS 1.4, load at £DC00
                     other set but both announce themselves
                     as "NAS-DOS 1"
                     Include Lucas copyright message
+                    These match code from the latest version
+                    of nasdos disassembly, as found on Github
 
 ND14DD0.GO  - (1Kb) NAS-DOS 1.4, load at £D000
 ND14DD4.GO  - (1Kb) NAS-DOS 1.4, load at £D400
@@ -378,7 +383,8 @@ ND14DDC.GO  - (1Kb) NAS-DOS 1.4, load at £DC00
                     Identical to images from "Nas-Dos.zip"
                     by Mike Strange.
                     (ND14DDC.GO matches ND14MDC.GO)
-                    No Lucas copyright message
+                    No Lucas copyright message. These seem to
+                    have come from a ROM in MAME.
 
 POLY2.GO    - (2Kb) POLYDOS 2 boot ROM, load at £D000
 POLY3.GO    - (2Kb) POLYDOS 3 boot ROM, load at £D000 -- only
