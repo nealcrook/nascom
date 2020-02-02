@@ -10,21 +10,21 @@
 #
 # Remaining commands to implement, with priorities:
 # copy
-# rename   <-- EASY.
 # type
 # export - done, but need to code more exporters
 # import  <-- HARD, BUT MOST USEFUL. DO NEXT!
-# undelete - if multiple matches, undeletes oldest first.
-# create?? - probably no use-case but simple and could be useful??
-# fix -- not implemented in flex version
-# wildcarding
+# create - probably no use-case but simple and could be useful
+# repair -- not implemented in flex version
 # DELETE all old/irrelevant subroutines
-# Disk specifier in correct order and with letter restrictions
+
+# TODO  undelete command, to clear delete (D) flag .. only when there is no
+# current file of the same name. If multiple deleted, it undeletes the first
+# (oldest).
 
 
 # next:
 #
-# - code importers
+# - code importers:
 # -- do the text one
 # -- tidy up the CAS importer
 # -- and add E detection (and to the stand-alone script, too)
@@ -40,9 +40,6 @@
 # conv_import_txt PART-DONE
 # conv_import_nas DONE needs tidy
 # conv_import_cas PART-DONE needs tidy
-
-
-# TODO does PolyDos treat foo.txt and FOO.TXT as different files? YES
 
 
 # bug: make nascom convert (And others) report file name as they go
@@ -61,12 +58,16 @@
 # file with different name)
 # FUTURE: record inode so that we cannot double-mount a drive.
 # TODO: fs in check_arg can return a wildcard. May want a variant xfs that returns
-# exactly one file - avoid over-use of legal_flex_name. Only affects commands that create
+# exactly one file - avoid over-use of legal_poly_name. Only affects commands that create
 # new files; currently import, rename, create.
 # BUG: pressing CTRL-D results in lots of PERL warnings
 # BUG: I think a set of bugs will occur if the disk becomes full (zero free sectors).
 # TODO: when only 1 image is mounted, make drive number optional/implicit to save typing
-# TODO: allow delete to accept a list of file names
+# ..this can be done in check_arg fs match: if no :N present, and only 1 drive mounted,
+# bolt on the drive number in the same way as 1 is turned into *.*:1
+# TODO: allow delete to accept a list of file names.. should be an easy loop in cmd_delete
+# but make sure it doesn't interfere with wildcarding.. each element of the list could be a
+# wildcard.
 
 
 use strict;
@@ -74,7 +75,7 @@ no strict 'refs'; # CLI makes subroutine from command name.
 use warnings;
 use File::Basename;
 
-# POLYDOS constants
+# PolyDos constants
 my $FCB_BASE = 0xc418;
 my $FCB_SIZE = 20;
 my $FCB_OFFSET = 24;
@@ -89,7 +90,6 @@ my $BYTES_SECTOR = 256;
 my $SECTORS = 35*2*18;
 
 my $cmdline;
-
 
 # For 'type' command
 my $LINES_PER_PAGE = 40;
@@ -169,6 +169,7 @@ while (1) {
         print "ERROR: no command \'$bits[0]\'\n";
     }
 }
+
 
 #################################################################
 #################################################################
@@ -326,9 +327,9 @@ sub cmd_copy {
     my ($fs, $dst) = check_arg('fs v', @_);
     return unless defined($fs);
 
-    my ($src,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$src) = fs_to_fed($fs);
 
-    print "Not yet implemented";
+    print "Not yet implemented"; # TODO
     return;
 
     if (not $dsk[$src]->{mounted}) {
@@ -344,7 +345,7 @@ sub cmd_copy {
         return;
     }
 
-    my $cp_match = filter_dir($src,$file,$ext);
+    my $cp_match = filter_dir($src,$file,$ext,'NON-DELETED');
     # which of those names already in use at the destination?
     my $rm_match = index_match_dir($src,$cp_match,$dst);
 
@@ -373,11 +374,8 @@ sub cmd_rename {
     my ($old, $new) = check_arg('fs fs', @_);
     return unless defined($old);
 
-    print "Not yet implemented";
-    return;
-
-    my ($drive, $ofile,$oext) = split /\./, $old;
-    my ($ndrive,$nfile,$next) = split /\./, $new;
+    my ($ofile,$oext,$drive) = fs_to_fed($old);
+    my ($nfile,$next,$ndrive) = fs_to_fed($new);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
@@ -388,8 +386,8 @@ sub cmd_rename {
         return;
     }
 
-    my $old_match = filter_dir($drive, $ofile,$oext);
-    my $new_match = filter_dir($ndrive,$nfile,$next);
+    my $old_match = filter_dir($drive, $ofile,$oext,'NON-DELETED');
+    my $new_match = filter_dir($ndrive,$nfile,$next,'NON-DELETED');
 
     if (scalar @$old_match != 1) {
         printf "ERROR source must match exactly 1 file. Matched %d files\n", scalar @$old_match;
@@ -404,48 +402,14 @@ sub cmd_rename {
         return;
     }
 
-    ## TODO new_match isn't working correctly when there's any wildcarding.
-    ## ..probably (Surely) both are not working in that scenario, but the 1st check above is catching
-    ## the old_match case before the ignomony of the new_match case can be exposed.
+    if (scalar @$new_match == 1) {
+        # Delete existing file that matches the new name
+        rm_files($drive, $new_match);
+    }
 
-
-    print "DEBUG: OK to rename..\n";
-    print "File from $ofile to $nfile and extension from $oext to $next\n";
-    print "Old name is $dsk[$drive]->{fcb}->[$old_match->[0]]->{fnam}\n";
-    print "Old ext  is $dsk[$drive]->{fcb}->[$old_match->[0]]->{fext}\n";
-    print "New name is $dsk[$drive]->{fcb}->[$new_match->[0]]->{fnam}\n";
-    print "New ext  is $dsk[$drive]->{fcb}->[$new_match->[0]]->{fext}\n";
-
-    ## TODO an existing file of the same name is DELETED
-
-
-##    $dsk[$drive]->{fcb}->[
-
-#    my $dir_entry_data = rd_dir_entry($drive, $old_match->[0]);
-
-#    if (scalar @$new_match == 1) {
-#        # copy exact name (8+3 characters) from matching entry. Need to do this
-#        # because $nfile, $next may be wildcarded.
-#        my $tmp_dir_entry_data = rd_dir_entry($drive, $new_match->[0]);
-#        for my $i (0..10) {
-#            $dir_entry_data->[$i] = $tmp_dir_entry_data->[$i];
-#        }
-#        rm_files($ndrive, $new_match);
-#    }
-#    else {
-#        my $flex_name = "$nfile.$next";
-#        # make sure there's no wildcarding
-#        if (legal_flex_name($flex_name)) {
-#            name_dir_entry($flex_name, $dir_entry_data);
-#        }
-#        else {
-#            print "ERROR cannot resolve $flex_name to a unique name.\n";
-#            return;
-#        }
-#    }
-
-#    wr_dir_entry($drive, $old_match->[0], $dir_entry_data);
-#    rd_dir($drive);
+    $dsk[$drive]->{fcb}->[$old_match->[0]]->{fnam} = $nfile;
+    $dsk[$drive]->{fcb}->[$old_match->[0]]->{fext} = $next;
+    wr_dir($drive);
 }
 
 
@@ -489,16 +453,16 @@ sub cmd_export {
 sub type_export_common {
     my ($fs, $conv_ref, $lpp, $path, $export) = @_;
 
-    my ($drive,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$drive) = fs_to_fed($fs);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext);
+    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
 
-    printf " INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+    printf " INFO %d files match $file.$ext:$drive\n", scalar @$match if scalar @$match != 1;
 
     export_files($drive, $match, $conv_ref, $lpp, $path, $export);
 }
@@ -612,14 +576,14 @@ sub cmd_dir {
     my ($fs) = check_arg('fs', @_);
     return unless defined($fs);
 
-    my ($drive,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$drive) = fs_to_fed($fs);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext);
+    my $match = filter_dir($drive,$file,$ext,'ALL');
 
     print "   Sect Nsct Load Exec SysFlg   Name\n";
 
@@ -644,18 +608,51 @@ sub cmd_delete {
     my ($fs) = check_arg('fs', @_);
     return unless defined($fs);
 
-    my ($drive,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$drive) = fs_to_fed($fs);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext);
+    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
 
-    printf " INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+    printf " INFO %d files match $file.$ext:$drive\n", scalar @$match if scalar @$match != 1;
 
     rm_files($drive, $match);
+}
+
+
+sub cmd_undelete {
+    my ($fs) = check_arg('fs', @_);
+    return unless defined($fs);
+
+    my ($file,$ext,$drive) = fs_to_fed($fs);
+
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
+
+    if (scalar @$match != 0) {
+        print "ERROR there is already a file with that name.\n";
+        return;
+    }
+
+    $match = filter_dir($drive,$file,$ext,'DELETED');
+
+    if (scalar @$match == 0) {
+        print "ERROR there is no deleted file with that name.\n";
+        return;
+    }
+
+    printf " INFO %d files match $file.$ext:$drive - undeleted oldest one\n", scalar @$match if scalar @$match != 1;
+
+    # undelete the oldest one
+    $dsk[$drive]->{fcb}->[$match->[0]]->{fsfl} = $dsk[$drive]->{fcb}->[$match->[0]]->{fsfl} & (0xff ^ $SFLG_DEL);
+    wr_dir($drive);
 }
 
 
@@ -663,16 +660,16 @@ sub cmd_lock {
     my ($fs) = check_arg('fs', @_);
     return unless defined($fs);
 
-    my ($drive,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$drive) = fs_to_fed($fs);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext);
+    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
 
-    printf " INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+    printf " INFO %d files match $file.$ext:$drive\n", scalar @$match if scalar @$match != 1;
 
     foreach my $i (@{$match}) {
         $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} | $SFLG_LOK;
@@ -685,16 +682,16 @@ sub cmd_unlock {
     my ($fs) = check_arg('fs', @_);
     return unless defined($fs);
 
-    my ($drive,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$drive) = fs_to_fed($fs);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext);
+    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
 
-    printf " INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+    printf " INFO %d files match $file.$ext:$drive\n", scalar @$match if scalar @$match != 1;
 
     foreach my $i (@{$match}) {
         $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} & (0xff ^ $SFLG_LOK);
@@ -707,16 +704,16 @@ sub cmd_attrib {
     my ($fs, $new_fexa, $new_flda) = check_arg('fs hi ohi', @_);
     return unless defined($new_fexa);
 
-    my ($drive,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$drive) = fs_to_fed($fs);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext);
+    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
 
-    printf " INFO %d files match $drive.$file.$ext\n", scalar @$match if scalar @$match != 1;
+    printf " INFO %d files match $file.$ext:$drive\n", scalar @$match if scalar @$match != 1;
 
     # must have $new_fexa
     foreach my $i (@{$match}) {
@@ -778,16 +775,15 @@ sub cmd_create {
     my ($fs, $sectors) = check_arg('fs i', @_);
     return unless defined($fs);
 
-    my ($drive,$file,$ext) = split /\./, $fs;
+    my ($file,$ext,$drive) = fs_to_fed($fs);
 
     if (not $dsk[$drive]->{mounted}) {
         print "ERROR drive $drive is not mounted\n";
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext);
-    # if we needed to delete a file first, the free chain would get messed up. We could cope, but better
-    # not to get into the bother of it.
+    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
+
     if (scalar @$match != 0) {
         printf "ERROR file specifier must not match existing file. Matched %d files\n", scalar @$match;
         return;
@@ -799,7 +795,7 @@ sub cmd_create {
     }
 
     my $flex_name = "$file.$ext";
-    if (not legal_flex_name($flex_name)) {
+    if (not legal_poly_name($flex_name)) {
         print "ERROR cannot resolve $flex_name to a unique name.\n";
         return;
     }
@@ -863,8 +859,8 @@ sub cmd_create {
 }
 
 
-sub cmd_fix {
-    print "fix TODO - not yet implemented\n";
+sub cmd_repair {
+    print "repair TODO - not yet implemented\n";
 }
 
 
@@ -991,22 +987,22 @@ sub cmd_uppercase {
 # additional values get inserted. See case-by-case comments.
 #
 # argument formats:
-# v - virtual drive number
-# mv - virtual drive number of mounted drive (error if not mounted)
-# h - existing file in host filesystem
+# v   - virtual drive number
+# mv  - virtual drive number of mounted drive (error if not mounted)
+# h   - existing file in host filesystem
 # hfw - wildcard in host filesystem. Only recognise files that are
-#      valid FLEX file names and non-zero in size. Must match at
-#      least 1 file.
-# nh - file in host filesystem (may or may not exist)
-# od - optional directory in host filesystem (must exist) default to .
-# fs - FLEX file specifier: 1 or 1.foo.bar
-# n - disk name (truncated/padded to 20 characters, can
-#     include spaces) - consumes all remaining arguments and so must
-#     be the last entry in the format list.
-# hi - hex value (1-4 characters)
+#       valid PolyDos file names and non-zero in size. Must match at
+#       least 1 file.
+# nh  - file in host filesystem (may or may not exist)
+# od  - optional directory in host filesystem (must exist) default to .
+# fs  - PolyDos file specifier eg: 1 or FOO.GO:1
+# n   - disk name (truncated/padded to 20 characters, can
+#       include spaces) - consumes all remaining arguments and so must
+#       be the last entry in the format list.
+# hi  - hex value (1-4 characters)
 # ohi - optional hex value (1-4 characters)
-# i - integer
-# oi - optional integer
+# i   - integer
+# oi  - optional integer
 # os  - optional sector. If omitted, default value is returned.
 # oic - optional import converters. Returns hash reference
 # oec - optional export converters. Returns hash reference
@@ -1137,7 +1133,7 @@ sub check_arg {
             }
         }
         elsif ($f eq 'hfw') {
-            # host wildcard; only recognise files that are valid FLEX
+            # host wildcard; only recognise files that are valid PolyDos
             # names and non-zero in size. Must match at least 1 file.
             # Return a reference to a list of files AND a directory path
             if (not defined $_[$i]) {
@@ -1157,11 +1153,11 @@ sub check_arg {
             # nothing more (so that fred.dsk doesn't match fred.dsk_x)
             my @matches = grep /$f$/, readdir DIR;
             close DIR;
-            @matches = grep { legal_flex_name($_) } @matches;
+            @matches = grep { legal_poly_name($_) } @matches;
             @matches = grep { -s "$path$_" != 0 } @matches;
 
             if (not defined $matches[0]) {
-                print "ERROR no matching host files - candidates must be non-zero size with legal FLEX names\n";
+                print "ERROR no matching host files - candidates must be non-zero size with legal PolyDos names\n";
                 return;
             }
 
@@ -1186,9 +1182,9 @@ sub check_arg {
             }
         }
         elsif ($f eq 'fs') {
-            # FLEX file specifier
+            # PolyDos file specifier
             if (not defined $_[$i]) {
-                print "ERROR missing argument - expected FLEX file specifier\n";
+                print "ERROR missing argument - expected PolyDos file specifier\n";
                 return;
             }
             if ($UPCASE) {
@@ -1197,14 +1193,15 @@ sub check_arg {
             if (($_[$i] eq "0") or ($_[$i] eq "1") or
                 ($_[$i] eq "2") or ($_[$i] eq "3")) {
                 # make it more regular and we're done
-                $_[$i] = "$_[$i].*.*";
+                $_[$i] = "*.*:$_[$i]";
             }
-            # From FLEX User Manual
-            # 0-3 for drive, 1-8 character name, 1-3 character extension
-            # extension must start with a letter
-            # otherwise both can contain 0-9 a-z A-Z _ -
-            # in addition, name and extension can contain * to wildcard.
-            if ($_[$i] !~ /^[0123]\.[\*\w\-]{1,8}\.[\*a-zA-Z][\*\w\-]{0,2}$/) {
+            # From PolyDos Users Guide
+            # 1-8 character name, 2 character extension, 0-3 for drive.
+            # name/extension can contain 0-9 a-z A-Z _ - &
+            # flex_vfs allows name and extension can contain * to wildcard.
+            # ..and the fiddly part is that a single * can wildcard the
+            # extension, which othewise would need to be 2 characters long
+            if ($_[$i] !~ /^[\*\w\-\&]{1,8}\.(\*|[\w\-\&]{2,2})\:[0123]$/) {
                 print "ERROR $_[$i] is not a legal file specifier\n";
                 return;
             }
@@ -1259,6 +1256,15 @@ sub check_arg {
     return @_;
 }
 
+
+# break a file specifier into filename, extension, drive
+# eg: my ($file,$ext,$drive) = fs_to_fed($fs);
+# assume file specifier is legal and fully-specified
+sub fs_to_fed {
+    my ($fs) = @_;
+    $fs =~ /^([\w\-\&\*]+).([\w\-\&\*]+):(\d)/;
+    return ($1,$2,$3)
+}
 
 # export/type zero or more files
 # files specified by list of directory indices
@@ -1730,32 +1736,16 @@ sub process_cas_blk {
 }
 
 
-
-
-
-
-
-
-
-# is this a legal FLEX name? Return true if it is, false otherwise.
+# Is this a legal PolyDos name? Return true if it is, false otherwise.
 # Must be in the form "file dot extension" where
-# file starts with letter, contains a-zA-Z0-9_- only and is 1-8 char
-# extension starts with letter, contains a-zA-Z0-9_- only and is 1-3 char.
-# It is not legal to have no extension (FLEX utilities will not allow
-# you to create or to see such a file).
-# FLEX documentation doesn't state the requirement for the extension
-# to start with a letter but by experiment it seems to require it.
-# In FLEX 9.1 there is a bug where you can do this:
-# +++COPY SAVE.LOW TEST.1   -- apparently successful
-# +++COPY SAVE.LOW TEST.1   -- gives "FILE EXISTS" warning
-# +++DELETE TEST.1          -- gives "EXTENSION REQUIRED" error
-# +++DIR                    -- TEST.1 does not appear
-#
-# ie there is an inconsistency in that COPY will create the
-# file but nothing else can see it
-sub legal_flex_name {
+# file contains a-zA-Z0-9_-& only and is 1-8 char
+# extension starts with letter, contains a-zA-Z0-9_- only and is 2 char.
+# (actually, PolyDos forbids space . , : ; and control characters but
+# may allow anything else, so the check here is over-restrictive. However
+# need to forbid * in names because it's used here for wildcarding)
+sub legal_poly_name {
     my ($name) = @_;
-    return $name =~ /^[a-zA-Z][a-zA-Z\d\-\_]{0,7}\.[a-zA-Z][a-zA-Z\d\-\_]{0,2}$/;
+    return $name =~ /^[\w\-\&]{1,8}\.[\w\-\&]{2}$/;
 }
 
 
@@ -2054,21 +2044,35 @@ sub wr_dir {
 
 # Given a drive number and (potentially wildcarded) file name/extension,
 # return a reference to a list of the directory entries that match.
+# $which is:
+# NON-DELETED - consider non-deleted files only
+# ALL         - consider deleted and non-deleted files
+# DELETED     - consider deleted files only
 sub filter_dir {
-    my ($drive, $file, $ext) = @_;
+    my ($drive, $file, $ext, $which) = @_;
     my @matches;
 
     # turn the "all files" specifier, *, into a legal PERL regex.
-    # Fileame can contain \w (a-zA-Z0-9_) and - and /.
+    # Filename can contain \w (a-zA-Z0-9_) and - and /.
     # so change * -> [/-\w]*
     # but escaped once for the string here and again for the match below
     $file =~ s|\*|\[\\/\\-\\w\]\*|g;
     $ext =~  s|\*|\[\\/\\-\\w\]\*|g;
 
     for my $i (0..($dsk[$drive]->{fcbval} -1)) {
-        if (($dsk[$drive]->{fcb}->[$i]->{fnam} =~ /^$file$/)
-            and ($dsk[$drive]->{fcb}->[$i]->{fext} =~ /^$ext$/)) {
-            push @matches, $i;
+        if (($which eq 'ALL') or ($which eq 'NON-DELETED')) {
+            if (($dsk[$drive]->{fcb}->[$i]->{fnam} =~ /^$file$/)
+                and ($dsk[$drive]->{fcb}->[$i]->{fext} =~ /^$ext$/)
+                and (($dsk[$drive]->{fcb}->[$i]->{fsfl} & $SFLG_DEL) == 0)) {
+                push @matches, $i;
+            }
+        }
+        if (($which eq 'ALL') or ($which eq 'DELETED')) {
+            if (($dsk[$drive]->{fcb}->[$i]->{fnam} =~ /^$file$/)
+                and ($dsk[$drive]->{fcb}->[$i]->{fext} =~ /^$ext$/)
+                and (($dsk[$drive]->{fcb}->[$i]->{fsfl} & $SFLG_DEL) != 0)) {
+                push @matches, $i;
+            }
         }
     }
     return \@matches;
@@ -2134,9 +2138,9 @@ sub name_match_dir {
 
 
 # delete an entry from the directory by editing the sector
-# TODO will be modified for polydos
 sub rm_dir_entry {
     my ($drive, $index) = @_;
+    print "TODO will be modified for PolyDos - this routine is never called\n";
 
     my $trk = $dsk[$drive]->{dir}->[$index]->{T};
     my $sct = $dsk[$drive]->{dir}->[$index]->{S};
@@ -2161,9 +2165,10 @@ sub rm_dir_entry {
 # Return a reference to an empty directory entry
 # data structure - to be filled in and then used by
 # allocate_dir_entry(), wr_dir_entry() etc.
-# TODO will be modified for polydos
+# TODO will be modified for PolyDos - only used by cmd_create. May be simpler ways to do it.
 sub empty_dir_entry {
     my @dir_entry = (0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0);
+    print "TODO will be modified for PolyDos\n";
     return \@dir_entry;
 }
 
@@ -2172,9 +2177,10 @@ sub empty_dir_entry {
 # $flex_name is file name and extension, separated by "."
 # $dir_entry_data is a reference to an array eg created
 # by empty_dir_entry() or rd_dir_entry()
-# TODO will be modified for polydos
+# TODO will be modified for PolyDos.. or may not be needed
 sub name_dir_entry {
     my ($flex_name, $dir_entry_data) = @_;
+    print "TODO will be modified for PolyDos\n";
 
     my $findex = 0;
     my $sindex = 0;
@@ -2197,9 +2203,11 @@ sub name_dir_entry {
 # allocated. Otherwise, an entry that has been deleted will
 # be allocated. Use dir_entries() before to make sure that
 # an unallocated entry exists; there is no check here.
-# TODO will be modified for polydos
+# TODO will be modified for PolyDos - or may not be needed, since this process is much simpler for PolyDos
 sub allocate_dir_entry {
     my ($drive) = @_;
+
+    print "TODO will be modified for PolyDos\n";
 
     # first try for a never-used entry
     for my $i (0.. $#{$dsk[$drive]->{dir}}) {
@@ -2226,9 +2234,11 @@ sub allocate_dir_entry {
 
 # return a reference to a 24-element array that is the directory
 # data for the specified index/drive. Read from disk.
-# TODO will be modified for polydos
+# TODO will be modified for PolyDos - or may not be needed
 sub rd_dir_entry {
     my ($drive, $index) = @_;
+
+    print "TODO will be modified for PolyDos\n";
 
     my $trk = $dsk[$drive]->{dir}->[$index]->{T};
     my $sct = $dsk[$drive]->{dir}->[$index]->{S};
@@ -2248,9 +2258,11 @@ sub rd_dir_entry {
 # reference to a 24-element array that is the directory data
 # and it's written to the specified index/drive. Writes to disk.
 # Local copy of directory structure is NOT kept coherent.
-# TODO will be modified for polydos
+# TODO will be modified for PolyDos - or may not be needed
 sub wr_dir_entry {
     my ($drive, $index, $dir_data) = @_;
+
+    print "TODO will be modified for PolyDos\n";
 
     my $trk = $dsk[$drive]->{dir}->[$index]->{T};
     my $sct = $dsk[$drive]->{dir}->[$index]->{S};
@@ -2268,12 +2280,13 @@ sub wr_dir_entry {
 }
 
 
-
 # sum the sectors needed to hold the specified files
-# TODO will be modified for polydos
+# TODO will be modified for PolyDos
 sub sectors {
     my ($drive, $match) = @_;
     my $sum = 0;
+
+    print "TODO will be modified for PolyDos\n";
 
     foreach my $i (@{$match}) {
         $sum = $sum + $dsk[$drive]->{dir}->[$i]->{SIZE};
@@ -2382,9 +2395,10 @@ EOF
     Create a file on the host filesystem that represents a blank disk.
     ANY EXISTING FILE OF THAT NAME WILL BE SILENTLY DELETED.
 
-    The size of the disk can be specified. s=Y creates a disk of Y sectors.
+    The size of the disk can be specified. s=N creates a disk of N sectors.
 
-    If the geometry is not specified it defaults to t=$SECTORS
+    If the size is not specified it defaults to $SECTORS sectors. Each sector
+    is $BYTES_SECTOR bytes.
 
     The disk image created is empty, with a valid, empty directory and a blank
     disk name. Mount the image and use 'name' to set the disk name.
@@ -2395,7 +2409,7 @@ EOF
     new foo.bin
     new bar.bin s=256
     mount 0 bar.bin
-    name 0 BASIC Progs 2
+    name 0 BASIC Progs 27
 EOF
     }
     elsif ($cmd eq 'copy') {
@@ -2411,31 +2425,42 @@ EOF
     drive to match the destination drive. This restriction may be removed in the
     future.
 
-    Copying a file that has the R (random) attribute set does NOT regenerate the
-    file sector map in the first two sectors of the file. You must rebuild that
-    under the control of FLEX, using the COPYR utility.
-
     Examples:
     copy 2 3
-    copy 2.*.* 3
-    copy 2.*.CMD 3
-    copy 1.FLEX.SYS 2
+    copy *.*:2 3
+    copy *.TX:2 3
+    copy ZOMBIE.BS:1 2
 EOF
     }
     elsif ($cmd eq 'rename') {
         print <<EOF
     rename <file specifier> <new file specifier>
 
-    Rename the file that matches the file specifier (source) to the new
-    name. Any existing file of the same name on the virtual drive is deleted.
+    Rename the file that matches the first file specifier to the name in the
+    second file specifier. Any existing file of the same name on the
+    virtual drive is deleted.
 
-    The new file specifier must be on the same virtual drive. The files can be
-    specified using wildcard, but must each resolve to exactly one file.
+    The new file specifier must be on the same virtual drive.
 
-    Examples:
-    rename 1.FLEX.SYS 1.FLEX.OLD
-    rename 1.*.COR 1.FLEX.BAK
-    rename 1.FRED.TXT 1.FR*.BAK
+    Both files can be specified using wildcards, but must each resolve to
+    exactly one file. Be careful when using wildcards for the new name (see
+    examples).
+
+    Examples 1 -- all of these are equivalent, assuming only one source
+                  match and that the new name does not match an existing file
+    rename CHESS.GO:1 CHESS.XX:1
+    rename CHESS.*:1 CHESS.XX:1
+    rename C*.*:1 CHESS.XX:1
+
+    Examples 2 -- the destination matches existing files Exec.OV and
+                  Edit.OV and Ecmd.OV and Emsg.OV - it results in an error and
+                  no rename occurs.
+    rename CHESS.GO:1 E*.*:1
+
+    Examples 3 -- the destination matches existing files Exec.OV and this
+                  file is marked as deleted then CHESS.GO is renamed as
+                  Edit.OV.
+    rename CHESS.GO:1 Ex*.*:1
 EOF
     }
     elsif ($cmd eq 'name') {
@@ -2568,10 +2593,10 @@ EOF
 
     Examples:
     dir 2
-    dir 1.FLEX.SYS
-    dir 1.F*.*
-    dir 1.*.CMD
-    dir 1.*A*.*
+    dir AS.GO:1
+    dir F*.GO:1
+    dir *.TX:1
+    dir *A*.*:1
 EOF
     }
     elsif ($cmd eq 'hdir') {
@@ -2596,14 +2621,36 @@ EOF
     or all of the files that match the file specifier.  The file specifier can
     include * used as a wildcard.
 
-    BE CAREFUL BECAUSE NO CONFIRMATION IS ASKED FOR!
+    BE CAREFUL -- NO CONFIRMATION IS ASKED FOR!
 
     Examples:
     delete 2
-    delete 1.FLEX.SYS
-    delete 1.F*.*
-    delete 1.*.CMD
-    delete 1.*A*.*
+    delete NASDIS.GO:1
+    delete F*.*:1
+    delete *.OV:1
+    delete *A*.*:1
+EOF
+    }
+    elsif ($cmd eq 'undelete') {
+        print <<EOF
+    undelete <virtual drive number> | <file specifier>
+
+    Clear the delete (D) flag on all of the files on the specified virtual drive,
+    or all of the files that match the file specifier.  The file specifier can
+    include * used as a wildcard.
+
+    A deleted file cannot be undeleted if there is an existing undeleted file
+    with the same name (rename the existing file first).
+
+    If multiple deleted files of the same name exist, the oldest will be
+    undeleted (the one that appears earliest in the directory listing).
+
+    Examples:
+    undelete 2
+    undelete NASDIS.GO:1
+    undelete F*.*:1
+    undelete *.OV:1
+    undelete *A*.*:1
 EOF
     }
     elsif ($cmd eq 'lock') {
@@ -2616,10 +2663,10 @@ EOF
 
     Examples:
     lock 2
-    lock 1.FLEX.SYS
-    lock 1.F*.*
-    lock 1.*.CMD
-    lock 1.*A*.*
+    lock ZP.GO:1
+    lock F*.*:1
+    lock *.GO:1
+    lock *A*.*:1
 EOF
     }
     elsif ($cmd eq 'unlock') {
@@ -2631,35 +2678,35 @@ EOF
     include * used as a wildcard.
 
     Examples:
-    unlock 2
-    unlock 1.FLEX.SYS
-    unlock 1.F*.*
-    unlock 1.*.CMD
-    unlock 1.*A*.*
+    lock 2
+    lock ZP.GO:1
+    lock F*.*:1
+    lock *.GO:1
+    lock *A*.*:1
 EOF
     }
     elsif ($cmd eq 'attrib') {
         print <<EOF
-    attrib <virtual drive number> | <file specifier> hexval1 [ hexval2 ]
+    attrib <virtual drive number> | <file specifier> exe-hex [ load-hex ]
 
     Change attributes on all of the files on the specified virtual drive,
     or all of the files that match the file specifier.  The file specifier can
     include * used as a wildcard.
 
-    hexval1 is the new execution address for the file. hexval2, if present, is
-    the new load address for the file.
+    exe-hex is the new execution address for the file. load-hex, if present, is
+    the new load address for the file; both values must be in hex
 
     Examples:
     attrib 2 1000
-    unlock 1.INVADE.GO 1000 1000
-    unlock 1.*.GO 1010 1000
+    attrib INVADE.GO:1 1000 1000
+    attrib *.BS:1 10d6 10d6
 EOF
     }
     elsif ($cmd eq 'pack') {
         print <<EOF
     pack <virtual drive number>
 
-    When deleted, a file still take up disk space and a directory entry. To free
+    When deleted, a file still takes up disk space and a directory entry. To free
     up those resources, the disk must be packed: all of the deleted files are
     removed and the remaining files (and their directory entries) are shuffled
     back to free up space for reuse.
@@ -2673,21 +2720,13 @@ EOF
         print <<EOF
     create <file specifier> <number of sectors>
 
-    Create a file by taking a number of sectors from the start of the unallocated
-    space on the virtual drive. Can be used as a last-ditch method of recovering
-    a deleted file.
+    Create a file by taking a number of sectors from the unallocated space on
+    the virtual drive.
 
     The file specifier must not match an existing file name.
 
     Example:
-    delete 1.MYFILE.TX
-    pack 1
-    create 1.SAVED.XX 5
-EOF
-    }
-    elsif ($cmd eq 'fix') {
-        print <<EOF
-TODO
+    create SAVED.XX:1 5
 EOF
     }
     elsif ($cmd eq 'check') {
@@ -2700,6 +2739,9 @@ EOF
     - sectors assigned to files start at sector 4
     - sectors are assigned sequentially and contiguously
     - the first free sector follows on from the last allocated sector
+
+    Example:
+    check 0
 EOF
     }
     elsif ($cmd eq 'scrub') {
@@ -2709,16 +2751,19 @@ EOF
     Over-write every unused directory entry and every unused sector with the
     values they would have on a freshly formatted disk.  The main motivation is
     to allow the resultant disk images to compress better.
+
+    Example:
+    scrub 0
 EOF
     }
     elsif ($cmd eq 'repair') {
         print <<EOF
-TODO
+TODO - intended to repair any inconsistencies found by check. Not yet implemented
 EOF
     }
     elsif ($cmd eq 'uppercase') {
         print <<EOF
-    uppercase [0|1]
+    uppercase [0 | 1]
 
     PolyDos can use mixed-case file names and polydos_vfs allows this by
     default. However, in many cases, old disks have upper-case only file names
@@ -2733,24 +2778,65 @@ EOF
 
     uppercase toggles the state of upper-case forcing. With an argument of 0 or
     1 it forces the state. In both cases, the new state is reported.
+
+    Example:
+    uppercase 0
+    uppercase 1
+EOF
+    }
+    elsif ($cmd eq 'files') {
+        print <<EOF
+    A file specifier in PolyDos consists of a file name, an extension and a
+    drive number. They are arranged like this:
+
+    <file name>.<extension>:<drive number>
+
+    The name and extension can use the characters A-Z a-z 0-9 & - _
+
+    The drive number (within polydos_vfs) can be 0-3
+
+    The file name can be 1-8 characters long
+
+    The extension must be exactly 2 characters. The following extensions
+    are conventional:
+
+    .TX - text file (including assembler source code)
+    .GO - executable
+    .OV - overlay
+    .BS - BASIC program
+    .DT - BASIC Data file
+    .IN - information file
+
+    In general, flex_vfs allows use of * for wildcarding. For example:
+
+    dir *.TX:0
+    dir C*.*:0
+
+    You can't (currently) wildcard the drive number though.
+
+    The PolyDos Users Guide implies that characters like !£$%^&*()[]@#
+    could be legal in file-names, but polydos_vfs does not permit them
+    (please complain/raise a bug if you have reason to need any of these).
+    In particular, polydos_vfs uses * for wildcarding so it cannot
+    allow it in a filename.
 EOF
     }
     elsif ($cmd eq 'formats') {
         print <<EOF
-    Different polydos releases supported different disk drives, having different
+    Different PolyDos releases supported different disk drives, having different
     number of sectors/tracks/sides. In all cases, the sector size is contant
-    (256 bytes) and Polydos treats the disk as a linear sequence of sectors,
+    (256 bytes) and PolyDos treats the disk as a linear sequence of sectors,
     starting at 0.
 
     All of the conversion between linear sector address and track/ sector/size
-    takes place in the Polydos ROM, effectively a hardware abstraction layer.
+    takes place in the PolyDos ROM, effectively a hardware abstraction layer.
 
     Within polydos_vfs, you can mount disk images of different sizes (eg, from
     35-track and 40-track systems) and transfer data betweem them; the only
     requirement is that the sector count is correct in the directory data
     structure.
 
-    However, Polydos itself is not so flexible; it provides a SCAL DSIZ which
+    However, PolyDos itself is not so flexible; it provides a SCAL DSIZ which
     reports the size of a disk (though on the SD/DD system 2 disk sizes can
     co-exist.
 EOF
@@ -2825,12 +2911,11 @@ EOF
 
 # make a bootable system disk
 mount 1 test1.img
-clone 1 boot.dsk
+new 2 boot.dsk
 mount 2 boot.dsk
-copy 1.*.CMD 2      # need commands
-copy 1.FLEX.SYS 2   # need this too!
-rdboot 1
-wrboot 2            # copy boot sector
+copy *.OV:1 2         # need overlays
+copy SYSEQU.SY:1  2   # useful stuff
+copy AS.GO:1  2       # useful stuff
 exit
 
     From the command line invoke it like this:
@@ -2889,20 +2974,21 @@ Commands are:
     dir        - directory of virtual drive
     hdir       - directory of local file system
     delete     - set delete (D) flag on file(s) from virtual drive
+    undelete   - clear delete (D) flag on file(s) from virtual drive
     lock       - set lock (L) flag on file(s) from virtual drive
     unlock     - clear lock (L) flag on file(s) from virtual drive
     attrib     - change execution/load address on file(s) from virtual drive
     pack       - remove deleted files and free up disk space and directory entries
     create     - create file from sector(s) on the free list
-    fix        - perform low-level edit on virtual drive
+    repair     - perform low-level edit on virtual drive
     check      - check integrity of virtual drive
     scrub      - null out deleted file names and unused sectors
-    uppercase  - treat all POLYDOS file specifiers as upper-case
+    uppercase  - treat all PolyDos file specifiers as upper-case
     exit       - unmount all mounted drives and leave polydos_vfs
     quit       - synonym for exit
     help       - this is it.
 
-Other help topics: comments formats scripts conversions
+Other help topics: file comments formats scripts conversions
 
 Type help <command name> or help <topic> for more help.
 EOF
