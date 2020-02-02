@@ -15,6 +15,10 @@
 # repair -- not implemented in flex version
 # DELETE all old/irrelevant subroutines
 
+# BUG in undelete if you say "undelete *.OV:0" it will
+# fail if there is any non-deleted .OV file even if the
+# names don't match.
+
 # next:
 #
 # - code importers:
@@ -322,9 +326,6 @@ sub cmd_copy {
 
     my ($file,$ext,$src) = fs_to_fed($fs);
 
-    print "Not yet implemented"; # TODO
-    return;
-
     if (not $dsk[$src]->{mounted}) {
         print "ERROR source drive $src is not mounted\n";
         return;
@@ -342,10 +343,10 @@ sub cmd_copy {
     # which of those names already in use at the destination?
     my $rm_match = index_match_dir($src,$cp_match,$dst);
 
-    print " INFO 0 files match $src.$file.$ext\n" if scalar @$cp_match == 0;
+    print " INFO 0 files match $src.$file:$ext\n" if scalar @$cp_match == 0;
 
     # is there enough space for the copy?
-    my $dst_free = $dsk[$dst]->{sir}->{FREE} + sectors($dst, $rm_match);
+    my $dst_free = free_sectors($dst) + sectors($dst, $rm_match);
     if ($dst_free < sectors($src, $cp_match)) {
         print "ERROR insufficient space for copy\n";
         return;
@@ -596,7 +597,6 @@ sub cmd_dir {
 
 # TODO: currently accepts "delete fs". Change it to "delete fs [fs..]" ie multiple file specifiers - each
 # of which is run through the match/rm_files/rd_dir sequence in turn.
-# TODO may not need rm_files for any other purpose, in which case pull it in to here.
 sub cmd_delete {
     my ($fs) = check_arg('fs', @_);
     return unless defined($fs);
@@ -867,7 +867,7 @@ sub cmd_scrub {
     my $data8 = pack("C*", @data[0..7]);
 
     # scrub undefined entries in the directory
-    for (my $i=$dsk[$drive]->{fcbval}-1; $i<$FCB_COUNT; $i=$i+1) {
+    for (my $i=$dsk[$drive]->{fcbval}; $i<$FCB_COUNT; $i=$i+1) {
         $dsk[$drive]->{fcb}->[$i]->{fnam} = $data8;
         $dsk[$drive]->{fcb}->[$i]->{fext} = $data2;
         $dsk[$drive]->{fcb}->[$i]->{fsfl} = 0xe5;
@@ -1757,89 +1757,41 @@ sub pad_to_sector {
 
 
 # copy zero or more files
-# files specified by list of directory indices
-# TODO not yet updated for PolyDos
+# files specified by list of directory indices on the src.
+# already checked:
+# - there is enough space
+# - there are enough directory entries
+# - there are no name clashes
 sub cp_files {
     my ($src, $match, $dst) = @_;
-    my $TRK = 0;
-    my $SCT = 1;
-    my $SIZ = 2;
-
-    my @start_free_tsc = ($dsk[$dst]->{sir}->{FIRST_T},
-                          $dsk[$dst]->{sir}->{FIRST_S},
-                          $dsk[$dst]->{sir}->{FREE});
 
     foreach my $i (@{$match}) {
-        my @src_start_file_tsc = 0; ##rd_file_start_tsc($src,$i);
-        my $trk = $src_start_file_tsc[$TRK];
-        my $sct = $src_start_file_tsc[$SCT];
-        my $copied = 0;
-
-        # Use directory entry from src as starting point.
-        # *must* update start ts, end ts. Everything else
-        # can stay as-is.
-        my $dir_entry_data = rd_dir_entry($src, $i);
-
-        # copied file starts at first sector of
-        # destination free-list.
-        $dir_entry_data->[17-4] = $start_free_tsc[$TRK];
-        $dir_entry_data->[18-4] = $start_free_tsc[$SCT];
-
-        while (($trk != 0) or ($sct != 0)) {
-            $copied = $copied + 1;
-            my $data = " "; ##rd_dts($src, $trk, $sct);
-            my @data = unpack("C*", $data);
-
-            my $dst_data = " " ; ##rd_dts($dst,
-#                                  $start_free_tsc[$TRK],
-#                                  $start_free_tsc[$SCT]);
-            my @dst_data = unpack("C*", $dst_data);
-
-            # next to read
-            $trk = $data[0];
-            $sct = $data[1];
-
-            # copy the sector from src to dst. First, need
-            # to update its link field so that the destination
-            # sector links to the next sector on dst.. unless
-            # this was the last sector, in which case we break
-            # the chain.
-            if (($trk == 0) and ($sct == 0)) {
-                $data[0] = 0;
-                $data[1] = 0;
-
-                # copied file ends at this sector of
-                # destination free-list.
-                $dir_entry_data->[19-4] = $start_free_tsc[$TRK];
-                $dir_entry_data->[20-4] = $start_free_tsc[$SCT];
-            }
-            else {
-                $data[0] = $dst_data[0];
-                $data[1] = $dst_data[1];
-            }
-            ##wr_dts($dst, $start_free_tsc[$TRK], $start_free_tsc[$SCT], pack("C*", @data));
-
-            # update free list at destination
-            $start_free_tsc[$TRK] = $dst_data[0];
-            $start_free_tsc[$SCT] = $dst_data[1];
-            $start_free_tsc[$SIZ] = $start_free_tsc[$SIZ] - 1;
+        # make new directory entry and reserve space for the data
+        my $f_ref = empty_f_ref();
+        foreach my $key (keys %$f_ref) {
+            $f_ref->{$key} = $dsk[$src]->{fcb}->[$i]->{$key};
         }
 
-        # sanity
-        if ($copied != $src_start_file_tsc[$SIZ]) {
-            print "ERROR - copied file chain longer than file declared\n";
-        }
+        $f_ref->{fsec} = $dsk[$dst]->{nxtsec};
+        $dsk[$dst]->{nxtsec} = $dsk[$dst]->{nxtsec} + $f_ref->{fnsc};
 
-        my $index = allocate_dir_entry($dst); # TODO this will probably go away
-        wr_dir_entry($dst, $index, $dir_entry_data);
+        # add the directory entry and increment fcb count
+        my $dst_i = $dsk[$dst]->{fcbval};
+        $dsk[$dst]->{fcb}->[$dst_i] = $f_ref;
+        $dsk[$dst]->{fcbval} = $dst_i + 1;
+        $dsk[$dst]->{nxtfcb} = $dsk[$dst]->{nxtfcb} + $FCB_SIZE;
+
+        # copy the data.
+        my $data = rd_dsec($src, $dsk[$src]->{fcb}->[$i]->{fsec}, $dsk[$src]->{fcb}->[$i]->{fnsc});
+        wr_dsec($dst, $dsk[$dst]->{fcb}->[$dst_i]->{fsec}, $data);
     }
 
-    # and refresh the local data TODO may not need this if I can update the existing data structure.
-    rd_dir($dst);
+    # update directory structure in the disk image
+    wr_dir($dst);
 }
 
 
-# delete zero or more files
+# Set D (delete) flag on zero or more files
 # files specified by list of directory indices
 sub rm_files {
     my ($drive, $match) = @_;
@@ -2048,12 +2000,14 @@ sub index_match_dir {
 
     # build a hash of the names we're looking for
     foreach my $i (@{$files}) {
-        my $name = "$dsk[$drive1]->{dir}->[$i]->{NAME}.$dsk[$drive1]->{dir}->[$i]->{EXT}";
+        my $name = "$dsk[$drive1]->{fcb}->[$i]->{fnam}.$dsk[$drive1]->{fcb}->[$i]->{fext}";
         $drive1_names{$name} = 1;
     }
 
-    for my $i (0.. $#{$dsk[$drive2]->{dir}}) {
-        my $name = "$dsk[$drive2]->{dir}->[$i]->{NAME}.$dsk[$drive2]->{dir}->[$i]->{EXT}";
+    # look for non-deleted name matches on the destination drive
+    for my $i (0.. $dsk[$drive2]->{fcbval}-1) {
+        next if ($dsk[$drive2]->{fcb}->[$i]->{fsfl} & $SFLG_DEL);
+        my $name = "$dsk[$drive2]->{fcb}->[$i]->{fnam}.$dsk[$drive2]->{fcb}->[$i]->{fext}";
         if (exists $drive1_names{$name}) {
             push @matches, $i;
         }
@@ -2098,7 +2052,7 @@ sub name_match_dir {
 # delete an entry from the directory by editing the sector
 sub rm_dir_entry {
     my ($drive, $index) = @_;
-    print "TODO will be modified for PolyDos - this routine is never called\n";
+    print "TODO rm_dir_entry will be modified for PolyDos - this routine is never called\n";
 
     my $trk = $dsk[$drive]->{dir}->[$index]->{T};
     my $sct = $dsk[$drive]->{dir}->[$index]->{S};
@@ -2145,7 +2099,7 @@ sub empty_f_ref {
 sub allocate_dir_entry {
     my ($drive) = @_;
 
-    print "TODO will be modified for PolyDos\n";
+    print "TODO allocate_dir_entry will be modified for PolyDos\n";
 
     # first try for a never-used entry
     for my $i (0.. $#{$dsk[$drive]->{dir}}) {
@@ -2170,64 +2124,13 @@ sub allocate_dir_entry {
 }
 
 
-# return a reference to a 24-element array that is the directory
-# data for the specified index/drive. Read from disk.
-# TODO will be modified for PolyDos - or may not be needed
-sub rd_dir_entry {
-    my ($drive, $index) = @_;
-
-    print "TODO will be modified for PolyDos\n";
-
-    my $trk = $dsk[$drive]->{dir}->[$index]->{T};
-    my $sct = $dsk[$drive]->{dir}->[$index]->{S};
-    my $entry = $dsk[$drive]->{dir}->[$index]->{ENTRY};
-
-    # first byte of the directory entry
-    my $offset = 16 + ($entry * 24);
-
-    ##my $data = rd_dts($drive, $trk, $sct);
-    ##my $dir_data = substr($data, $offset, 24);
-    ##my @dir_data = unpack("C*", $dir_data);
-    ##return \@dir_data;
-}
-
-
-# write a directory entry to disk. The directory entry is a
-# reference to a 24-element array that is the directory data
-# and it's written to the specified index/drive. Writes to disk.
-# Local copy of directory structure is NOT kept coherent.
-# TODO will be modified for PolyDos - or may not be needed
-sub wr_dir_entry {
-    my ($drive, $index, $dir_data) = @_;
-
-    print "TODO will be modified for PolyDos\n";
-
-    my $trk = $dsk[$drive]->{dir}->[$index]->{T};
-    my $sct = $dsk[$drive]->{dir}->[$index]->{S};
-    my $entry = $dsk[$drive]->{dir}->[$index]->{ENTRY};
-
-    # first byte of the directory entry
-    my $offset = 16 + ($entry * 24);
-
-    ##my $data = rd_dts($drive, $trk, $sct);
-    ##my @data = unpack("C*", $data);
-    ##for my $i (0..23) {
-    ##    $data[$offset + $i] = $dir_data->[$i];
-    ##}
-    ##wr_dts($drive, $trk, $sct, pack("C*", @data));
-}
-
-
 # sum the sectors needed to hold the specified files
-# TODO will be modified for PolyDos
 sub sectors {
     my ($drive, $match) = @_;
     my $sum = 0;
 
-    print "TODO will be modified for PolyDos\n";
-
     foreach my $i (@{$match}) {
-        $sum = $sum + $dsk[$drive]->{dir}->[$i]->{SIZE};
+        $sum = $sum + $dsk[$drive]->{fcb}->[$i]->{fnsc};
     }
 
     return $sum;
