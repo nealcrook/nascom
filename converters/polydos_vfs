@@ -10,17 +10,17 @@
 #
 # TODO: the import/export commands are incomplete. The current status is:
 #
-# conv_export_raw DONE
-# conv_export_txt DONE
-# conv_export_dump
-# conv_export_nas
+# conv_export_raw  DONE
+# conv_export_txt  DONE
+# conv_export_dump DONE
+# conv_export_nas  DONE
+# conv_export_nasg DONE
 # conv_export_cas
-# conv_export_nasg
 # conv_export_casg
-# conv_import_raw DONE
-# conv_import_txt PART-DONE
-# conv_import_nas DONE needs tidy
-# conv_import_cas PART-DONE needs tidy
+# conv_import_raw  DONE
+# conv_import_txt  PART-DONE
+# conv_import_nas  DONE needs tidy
+# conv_import_cas  PART-DONE needs tidy
 
 # bug: make nascom convert (And others) report file name as they go
 # - looks at bad formats in files and see if it can be accommodated
@@ -1016,7 +1016,7 @@ sub check_arg {
             while ((defined $_[$i]) and ($_[$i] =~ /^\w+=\w+$/)) {
                 # Looks like a conversion rule. Do everything in lower case.
                 my $rule = lc $_[$i];
-                if ($rule =~ /^(\w+)=(raw|txt|dump|nas|nasg|cas|casg)/) { # conversions for export
+                if ($rule =~ /^(\w+)=(raw|txt|dump|nas|nasg|cas|casg)$/) { # conversions for export
                     $conv{$1} = $2;
                 }
                 else {
@@ -1364,32 +1364,61 @@ sub conv_export_dump {
             last if page($f_ref);
         }
     }
-    # runt
-    if ($count != 0) {
-        my $pad = '   ' x (16 - $count);
-        if ($count < 8) {
-            $pad = $pad . ' ';
-        }
-        printf $handle "%04x%s $pad %s\n", $offset, $num_str, $let_str;
-    }
+    # every exported file is a whole number of sectors and so there are
+    # no left-over/runt bytes at the end.
 }
 
 
 # Export in NAS or NAS/Generate format.
-sub conv_export_nasg {
-    my ($f_ref) = @_;
+sub conv_export_nasg { my ($f_ref) = @_; helper_conv_export_nas_nasg(1, $f_ref);  }
+sub conv_export_nas  { my ($f_ref) = @_; helper_conv_export_nas_nasg(0, $f_ref);  }
+
+sub helper_conv_export_nas_nasg {
+    my ($nasg, $f_ref) = @_;
     $f_ref->{fext} = 'NAS';
     return if not set_export_handle($f_ref);
-    print "TODO conv_export_nasg\n";
+    my $handle = $f_ref->{handle};
+    my $num_str = '';
+    my $count = 0;
+    my $csum = 0;
+    my $offset = $f_ref->{flda};
+
+    for (my $i=0; $i<length $f_ref->{data}; $i=$i+1) {
+        my $chr = ord substr($f_ref->{data}, $i, 1);
+        if ($count == 0) {
+            $csum = (0xff & $offset) + ($offset >> 8);
+            printf $handle "%04X ", $offset;
+        }
+        $csum = $csum + $chr;
+        printf $handle "%02X ", $chr;
+
+        if ($count == 7) {
+            printf $handle "%02X\n", 0xff & $csum;
+            $csum = 0;
+            $offset = $offset + 8;
+        }
+
+        $count = ($count + 1) %8;
+        last if page($f_ref);
+    }
+    # every exported file is a whole number of sectors and so there are
+    # no left-over/runt bytes at the end.
+    if ($nasg) {
+        printf $handle ".\n";
+        printf $handle "E%04X\n", $f_ref->{fexa};
+    }
 }
 
 
 # Export in CAS or CAS/Generate format.
-sub conv_export_casg {
-    my ($f_ref) = @_;
+sub conv_export_casg { my ($f_ref) = @_;  helper_conv_export_cas_casg(1, $f_ref);  }
+sub conv_export_cas  { my ($f_ref) = @_;  helper_conv_export_cas_casg(0, $f_ref);  }
+
+sub helper_conv_export_cas_casg {
+    my ($casg, $f_ref) = @_;
     $f_ref->{fext} = 'CAS';
     return if not set_export_handle($f_ref);
-    print "TODO conv_export_casg\n";
+    print "TODO helper_conv_export_cas_casg with $casg\n";
 }
 
 
@@ -2269,9 +2298,9 @@ EOF
     See 'help conversions' for more details. See also 'help type'
 
     Example:
-    export 1.*.TX TX=txt ../files
-    export 0.*.GO GO=dump
-    export 1.*.* TX=raw BS=dump xxx=raw some_subdirectory
+    export *.TX:1 TX=txt ../files
+    export *.GO:0 GO=dump
+    export *.*:1 TX=raw BS=dump xxx=raw some_subdirectory
 EOF
     }
     elsif ($cmd eq 'import') {
