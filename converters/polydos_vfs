@@ -8,24 +8,8 @@
 #
 # https://github.com/nealcrook/nascom
 #
-# Remaining commands to implement, with priorities:
-# copy
-# export - done, but need to code more exporters
-# import  <-- HARD, BUT MOST USEFUL. DO NEXT!
-# repair -- not implemented in flex version
-# DELETE all old/irrelevant subroutines
-
-# BUG in undelete if you say "undelete *.OV:0" it will
-# fail if there is any non-deleted .OV file even if the
-# names don't match.
-
-# next:
+# TODO: the import/export commands are incomplete. The current status is:
 #
-# - code importers:
-# -- do the text one
-# -- tidy up the CAS importer
-# -- and add E detection (and to the stand-alone script, too)
-
 # conv_export_raw DONE
 # conv_export_txt DONE
 # conv_export_dump
@@ -38,16 +22,9 @@
 # conv_import_nas DONE needs tidy
 # conv_import_cas PART-DONE needs tidy
 
-
 # bug: make nascom convert (And others) report file name as they go
 # - looks at bad formats in files and see if it can be accommodated
 # - try to extract execution address
-
-# bugette: filter also checks files that are marked as deleted.
-# =>  "type" matches deleted files. It should not.
-# =>  "delete" matches deleted files. It should not.
-# bugette: polydos will only allow you to delete a file that is unlocked. Should impose and document the same rule
-
 
 # FUTURE: add optional y/n arg to delete.
 # FUTURE: THEN (command separator)
@@ -101,7 +78,6 @@ my $UPCASE = 0;
 # $dsk[n]->{blks} number of blocks -- INFERRED from reading the image
 # $dsk[n]->{filename} file name by which file was accessed
 # filled in by rd_dir when disk is mounted:
-# $dsk[n]->{dir}->[n] array of data ?? TODO do I need this
 # $dsk[n]->{dname} disk name in ASCII
 # $dsk[n]->{nxtsec} next sector
 # $dsk[n]->{nxtfcb} next fcb address - 1st fcb is $c418, 2nd is $c418 + 20 etc.
@@ -627,24 +603,34 @@ sub cmd_undelete {
         return;
     }
 
-    my $match = filter_dir($drive,$file,$ext,'NON-DELETED');
-
-    if (scalar @$match != 0) {
-        print "ERROR there is already a file with that name.\n";
-        return;
-    }
-
-    $match = filter_dir($drive,$file,$ext,'DELETED');
+    my $match = filter_dir($drive,$file,$ext,'DELETED');
 
     if (scalar @$match == 0) {
         print "ERROR there is no deleted file with that name.\n";
         return;
     }
 
-    printf " INFO %d files match $file.$ext:$drive - undeleted oldest one\n", scalar @$match if scalar @$match != 1;
-
-    # undelete the oldest one
-    $dsk[$drive]->{fcb}->[$match->[0]]->{fsfl} = $dsk[$drive]->{fcb}->[$match->[0]]->{fsfl} & (0xff ^ $SFLG_DEL);
+    # in a previous version of the code I did a filter_dir looking
+    # to see if there was >0 non-deleted file matches. That's no
+    # good though when a wildcard's in use.. consider the command:
+    # undelete *.OV:0
+    # one or more of the deleted files might have a non-deleted
+    # equivalent, but one or more might not. Therefore, need to
+    # consider each undelete candidate separately.
+    # If there are multiple deleted files with the same name, this
+    # will undelete the oldest and report an error for the others
+    my $names_ref = names_ref($drive);
+    foreach my $i (@{$match}) {
+        my $name = "$dsk[$drive]->{fcb}->[$i]->{fnam}.$dsk[$drive]->{fcb}->[$i]->{fext}";
+        if (exists $names_ref->{$name}) {
+            print "ERROR skipped undelete of $name - there is already a file with that name.\n";
+        }
+        else {
+            $dsk[$drive]->{fcb}->[$i]->{fsfl} = $dsk[$drive]->{fcb}->[$i]->{fsfl} & (0xff ^ $SFLG_DEL);
+            # need this to prevent undeletion of another copy next time round the loop
+            $names_ref->{$name} = $i;
+        }
+    }
     wr_dir($drive);
 }
 
@@ -1996,20 +1982,14 @@ sub filter_dir {
 sub index_match_dir {
     my ($drive1, $files, $drive2) = @_;
     my @matches;
-    my %drive1_names;
 
-    # build a hash of the names we're looking for
+    my $drive2_names_ref = names_ref($drive2);
+
+    # check each name we're looking for
     foreach my $i (@{$files}) {
         my $name = "$dsk[$drive1]->{fcb}->[$i]->{fnam}.$dsk[$drive1]->{fcb}->[$i]->{fext}";
-        $drive1_names{$name} = 1;
-    }
-
-    # look for non-deleted name matches on the destination drive
-    for my $i (0.. $dsk[$drive2]->{fcbval}-1) {
-        next if ($dsk[$drive2]->{fcb}->[$i]->{fsfl} & $SFLG_DEL);
-        my $name = "$dsk[$drive2]->{fcb}->[$i]->{fnam}.$dsk[$drive2]->{fcb}->[$i]->{fext}";
-        if (exists $drive1_names{$name}) {
-            push @matches, $i;
+        if (exists $drive2_names_ref->{$name}) {
+            push @matches, $drive2_names_ref->{$name};
         }
     }
 
@@ -2017,60 +1997,20 @@ sub index_match_dir {
 }
 
 
-# $names is a ref to a list of file names.
-# Look for filename matches on $drive and return a ref
-# to a list of the directory entries that match - that list
-# corresponds to indices in $drive.
-# If $toupper is true, entries in $names will be forced to
-# upper case before attempting a match.
-sub name_match_dir {
-    my ($drive, $names, $toupper) = @_;
-    my @matches;
-    my %names;
+# return a reference to a hash whose keys are the non-deleted files on
+# the drive, and whose values are the associated fcb indices Usage:
+# my $names = names_ref(0);
+# if (exists $names->{ZOMBIE.GO})  { #etc }
+sub names_ref {
+    my ($drive) = @_;
+    my $ref;
 
-    # build a hash of the names we're looking for
-    foreach my $i (@{$names}) {
-        if ($toupper) {
-            $names{uc $i} = 1;
-        }
-        else {
-            $names{$i} = 1;
-        }
+    for my $i (0.. $dsk[$drive]->{fcbval}-1) {
+        next if ($dsk[$drive]->{fcb}->[$i]->{fsfl} & $SFLG_DEL);
+        my $name = "$dsk[$drive]->{fcb}->[$i]->{fnam}.$dsk[$drive]->{fcb}->[$i]->{fext}";
+        $ref->{$name} = $i;
     }
-
-    for my $i (0.. $#{$dsk[$drive]->{dir}}) {
-        my $name = "$dsk[$drive]->{dir}->[$i]->{NAME}.$dsk[$drive]->{dir}->[$i]->{EXT}";
-        if (exists $names{$name}) {
-            push @matches, $i;
-        }
-    }
-
-    return \@matches;
-}
-
-
-# delete an entry from the directory by editing the sector
-sub rm_dir_entry {
-    my ($drive, $index) = @_;
-    print "TODO rm_dir_entry will be modified for PolyDos - this routine is never called\n";
-
-    my $trk = $dsk[$drive]->{dir}->[$index]->{T};
-    my $sct = $dsk[$drive]->{dir}->[$index]->{S};
-    my $entry = $dsk[$drive]->{dir}->[$index]->{ENTRY};
-
-    # first byte of the directory entry (first byte of the name)
-    my $offset = 16 + ($entry * 24);
-
-    # keep local data structure intact
-    $dsk[$drive]->{dir}->[$index]->{NAME} = "%DELETED";
-    $dsk[$drive]->{dir}->[$index]->{EXT} = "%";
-
-    ##my $data = rd_dts($drive, $trk, $sct);
-    ##my @data = unpack("C*", $data);
-    # set MSB to mark it as a deleted entry
-    ##$data[$offset] = $data[$offset] | 0x80;
-
-    ##wr_dts($drive, $trk, $sct, pack("C*", @data));
+    return $ref;
 }
 
 
@@ -2087,40 +2027,6 @@ sub empty_f_ref {
     $f_ref->{flda} = 0;
     $f_ref->{fexa} = 0;
     return $f_ref;
-}
-
-
-# Return an index to a directory entry that is unused.
-# If possible, an entry that has never been used will be
-# allocated. Otherwise, an entry that has been deleted will
-# be allocated. Use dir_entries() before to make sure that
-# an unallocated entry exists; there is no check here.
-# TODO will be modified for PolyDos - or may not be needed, since this process is much simpler for PolyDos
-sub allocate_dir_entry {
-    my ($drive) = @_;
-
-    print "TODO allocate_dir_entry will be modified for PolyDos\n";
-
-    # first try for a never-used entry
-    for my $i (0.. $#{$dsk[$drive]->{dir}}) {
-        my $j = $dsk[$drive]->{dir}->[$i];
-        if ($j->{NAME} eq "%UNUSED") {
-            # keep local data structure intact
-            $j->{NAME} = "%ALLOCATED";
-            return $i
-        }
-    }
-
-    # otherwise a deleted entry
-    for my $i (0.. $#{$dsk[$drive]->{dir}}) {
-        my $j = $dsk[$drive]->{dir}->[$i];
-        if ($j->{NAME} eq "%DELETED") {
-            # keep local data structure intact
-            $j->{NAME} = "%ALLOCATED";
-            return $i
-        }
-    }
-    die "FATAL internal error - no unused directory entry\n";
 }
 
 
@@ -2462,6 +2368,8 @@ EOF
     or all of the files that match the file specifier.  The file specifier can
     include * used as a wildcard.
 
+    PolyDos will not allow deletion of a Locked file; polydos_vfs will allow it.
+
     BE CAREFUL -- NO CONFIRMATION IS ASKED FOR!
 
     Examples:
@@ -2484,7 +2392,8 @@ EOF
     with the same name (rename the existing file first).
 
     If multiple deleted files of the same name exist, the oldest will be
-    undeleted (the one that appears earliest in the directory listing).
+    undeleted (the one that appears earliest in the directory listing) and an
+    error reported for each other deleted file with the same name.
 
     Examples:
     undelete 2
@@ -2829,7 +2738,7 @@ Commands are:
     quit       - synonym for exit
     help       - this is it.
 
-Other help topics: file comments formats scripts conversions
+Other help topics: files formats comments conversions scripts
 
 Type help <command name> or help <topic> for more help.
 EOF
