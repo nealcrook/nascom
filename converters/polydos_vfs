@@ -10,17 +10,10 @@
 #
 # Remaining commands to implement, with priorities:
 # copy
-# type
 # export - done, but need to code more exporters
 # import  <-- HARD, BUT MOST USEFUL. DO NEXT!
-# create - probably no use-case but simple and could be useful
 # repair -- not implemented in flex version
 # DELETE all old/irrelevant subroutines
-
-# TODO  undelete command, to clear delete (D) flag .. only when there is no
-# current file of the same name. If multiple deleted, it undeletes the first
-# (oldest).
-
 
 # next:
 #
@@ -794,68 +787,32 @@ sub cmd_create {
         return;
     }
 
-    my $flex_name = "$file.$ext";
-    if (not legal_poly_name($flex_name)) {
-        print "ERROR cannot resolve $flex_name to a unique name.\n";
+    my $name = "$file.$ext";
+    if (not legal_poly_name($name)) {
+        print "ERROR cannot resolve $name to a unique/legal name.\n";
         return;
     }
 
-    if ($sectors > $dsk[$drive]->{sir}->{FREE}) {
-        print "ERROR insufficient sectors on the free list.\n";
+    if ($sectors > free_sectors($drive)) {
+        print "ERROR insufficient free sectors.\n";
         return;
     }
 
-    # Start with empty directory entry
-    my $dir_entry_data = empty_dir_entry();
+    # make new directory entry and reserve space for the data
+    my $f_ref = empty_f_ref();
+    $f_ref->{fnam} = $file;
+    $f_ref->{fext} = $ext;
+    $f_ref->{fsec} = $dsk[$drive]->{nxtsec};
+    $dsk[$drive]->{nxtsec} = $dsk[$drive]->{nxtsec} + $sectors;
+    $f_ref->{fnsc} = $sectors;
 
-    # Populate file name and extension
-    name_dir_entry($flex_name, $dir_entry_data);
+    # add the directory entry and increment fcb count
+    $dsk[$drive]->{fcb}->[$dsk[$drive]->{fcbval}] = $f_ref;
+    $dsk[$drive]->{fcbval} = $dsk[$drive]->{fcbval} + 1;
+    $dsk[$drive]->{nxtfcb} = $dsk[$drive]->{nxtfcb} + $FCB_SIZE;
 
-    # Populate file length
-    $dir_entry_data->[21+0-4] = int($sectors/256);
-    $dir_entry_data->[21+1-4] = $sectors % 256;
-
-    # Walk the free list to the sector we want
-    ##my ($status, $trk, $sct, $data_ref) = walk_chain_n($drive, $dsk[$drive]->{sir}->{FIRST_T},
-    ##                                                   $dsk[$drive]->{sir}->{FIRST_S},
-    ##                                                   $dsk[$drive]->{sir}->{FREE} - $sectors);
-
-    my ($status, $data_ref, $trk, $sct);
-    if ($status == -1) {
-        print "ERROR consistency error in free chain. Check disk image.\n";
-        return;
-    }
-
-    # Sanity check the chain that will make up the new file
-    ##my ($status2, $trk2, $sct2, $data_ref2) = walk_chain_n($drive, $data_ref->[0],
-    ##                                                       $data_ref->[1], $sectors);
-
-    my ($status2, $data_ref2);
-    if ($status2 == -1) {
-        print "ERROR consistency error in end part of free chain. Check/repair disk image.\n";
-        return;
-    }
-
-    # This ought to be the current end of the free chain and so should be a 0,0 link
-    if (($data_ref2->[0] != 0) or ($data_ref2->[1] != 0)) {
-        print "ERROR missing 0,0 link at end of free chain. Check/repair disk image.\n";
-        return;
-    }
-
-    # Everything seems to be in good order.
-
-    # Fix up the free chain link and (in the SIR) the end t/s and count
-    $data_ref->[0] = 0;
-    $data_ref->[1] = 0;
-    ##wr_dts($drive, $trk, $sct, pack("C*", @$data_ref));
-##    wr_sir_end_free($drive, $trk, $sct, $dsk[$drive]->{sir}->{FREE} - $sectors);
-
-    # Populate first t/s for the new file then write it to the directory
-    $dir_entry_data->[17-4] = $data_ref->[0];
-    $dir_entry_data->[18-4] = $data_ref->[1];
-    my $index = allocate_dir_entry($drive);
-    wr_dir_entry($drive, $index, $dir_entry_data);
-    rd_dir($drive);
+    # Update directory on disk
+    wr_dir($drive);
 }
 
 
@@ -1801,6 +1758,7 @@ sub pad_to_sector {
 
 # copy zero or more files
 # files specified by list of directory indices
+# TODO not yet updated for PolyDos
 sub cp_files {
     my ($src, $match, $dst) = @_;
     my $TRK = 0;
@@ -1872,11 +1830,11 @@ sub cp_files {
             print "ERROR - copied file chain longer than file declared\n";
         }
 
-        my $index = allocate_dir_entry($dst);
+        my $index = allocate_dir_entry($dst); # TODO this will probably go away
         wr_dir_entry($dst, $index, $dir_entry_data);
     }
 
-    # and refresh the local data
+    # and refresh the local data TODO may not need this if I can update the existing data structure.
     rd_dir($dst);
 }
 
@@ -2162,39 +2120,19 @@ sub rm_dir_entry {
 }
 
 
-# Return a reference to an empty directory entry
-# data structure - to be filled in and then used by
-# allocate_dir_entry(), wr_dir_entry() etc.
-# TODO will be modified for PolyDos - only used by cmd_create. May be simpler ways to do it.
-sub empty_dir_entry {
-    my @dir_entry = (0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0);
-    print "TODO will be modified for PolyDos\n";
-    return \@dir_entry;
-}
-
-
-# Insert a file name into a directory entry.
-# $flex_name is file name and extension, separated by "."
-# $dir_entry_data is a reference to an array eg created
-# by empty_dir_entry() or rd_dir_entry()
-# TODO will be modified for PolyDos.. or may not be needed
-sub name_dir_entry {
-    my ($flex_name, $dir_entry_data) = @_;
-    print "TODO will be modified for PolyDos\n";
-
-    my $findex = 0;
-    my $sindex = 0;
-    while (my $char = ord substr($flex_name, $findex, 1)) {
-        if ($char == 0x2e) {
-            $sindex = 8;
-            $findex = $findex + 1;
-            next;
-        }
-
-        $dir_entry_data->[$sindex] = $char;
-        $findex = $findex + 1;
-        $sindex = $sindex + 1;
-    }
+# Return a reference to an empty directory entry; a hash
+# reference containing the minimum set of fields.
+sub empty_f_ref {
+    my $f_ref;
+    $f_ref->{fnam} = "";
+    $f_ref->{fext} = "";
+    $f_ref->{fsfl} = 0;
+    $f_ref->{fufl} = 0;
+    $f_ref->{fsec} = 0;
+    $f_ref->{fnsc} = 0;
+    $f_ref->{flda} = 0;
+    $f_ref->{fexa} = 0;
+    return $f_ref;
 }
 
 
