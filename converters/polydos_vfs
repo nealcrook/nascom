@@ -8,15 +8,8 @@
 #
 # https://github.com/nealcrook/nascom
 #
-# TODO: the import/export commands are incomplete. The current status is:
+# TODO: the imports would benefit from some tidying
 #
-# conv_export_raw  DONE
-# conv_export_txt  DONE
-# conv_export_dump DONE
-# conv_export_nas  DONE
-# conv_export_nasg DONE
-# conv_export_cas
-# conv_export_casg
 # conv_import_raw  DONE
 # conv_import_txt  PART-DONE
 # conv_import_nas  DONE needs tidy
@@ -1378,6 +1371,7 @@ sub helper_conv_export_nas_nasg {
     $f_ref->{fext} = 'NAS';
     return if not set_export_handle($f_ref);
     my $handle = $f_ref->{handle};
+
     my $num_str = '';
     my $count = 0;
     my $csum = 0;
@@ -1393,7 +1387,8 @@ sub helper_conv_export_nas_nasg {
         printf $handle "%02X ", $chr;
 
         if ($count == 7) {
-            printf $handle "%02X\n", 0xff & $csum;
+            # by inspection, there are 2 backspaces to "hide" the checksum
+            printf $handle "%02X%c%c\r\n", 0xff & $csum, 8, 8;
             $csum = 0;
             $offset = $offset + 8;
         }
@@ -1403,6 +1398,8 @@ sub helper_conv_export_nas_nasg {
     }
     # every exported file is a whole number of sectors and so there are
     # no left-over/runt bytes at the end.
+
+    # "Generate"ed file has the execution address at the end
     if ($nasg) {
         printf $handle ".\n";
         printf $handle "E%04X\n", $f_ref->{fexa};
@@ -1418,7 +1415,49 @@ sub helper_conv_export_cas_casg {
     my ($casg, $f_ref) = @_;
     $f_ref->{fext} = 'CAS';
     return if not set_export_handle($f_ref);
-    print "TODO helper_conv_export_cas_casg with $casg\n";
+    my $handle = $f_ref->{handle};
+
+    # every exported file is a whole number of sectors and so a whole
+    # number of CAS-format blocks
+    die "CAS Exporter relies on a sector size of 256" if $BYTES_SECTOR != 256;
+    my $addr = $f_ref->{flda};
+    my $maxblk = (length $f_ref->{data})/256 - 1; # blocks go maxblk..0
+
+    foreach my $i (0..$maxblk) {
+        printf "%04x %04x\n", $addr, $maxblk - $i;
+        # Output sync pattern
+        print $handle chr(0) . chr(0xff) . chr(0xff) . chr(0xff) . chr(0xff);
+
+        # Output block header and checksum
+        my $csum = ($addr & 0xff) + ($addr >> 8) + $maxblk - $i;
+        print $handle chr($addr & 0xff);
+        print $handle chr($addr >> 8);
+
+        # 256-byte block: size is 0 (0=>256) and the csum does not change
+        my $body = substr($f_ref->{data}, 256*$i, 256);
+        print $handle chr(0);
+
+        print $handle chr($maxblk - $i);
+        print $handle chr($csum & 0xff); # header checksum
+        print $handle $body;
+
+        $csum = 0;
+        foreach my $byte (0..(length($body) -1)) {
+            $csum = $csum + ord(substr($body, $byte, 1));
+        }
+        print $handle chr($csum & 0xff); # body checksum
+
+        # Output 10 nulls
+        print $handle chr(0) x 10;
+
+        # Step to next
+        $addr = $addr + 256;
+    }
+
+    # "Generate"ed file has the execution address at the end
+    if ($casg) {
+        printf $handle "E%04X\n", $f_ref->{fexa};
+    }
 }
 
 
