@@ -44,9 +44,11 @@ PD000 -- PolyDos 2 System disk and SDcard utilities
 PD100 -- Languages
 ==================
 
-forth.cas     HULL Forth, version 1.1              [Origin: virtual-nascom]
-hisoft.cas     E 1000  Hisoft Pascal               [Origin: virtual-nascom]
-blspas12.nas         BLS Pascal 1.2                [Origin: virtual-nascom]
+   Sect Nsct Load Exec SysFlg   Name
+   0004 002f 1400 1400          FORTH.GO     HULL Forth, version 1.1  [Origin: virtual-nascom]
+   0033 0054 1000 1000          HISOFT.GO    E 1000  Hisoft Pascal    [Origin: virtual-nascom]
+   0087 0030 1000 1000          BLSPAS12.GO  BLS Pascal 1.2           [Origin: virtual-nascom]
+   00b7 0016 1000 1000          EMPL.GO      Micro APL                [Origin: groups.io]
 
 --------------------------------------------------------------------------------------
 PD200 -- INMC Classics
