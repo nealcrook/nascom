@@ -927,8 +927,8 @@ sub cmd_uppercase {
 # mv  - virtual drive number of mounted drive (error if not mounted)
 # h   - existing file in host filesystem
 # hfw - wildcard in host filesystem. Only recognise files that are
-#       valid PolyDos file names and non-zero in size. Must match at
-#       least 1 file.
+#       non-zero in size. Need not be valid PolyDos names (they will
+#       get legalised later). Must match at least 1 file.
 # nh  - file in host filesystem (may or may not exist)
 # od  - optional directory in host filesystem (must exist) default to .
 # fs  - PolyDos file specifier eg: 1 or FOO.GO:1
@@ -1069,8 +1069,8 @@ sub check_arg {
             }
         }
         elsif ($f eq 'hfw') {
-            # host wildcard; only recognise files that are valid PolyDos
-            # names and non-zero in size. Must match at least 1 file.
+            # host wildcard; only recognise files that are non-zero in size.
+            # (need not be legal PolyDos names). Must match at least 1 file.
             # Return a reference to a list of files AND a directory path
             if (not defined $_[$i]) {
                 print "ERROR missing argument - expected host file name\n";
@@ -1089,11 +1089,11 @@ sub check_arg {
             # nothing more (so that fred.dsk doesn't match fred.dsk_x)
             my @matches = grep /$f$/, readdir DIR;
             close DIR;
-            @matches = grep { legal_poly_name($_) } @matches;
+            @matches = grep { $_                } @matches;
             @matches = grep { -s "$path$_" != 0 } @matches;
 
             if (not defined $matches[0]) {
-                print "ERROR no matching host files - candidates must be non-zero size with legal PolyDos names\n";
+                print "ERROR no matching host files - candidates must be non-zero size\n";
                 return;
             }
 
