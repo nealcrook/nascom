@@ -8,6 +8,10 @@
 # Downloaded from: http://www.hytherion.com/beattidp/comput/z80cpm.htm
 # Then converted from AWK to PERL by a2p
 #
+# Modified to fix bugs and add missing 8080 op-codes by
+# foofoobedoo@gmail.com
+# 
+#
 # Usage: ./toZ80 file.a80 > file.asm
 
 $, = ' ';                      # set output field separator
@@ -30,6 +34,33 @@ line: while (<>) {
     if ((/^[^; \t]*[ \t]+[^; \t]+[ \t]+[Mm],[^; \t]+([; \t]|$)/)) {
 	s/[Mm],/(HL),/;
     }
+
+
+    # New way of doing things.. migrate all op-codes to this style
+    # (search for $middle to see example of how to use these).
+    my $prefix;
+    my $suffix;
+    my $middle;
+
+    if ($_ =~ /^([\s]+|\w+:\s+)/) {
+        $prefix = $1;
+    }
+    else {
+        $prefix = "";
+    }
+
+    if ($_ =~ /([\s]*;.*$)/) {
+        $suffix = $1;
+    }
+    elsif ($_ =~ /([\s]*$)/) {
+        $suffix = $1;
+    }
+    else {
+        $suffix = "";
+    }
+
+    $middle = substr($_, length($prefix), length($_) - length($prefix) - length($suffix));
+
 
     #### MOV
     ############################
@@ -175,42 +206,16 @@ line: while (<>) {
 
     ### LHLD word
     ############################
-    if ((/^[^; \t]*[ \t]+([Ll][Hh][Ll][Dd])[ \t]+[^ \t]+([; \t]|$)/)) {
-	&save_label();
-
-	$wkg_str = &get_operand('[Ll][Hh][Ll][Dd]', 4);
-
-	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
-
-	  s/[Ll][Hh][Ll][Dd]/eval $s_/e;
-	($s_ = '"'.('HL,(' . $wkg_str . ')').'"') =~ s/&/\$&/g,
-
-	  s/$wkg_str/eval $s_/e;
-	s/$temp_xyz/LD/;
-
-	&restore_label();
-	print $_;
-	next line;
+    if ($middle =~ /(^[Ll][Hh][Ll][Dd])(\s+)(.*)$/) {
+        print $prefix, "LD HL, ($3)", $suffix;
+        next line;
     }
 
     ### SHLD word
     ############################
-    if ((/^[^; \t]*[ \t]+([Ss][Hh][Ll][Dd])[ \t]+[^ \t]+([; \t]|$)/)) {
-	&save_label();
-
-	$wkg_str = &get_operand('[Ss][Hh][Ll][Dd]', 4);
-
-	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
-
-	  s/[Ss][Hh][Ll][Dd]/eval $s_/e;
-	($s_ = '"'.('(' . $wkg_str . '),HL').'"') =~ s/&/\$&/g,
-
-	  s/$wkg_str/eval $s_/e;
-	s/$temp_xyz/LD/;
-
-	&restore_label();
-	print $_;
-	next line;
+    if ($middle =~ /(^[Ss][Hh][Ll][Dd])(\s+)(.*)$/) {
+        print $prefix, "LD ($3), HL", $suffix;
+        next line;
     }
 
     #### Simple replacements (no operand)
@@ -426,9 +431,7 @@ line: while (<>) {
 
     ###### INX DCX
     ############################
-    if ((/^[^; \t]*[ \t]+([Ii][Nn][Xx]|[Dd][Cc][Xx])[ \t]+[^ \t]+([; \t]|$)/))
-
-      {
+    if ((/^[^; \t]*[ \t]+([Ii][Nn][Xx]|[Dd][Cc][Xx])[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
 	$wkg_str = &get_operand('([Ii][Nn][Xx]|[Dd][Cc][Xx])', 3);
@@ -529,9 +532,7 @@ line: while (<>) {
 
     ###### ANI XRI ORI
     ############################
-    if ((/^[^; \t]*[ \t]+([Aa][Nn][Ii]|[Xx][Rr][Ii]|[Oo][Rr][Ii])[ \t]+[^ \t]+([; \t]|$)/))
-
-      {
+    if ((/^[^; \t]*[ \t]+([Aa][Nn][Ii]|[Xx][Rr][Ii]|[Oo][Rr][Ii])[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
 	if ($_ =~ /[Aa][Nn][Ii]/ ? scalar($RLENGTH = length($&),
@@ -635,10 +636,7 @@ line: while (<>) {
 
     ###### JNZ JNC JPO JPE
     ############################
-    #    (/^[^; \t]*[ \t]+[Jj]([Nn][Zz]|[Nn][Cc]|[Pp][Oo]|[Pp][Ee])[ \t]+[^ \t]+([; \t]|$)/) {
-    if ((/^[^; \t]*[ \t]+[Jj]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/))
-
-      {
+    if ((/^[^; \t]*[ \t]+[Jj]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
 	if ($_ =~ /[Jj][Nn][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
@@ -669,7 +667,6 @@ line: while (<>) {
 
     ###### JZ JC JP JM
     ############################
-    #    (/^[^; \t]*[ \t]+[Jj]([Nn][Zz]|[Nn][Cc]|[Pp][Oo]|[Pp][Ee])[ \t]+[^ \t]+([; \t]|$)/) {
     if ((/^[^; \t]*[ \t]+[Jj]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
@@ -701,9 +698,7 @@ line: while (<>) {
 
     ###### CNZ CNC CPO CPE
     ############################
-    if ((/^[^; \t]*[ \t]+[Cc]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/))
-
-      {
+    if ((/^[^; \t]*[ \t]+[Cc]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
 	if ($_ =~ /[Cc][Nn][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
@@ -875,7 +870,6 @@ line: while (<>) {
 
     ###### PUSH B/D/H/PSW
     ############################
-
     if ((/^[^; \t]*[ \t]+([Pp][Uu][Ss][Hh])[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
@@ -898,7 +892,6 @@ line: while (<>) {
 
     ###### POP B/D/H/PSW
     ############################
-
     if ((/^[^; \t]*[ \t]+([Pp][Oo][Pp])[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
