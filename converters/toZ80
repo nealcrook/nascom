@@ -1,819 +1,1006 @@
+#!/usr/bin/perl
+eval 'exec /usr/bin/perl -S $0 ${1+"$@"}'
+    if $running_under_some_shell;
+			# this emulates #! processing on NIH machines.
+			# (remove #! line above if indigestible)
+
+eval '$'.$1.'$2;' while $ARGV[0] =~ /^([A-Za-z_0-9]+=)(.*)/ && shift;
+			# process any FOO=bar switches
+
 # toZ80.awk
 # Convert any 8080 assembler source file to Z80 mnemonics
 # Copyright (c) 2003 Douglas Beattie Jr.
 # All rights reserved world-wide
 #
 
-function save_label() {
-    if (match($0,/^[^; \t]+/)) {
-        label = substr($0,RSTART,RLENGTH)
-        #printf("%d %d",RSTART,RLENGTH);
-        sub(label_reg_exp,temp_label)
-    }
-}
+$, = ' ';		# set output field separator
+$\ = "\n";		# set output record separator
 
-function restore_label() {
-    if (label != "?") {
-        sub(temp_label,label)
-        label = "?"          # init for next label
-    }
-}
-
-function get_operand(op_regexp,op_len) {
-        regexp_str = op_regexp "[ \t]+[^ \t,]+([, \t]|$)"
-        match($0,regexp_str);
-        tmp_str = substr($0,(RSTART+op_len),(RLENGTH-(op_len)))
-        match(tmp_str,/[^ \t,]+/);
-        tmp_str = substr(tmp_str,(RSTART),(RLENGTH))
-        return tmp_str
-}
-
-
-# Substitute BC for B, DE for D, or HL for H in operand field
-function sub_bdh() {
-    if (match(wkg_str,/[BbDdHh]/)) {
-        if (match(wkg_str,/[Bb]/)) {
-            sub(/[Bb]/,"BC");
-        }
-        else if (match(wkg_str,/[Dd]/)) {
-            sub(/[Dd]/,"DE");
-        }
-        else if (match(wkg_str,/[Hh]/)) {
-            sub(/[Hh]/,"HL");
-        }
-    }
-}
-
-
-BEGIN {
- temp_xyz = "zyx"     # temporary replacement for Mnemonic
- temp_label = "zz" # temporary replacement for ^LABEL
- label = "?"          # storage for label during conversion
- label_reg_exp = "^[^; \t]+"
-}
-
+$temp_xyz = 'zyx';# temporary replacement for Mnemonic
+$temp_label = 'zz';# temporary replacement for ^LABEL
+$label = '?';# storage for label during conversion
+$label_reg_exp = "^[^; \t]+";
 
 #### look for "r,M"
-    (/^[^; \t]*[ \t]+[^; \t]+[ \t]+[^; \t]+,[Mm]/) {
-        sub(/,[Mm]/,",(HL)");
+
+line: while (<>) {
+    chomp;	# strip record separator
+
+    # Substitute BC for B, DE for D, or HL for H in operand field
+
+    if ((/^[^; \t]*[ \t]+[^; \t]+[ \t]+[^; \t]+,[Mm]/)) {
+	s/,[Mm]/,(HL)/;
     }
 
-#### look for "M,r"
-    (/^[^; \t]*[ \t]+[^; \t]+[ \t]+[Mm],[^; \t]+([; \t]|$)/) {
-        sub(/[Mm],/,"(HL),");
+    #### look for "M,r"
+    if ((/^[^; \t]*[ \t]+[^; \t]+[ \t]+[Mm],[^; \t]+([; \t]|$)/)) {
+	s/[Mm],/(HL),/;
     }
 
-#### MOV
-############################
-    (/^[^; \t]*[ \t]+([Mm][Oo][Vv][ \t])/) {
-        save_label()
-        sub(/[Mm][Oo][Vv]/,"LD ");
-        restore_label()
-        print $0
-        next
+    #### MOV
+    ############################
+    if ((/^[^; \t]*[ \t]+([Mm][Oo][Vv][ \t])/)) {
+	&save_label();
+	s/[Mm][Oo][Vv]/LD /;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-#### MVI
-############################
-    (/^[^; \t]*[ \t]+([Mm][Vv][Ii][ \t])/) {
-        save_label()
-        sub(/[Mm][Vv][Ii]/,"LD ");
-        restore_label()
-        print $0
-        next
+    #### MVI
+    ############################
+    if ((/^[^; \t]*[ \t]+([Mm][Vv][Ii][ \t])/)) {
+	&save_label();
+	s/[Mm][Vv][Ii]/LD /;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-#### LDAX
-############################
-    (/^[^; \t]*[ \t]+([Ll][Dd][Aa][Xx])/) {
-        save_label()
+    #### LDAX
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ll][Dd][Aa][Xx])/)) {
+	&save_label();
 
-        wkg_str =  get_operand("[Ll][Dd][Aa][Xx]",4);
+	$wkg_str = &get_operand('[Ll][Dd][Aa][Xx]', 4);
 
-        if (match(wkg_str,/[Dd]/)) {
-            sub(/[Ll][Dd][Aa][Xx]/,temp_xyz);
-            sub(wkg_str,"A,(DE)");
-            sub(temp_xyz,"LD");
+	if ($wkg_str =~ /[Dd]/ ? scalar($RLENGTH = length($&),
 
-            restore_label()
-            print $0
-            next
-        }
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
 
-        else if (match(wkg_str,/[Bb]/)) {
-            sub(/[Ll][Dd][Aa][Xx]/,temp_xyz);
-            sub(wkg_str,"A,(BC)");
-            sub(temp_xyz,"LD");
+	      s/[Ll][Dd][Aa][Xx]/eval $s_/e;
+	    s/$wkg_str/A,(DE)/;
+	    s/$temp_xyz/LD/;
 
-            restore_label()
-            print $0
-            next
-        }
+	    &restore_label();
+	    print $_;
+	    next line;
+	}
 
+	elsif ($wkg_str =~ /[Bb]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Ll][Dd][Aa][Xx]/eval $s_/e;
+	    s/$wkg_str/A,(BC)/;
+	    s/$temp_xyz/LD/;
+
+	    &restore_label();
+	    print $_;
+	    next line;
+	}
     }
 
+    #### STAX
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ss][Tt][Aa][Xx])/)) {
+	&save_label();
 
-#### STAX
-############################
-    (/^[^; \t]*[ \t]+([Ss][Tt][Aa][Xx])/) {
-        save_label()
+	$wkg_str = &get_operand('[Ss][Tt][Aa][Xx]', 4);
 
-        wkg_str =  get_operand("[Ss][Tt][Aa][Xx]",4);
+	if ($wkg_str =~ /[Dd]/ ? scalar($RLENGTH = length($&),
 
-        if (match(wkg_str,/[Dd]/)) {
-            sub(/[Ss][Tt][Aa][Xx]/,temp_xyz);
-            sub(wkg_str,"(DE),A");
-            sub(temp_xyz,"LD");
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
 
-            restore_label()
-            print $0
-            next
-        }
+	      s/[Ss][Tt][Aa][Xx]/eval $s_/e;
+	    s/$wkg_str/(DE),A/;
+	    s/$temp_xyz/LD/;
 
-        else if (match(wkg_str,/[Bb]/)) {
-            sub(/[Ss][Tt][Aa][Xx]/,temp_xyz);
-            sub(wkg_str,"(BC),A");
-            sub(temp_xyz,"LD");
+	    &restore_label();
+	    print $_;
+	    next line;
+	}
 
-            restore_label()
-            print $0
-            next
-        }
+	elsif ($wkg_str =~ /[Bb]/ ? scalar($RLENGTH = length($&),
 
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Ss][Tt][Aa][Xx]/eval $s_/e;
+	    s/$wkg_str/(BC),A/;
+	    s/$temp_xyz/LD/;
+
+	    &restore_label();
+	    print $_;
+	    next line;
+	}
     }
 
+    ### LDA word
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ll][Dd][Aa])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-### LDA word
-############################
-    (/^[^; \t]*[ \t]+([Ll][Dd][Aa])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+	$wkg_str = &get_operand('[Ll][Dd][Aa]', 3);
 
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g, s/[Ll][Dd][Aa]/eval $s_/e;
+	($s_ = '"'.('A,(' . $wkg_str . ')').'"') =~ s/&/\$&/g,
 
-        wkg_str =  get_operand("[Ll][Dd][Aa]",3);
+	  s/$wkg_str/eval $s_/e;
+	s/$temp_xyz/LD/;
 
-            sub(/[Ll][Dd][Aa]/,temp_xyz);
-            sub(wkg_str,"A,(" wkg_str ")" );
-            sub(temp_xyz,"LD");
-
-        restore_label()
-        print $0
-        next
-
+	&restore_label();
+	print $_;
+	next line;
     }
 
-### STA word
-############################
-    (/^[^; \t]*[ \t]+([Ss][Tt][Aa])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ### STA word
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ss][Tt][Aa])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        wkg_str =  get_operand("[Ss][Tt][Aa]",3);
+	$wkg_str = &get_operand('[Ss][Tt][Aa]', 3);
 
-            sub(/[Ss][Tt][Aa]/,temp_xyz);
-            sub(wkg_str,"(" wkg_str "),A" );
-            sub(temp_xyz,"LD");
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g, s/[Ss][Tt][Aa]/eval $s_/e;
+	($s_ = '"'.('(' . $wkg_str . '),A').'"') =~ s/&/\$&/g,
 
-        restore_label()
-        print $0
-        next
+	  s/$wkg_str/eval $s_/e;
+	s/$temp_xyz/LD/;
 
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###   LXI   B/D/H/SP,word
-############################
-    (/^[^; \t]*[ \t]+([Ll][Xx][Ii])/) {
-        save_label()
+    ###   LXI   B/D/H/SP,word
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ll][Xx][Ii])/)) {
+	&save_label();
 
+	$wkg_str = &get_operand('[Ll][Xx][Ii]', 3);
+	&sub_bdh();
+	s/[Ll][Xx][Ii]/LD/;
 
-        wkg_str =  get_operand("[Ll][Xx][Ii]",3);
-        sub_bdh()
-        sub(/[Ll][Xx][Ii]/,"LD");
-
-        restore_label()
-        print $0
-        next
+	&restore_label();
+	print $_;
+	next line;
     }
 
-### LHLD word
-############################
-    (/^[^; \t]*[ \t]+([Ll][Hh][Ll][Dd])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ### LHLD word
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ll][Hh][Ll][Dd])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-            wkg_str =  get_operand("[Ll][Hh][Ll][Dd]",4);
+	$wkg_str = &get_operand('[Ll][Hh][Ll][Dd]', 4);
 
-            sub(/[Ll][Hh][Ll][Dd]/,temp_xyz);
-            sub(wkg_str,"HL,(" wkg_str ")" );
-            sub(temp_xyz,"LD")
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
 
-        restore_label()
-        print $0
-        next
+	  s/[Ll][Hh][Ll][Dd]/eval $s_/e;
+	($s_ = '"'.('HL,(' . $wkg_str . ')').'"') =~ s/&/\$&/g,
+
+	  s/$wkg_str/eval $s_/e;
+	s/$temp_xyz/LD/;
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-### SHLD word
-############################
-    (/^[^; \t]*[ \t]+([Ss][Hh][Ll][Dd])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ### SHLD word
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ss][Hh][Ll][Dd])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
+	$wkg_str = &get_operand('[Ss][Hh][Ll][Dd]', 4);
 
-        wkg_str =  get_operand("[Ss][Hh][Ll][Dd]",4);
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
 
-        sub(/[Ss][Hh][Ll][Dd]/,temp_xyz);
-        sub(wkg_str,"(" wkg_str "),HL" );
-        sub(temp_xyz,"LD")
+	  s/[Ss][Hh][Ll][Dd]/eval $s_/e;
+	($s_ = '"'.('(' . $wkg_str . '),HL').'"') =~ s/&/\$&/g,
 
-        restore_label()
-        print $0
-        next
+	  s/$wkg_str/eval $s_/e;
+	s/$temp_xyz/LD/;
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
+    #### Simple replacements (no operand)
+    ############################
 
-#### Simple replacements (no operand)
-############################
-
-
-###### SPHL
-    (/^[^; \t]*[ \t]+([Ss][Pp][Hh][Ll])([; \t]|$)/) {
-        save_label()
-        sub(/[Ss][Pp][Hh][Ll]/,"LD SP,HL");
-        restore_label()
-        print $0
-        next
+    ###### SPHL
+    if ((/^[^; \t]*[ \t]+([Ss][Pp][Hh][Ll])([; \t]|$)/)) {
+	&save_label();
+	s/[Ss][Pp][Hh][Ll]/LD SP,HL/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### XCHG
-    (/^[^; \t]*[ \t]+([Xx][Cc][Hh][Gg])([; \t]|$)/) {
-        save_label()
-        sub(/[Xx][Cc][Hh][Gg]/,"EX DE,HL");
-        restore_label()
-        print $0
-        next
+    ###### XCHG
+    if ((/^[^; \t]*[ \t]+([Xx][Cc][Hh][Gg])([; \t]|$)/)) {
+	&save_label();
+	s/[Xx][Cc][Hh][Gg]/EX DE,HL/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### XTHL
-    (/^[^; \t]*[ \t]+([Xx][Tt][Hh][Ll])([; \t]|$)/) {
-        save_label()
-        sub(/[Xx][Tt][Hh][Ll]/,"EX (SP),HL");
-        restore_label()
-        print $0
-        next
+    ###### XTHL
+    if ((/^[^; \t]*[ \t]+([Xx][Tt][Hh][Ll])([; \t]|$)/)) {
+	&save_label();
+	s/[Xx][Tt][Hh][Ll]/EX (SP),HL/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### HLT
-    (/^[^; \t]*[ \t]+([Hh][Ll][Tt])([; \t]|$)/) {
-        save_label()
-        sub(/[Hh][Ll][Tt]/,"HALT");
-        restore_label()
-        print $0
-        next
+    ###### HLT
+    if ((/^[^; \t]*[ \t]+([Hh][Ll][Tt])([; \t]|$)/)) {
+	&save_label();
+	s/[Hh][Ll][Tt]/HALT/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### PCHL
-    (/^[^; \t]*[ \t]+([Pp][Cc][Hh][Ll])([; \t]|$)/) {
-        save_label()
-        sub(/[Pp][Cc][Hh][Ll]/,"JP (HL)");
-        restore_label()
-        print $0
-        next
+    ###### PCHL
+    if ((/^[^; \t]*[ \t]+([Pp][Cc][Hh][Ll])([; \t]|$)/)) {
+	&save_label();
+	s/[Pp][Cc][Hh][Ll]/JP (HL)/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### ADI ACI
-############################
-    (/^[^; \t]*[ \t]+[aA]([dD]|[cC])[iI][ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### ADI ACI
+    ############################
+    if ((/^[^; \t]*[ \t]+[aA]([dD]|[cC])[iI][ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        wkg_str =  get_operand("[aA]([dD]|[cC])[iI]",3);
+	$wkg_str = &get_operand('[aA]([dD]|[cC])[iI]', 3);
 
-        if (match($0,/[Aa][Dd][Ii]/)) {
-            sub(/[Aa][Dd][Ii]/,temp_xyz);
-            sub(wkg_str,"A," wkg_str );
-            sub(temp_xyz,"ADD")
-        }
-        else if (match($0,/[Aa][Cc][Ii]/)) {
-            sub(/[Aa][Cc][Ii]/,temp_xyz);
-            sub(wkg_str,"A," wkg_str );
-            sub(temp_xyz,"ADC")
-        }
+	if ($_ =~ /[Aa][Dd][Ii]/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0;
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Aa][Dd][Ii]/eval $s_/e;
+	    ($s_ = '"'.('A,' . $wkg_str).'"') =~ s/&/\$&/g,
+
+	      s/$wkg_str/eval $s_/e;
+	    s/$temp_xyz/ADD/;
+	}
+	elsif ($_ =~ /[Aa][Cc][Ii]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Aa][Cc][Ii]/eval $s_/e;
+	    ($s_ = '"'.('A,' . $wkg_str).'"') =~ s/&/\$&/g,
+
+	      s/$wkg_str/eval $s_/e;
+	    s/$temp_xyz/ADC/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
+    ###### SUI SBI
+    ############################
+    if ((/^[^; \t]*[ \t]+[sS]([uU]|[bB])[iI][ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-###### SUI SBI
-############################
-    (/^[^; \t]*[ \t]+[sS]([uU]|[bB])[iI][ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+	if ($_ =~ /[Ss][Uu][Ii]/ ? scalar($RLENGTH = length($&),
 
-        if (match($0,/[Ss][Uu][Ii]/)) {
-            sub(/[Ss][Uu][Ii]/,"SUB");
-        }
-        else if (match($0,/[Ss][Bb][Ii]/)) {
-            sub(/[Ss][Bb][Ii]/,"SBC");
-        }
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Ss][Uu][Ii]/SUB/;
+	}
+	elsif ($_ =~ /[Ss][Bb][Ii]/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0;
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Ss][Bb][Ii]/SBC/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### ADD ADC
-############################
-    (/^[^; \t]*[ \t]+([aA][dD][dD]|[aA][dD][cC])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### ADD ADC
+    ############################
+    if ((/^[^; \t]*[ \t]+([aA][dD][dD]|[aA][dD][cC])[ \t]+[^ \t]+([; \t]|$)/))
 
-        wkg_str =  get_operand("([aA][dD][dD]|[aA][dD][cC])",3);
+      {
+	&save_label();
 
-        if (match($0,/[Aa][Dd][Dd]/)) {
-            sub(/[Aa][Dd][Dd]/,temp_xyz);
-            sub(wkg_str,"A," wkg_str );
-            sub(temp_xyz,"ADD")
-        }
-        else if (match($0,/[Aa][Dd][Cc]/)) {
-            sub(/[Aa][Dd][Cc]/,temp_xyz);
-            sub(wkg_str,"A," wkg_str );
-            sub(temp_xyz,"ADC")
-        }
+	$wkg_str = &get_operand('([aA][dD][dD]|[aA][dD][cC])', 3);
 
-        if (match(wkg_str,/^[^;]*[Mm]/)) {
-            sub(/[Mm]/,"(HL)");
-        }
+	if ($_ =~ /[Aa][Dd][Dd]/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Aa][Dd][Dd]/eval $s_/e;
+	    ($s_ = '"'.('A,' . $wkg_str).'"') =~ s/&/\$&/g,
+
+	      s/$wkg_str/eval $s_/e;
+	    s/$temp_xyz/ADD/;
+	}
+	elsif ($_ =~ /[Aa][Dd][Cc]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Aa][Dd][Cc]/eval $s_/e;
+	    ($s_ = '"'.('A,' . $wkg_str).'"') =~ s/&/\$&/g,
+
+	      s/$wkg_str/eval $s_/e;
+	    s/$temp_xyz/ADC/;
+	}
+
+	if ($wkg_str =~ /^[^;]*[Mm]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Mm]/(HL)/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
+    ###### DAD
+    ############################
 
-###### DAD
-############################
+    if ((/^[^; \t]*[ \t]+([dD][aA][dD])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-    (/^[^; \t]*[ \t]+([dD][aA][dD])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
-
-        wkg_str =  get_operand("[dD][aA][dD]",3);
-        sub(/[dD][aA][dD]/,temp_xyz);
-        sub_bdh()
-        sub(temp_xyz,"ADD")
-        sub(/ADD[ \t]*/,"ADD HL,")
-        restore_label()
-        print $0
-        next
+	$wkg_str = &get_operand('[dD][aA][dD]', 3);
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g, s/[dD][aA][dD]/eval $s_/e;
+	&sub_bdh();
+	s/$temp_xyz/ADD/;
+	s/ADD[ \t]*/ADD HL,/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
+    ###### INR DCR
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ii][Nn][Rr]|[Dd][Cc][Rr])[ \t]/)) {
+	&save_label();
 
-###### INR DCR
-############################
-    (/^[^; \t]*[ \t]+([Ii][Nn][Rr]|[Dd][Cc][Rr])[ \t]/) {
-        save_label()
+	$wkg_str = &get_operand('([Ii][Nn][Rr]|[Dd][Cc][Rr])', 3);
+	if ($wkg_str =~ /^[^;]*[Mm]/ ? scalar($RLENGTH = length($&),
 
-        wkg_str =  get_operand("([Ii][Nn][Rr]|[Dd][Cc][Rr])",3);
-        if (match(wkg_str,/^[^;]*[Mm]/)) {
-            sub(/[Mm]/,"(HL)");
-        }
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Mm]/(HL)/;
+	}
 
-        if (match($0,/[Ii][Nn][Rr]/)) {
-            sub(/[Ii][Nn][Rr]/,"INC");
-        }
-        else if (match($0,/[Dd][Cc][Rr]/)) {
-            sub(/[Dd][Cc][Rr]/,"DEC");
-        }
+	if ($_ =~ /[Ii][Nn][Rr]/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Ii][Nn][Rr]/INC/;
+	}
+	elsif ($_ =~ /[Dd][Cc][Rr]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Dd][Cc][Rr]/DEC/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### INX DCX
-############################
-    (/^[^; \t]*[ \t]+([Ii][Nn][Xx]|[Dd][Cc][Xx])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### INX DCX
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ii][Nn][Xx]|[Dd][Cc][Xx])[ \t]+[^ \t]+([; \t]|$)/))
 
-        wkg_str =  get_operand("([Ii][Nn][Xx]|[Dd][Cc][Xx])",3);
+      {
+	&save_label();
 
-        if (match($0,/[Ii][Nn][Xx]/)) {
-            sub(/[Ii][Nn][Xx]/,temp_xyz);
-            sub_bdh()
-            sub(temp_xyz,"INC")
-        }
-        else if (match($0,/[Dd][Cc][Xx]/)) {
-            sub(/[Dd][Cc][Xx]/,temp_xyz);
-            sub_bdh()
-            sub(temp_xyz,"DEC")
-        }
+	$wkg_str = &get_operand('([Ii][Nn][Xx]|[Dd][Cc][Xx])', 3);
 
-        restore_label()
-        print $0
-        next
+	if ($_ =~ /[Ii][Nn][Xx]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Ii][Nn][Xx]/eval $s_/e;
+	    &sub_bdh();
+	    s/$temp_xyz/INC/;
+	}
+	elsif ($_ =~ /[Dd][Cc][Xx]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Dd][Cc][Xx]/eval $s_/e;
+	    &sub_bdh();
+	    s/$temp_xyz/DEC/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-
-###### CMA
-############################
-    (/^[^; \t]*[ \t]+([Cc][Mm][Aa])([; \t]|$)/) {
-        save_label()
-        sub(/[Cc][Mm][Aa]/,"CPL");
-        restore_label()
-        print $0
-        next
+    ###### CMA
+    ############################
+    if ((/^[^; \t]*[ \t]+([Cc][Mm][Aa])([; \t]|$)/)) {
+	&save_label();
+	s/[Cc][Mm][Aa]/CPL/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### STC
-############################
-    (/^[^; \t]*[ \t]+([Ss][Tt][Cc])([; \t]|$)/) {
-        save_label()
-        sub(/[Ss][Tt][Cc]/,"SCF");
-        restore_label()
-        print $0
-        next
+    ###### STC
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ss][Tt][Cc])([; \t]|$)/)) {
+	&save_label();
+	s/[Ss][Tt][Cc]/SCF/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### CMC
-############################
-    (/^[^; \t]*[ \t]+([Cc][Mm][Cc])([; \t]|$)/) {
-        save_label()
-        sub(/[Cc][Mm][Cc]/,"CCF");
-        restore_label()
-        print $0
-        next
+    ###### CMC
+    ############################
+    if ((/^[^; \t]*[ \t]+([Cc][Mm][Cc])([; \t]|$)/)) {
+	&save_label();
+	s/[Cc][Mm][Cc]/CCF/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### RLC
-############################
-    (/^[^; \t]*[ \t]+([Rr][Ll][Cc])([; \t]|$)/) {
-        save_label()
-        sub(/[Rr][Ll][Cc]/,"RLCA");
-        restore_label()
-        print $0
-        next
+    ###### RLC
+    ############################
+    if ((/^[^; \t]*[ \t]+([Rr][Ll][Cc])([; \t]|$)/)) {
+	&save_label();
+	s/[Rr][Ll][Cc]/RLCA/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### RRC
-############################
-    (/^[^; \t]*[ \t]+([Rr][Rr][Cc])([; \t]|$)/) {
-        save_label()
-        sub(/[Rr][Rr][Cc]/,"RRCA");
-        restore_label()
-        print $0
-        next
+    ###### RRC
+    ############################
+    if ((/^[^; \t]*[ \t]+([Rr][Rr][Cc])([; \t]|$)/)) {
+	&save_label();
+	s/[Rr][Rr][Cc]/RRCA/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### RAL
-############################
-    (/^[^; \t]*[ \t]+([Rr][Aa][Ll])([; \t]|$)/) {
-        save_label()
-        sub(/[Rr][Aa][Ll]/,"RLA");
-        restore_label()
-        print $0
-        next
+    ###### RAL
+    ############################
+    if ((/^[^; \t]*[ \t]+([Rr][Aa][Ll])([; \t]|$)/)) {
+	&save_label();
+	s/[Rr][Aa][Ll]/RLA/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### RAR
-############################
-    (/^[^; \t]*[ \t]+([Rr][Aa][Rr])([; \t]|$)/) {
-        save_label()
-        sub(/[Rr][Aa][Rr]/,"RRA");
-        restore_label()
-        print $0
-        next
+    ###### RAR
+    ############################
+    if ((/^[^; \t]*[ \t]+([Rr][Aa][Rr])([; \t]|$)/)) {
+	&save_label();
+	s/[Rr][Aa][Rr]/RRA/;
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### ANI XRI ORI
-############################
-    (/^[^; \t]*[ \t]+([Aa][Nn][Ii]|[Xx][Rr][Ii]|[Oo][Rr][Ii])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### ANI XRI ORI
+    ############################
+    if ((/^[^; \t]*[ \t]+([Aa][Nn][Ii]|[Xx][Rr][Ii]|[Oo][Rr][Ii])[ \t]+[^ \t]+([; \t]|$)/))
 
-        if (match($0,/[Aa][Nn][Ii]/)) {
-            sub(/[Aa][Nn][Ii]/,"AND");
-        }
-        else if (match($0,/[Xx][Rr][Ii]/)) {
-            sub(/[Xx][Rr][Ii]/,"XOR");
-        }
-        else if (match($0,/[Oo][Rr][Ii]/)) {
-            sub(/[Oo][Rr][Ii]/,"OR");
-        }
-        restore_label()
-        print $0;
-        next
+      {
+	&save_label();
+
+	if ($_ =~ /[Aa][Nn][Ii]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Aa][Nn][Ii]/AND/;
+	}
+	elsif ($_ =~ /[Xx][Rr][Ii]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Xx][Rr][Ii]/XOR/;
+	}
+	elsif ($_ =~ /[Oo][Rr][Ii]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Oo][Rr][Ii]/OR/;
+	}
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### ANA XRA ORA
-############################
-    (/^[^; \t]*[ \t]+([Aa][Nn][Aa]|[Xx][Rr][Aa]|[Oo][Rr][Aa])[ \t]/) {
-        save_label()
+    ###### ANA XRA ORA
+    ############################
+    if ((/^[^; \t]*[ \t]+([Aa][Nn][Aa]|[Xx][Rr][Aa]|[Oo][Rr][Aa])[ \t]/)) {
+	&save_label();
 
-        wkg_str =  get_operand("([Aa][Nn][Aa]|[Xx][Rr][Aa]|[Oo][Rr][Aa])",3);
-        if (match(wkg_str,/^[^;]*[Mm]/)) {
-            sub(/[Mm]/,"(HL)");
-        }
+	$wkg_str = &get_operand('([Aa][Nn][Aa]|[Xx][Rr][Aa]|[Oo][Rr][Aa])',
 
-        if (match($0,/[Aa][Nn][Aa]/)) {
-            sub(/[Aa][Nn][Aa]/,"AND");
-        }
-        else if (match($0,/[Xx][Rr][Aa]/)) {
-            sub(/[Xx][Rr][Aa]/,"XOR");
-        }
-        else if (match($0,/[Oo][Rr][Aa]/)) {
-            sub(/[Oo][Rr][Aa]/,"OR");
-        }
+	  3);
+	if ($wkg_str =~ /^[^;]*[Mm]/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Mm]/(HL)/;
+	}
+
+	if ($_ =~ /[Aa][Nn][Aa]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Aa][Nn][Aa]/AND/;
+	}
+	elsif ($_ =~ /[Xx][Rr][Aa]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Xx][Rr][Aa]/XOR/;
+	}
+	elsif ($_ =~ /[Oo][Rr][Aa]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Oo][Rr][Aa]/OR/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### CPI
-############################
-    (/^[^; \t]*[ \t]+([Cc][Pp][Ii])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### CPI
+    ############################
+    if ((/^[^; \t]*[ \t]+([Cc][Pp][Ii])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        sub(/[Cc][Pp][Ii]/,"CP");
+	s/[Cc][Pp][Ii]/CP/;
 
-        restore_label()
-        print $0;
-        next
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### CMP
-############################
-    (/^[^; \t]*[ \t]+([Cc][Mm][Pp])[ \t]/) {
-        save_label()
+    ###### CMP
+    ############################
+    if ((/^[^; \t]*[ \t]+([Cc][Mm][Pp])[ \t]/)) {
+	&save_label();
 
-        wkg_str =  get_operand("[Cc][Mm][Pp]",3);
+	$wkg_str = &get_operand('[Cc][Mm][Pp]', 3);
 
-        sub(/[Cc][Mm][Pp]/,temp_xyz);
-        if (match(wkg_str,/^[^;]*[Mm]/)) {
-            sub(/[Mm]/,"(HL)");
-        }
-        sub(temp_xyz,"CP")
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g, s/[Cc][Mm][Pp]/eval $s_/e;
+	if ($wkg_str =~ /^[^;]*[Mm]/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Mm]/(HL)/;
+	}
+	s/$temp_xyz/CP/;
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### JMP
-############################
-    (/^[^; \t]*[ \t]+([Jj][Mm][Pp])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### JMP
+    ############################
+    if ((/^[^; \t]*[ \t]+([Jj][Mm][Pp])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        sub(/[Jj][Mm][Pp]/,"JP");
+	s/[Jj][Mm][Pp]/JP/;
 
-        restore_label()
-        print $0;
-        next
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### JNZ JNC JPO JPE
-############################
-#    (/^[^; \t]*[ \t]+[Jj]([Nn][Zz]|[Nn][Cc]|[Pp][Oo]|[Pp][Ee])[ \t]+[^ \t]+([; \t]|$)/) {
-    (/^[^; \t]*[ \t]+[Jj]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### JNZ JNC JPO JPE
+    ############################
+    #    (/^[^; \t]*[ \t]+[Jj]([Nn][Zz]|[Nn][Cc]|[Pp][Oo]|[Pp][Ee])[ \t]+[^ \t]+([; \t]|$)/) {
+    if ((/^[^; \t]*[ \t]+[Jj]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/))
 
-        if (match($0,/[Jj][Nn][Zz][ \t]+/)) {
-            sub(/[Jj][Nn][Zz][ \t]+/,"JP NZ,");
-        }
-        else if (match($0,/[Jj][Nn][Cc][ \t]+/)) {
-            sub(/[Jj][Nn][Cc][ \t]+/,"JP NC,");
-        }
-        else if (match($0,/[Jj][Pp][Oo][ \t]+/)) {
-            sub(/[Jj][Pp][Oo][ \t]+/,"JP PO,");
-        }
-        else if (match($0,/[Jj][Pp][Ee][ \t]+/)) {
-            sub(/[Jj][Pp][Ee][ \t]+/,"JP PE,");
-        }
+      {
+	&save_label();
 
-        restore_label()
-        print $0;
-        next
+	if ($_ =~ /[Jj][Nn][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Nn][Zz][ \t]+/JP NZ,/;
+	}
+	elsif ($_ =~ /[Jj][Nn][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Nn][Cc][ \t]+/JP NC,/;
+	}
+	elsif ($_ =~ /[Jj][Pp][Oo][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Pp][Oo][ \t]+/JP PO,/;
+	}
+	elsif ($_ =~ /[Jj][Pp][Ee][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Pp][Ee][ \t]+/JP PE,/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### JZ JC JP JM
-############################
-#    (/^[^; \t]*[ \t]+[Jj]([Nn][Zz]|[Nn][Cc]|[Pp][Oo]|[Pp][Ee])[ \t]+[^ \t]+([; \t]|$)/) {
-    (/^[^; \t]*[ \t]+[Jj]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### JZ JC JP JM
+    ############################
+    #    (/^[^; \t]*[ \t]+[Jj]([Nn][Zz]|[Nn][Cc]|[Pp][Oo]|[Pp][Ee])[ \t]+[^ \t]+([; \t]|$)/) {
+    if ((/^[^; \t]*[ \t]+[Jj]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        if (match($0,/^[^;]*[Jj][Zz][ \t]+/)) {
-            sub(/[Jj][Zz][ \t]+/,"JP Z,");
-        }
-        else if (match($0,/^[^;]*[Jj][Cc][ \t]+/)) {
-            sub(/[Jj][Cc][ \t]+/,"JP C,");
-        }
-        else if (match($0,/^[^;]*[Jj][Pp][ \t]+/)) {
-            sub(/[Jj][Pp][ \t]+/,"JP P,");
-        }
-        else if (match($0,/^[^;]*[Jj][Mm][ \t]+/)) {
-            sub(/[Jj][Mm][ \t]+/,"JP M,");
-        }
+	if ($_ =~ /^[^;]*[Jj][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0;
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Zz][ \t]+/JP Z,/;
+	}
+	elsif ($_ =~ /^[^;]*[Jj][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Cc][ \t]+/JP C,/;
+	}
+	elsif ($_ =~ /^[^;]*[Jj][Pp][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Pp][ \t]+/JP P,/;
+	}
+	elsif ($_ =~ /^[^;]*[Jj][Mm][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Jj][Mm][ \t]+/JP M,/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
+    ###### CNZ CNC CPO CPE
+    ############################
+    if ((/^[^; \t]*[ \t]+[Cc]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/))
 
+      {
+	&save_label();
 
+	if ($_ =~ /[Cc][Nn][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
 
-###### CNZ CNC CPO CPE
-############################
-    (/^[^; \t]*[ \t]+[Cc]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Nn][Zz][ \t]+/CALL NZ,/;
+	}
+	elsif ($_ =~ /[Cc][Nn][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
 
-        if (match($0,/[Cc][Nn][Zz][ \t]+/)) {
-            sub(/[Cc][Nn][Zz][ \t]+/,"CALL NZ,");
-        }
-        else if (match($0,/[Cc][Nn][Cc][ \t]+/)) {
-            sub(/[Cc][Nn][Cc][ \t]+/,"CALL NC,");
-        }
-        else if (match($0,/[Cc][Pp][Oo][ \t]+/)) {
-            sub(/[Cc][Pp][Oo][ \t]+/,"CALL PO,");
-        }
-        else if (match($0,/[Cc][Pp][Ee][ \t]+/)) {
-            sub(/[Cc][Pp][Ee][ \t]+/,"CALL PE,");
-        }
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Nn][Cc][ \t]+/CALL NC,/;
+	}
+	elsif ($_ =~ /[Cc][Pp][Oo][ \t]+/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0;
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Pp][Oo][ \t]+/CALL PO,/;
+	}
+	elsif ($_ =~ /[Cc][Pp][Ee][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Pp][Ee][ \t]+/CALL PE,/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### CZ CC CP CM
-############################
-    (/^[^; \t]*[ \t]+[Cc]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### CZ CC CP CM
+    ############################
+    if ((/^[^; \t]*[ \t]+[Cc]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        if (match($0,/[Cc][Zz][ \t]+/)) {
-            sub(/[Cc][Zz][ \t]+/,"CALL Z,");
-        }
-        else if (match($0,/[Cc][Cc][ \t]+/)) {
-            sub(/[Cc][Cc][ \t]+/,"CALL C,");
-        }
-        else if (match($0,/[Cc][Pp][ \t]+/)) {
-            sub(/[Cc][Pp][ \t]+/,"CALL P,");
-        }
-        else if (match($0,/[Cc][Mm][ \t]+/)) {
-            sub(/[Cc][Mm][ \t]+/,"CALL M,");
-        }
+	if ($_ =~ /[Cc][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0;
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Zz][ \t]+/CALL Z,/;
+	}
+	elsif ($_ =~ /[Cc][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Cc][ \t]+/CALL C,/;
+	}
+	elsif ($_ =~ /[Cc][Pp][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Pp][ \t]+/CALL P,/;
+	}
+	elsif ($_ =~ /[Cc][Mm][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Cc][Mm][ \t]+/CALL M,/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### RNZ RNC RPO RPE
-############################
-    (/^[^; \t]*[ \t]+[Rr]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### RNZ RNC RPO RPE
+    ############################
+    if ((/^[^; \t]*[ \t]+[Rr]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/))
 
-        if (match($0,/[Rr][Nn][Zz][ \t]+/)) {
-            sub(/[Rr][Nn][Zz][ \t]+/,"RET NZ");
-        }
-        else if (match($0,/[Rr][Nn][Cc][ \t]+/)) {
-            sub(/[Rr][Nn][Cc][ \t]+/,"RET NC");
-        }
-        else if (match($0,/[Rr][Pp][Oo][ \t]+/)) {
-            sub(/[Rr][Pp][Oo][ \t]+/,"RET PO");
-        }
-        else if (match($0,/[Rr][Pp][Ee][ \t]+/)) {
-            sub(/[Rr][Pp][Ee][ \t]+/,"RET PE");
-        }
+      {
+	&save_label();
 
-        restore_label()
-        print $0;
-        next
+	if ($_ =~ /[Rr][Nn][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Nn][Zz][ \t]+/RET NZ/;
+	}
+	elsif ($_ =~ /[Rr][Nn][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Nn][Cc][ \t]+/RET NC/;
+	}
+	elsif ($_ =~ /[Rr][Pp][Oo][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Pp][Oo][ \t]+/RET PO/;
+	}
+	elsif ($_ =~ /[Rr][Pp][Ee][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Pp][Ee][ \t]+/RET PE/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### RZ RC RP RM
-############################
-    (/^[^; \t]*[ \t]+[Rr]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ###### RZ RC RP RM
+    ############################
+    if ((/^[^; \t]*[ \t]+[Rr]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        if (match($0,/[Rr][Zz][ \t]+/)) {
-            sub(/[Rr][Zz][ \t]+/,"RET Z");
-        }
-        else if (match($0,/[Rr][Cc][ \t]+/)) {
-            sub(/[Rr][Cc][ \t]+/,"RET C");
-        }
-        else if (match($0,/[Rr][Pp][ \t]+/)) {
-            sub(/[Rr][Pp][ \t]+/,"RET P");
-        }
-        else if (match($0,/[Rr][Mm][ \t]+/)) {
-            sub(/[Rr][Mm][ \t]+/,"RET M");
-        }
+	if ($_ =~ /[Rr][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0;
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Zz][ \t]+/RET Z/;
+	}
+	elsif ($_ =~ /[Rr][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Cc][ \t]+/RET C/;
+	}
+	elsif ($_ =~ /[Rr][Pp][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Pp][ \t]+/RET P/;
+	}
+	elsif ($_ =~ /[Rr][Mm][ \t]+/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Rr][Mm][ \t]+/RET M/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### RST 0..7
-############################
-    (/^[^; \t]*[ \t]+([Rr][Ss][Tt])[ \t]/) {
-        save_label()
+    ###### RST 0..7
+    ############################
+    if ((/^[^; \t]*[ \t]+([Rr][Ss][Tt])[ \t]/)) {
+	&save_label();
 
-        wkg_str =  get_operand("[Rr][Ss][Tt]",3);
+	$wkg_str = &get_operand('[Rr][Ss][Tt]', 3);
 
-        if (match(wkg_str,/^[^;]*1/)) {
-            sub(/1/,"08h");
-        }
-        else if (match(wkg_str,/^[^;]*2/)) {
-            sub(/2/,"10h");
-        }
-        else if (match(wkg_str,/^[^;]*3/)) {
-            sub(/3/,"18h");
-        }
-        else if (match(wkg_str,/^[^;]*4/)) {
-            sub(/4/,"20h");
-        }
-        else if (match(wkg_str,/^[^;]*5/)) {
-            sub(/5/,"28h");
-        }
-        else if (match(wkg_str,/^[^;]*6/)) {
-            sub(/6/,"30h");
-        }
-        else if (match(wkg_str,/^[^;]*7/)) {
-            sub(/7/,"38h");
-        }
+	if ($wkg_str =~ /^[^;]*1/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/1/08h/;
+	}
+	elsif ($wkg_str =~ /^[^;]*2/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/2/10h/;
+	}
+	elsif ($wkg_str =~ /^[^;]*3/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/3/18h/;
+	}
+	elsif ($wkg_str =~ /^[^;]*4/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/4/20h/;
+	}
+	elsif ($wkg_str =~ /^[^;]*5/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/5/28h/;
+	}
+	elsif ($wkg_str =~ /^[^;]*6/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/6/30h/;
+	}
+	elsif ($wkg_str =~ /^[^;]*7/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/7/38h/;
+	}
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### PUSH B/D/H/PSW
-############################
+    ###### PUSH B/D/H/PSW
+    ############################
 
-    (/^[^; \t]*[ \t]+([Pp][Uu][Ss][Hh])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    if ((/^[^; \t]*[ \t]+([Pp][Uu][Ss][Hh])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        wkg_str =  get_operand("[Pp][Uu][Ss][Hh]",4);
-        sub(/[Pp][Uu][Ss][Hh]/,temp_xyz);
-        sub_bdh()
-        if (match(wkg_str,/[Pp][Ss][Ww]/)) {
-            sub(/[Pp][Ss][Ww]/,"AF");
-        }
-        sub(temp_xyz,"PUSH")
+	$wkg_str = &get_operand('[Pp][Uu][Ss][Hh]', 4);
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
 
-        restore_label()
-        print $0
-        next
+	  s/[Pp][Uu][Ss][Hh]/eval $s_/e;
+	&sub_bdh();
+	if ($wkg_str =~ /[Pp][Ss][Ww]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Pp][Ss][Ww]/AF/;
+	}
+	s/$temp_xyz/PUSH/;
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### POP B/D/H/PSW
-############################
+    ###### POP B/D/H/PSW
+    ############################
 
-    (/^[^; \t]*[ \t]+([Pp][Oo][Pp])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    if ((/^[^; \t]*[ \t]+([Pp][Oo][Pp])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-        wkg_str =  get_operand("[Pp][Oo][Pp]",3);
-        sub(/[Pp][Oo][Pp]/,temp_xyz);
-        sub_bdh()
-        if (match(wkg_str,/[Pp][Ss][Ww]/)) {
-            sub(/[Pp][Ss][Ww]/,"AF");
-        }
-        sub(temp_xyz,"POP")
+	$wkg_str = &get_operand('[Pp][Oo][Pp]', 3);
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g, s/[Pp][Oo][Pp]/eval $s_/e;
+	&sub_bdh();
+	if ($wkg_str =~ /[Pp][Ss][Ww]/ ? scalar($RLENGTH = length($&),
 
-        restore_label()
-        print $0
-        next
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Pp][Ss][Ww]/AF/;
+	}
+	s/$temp_xyz/POP/;
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-### OUT byte
-############################
-    (/^[^; \t]*[ \t]+([Oo][Uu][Tt])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ### OUT byte
+    ############################
+    if ((/^[^; \t]*[ \t]+([Oo][Uu][Tt])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
+	$wkg_str = &get_operand('[Oo][Uu][Tt]', 3);
 
-        wkg_str =  get_operand("[Oo][Uu][Tt]",3);
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g, s/[Oo][Uu][Tt]/eval $s_/e;
+	($s_ = '"'.('(' . $wkg_str . '),A').'"') =~ s/&/\$&/g,
 
-        sub(/[Oo][Uu][Tt]/,temp_xyz);
-        sub(wkg_str,"(" wkg_str "),A" );
-        sub(temp_xyz,"OUT")
+	  s/$wkg_str/eval $s_/e;
+	s/$temp_xyz/OUT/;
 
-        restore_label()
-        print $0
-        next
+	&restore_label();
+	print $_;
+	next line;
     }
 
-### IN byte
-############################
-    (/^[^; \t]*[ \t]+([Ii][Nn])[ \t]+[^ \t]+([; \t]|$)/) {
-        save_label()
+    ### IN byte
+    ############################
+    if ((/^[^; \t]*[ \t]+([Ii][Nn])[ \t]+[^ \t]+([; \t]|$)/)) {
+	&save_label();
 
-            wkg_str =  get_operand("[Ii][Nn]",2);
+	$wkg_str = &get_operand('[Ii][Nn]', 2);
 
-            sub(/[Ii][Nn]/,temp_xyz);
-            sub(wkg_str,"A,(" wkg_str ")" );
-            sub(temp_xyz,"IN")
+	($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g, s/[Ii][Nn]/eval $s_/e;
+	($s_ = '"'.('A,(' . $wkg_str . ')').'"') =~ s/&/\$&/g,
 
-        restore_label()
-        print $0
-        next
+	  s/$wkg_str/eval $s_/e;
+	s/$temp_xyz/IN/;
+
+	&restore_label();
+	print $_;
+	next line;
     }
 
-###### Default
-(/^.*/) {
-    print $0
-    next
+    ###### Default
+    if ((/^.*/)) {
+	print $_;
+	next line;
+    }
+}
+
+sub save_label {
+    if ($_ =~ /^[^; \t]+/ ? scalar($RLENGTH = length($&),
+
+      $RSTART = length($`)+1) : 0) {
+	$label = substr($_, ($RSTART)-1, $RLENGTH);
+	#printf("%d %d",RSTART,RLENGTH);
+	($s_ = '"'.($temp_label).'"') =~ s/&/\$&/g,
+
+	  s/$label_reg_exp/eval $s_/e;
+    }
+}
+
+sub restore_label {
+    if ($label ne '?') {
+	($s_ = '"'.($label).'"') =~ s/&/\$&/g, s/$temp_label/eval $s_/e;
+	$label = '?';# init for next label
+
+	;
+    }
+}
+
+sub get_operand {
+    local($op_regexp, $op_len) = @_;
+    $regexp_str = $op_regexp . "[ \t]+[^ \t,]+([, \t]|\$)";
+    $_ =~ $regexp_str ? scalar($RLENGTH = length($&),
+
+      $RSTART = length($`)+1) : 0;
+    $tmp_str = substr($_, (($RSTART + $op_len))-1, ($RLENGTH - ($op_len)));
+    $tmp_str =~ /[^ \t,]+/ ? scalar($RLENGTH = length($&),
+
+      $RSTART = length($`)+1) : 0;
+    $tmp_str = substr($tmp_str, (($RSTART))-1, ($RLENGTH));
+    $tmp_str;
+}
+
+sub sub_bdh {
+    if ($wkg_str =~ /[BbDdHh]/ ? scalar($RLENGTH = length($&),
+
+      $RSTART = length($`)+1) : 0) {
+	if ($wkg_str =~ /[Bb]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Bb]/BC/;
+	}
+	elsif ($wkg_str =~ /[Dd]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Dd]/DE/;
+	}
+	elsif ($wkg_str =~ /[Hh]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    s/[Hh]/HL/;
+	}
+    }
 }
