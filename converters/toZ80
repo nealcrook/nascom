@@ -317,14 +317,12 @@ line: while (<>) {
 	next line;
     }
 
-    ###### ADD ADC
+    ###### ADD ADC SUB SBB
     ############################
-    if ((/^[^; \t]*[ \t]+([aA][dD][dD]|[aA][dD][cC])[ \t]+[^ \t]+([; \t]|$)/))
-
-      {
+    if ((/^[^; \t]*[ \t]+([aA][dD][dD]|[aA][dD][cC]|[sS][uU][bB]|[sS][bB][bB])[ \t]+[^ \t]+([; \t]|$)/)) {
 	&save_label();
 
-	$wkg_str = &get_operand('([aA][dD][dD]|[aA][dD][cC])', 3);
+	$wkg_str = &get_operand('([aA][dD][dD]|[aA][dD][cC]|[sS][uU][bB]|[sS][bB][bB])', 3);
 
 	if ($_ =~ /[Aa][Dd][Dd]/ ? scalar($RLENGTH = length($&),
 
@@ -347,6 +345,28 @@ line: while (<>) {
 
 	      s/$wkg_str/eval $s_/e;
 	    s/$temp_xyz/ADC/;
+	}
+	elsif ($_ =~ /[Ss][Uu][Bb]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Ss][Uu][Bb]/eval $s_/e;
+	    ($s_ = '"'.('A,' . $wkg_str).'"') =~ s/&/\$&/g,
+
+	      s/$wkg_str/eval $s_/e;
+	    s/$temp_xyz/SUB/;
+	}
+	elsif ($_ =~ /[Ss][Bb][Bb]/ ? scalar($RLENGTH = length($&),
+
+	  $RSTART = length($`)+1) : 0) {
+	    ($s_ = '"'.($temp_xyz).'"') =~ s/&/\$&/g,
+
+	      s/[Ss][Bb][Bb]/eval $s_/e;
+	    ($s_ = '"'.('A,' . $wkg_str).'"') =~ s/&/\$&/g,
+
+	      s/$wkg_str/eval $s_/e;
+	    s/$temp_xyz/SBC/;
 	}
 
 	if ($wkg_str =~ /^[^;]*[Mm]/ ? scalar($RLENGTH = length($&),
