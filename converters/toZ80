@@ -1,33 +1,27 @@
 #!/usr/bin/perl
-eval 'exec /usr/bin/perl -S $0 ${1+"$@"}'
-    if $running_under_some_shell;
-			# this emulates #! processing on NIH machines.
-			# (remove #! line above if indigestible)
-
-eval '$'.$1.'$2;' while $ARGV[0] =~ /^([A-Za-z_0-9]+=)(.*)/ && shift;
-			# process any FOO=bar switches
-
+#
 # toZ80.awk
 # Convert any 8080 assembler source file to Z80 mnemonics
 # Copyright (c) 2003 Douglas Beattie Jr.
 # All rights reserved world-wide
 #
+# Downloaded from: http://www.hytherion.com/beattidp/comput/z80cpm.htm
+# Then converted from AWK to PERL by a2p
+#
+# Usage: ./toZ80 file.a80 > file.asm
 
-$, = ' ';		# set output field separator
-$\ = "\n";		# set output record separator
+$, = ' ';                      # set output field separator
+$\ = "\n";                     # set output record separator
 
-$temp_xyz = 'zyx';# temporary replacement for Mnemonic
-$temp_label = 'zz';# temporary replacement for ^LABEL
-$label = '?';# storage for label during conversion
+$temp_xyz = 'zyx';             # temporary replacement for Mnemonic
+$temp_label = 'zz';            # temporary replacement for ^LABEL
+$label = '?';                  # storage for label during conversion
 $label_reg_exp = "^[^; \t]+";
-
-#### look for "r,M"
 
 line: while (<>) {
     chomp;	# strip record separator
 
-    # Substitute BC for B, DE for D, or HL for H in operand field
-
+    #### look for "r,M"
     if ((/^[^; \t]*[ \t]+[^; \t]+[ \t]+[^; \t]+,[Mm]/)) {
 	s/,[Mm]/,(HL)/;
     }
@@ -983,6 +977,7 @@ sub get_operand {
     $tmp_str;
 }
 
+# Substitute BC for B, DE for D, or HL for H in operand field
 sub sub_bdh {
     if ($wkg_str =~ /[BbDdHh]/ ? scalar($RLENGTH = length($&),
 
