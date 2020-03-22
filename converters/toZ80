@@ -745,30 +745,28 @@ line: while (<>) {
 
     ###### RNZ RNC RPO RPE
     ############################
-    if ((/^[^; \t]*[ \t]+[Rr]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))[ \t]+[^ \t]+([; \t]|$)/))
-
-      {
+    if ((/^[^; \t]*[ \t]+[Rr]([Nn]([Zz]|[Cc])|([Pp]([Oo]|[Ee])))+([; \t]|$)/)) {
 	&save_label();
 
-	if ($_ =~ /[Rr][Nn][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
+	if ($_ =~ /[Rr][Nn][Zz]/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Nn][Zz][ \t]+/RET NZ/;
+	    s/[Rr][Nn][Zz]/RET NZ/;
 	}
-	elsif ($_ =~ /[Rr][Nn][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
+	elsif ($_ =~ /[Rr][Nn][Cc]/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Nn][Cc][ \t]+/RET NC/;
+	    s/[Rr][Nn][Cc]/RET NC/;
 	}
-	elsif ($_ =~ /[Rr][Pp][Oo][ \t]+/ ? scalar($RLENGTH = length($&),
+	elsif ($_ =~ /[Rr][Pp][Oo]/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Pp][Oo][ \t]+/RET PO/;
+	    s/[Rr][Pp][Oo]/RET PO/;
 	}
-	elsif ($_ =~ /[Rr][Pp][Ee][ \t]+/ ? scalar($RLENGTH = length($&),
+	elsif ($_ =~ /[Rr][Pp][Ee]/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Pp][Ee][ \t]+/RET PE/;
+	    s/[Rr][Pp][Ee]/RET PE/;
 	}
 
 	&restore_label();
@@ -778,28 +776,28 @@ line: while (<>) {
 
     ###### RZ RC RP RM
     ############################
-    if ((/^[^; \t]*[ \t]+[Rr]([Zz]|[Cc]|[Pp]|[Mm])[ \t]+[^ \t]+([; \t]|$)/)) {
+    if ((/^[^; \t]*[ \t]+[Rr]([Zz]|[Cc]|[Pp]|[Mm])+([; \t]|$)/)) {
 	&save_label();
 
-	if ($_ =~ /[Rr][Zz][ \t]+/ ? scalar($RLENGTH = length($&),
+	if ($_ =~ /[Rr][Zz]/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Zz][ \t]+/RET Z/;
+	    s/[Rr][Zz]/RET Z/;
 	}
-	elsif ($_ =~ /[Rr][Cc][ \t]+/ ? scalar($RLENGTH = length($&),
+	elsif ($_ =~ /[Rr][Cc]+/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Cc][ \t]+/RET C/;
+	    s/[Rr][Cc]/RET C/;
 	}
-	elsif ($_ =~ /[Rr][Pp][ \t]+/ ? scalar($RLENGTH = length($&),
+	elsif ($_ =~ /[Rr][Pp]+/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Pp][ \t]+/RET P/;
+	    s/[Rr][Pp]/RET P/;
 	}
-	elsif ($_ =~ /[Rr][Mm][ \t]+/ ? scalar($RLENGTH = length($&),
+	elsif ($_ =~ /[Rr][Mm]/ ? scalar($RLENGTH = length($&),
 
 	  $RSTART = length($`)+1) : 0) {
-	    s/[Rr][Mm][ \t]+/RET M/;
+	    s/[Rr][Mm]/RET M/;
 	}
 
 	&restore_label();
