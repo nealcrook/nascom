@@ -135,7 +135,7 @@ if (not defined $args{-out}) {
 if ($args{-in} !~ /^(bin|cas|nas|hex|dmp)$/) {
     die "ERROR input format $args{-in} is not recognised/supported\n";
 }
-if ($args{-out} !~ /^(bin|cas|nas|hex|dmp|dbg)$/) {
+if ($args{-out} !~ /^(bin|cas|nas|hex|dmp|dbg|js)$/) {
     die "ERROR output format $args{-out} is not recognised/supported\n";
 }
 
@@ -195,6 +195,7 @@ bin       - raw binary format.
 hex       - Intel HEX format.
 dmp       - dump format: address, 16-bytes hex, 16-bytes ASCII per line
 dbg       - (output only) human-readable dump of the internal data structure
+js        - (output only) Javascript text string
 
 Usage:
 
@@ -787,6 +788,36 @@ sub write_as_dbg {
         }
         dmp_common($records[$i]);
     }
+}
+
+
+################################################################################
+# Write @records as a javascript string
+# It would be much simpler to do it as hex escapes but I used octal escapes
+# to match the format used by the ROMs in jsnascom. The basic nastiness in
+# Javascript octal escapes is that \123 can be followed by a literal
+# digit, so can \023 but \12 cannot, because the literal digit would get
+# confused with the 3rd digit of the escaped value.
+sub write_as_js {
+    print OUT "var rom_monitor = \"";
+    if ($#records > 0) {
+        die "ERROR cannot write bin file with discontinuous records; use -dbg to examine input file\n";
+    }
+    my $merge_danger=0;
+    my $numeric=0;
+    foreach my $x (0..$records[0]->{len}-1) {
+        my $chr = ord(substr $records[0]->{data}, $x, 1);
+        $numeric = ($chr >= 48) && ($chr <= 57);
+        if (($merge_danger and $numeric) or ($chr == 92) or ($chr == 34) or ($chr < 32) or ($chr > 126)) {
+            printf OUT "\\%o",$chr;
+            $merge_danger = ($chr < 7*8+7); # if 2 digits next position can merge with it
+        }
+        else {
+            print OUT chr($chr);
+            $merge_danger = 0;
+        }
+    }
+    print OUT "\"\;";
 }
 
 
