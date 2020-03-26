@@ -114,15 +114,11 @@ if (not defined $args{outfile}) {
 # deduce input and output formats from file extension if not set explicitly
 if (not defined $args{-in}) {
     my @bits = split /\./, $args{infile};
-    if (defined $bits[1]) {
-        $args{-in} = lc $bits[1];
-    }
+    $args{-in} = lc $bits[-1];
 }
 if (not defined $args{-out}) {
     my @bits = split /\./, $args{outfile};
-    if (defined $bits[1]) {
-        $args{-out} = lc $bits[1];
-    }
+    $args{-out} = lc $bits[-1];
 }
 
 ################################################################################
