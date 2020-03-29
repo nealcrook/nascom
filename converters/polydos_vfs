@@ -796,7 +796,83 @@ sub cmd_create {
 
 
 sub cmd_repair {
-    print "repair TODO - not yet implemented\n";
+    my ($drive) = @_;
+
+    return unless defined ($drive);
+    if (not $dsk[$drive]->{mounted}) {
+        print "ERROR drive $drive is not mounted\n";
+        return;
+    }
+
+    print "WARNING you should only allow this command to make changes if the 'check' command\n";
+    print "        reports an inconsistency in the directory structure of this drive.\n\n";
+
+    printf "The directory claims that there are %d directory entries (0..%d).\nDo you want to change this? [Y/N] ",
+        $dsk[$drive]->{fcbval}, $dsk[$drive]->{fcbval} - 1;
+    my $response = get_yes_no();
+
+    if ($response eq 'Y') {
+        print "How many directory entries (enter a decimal number) ";
+        $response = <>;
+        if (not -t STDIN) {
+            # non-interactive, so echo input to output
+            print $response;
+        }
+        chomp $response;
+        if ($response =~ /^\d+$/) {
+            if ($response < 50) {
+                $dsk[$drive]->{fcbval} = $response;
+            }
+            else {
+                print "ERROR maximum value is 50\n";
+                return;
+            }
+        }
+        else {
+            print "ERROR require a decimal integer\n";
+        }
+    }
+
+    # N files => last file is at index N-1. Find last sector assigned to that file
+    my $i = $dsk[$drive]->{fcbval} - 1;
+    my $sec_expect;
+    if ($i == -1) {
+        # empty disk
+        $sec_expect = 4;
+    }
+    else {
+        $sec_expect = $dsk[$drive]->{fcb}->[$i]->{fsec} + $dsk[$drive]->{fcb}->[$i]->{fnsc};
+    }
+
+    printf "The directory claims that the next sector to be allocated is %d (0x%x) but first free sector after last file is %d (0x%x)\n",
+            $dsk[$drive]->{nxtsec}, $dsk[$drive]->{nxtsec}, $sec_expect, $sec_expect;
+    print "Do you want to change this? [Y/N] ";
+    $response = get_yes_no();
+
+    if ($response eq 'Y') {
+        print "Next sector to be allocated (enter a decimal number) ";
+        $response = <>;
+        if (not -t STDIN) {
+            # non-interactive, so echo input to output
+            print $response;
+        }
+        chomp $response;
+        if ($response =~ /^\d+$/) {
+            if ($response < $dsk[$drive]->{blks}) {
+                $dsk[$drive]->{nxtsec} = $response;
+            }
+            else {
+                print "ERROR maximum value is $dsk[$drive]->{blks}\n";
+                return;
+            }
+        }
+        else {
+            print "ERROR require a decimal integer\n";
+        }
+    }
+
+    # update directory structure in the disk image in case anything changed
+    wr_dir($drive);
 }
 
 
@@ -816,14 +892,16 @@ sub cmd_check {
         my $num = $dsk[$drive]->{fcb}->[$i]->{fnsc};
 
         if ($sec != $sec_expect) {
-            print "ERROR for directory entry $i, expected start sector of $sec_expect but read $sec\n";
+            printf "ERROR for directory entry $i, expected start sector of %d (0x%x) but read %d (0x%x)\n",
+                $sec_expect, $sec_expect, $sec, $sec;
             $error = $error + 1;
         }
         $sec_expect = $sec + $num;
     }
 
     if ($sec_expect != $dsk[$drive]->{nxtsec}) {
-        print "ERROR next sector to be allocated ($dsk[$drive]->{nxtsec}) does not match sector after last file ($sec_expect)\n";
+        printf "ERROR the directory claims next sector to be allocated is %d (0x%x) but first free sector after last file is %d (0x%x)\n",
+            $dsk[$drive]->{nxtsec}, $dsk[$drive]->{nxtsec}, $sec_expect, $sec_expect;
         $error = $error + 1;
     }
 
@@ -2144,6 +2222,24 @@ sub delete_existing {
 }
 
 
+# return Y or N from user input
+sub get_yes_no {
+    while (1) {
+        my $answer = <>;
+        if (not -t STDIN) {
+            # non-interactive, so echo input to output
+            print $answer;
+        }
+        $answer = uc $answer;
+        chomp $answer;
+        if (($answer eq 'Y') or ($answer eq 'N')) {
+            return $answer;
+        }
+        print "Please answer Y or N ";
+    }
+}
+
+
 #################################################################
 #################################################################
 ## Help
@@ -2576,7 +2672,11 @@ EOF
     }
     elsif ($cmd eq 'repair') {
         print <<EOF
-TODO - intended to repair any inconsistencies found by check. Not yet implemented
+    Modify directory structure to correct inconsistencies in FCB count or next-free-sector.
+    This command is interactive and prompts before making any change.
+
+    Examples:
+    repair 0
 EOF
     }
     elsif ($cmd eq 'uppercase') {
@@ -2798,7 +2898,7 @@ Commands are:
     attrib     - change execution/load address on file(s) from virtual drive
     pack       - remove deleted files and free up disk space and directory entries
     create     - create file from sector(s) on the free list
-    repair     - perform low-level edit on virtual drive
+    repair     - interactively correct directory structure errors
     check      - check integrity of virtual drive
     scrub      - null out deleted file names and unused sectors
     uppercase  - treat all PolyDos file specifiers as upper-case
