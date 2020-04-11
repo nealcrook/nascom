@@ -10,7 +10,7 @@ L_0028:
 
         org $0C50
 
-;;; ============================
+;;; ========================================================
 ;;; M5 Interpreter for NASCOM
 ;;; Uses these calls into NASBUG T2 monitor:
 ;;; RST $28   -- print in-line string; string is terminated by 00.
@@ -20,11 +20,15 @@ L_0028:
 ;;; It is a peculiarity of T2 that it uses non-standard
 ;;; codes instead of ASCII for some operations:
 ;;; $1f for carriage-return
-;;; $?? for clear-screen
-;;; $?? for backspace
+;;; $1d for backspace
 ;;;
-;;; User program is stored starting at SOP ($efd) and is
-;;; terminated with two bytes of 0.
+;;; User program is stored starting at SOP ($efe) and is
+;;; terminated with two bytes of 0. In the code, the address
+;;; SOP-1 is loaded in multiple places, because it is
+;;; incremented before use. I defined name SOPM1 for
+;;; this address ($efd). A little rearrangement would
+;;; allow SOP to be used consistently in the code, which
+;;; would make the code clearer.
 ;;;
 ;;; There are 27 16-bit variables, named @ and A-Z which
 ;;; are accessed based on their ASCII codes $40-$5a
@@ -50,7 +54,7 @@ L_0028:
 ;;;
 ;;; memory scratch ?? none??
 ;;;
-;;; ============================
+;;; ========================================================
 
 
 ;;; A specifies a variable. $40 is @, $41 is A.. $5A is Z.
@@ -64,7 +68,7 @@ GETVAR:
         ld d, (hl)
         jr NEXT
 
-;;; Symbol: subtract: x:=x - TOS
+;;; Symbol: - -- subtract: x:=x - TOS
 
 SUB:
         pop hl
@@ -77,7 +81,7 @@ SUB:
 ENTRY:
         jp MONITOR
 
-;;; Symbol: prompt with ? and get numeric input from user into x (DE)
+;;; Symbol: ? -- prompt with ? and get numeric input from user into x (DE)
 
 NUMIN:
         rst $28
@@ -97,7 +101,7 @@ NUMI1:
 NUMOUT:
         ld h, d
         ld l, e
-        ld iy, $0E0A
+        ld iy, NUMTAB
 
 NUMO1:
         xor a
@@ -162,20 +166,20 @@ SYMBOL:
         jp z, MONITOR
         jp WHAT
 
-;;; Symbol: push x onto stack
+;;; Symbol: , -- push x onto stack
 
 STAKIT:
         push de
         jr NEXT
 
-;;; Symbol: label. Just step past the label identifier
-;;;optimisation: could this be merged with FALSE
+;;; Symbol: ( -- label. Just step past the label identifier
+;;; TODO optimisation: could this be merged with FALSE?
 
 LABEL:
         inc ix
         jr NEXT
 
-;;; Symbol: = (assign) or =? (output)
+;;; Symbol: = -- assign or =? -- print number
 
 ASSIGN:
         inc ix
@@ -189,7 +193,7 @@ ASSIGN:
         ld (hl), d
         jr NEXT
 
-;;; Symbol: add: x:=x + TOS
+;;; Symbol: + -- add: x:=x + TOS
 
 ADD:
         pop hl
@@ -197,19 +201,19 @@ ADD:
         ex de, hl
         jr NEXT
 
-;;; Symbol: inc: x:=x + 1
+;;; Symbol: % -- increment: x:=x + 1
 
 INC:
         inc de
         jr NEXT
 
-;;; Symbol: dec: x:=x - 1
+;;; Symbol: £ -- decrement: x:=x - 1
 
 DEC:
         dec de
         jr NEXT
 
-;;; Symbol: multiply: x:=x * TOS, @:=overflow
+;;; Symbol: * -- multiply: x:=x * TOS, @:=overflow
 
 MUL:
         pop bc
@@ -244,7 +248,7 @@ STORAT:
         ld ($0BC0), hl
         jp NEXT
 
-;;; Symbol: divide: x:=x / TOS, @:=remainder
+;;; Symbol: / -- divide: x:=x / TOS, @:=remainder
 
 DIV:
         ld b, d
@@ -316,14 +320,13 @@ ERRSYM:
 ;;; Symbol: ) -- branch. Check condition
 ;;; 8 conditions are:  Nonzero Uncon Zero Equal Xoteq Lessoreq Greatoreq Monitor
 ;;; TODO would save 2 bytes to move the inc ix from the end to here: then remove one inc ix each from NOBRA and BRA
-;;; TODO bug: Uncon returns to monitor -- like M -- but should go to BRA??!!
 
 BRACHK:
         ld a, (ix+$01)
         cp $4E
         jr z, NONZER
         cp $55
-        jr z, UNCOND
+        jr z, BRA
         cp $5A
         jr z, ZERO
         ex af, af'
@@ -413,7 +416,8 @@ UNCOND:
 
 
 ;;; taken branch. Search for destination
-;;; at 0ddd 31 fa 0f correct? LD SP, ./dis_romFFA -- cannot be correct: it would clear the user stack
+;;; at 0ddd 31 fa 0f correct? LD SP, $0FFA -- cannot be correct: it would clear the user stack
+;;; but neither B1 nor 81 would work here, and code looks good without this instruction.
 ;;; first, search for ( $28 to indicate a label, then check the jump symbol to see if it's the one we want
 ;;; TODO bug: if you use a label like this: (( and it's not the first label a branch from BRALAB to BRA1 will
 ;;; load and check the second ) instead of stepping past it. Trivial to fix.
@@ -421,7 +425,7 @@ UNCOND:
 BRA:
         ld c, (ix+$02)
         ld sp, $0FFA
-        ld hl, $0EFE
+        ld hl, SOP
         ld b, $28
 
 BRA1:
@@ -457,7 +461,7 @@ NEXTI:
         jp NEXT
 
 ;;; A indicates a variable; 1 -> @, 2 -> A, 3 -> B, 27 -> Z
-;;; double it (16-bit variables) then add to variables start address - 2 ($8be)
+;;; double it (16-bit variables) then add to variables start address - 2 ($bbe)
 ;;; to get address of storage. Would have been cleaner to index this from 0!!
 
 VARADR:
@@ -471,6 +475,8 @@ VARADR:
 ;;; Look-up table for hex->decimal conversion
 ;;; 1, 16-bit value for each of the 5 decimal output digits
 ;;; in decimal, values are: 10000, 1000, 100, 10, 1
+
+NUMTAB:
         defw $2710, $03E8, $0064, $000A, $0001
 
 ;;; TODO ??? Return C if ASCII in A is non-numeric, otherwise
@@ -504,7 +510,7 @@ ECHO:
 LIST:
         rst $28
         defb $1F, $00
-        ld hl, SOP
+        ld hl, SOPM1
 
 LIST1:
         inc hl
@@ -516,7 +522,7 @@ LIST1:
 
 
 ;;; Mark end of program at HL: two bytes of 0.
-;;; I'm not sure that the 2nd 0 is necessary, but there might be some scenario where
+;;; TODO is the 2nd 0 necessary?? -- there might be some scenario where
 ;;; you incorrectly end a program with a ) maybe a label search would not stop??
 
 MARKEOP:
@@ -526,6 +532,7 @@ MARKEOP:
         ld (hl), a
 
 ;;; Command loop
+;;; TODO it would be tidier and same code size to avoid the double fall-through
 
 MONITOR:
         rst $28
@@ -542,7 +549,7 @@ MONITOR:
 ;;; fall-through to Run command: CR then start executing symbols at SOP
         rst $28
         defb $1F, $00
-        ld ix, SOP
+        ld ix, SOPM1
         jr NEXTI
 
 
@@ -574,10 +581,11 @@ EDLOP1:
         cp $1F
         jr z, EDIT
         cp $3E
-        jr nz, NOTI
+        jr nz, NOTRT
+;;; > (right) sub-command of Edit command
         inc hl
 
-NOTI:
+NOTRT:
         cp $3C
         jr nz, EDLOP2
 ;;; < (left) sub-command of Edit command
@@ -597,7 +605,6 @@ EDLOP3:
         call ECHO
         cp $3B
         jr z, EDLOP1
-;;; > (right) sub-command of Edit command
         push hl
 
 EDLOP4:
@@ -615,6 +622,8 @@ EDLOP4:
         jr EDLOP3
 
 ;;; Rewind sub-command of Edit command
+;;; TODO the coding here is perverse! Loading with SOP+1 then decrementing! And can all be
+;;; eliminated by jumping to the start of the edit command.. save 6 bytes
 
 REWIND:
         ld hl, $0EFF
@@ -622,6 +631,7 @@ REWIND:
         jr EDLOP1
 
 ;;; Delete sub-command of Edit command
+;;; copy the program back by 1 byte; loop until end of program marker copied
 
 DELETE:
         push hl
@@ -636,6 +646,7 @@ DEL1:
         jr DEL1
 
 ;;; NextLine sub-command of Edit command
+;;; advance pointer past next newline, or stop at end
 
 NEXTLN:
         ld a, (hl)
@@ -647,27 +658,25 @@ NEXTLN:
         jr EDLOP1
 
 ;;; Input command: message, CR then get/store user program
-;;; TODO looks like 1st byte is stored at SOP+1 ??
-;;; TODO 
 
 INPUT:
         rst $28
         defm "nput"
         defb $1F, $00
-        ld hl, SOP
+        ld hl, SOPM1
 
-L_0EDD:
+INOK:
         inc hl
 
-L_0EDE:
+INBAK:
         call ECHO
         cp $3B
         jp z, MARKEOP
         ld (hl), a
         cp $1D
-        jr nz, L_0EDD
+        jr nz, INOK
         dec hl
-        jr L_0EDE
+        jr INBAK
 
 
         ; Start of unknown area $0EEE to $0EEE
@@ -677,6 +686,9 @@ L_0EDE:
 
         org $0EFD
 
+
+SOPM1:
+        defb $00
 
 SOP:
         defb $00
@@ -693,6 +705,7 @@ SOP:
 ; $0E60 CCCCCCCCCCCCCCCCCCCBBBBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 ; $0EB0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBBCCCCCCCCCCCCCCCCCCCC
 
+; $0EFD B
 
 ; Labels
 ;
@@ -723,16 +736,16 @@ SOP:
 ; $0D1D => STORAT         GETVAR  => $0C50
 ; $0D23 => DIV            GRTEQU  => $0DBD
 ; $0D29 => DIV1           ID      => $0DC7
-; $0D2B => DIV2           INC     => $0CFC
-; $0D33 => DIV3           INPUT   => $0ED3
-; $0D3C => DIV4           L_0028  => $0028
-; $0D41 => STRING         L_003E  => $003E
-; $0D54 => WHAT           L_013B  => $013B
-; $0D5D => L_0D5D         L_0D5D  => $0D5D
-; $0D6D => ERRSYM         L_0DA8  => $0DA8
-; $0D74 => BRACHK         L_0DAE  => $0DAE
-; $0DA6 => ZERO           L_0EDD  => $0EDD
-; $0DA8 => L_0DA8         L_0EDE  => $0EDE
+; $0D2B => DIV2           INBAK   => $0EDE
+; $0D33 => DIV3           INC     => $0CFC
+; $0D3C => DIV4           INOK    => $0EDD
+; $0D41 => STRING         INPUT   => $0ED3
+; $0D54 => WHAT           L_0028  => $0028
+; $0D5D => L_0D5D         L_003E  => $003E
+; $0D6D => ERRSYM         L_013B  => $013B
+; $0D74 => BRACHK         L_0D5D  => $0D5D
+; $0DA6 => ZERO           L_0DA8  => $0DA8
+; $0DA8 => L_0DA8         L_0DAE  => $0DAE
 ; $0DAC => NONZER         LABEL   => $0CDF
 ; $0DAE => L_0DAE         LESEQU  => $0DB8
 ; $0DB2 => EQUAL          LIST    => $0E2B
@@ -748,24 +761,26 @@ SOP:
 ; $0DF7 => BRALAB         NEXTLN  => $0EC8
 ; $0DFE => NEXTI          NOBRA   => $0DC0
 ; $0E01 => VARADR         NONZER  => $0DAC
-; $0E14 => XXXNUM         NOTEQU  => $0DB5
-; $0E25 => ECHO           NOTI    => $0E87
-; $0E2B => LIST           NOTRUN  => $0E5E
-; $0E31 => LIST1          NUMI1   => $0C69
-; $0E3A => MARKEOP        NUMIN   => $0C63
-; $0E3E => MONITOR        NUMO1   => $0C7A
-; $0E5E => NOTRUN         NUMO2   => $0C81
-; $0E65 => EDIT           NUMO3   => $0C88
-; $0E77 => EDLOP1         NUMOUT  => $0C74
-; $0E87 => NOTI           REWIND  => $0EB2
-; $0E8C => EDLOP2         SOP     => $0EFD
-; $0E9C => EDLOP3         STAKIT  => $0CDC
-; $0EA4 => EDLOP4         STORAT  => $0D1D
-; $0EB2 => REWIND         STRING  => $0D41
-; $0EB8 => DELETE         SUB     => $0C5A
-; $0EBB => DEL1           SYMBOL  => $0C97
-; $0EC8 => NEXTLN         UNCOND  => $0DD8
-; $0ED3 => INPUT          VARADR  => $0E01
-; $0EDD => L_0EDD         WHAT    => $0D54
-; $0EDE => L_0EDE         XXXNUM  => $0E14
-; $0EFD => SOP            ZERO    => $0DA6
+; $0E0A => NUMTAB         NOTEQU  => $0DB5
+; $0E14 => XXXNUM         NOTRT   => $0E87
+; $0E25 => ECHO           NOTRUN  => $0E5E
+; $0E2B => LIST           NUMI1   => $0C69
+; $0E31 => LIST1          NUMIN   => $0C63
+; $0E3A => MARKEOP        NUMO1   => $0C7A
+; $0E3E => MONITOR        NUMO2   => $0C81
+; $0E5E => NOTRUN         NUMO3   => $0C88
+; $0E65 => EDIT           NUMOUT  => $0C74
+; $0E77 => EDLOP1         NUMTAB  => $0E0A
+; $0E87 => NOTRT          REWIND  => $0EB2
+; $0E8C => EDLOP2         SOP     => $0EFE
+; $0E9C => EDLOP3         SOPM1   => $0EFD
+; $0EA4 => EDLOP4         STAKIT  => $0CDC
+; $0EB2 => REWIND         STORAT  => $0D1D
+; $0EB8 => DELETE         STRING  => $0D41
+; $0EBB => DEL1           SUB     => $0C5A
+; $0EC8 => NEXTLN         SYMBOL  => $0C97
+; $0ED3 => INPUT          UNCOND  => $0DD8
+; $0EDD => INOK           VARADR  => $0E01
+; $0EDE => INBAK          WHAT    => $0D54
+; $0EFD => SOPM1          XXXNUM  => $0E14
+; $0EFE => SOP            ZERO    => $0DA6
