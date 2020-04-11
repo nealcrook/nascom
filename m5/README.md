@@ -46,7 +46,7 @@ Liverpool-based company Microdigital Ltd. around 1979. It had a list price of
 £10 but was provided free-of-charge when purchasing a NASCOM from Microdigital.
 
 In November 1979, Microdigital Ltd published the first edition of a magazine
-titled "Liverpoop software gazette". That edition contained an article about M5
+titled "Liverpool software gazette". That edition contained an article about M5
 and included a hex dump of the code.
 
 I have never seen the official M5 documentation but I assume that the article
@@ -64,19 +64,23 @@ with the goal of porting it from NASBUG T2 to NAS-SYS. I still have the
 recreated assembling listing with my annotated comments. I never succeeded in
 getting the code to work.
 
-Old me, in looking at the code again, and running it on an emulator with NASBUG
-T2, has managed to understand the code better and work through the ambiguous
+Fast-forward to 2020 and here I am, looking at the code again. Now I can run it
+on NASBUG T2 (on an emulator, to decouple NAS-SYS porting problems) and have
+looked at the code in more detail to understand it and unravel the ambiguous
 characters to produce a working version and a commented source listing. I have
 also OCRd and reworked the original documentation.
 
 I have provided multiple versions here, starting with a 100%-accurate copy of
 the original, and continuing with few mods/bug-fixes executed in versions for
-both NASBUG and NAS-SYS.
+both NASBUG and NAS-SYS. <-- COMING SOON.
 
 # Documentation
 
 - Article from Liverpool Software Gazette
 - Review from Computing Today, May 1979.
 
+<-- COMING SOON
+
 # Versions
 
+<-- COMING SOON
