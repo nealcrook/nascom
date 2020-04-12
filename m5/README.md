@@ -52,8 +52,9 @@ and included a hex dump of the code.
 I have never seen the official M5 documentation but I assume that the article
 was a straight reproduction of that documentation.
 
-Unfortunately, there were many, many transcription errors in the article (some,
-for example "A-7" when "A-Z" was intended, were easy to spot; others less so).
+The article was concse and well-written but contained many, many transcription
+errors. Some, for example "A-7" when "A-Z" was intended, were easy to spot;
+others less so.
 
 Worse, the hex dump was very poorly reproduced so that there were many instances
 of ambiguity for the hex digits 0 8 B E C and D.
@@ -78,8 +79,13 @@ both NASBUG and NAS-SYS. <-- COMING SOON.
 
 - Article from Liverpool Software Gazette
 - Review from Computing Today, May 1979.
+- Dr Dark's Diary #4 (INMC Issue 6)
 
 <-- COMING SOON
+
+# WANTED
+
+If anyone has other M5-related material I would love to see it.
 
 # Versions
 
