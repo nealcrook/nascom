@@ -1,12 +1,12 @@
 # M5 "a simple interpreter for the NASCOM 1"
 
-Execute from 0C60
+Original version loads at 0x0C50 and executes at 0C60.
 
 # Overview
 
 M5 is a simple interpreter for the NASCOM 1 and runs under NASBUG T2 or T4. It
 provides a mechanism for entering, editing and running programs. The total code
-size is about 670 bytes, allowing it to run on an unexpanded NASCOM 1 and still
+size is 671 bytes, allowing it to run on an unexpanded NASCOM 1 and still
 leave room for simple programs.
 
 # Language Features
@@ -77,16 +77,43 @@ both NASBUG and NAS-SYS. <-- COMING SOON.
 
 # Documentation
 
-- Article from Liverpool Software Gazette
-- Review from Computing Today, May 1979.
-- Dr Dark's Diary #4 (INMC Issue 6)
+* m5_lsg.pdf - Scan of article from Liverpool Software Gazette
+* m5_review - Scan of review from Computing Today, May 1979.
+* See also, Dr Dark's Diary #4 (INMC Issue 6)
+* m5.odt, m5.pdf - my recreation of the original article (took me 11 pages when the original was only 7).
 
-<-- COMING SOON
+The Computing Today review comments that < and > are not available on the NASCOM
+keyboard under T2, which is incorrect: they are reached using Shift-N and Shift-M.
 
 # WANTED
 
 If anyone has other M5-related material I would love to see it.
 
-# Versions
+# Bugs
 
-<-- COMING SOON
+Bugs in the original version
+
+* The stack is not initialised (eg, between runs) so a program that ends with an
+  unbalanced stack can degrade the system from run to run.
+
+* A taken branch resets the stack pointer; any user values on the stack are
+  lost. This is the one instruction in the whole program that baffles me. I can
+  only think that it was added in order to debug a mis-behaving program and was
+  never removed.
+
+* Using "backspace"  in the  editor Insert  command inserts  a backspace  in the
+  program --  which is  invisible when  the program is  listed and  difficult to
+  spot/fix. To be fair,  this behaviour is documented, but would  be worth a few
+  bytes to fix!
+
+* There is a bogus $D4 byte at the end of the program
+
+* There is wasted space between the end of the program and the start of the user
+program (see Computing Today review).
+
+# Original Version
+
+* m5.nas - original version, recreated hex dump. Runs under T2/T4/NASBUG. Load at 0xC50, execute at 0xC60
+* m5.odt/m5.pdf/m5_lsg.pdf/mv_review.pdf - all refer to this version
+* dis_rom - scripted disassembly of the binary created from m5.nas
+* m5.asm - the result of running dis_rom on m5.nas

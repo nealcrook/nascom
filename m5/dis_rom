@@ -308,13 +308,25 @@ $dis->code(0xdbd,"GRTEQU");
 
 $dis->block_comment(0xdc0,"\n;;; not-taken branch. Skip past brace and condition: point to jump symbol, then continue");
 $dis->code(0xdc0,"NOBRA");
-$dis->block_comment(0xdda,"\n;;; Branch unconditionally
-;;; also end up here for conditional branches that are to be taken. Search for destination
+$dis->block_comment(0xdda,"\n;;; Come here for unconditional Branch and for taken conditional branch.
+;;; Notation:   (n   )km
+;;; ( = label marker
+;;; n = label symbol
+;;; ) = branch marker
+;;; k = branch condition
+;;; m = destination symbol
+;;; Search for destination: first, search for label marker, then see if label symbol matches
+;;; destination symbol.
+
 ;;; at 0ddd 31 fa 0f correct? LD SP, \$0FFA -- cannot be correct: it would clear the user stack
 ;;; but neither B1 nor 81 would work here, and code looks good without this instruction.
-;;; first, search for ( \$28 to indicate a label, then check the jump symbol to see if it's the one we want
-;;; TODO bug: if you use a label like this: (( and it's not the first label a branch from BRALAB to BRA1 will
-;;; load and check the second ) instead of stepping past it. Trivial to fix.");
+
+;;; TODO bug: when BRALAB does not match the destination symbol it branches back to BRA1. However,
+;;; HL is still pointing to the destination symbol that was checked. At BRA1 it gets tested to see
+;;; if it is a label marker. Therefore, if you had a label (( and it's not the first label in
+;;; the program the second ( will get treated as the label marker and the next symbol treated as the
+;;; label symbol. It's trivial to fix: change JP NZ below to JR to save 1 byte. In BRA1 move INC HL
+;;; to after the OR and label it BRA2. In BRALAB, insert INC HL and change the branch destination to BRA2.");
 $dis->code(0xdda,"BRA");
 $dis->code(0xde5,"BRA1");
 
@@ -322,12 +334,12 @@ $dis->code(0xda8,"BRAIFZ");
 $dis->code(0xdae,"BRAIFNZ");
 
 
-$dis->block_comment(0xdf7,"\n;;; found branch label. Does the destination symbol match?");
+$dis->block_comment(0xdf7,"\n;;; found label symbol. Does the destination symbol match?");
 $dis->code(0xdf7,"BRALAB");
 
-$dis->block_comment(0xded,"\n;;; found 0 (end of program) without finding branch destination. Skip past brace and
-;;; condition: point to jump symbol, then report error");
-$dis->block_comment(0xdfb,"\n;;; yes, found match. Move symbol address to IX then continue with next symbol");
+$dis->block_comment(0xded,"\n;;; found 0 (end of program) without finding branch destination. Skip past branch marker
+;;; and condition; point to destination symbol, then report error");
+$dis->block_comment(0xdfb,"\n;;; yes, found match. Point IX to the label symbol then continue with next symbol");
 
 $dis->code(0xdc7,"ID");
 

@@ -415,13 +415,25 @@ ERROR:
         jr MONITOR
 
 
-;;; Branch unconditionally
-;;; also end up here for conditional branches that are to be taken. Search for destination
+;;; Come here for unconditional Branch and for taken conditional branch.
+;;; Notation:   (n   )km
+;;; ( = label marker
+;;; n = label symbol
+;;; ) = branch marker
+;;; k = branch condition
+;;; m = destination symbol
+;;; Search for destination: first, search for label marker, then see if label symbol matches
+;;; destination symbol.
+
 ;;; at 0ddd 31 fa 0f correct? LD SP, $0FFA -- cannot be correct: it would clear the user stack
 ;;; but neither B1 nor 81 would work here, and code looks good without this instruction.
-;;; first, search for ( $28 to indicate a label, then check the jump symbol to see if it's the one we want
-;;; TODO bug: if you use a label like this: (( and it's not the first label a branch from BRALAB to BRA1 will
-;;; load and check the second ) instead of stepping past it. Trivial to fix.
+
+;;; TODO bug: when BRALAB does not match the destination symbol it branches back to BRA1. However,
+;;; HL is still pointing to the destination symbol that was checked. At BRA1 it gets tested to see
+;;; if it is a label marker. Therefore, if you had a label (( and it's not the first label in
+;;; the program the second ( will get treated as the label marker and the next symbol treated as the
+;;; label symbol. It's trivial to fix: change JP NZ below to JR to save 1 byte. In BRA1 move INC HL
+;;; to after the OR and label it BRA2. In BRALAB, insert INC HL and change the branch destination to BRA2.
 
 BRA:
         ld c, (ix+$02)
@@ -437,8 +449,8 @@ BRA1:
         or a
         jp nz, BRA1
 
-;;; found 0 (end of program) without finding branch destination. Skip past brace and
-;;; condition: point to jump symbol, then report error
+;;; found 0 (end of program) without finding branch destination. Skip past branch marker
+;;; and condition; point to destination symbol, then report error
         inc ix
         inc ix
         rst $28
@@ -447,14 +459,14 @@ BRA1:
         jr ID
 
 
-;;; found branch label. Does the destination symbol match?
+;;; found label symbol. Does the destination symbol match?
 
 BRALAB:
         ld a, (hl)
         cp c
         jr nz, BRA1
 
-;;; yes, found match. Move symbol address to IX then continue with next symbol
+;;; yes, found match. Point IX to the label symbol then continue with next symbol
         push hl
         pop ix
 
