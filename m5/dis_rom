@@ -278,7 +278,7 @@ $dis->code(0xd08,"MUL1");
 $dis->code(0xd10,"MUL2");
 $dis->code(0xd1c,"MUL3");
 $dis->block_comment(0xd1d,"\n;;; Store in variable @");
-$dis->code(0xd1d,"STORAT");
+$dis->code(0xd1d,"STOREAT");
 $dis->block_comment(0xd23,";;; Symbol: / -- divide: x:=x / TOS, \@:=remainder");
 $dis->code(0xd23,"DIV");
 $dis->code(0xd29,"DIV1");
@@ -291,13 +291,14 @@ $dis->block_comment(0xcdf,";;; Symbol: ( -- label. Just step past the label iden
 $dis->code(0xcdf,"LABEL");
 $dis->code(0xd41,"STRING");
 $dis->block_comment(0xd54,";;; Either a variable @, A-Z or an unknown symbol (in which case, error)");
+$dis->block_comment(0xd5a,"\n;;; Convert/accumulate inline number from ASCII string into x (DE) -- like NUMIN");
 $dis->code(0xd54,"WHAT");
-$dis->block_comment(0xd5d,"\n;;; TODO ?? what's going on here? fetch and convert inline number");
 $dis->code(0xd6d,"ERRSYM");
 $dis->code(0xdcb,"ERROR");
 
+$dis->block_comment(0xdac,";;; Branch if x (in DE) is non-0");
 $dis->code(0xdac,"NONZER");
-$dis->code(0xdd8,"UNCOND");
+$dis->block_comment(0xda6,";;; Branch if x (in DE) is 0");
 $dis->code(0xda6,"ZERO");
 $dis->code(0xdb2,"EQUAL");
 $dis->code(0xdb5,"NOTEQU");
@@ -307,7 +308,8 @@ $dis->code(0xdbd,"GRTEQU");
 
 $dis->block_comment(0xdc0,"\n;;; not-taken branch. Skip past brace and condition: point to jump symbol, then continue");
 $dis->code(0xdc0,"NOBRA");
-$dis->block_comment(0xdda,"\n;;; taken branch. Search for destination
+$dis->block_comment(0xdda,"\n;;; Branch unconditionally
+;;; also end up here for conditional branches that are to be taken. Search for destination
 ;;; at 0ddd 31 fa 0f correct? LD SP, \$0FFA -- cannot be correct: it would clear the user stack
 ;;; but neither B1 nor 81 would work here, and code looks good without this instruction.
 ;;; first, search for ( \$28 to indicate a label, then check the jump symbol to see if it's the one we want
@@ -315,6 +317,10 @@ $dis->block_comment(0xdda,"\n;;; taken branch. Search for destination
 ;;; load and check the second ) instead of stepping past it. Trivial to fix.");
 $dis->code(0xdda,"BRA");
 $dis->code(0xde5,"BRA1");
+
+$dis->code(0xda8,"BRAIFZ");
+$dis->code(0xdae,"BRAIFNZ");
+
 
 $dis->block_comment(0xdf7,"\n;;; found branch label. Does the destination symbol match?");
 $dis->code(0xdf7,"BRALAB");

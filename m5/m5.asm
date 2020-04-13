@@ -189,7 +189,7 @@ ASSIGN:
         jp c, ID
         call VARADR
         ld (hl), e
-        dec hl
+        inc hl
         ld (hl), d
         jr NEXT
 
@@ -244,7 +244,7 @@ MUL3:
 
 ;;; Store in variable @
 
-STORAT:
+STOREAT:
         ld ($0BC0), hl
         jp NEXT
 
@@ -278,7 +278,7 @@ DIV3:
 DIV4:
         dec a
         jr nz, DIV2
-        jr STORAT
+        jr STOREAT
 
 
 STRING:
@@ -297,9 +297,9 @@ WHAT:
         sub $30
         cp $0A
         jr nc, ERRSYM
-        ld hl, $0000
 
-;;; TODO ?? what's going on here? fetch and convert inline number
+;;; Convert/accumulate inline number from ASCII string into x (DE) -- like NUMIN
+        ld hl, $0000
 
 L_0D5D:
         ld a, (ix)
@@ -351,33 +351,35 @@ BRACHK:
         inc ix
         jr ERROR
 
+;;; Branch if x (in DE) is 0
 
 ZERO:
         ld a, d
         or e
 
-L_0DA8:
+BRAIFZ:
         jr z, BRA
         jr NOBRA
 
+;;; Branch if x (in DE) is non-0
 
 NONZER:
         ld a, d
         or e
 
-L_0DAE:
+BRAIFNZ:
         jr nz, BRA
         jr NOBRA
 
 
 EQUAL:
         ex af, af'
-        jr L_0DA8
+        jr BRAIFZ
 
 
 NOTEQU:
         ex af, af'
-        jr L_0DAE
+        jr BRAIFNZ
 
 ;;; TODO ?? what's going on here with the dec/inc
 
@@ -410,12 +412,11 @@ ERROR:
         defb $00
         ld a, (ix)
         call L_013B
-
-UNCOND:
         jr MONITOR
 
 
-;;; taken branch. Search for destination
+;;; Branch unconditionally
+;;; also end up here for conditional branches that are to be taken. Search for destination
 ;;; at 0ddd 31 fa 0f correct? LD SP, $0FFA -- cannot be correct: it would clear the user stack
 ;;; but neither B1 nor 81 would work here, and code looks good without this instruction.
 ;;; first, search for ( $28 to indicate a label, then check the jump symbol to see if it's the one we want
@@ -714,40 +715,40 @@ SOP:
 ; $013B => L_013B         BRA     => $0DDA
 ; $0C50 => GETVAR         BRA1    => $0DE5
 ; $0C5A => SUB            BRACHK  => $0D74
-; $0C60 => ENTRY          BRALAB  => $0DF7
-; $0C63 => NUMIN          DEC     => $0CFF
-; $0C69 => NUMI1          DEL1    => $0EBB
-; $0C74 => NUMOUT         DELETE  => $0EB8
-; $0C7A => NUMO1          DIV     => $0D23
-; $0C81 => NUMO2          DIV1    => $0D29
-; $0C88 => NUMO3          DIV2    => $0D2B
-; $0C95 => NEXT           DIV3    => $0D33
-; $0C97 => SYMBOL         DIV4    => $0D3C
-; $0CDC => STAKIT         ECHO    => $0E25
-; $0CDF => LABEL          EDIT    => $0E65
-; $0CE3 => ASSIGN         EDLOP1  => $0E77
-; $0CF7 => ADD            EDLOP2  => $0E8C
-; $0CFC => INC            EDLOP3  => $0E9C
-; $0CFF => DEC            EDLOP4  => $0EA4
-; $0D02 => MUL            ENTRY   => $0C60
-; $0D08 => MUL1           EQUAL   => $0DB2
-; $0D10 => MUL2           ERROR   => $0DCB
-; $0D1C => MUL3           ERRSYM  => $0D6D
-; $0D1D => STORAT         GETVAR  => $0C50
-; $0D23 => DIV            GRTEQU  => $0DBD
-; $0D29 => DIV1           ID      => $0DC7
-; $0D2B => DIV2           INBAK   => $0EDE
-; $0D33 => DIV3           INC     => $0CFC
-; $0D3C => DIV4           INOK    => $0EDD
-; $0D41 => STRING         INPUT   => $0ED3
-; $0D54 => WHAT           L_0028  => $0028
-; $0D5D => L_0D5D         L_003E  => $003E
-; $0D6D => ERRSYM         L_013B  => $013B
-; $0D74 => BRACHK         L_0D5D  => $0D5D
-; $0DA6 => ZERO           L_0DA8  => $0DA8
-; $0DA8 => L_0DA8         L_0DAE  => $0DAE
+; $0C60 => ENTRY          BRAIFNZ => $0DAE
+; $0C63 => NUMIN          BRAIFZ  => $0DA8
+; $0C69 => NUMI1          BRALAB  => $0DF7
+; $0C74 => NUMOUT         DEC     => $0CFF
+; $0C7A => NUMO1          DEL1    => $0EBB
+; $0C81 => NUMO2          DELETE  => $0EB8
+; $0C88 => NUMO3          DIV     => $0D23
+; $0C95 => NEXT           DIV1    => $0D29
+; $0C97 => SYMBOL         DIV2    => $0D2B
+; $0CDC => STAKIT         DIV3    => $0D33
+; $0CDF => LABEL          DIV4    => $0D3C
+; $0CE3 => ASSIGN         ECHO    => $0E25
+; $0CF7 => ADD            EDIT    => $0E65
+; $0CFC => INC            EDLOP1  => $0E77
+; $0CFF => DEC            EDLOP2  => $0E8C
+; $0D02 => MUL            EDLOP3  => $0E9C
+; $0D08 => MUL1           EDLOP4  => $0EA4
+; $0D10 => MUL2           ENTRY   => $0C60
+; $0D1C => MUL3           EQUAL   => $0DB2
+; $0D1D => STOREAT        ERROR   => $0DCB
+; $0D23 => DIV            ERRSYM  => $0D6D
+; $0D29 => DIV1           GETVAR  => $0C50
+; $0D2B => DIV2           GRTEQU  => $0DBD
+; $0D33 => DIV3           ID      => $0DC7
+; $0D3C => DIV4           INBAK   => $0EDE
+; $0D41 => STRING         INC     => $0CFC
+; $0D54 => WHAT           INOK    => $0EDD
+; $0D5D => L_0D5D         INPUT   => $0ED3
+; $0D6D => ERRSYM         L_0028  => $0028
+; $0D74 => BRACHK         L_003E  => $003E
+; $0DA6 => ZERO           L_013B  => $013B
+; $0DA8 => BRAIFZ         L_0D5D  => $0D5D
 ; $0DAC => NONZER         LABEL   => $0CDF
-; $0DAE => L_0DAE         LESEQU  => $0DB8
+; $0DAE => BRAIFNZ        LESEQU  => $0DB8
 ; $0DB2 => EQUAL          LIST    => $0E2B
 ; $0DB5 => NOTEQU         LIST1   => $0E31
 ; $0DB8 => LESEQU         MARKEOP => $0E3A
@@ -755,31 +756,30 @@ SOP:
 ; $0DC0 => NOBRA          MUL     => $0D02
 ; $0DC7 => ID             MUL1    => $0D08
 ; $0DCB => ERROR          MUL2    => $0D10
-; $0DD8 => UNCOND         MUL3    => $0D1C
-; $0DDA => BRA            NEXT    => $0C95
-; $0DE5 => BRA1           NEXTI   => $0DFE
-; $0DF7 => BRALAB         NEXTLN  => $0EC8
-; $0DFE => NEXTI          NOBRA   => $0DC0
-; $0E01 => VARADR         NONZER  => $0DAC
-; $0E0A => NUMTAB         NOTEQU  => $0DB5
-; $0E14 => XXXNUM         NOTRT   => $0E87
-; $0E25 => ECHO           NOTRUN  => $0E5E
-; $0E2B => LIST           NUMI1   => $0C69
-; $0E31 => LIST1          NUMIN   => $0C63
-; $0E3A => MARKEOP        NUMO1   => $0C7A
-; $0E3E => MONITOR        NUMO2   => $0C81
-; $0E5E => NOTRUN         NUMO3   => $0C88
-; $0E65 => EDIT           NUMOUT  => $0C74
-; $0E77 => EDLOP1         NUMTAB  => $0E0A
-; $0E87 => NOTRT          REWIND  => $0EB2
-; $0E8C => EDLOP2         SOP     => $0EFE
-; $0E9C => EDLOP3         SOPM1   => $0EFD
-; $0EA4 => EDLOP4         STAKIT  => $0CDC
-; $0EB2 => REWIND         STORAT  => $0D1D
-; $0EB8 => DELETE         STRING  => $0D41
-; $0EBB => DEL1           SUB     => $0C5A
-; $0EC8 => NEXTLN         SYMBOL  => $0C97
-; $0ED3 => INPUT          UNCOND  => $0DD8
+; $0DDA => BRA            MUL3    => $0D1C
+; $0DE5 => BRA1           NEXT    => $0C95
+; $0DF7 => BRALAB         NEXTI   => $0DFE
+; $0DFE => NEXTI          NEXTLN  => $0EC8
+; $0E01 => VARADR         NOBRA   => $0DC0
+; $0E0A => NUMTAB         NONZER  => $0DAC
+; $0E14 => XXXNUM         NOTEQU  => $0DB5
+; $0E25 => ECHO           NOTRT   => $0E87
+; $0E2B => LIST           NOTRUN  => $0E5E
+; $0E31 => LIST1          NUMI1   => $0C69
+; $0E3A => MARKEOP        NUMIN   => $0C63
+; $0E3E => MONITOR        NUMO1   => $0C7A
+; $0E5E => NOTRUN         NUMO2   => $0C81
+; $0E65 => EDIT           NUMO3   => $0C88
+; $0E77 => EDLOP1         NUMOUT  => $0C74
+; $0E87 => NOTRT          NUMTAB  => $0E0A
+; $0E8C => EDLOP2         REWIND  => $0EB2
+; $0E9C => EDLOP3         SOP     => $0EFE
+; $0EA4 => EDLOP4         SOPM1   => $0EFD
+; $0EB2 => REWIND         STAKIT  => $0CDC
+; $0EB8 => DELETE         STOREAT => $0D1D
+; $0EBB => DEL1           STRING  => $0D41
+; $0EC8 => NEXTLN         SUB     => $0C5A
+; $0ED3 => INPUT          SYMBOL  => $0C97
 ; $0EDD => INOK           VARADR  => $0E01
 ; $0EDE => INBAK          WHAT    => $0D54
 ; $0EFD => SOPM1          XXXNUM  => $0E14
