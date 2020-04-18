@@ -1,27 +1,17 @@
-        ;; SOP:    equ $efe
-        ;; SOPM1:  equ SOP-1
-
-        org $0C50
-
 ;;; ========================================================
 ;;; M5 Interpreter for NASCOM
 ;;;
-;;; User program is stored starting at SOP ($efe) and is
-;;; terminated with two bytes of 0. In the code, the address
-;;; SOP-1 is loaded in multiple places, because it is
-;;; incremented before use. I defined name SOPM1 for
-;;; this address ($efd). A little rearrangement would
-;;; allow SOP to be used consistently in the code, which
-;;; would make the code clearer.
+;;; User program is stored starting at SOP and is
+;;; terminated with two bytes of 0.
 ;;;
 ;;; There are 27 16-bit variables, named @ and A-Z which
 ;;; are accessed based on their ASCII codes $40-$5a
 ;;; respectively.
 ;;;
-;;; Variables are stored starting at $bc0
-;;; which is the top (non-scrolled) line of the memory
-;;; -mapped display, which means that they are visible
-;;; before and after the program is running!
+;;; Variables are stored starting at SOV which defaults
+;;; to the top (non-scrolled) line of the memory-mapped
+;;; display, which means that they are visible before
+;;; and after the program is running!
 ;;;
 ;;; The editor does direct read/write to 1 location at
 ;;; the right-hand side of the top (non-scrolled) line
@@ -39,23 +29,86 @@
 ;;; memory scratch: none
 ;;;
 ;;; ========================================================
+;;; 0-> assemble for T2/T4   I/O at address $0c50
+;;; 1-> assemble for NAS-SYS I/O at address $0c80
+NASSYS: equ 1
 
+
+;;; ========================================================
+;;; ========================================================
+        if NASSYS
+;;; ========================================================
+        org $0C80
+;;; Non-printable codes (standard for NAS-SYS)
+CHR_CR: equ $0d
+CHR_BS: equ $08
+
+;;; I/O calls common to T2/T4/NAS-SYS
+RST_PRS:equ $28
+
+;;; I/O calls for NAS-SYS - padded to generate the same code size
+INCH:   MACRO
+        rst 8
+        nop
+        nop
+        ENDM
+
+COUTCH: MACRO
+        rst $30
+        nop
+        nop
+        ENDM
+
+;;; use this version for tail recursion
+JOUTCH: MACRO
+        jp $30
+        ENDM
+
+        else
+;;; ========================================================
+        org $0C50
 ;;; Non-printable codes (non-standard for T4)
 CHR_CR: equ $1f
 CHR_BS: equ $1d
 
-;;; T4 i/o calls
+;;; I/O calls common to T2/T4/NAS-SYS
 RST_PRS:equ $28
-INCH:   equ $003E
-OUTCH:  equ $013B
 
-;;; A specifies a variable. $40 is @, $41 is A.. $5A is Z.
+;;; I/O calls for T2/T4
+INCH:   MACRO
+        call $003E
+        ENDM
+
+COUTCH: MACRO
+        call $013B
+        ENDM
+
+;;; use this version for tail recursion
+JOUTCH: MACRO
+        jp $013B
+        ENDM
+
+        endif
+;;; ========================================================
+;;; ========================================================
+
+;;; Start of variable storage. 54 bytes are used
+SOV:    equ $bc0
+
+;;; Start of program storage (SOP) is defined at the end of
+;;; the code, because the program follows straight on from
+;;; the end of the program
+
+;;; Program entry point
+ENTRY:  jp MONITOR
+
+;;; A specifies a variable. @->$40 B->$41.. Z->$5A
 ;;; fetch value of referenced variable into DE ('x')
-GETVAR: sub '?'                 ;convert @->1, A->2.. Z->27
-        call VARADR
+GETVAR: sub '?'                 ;now @->1, A->2.. Z->27
+        call VARADR             ;get address of variable in HL
         ld e, (hl)
         inc hl
-        ld d, (hl)
+        ld d, (hl)              ;value of variable in x (DE)
         jr NEXT
 
 ;;; Symbol: - -- subtract: x:=x - TOS
@@ -63,9 +116,6 @@ SUB:    pop hl
         sbc hl, de
         ex de, hl
         jr NEXT
-
-;;; Program entry point
-ENTRY:  jp MONITOR
 
 ;;; Symbol: ? -- prompt with ? and get numeric input from user into x (DE)
 NUMIN:  rst RST_PRS
@@ -91,7 +141,7 @@ NUMO2:  sbc hl, bc
         jr NUMO2
 NUMO3:  add hl, bc
         add a, $30
-        call OUTCH
+        COUTCH
         inc iy
         inc iy
         dec c
@@ -101,11 +151,11 @@ NUMO3:  add hl, bc
 NEXT:   inc ix
 
 ;;; ..and process it
-SYMBOL: ld a, (ix+$00)
+SYMBOL: ld a, (ix+$00)          ;get next symbol
         cp ' '
-        jr z, NEXT
+        jr z, NEXT              ;skip space
         cp CHR_CR
-        jr z, NEXT
+        jr z, NEXT              ;skip CR
         cp '?'
         jr z, NUMIN
         jr nc, GETVAR
@@ -128,32 +178,27 @@ SYMBOL: ld a, (ix+$00)
         cp '/'
         jr z, DIV
         cp '('
-        jr z, LABEL
+        jp z, LABEL
         cp '"'                  ; "
         jr z, STRING
         or a
         jp z, MONITOR
-        jp WHAT
+        jp WHAT                 ;not recognised: abort run with error.
 
 ;;; Symbol: , -- push x onto stack
 STAKIT: push de
         jr NEXT
 
-;;; Symbol: ( -- label. Just step past the label identifier
-;;; TODO optimisation: could this be merged with FALSE?
-LABEL:  inc ix
-        jr NEXT
-
 ;;; Symbol: = -- assign or =? -- print number
 ASSIGN: inc ix
-        ld a, (ix+$00)
-        sub '?'
-        jr z, NUMOUT
-        jp c, ID
-        call VARADR
+        ld a, (ix+$00)          ;variable being assigned to
+        sub '?'                 ;now @->1, A->2 etc.
+        jr z, NUMOUT            ;if ? then print x
+        jp c, ID                ;illegal variable name
+        call VARADR             ;get address of variable in HL
         ld (hl), e
         inc hl
-        ld (hl), d
+        ld (hl), d              ;store x (DE) at that address
         jr NEXT
 
 ;;; Symbol: + -- add: x:=x + TOS
@@ -190,8 +235,8 @@ MUL2:   dec a
         jr MUL1
 MUL3:   ex de, hl
 
-;;; Store in variable @
-STOREAT:ld ($0BC0), hl
+;;; Store in variable @ -- the first variable
+STOREAT:ld (SOV), hl
         jp NEXT
 
 ;;; Symbol: / -- divide: x:=x / TOS, @:=remainder
@@ -216,14 +261,13 @@ DIV4:   dec a
         jr nz, DIV2
         jr STOREAT
 
-
 STRING: inc ix
         ld a, (ix+$00)
         cp '"'                  ;"
         jp z, NEXT
         or a
         jp z, MONITOR
-        call OUTCH
+        COUTCH
         jr STRING
 
 ;;; Either a variable @, A-Z or an unknown symbol (in which case, error)
@@ -242,7 +286,6 @@ L_0D5D: ld a, (ix+$00)
         dec ix
         jp SYMBOL
 
-
 ERRSYM: rst RST_PRS
         defm "SYM"
         defb $00
@@ -250,8 +293,8 @@ ERRSYM: rst RST_PRS
 
 ;;; Symbol: ) -- branch. Check condition
 ;;; 8 conditions are:  Nonzero Uncon Zero Equal Xoteq Lessoreq Greatoreq Monitor
-;;; TODO would save 2 bytes to move the inc ix from the end to here: then remove one inc ix each from NOBRA and BRA
-BRACHK: ld a, (ix+$01)
+BRACHK: inc ix                  ;skip past branch marker to branch condition
+        ld a, (ix+0)            ;get branch condition
         cp 'N'
         jr z, NONZER
         cp 'U'
@@ -273,11 +316,10 @@ BRACHK: ld a, (ix+$01)
         cp 'G'
         jr z, GRTEQU
         cp 'M'
-        jp z, MONITOR
+        jp z, MONITOR           ;quit program, return to command loop
         rst RST_PRS
         defm "J"
         defb $00
-        inc ix
         jr ERROR
 
 ;;; Branch if x (in DE) is 0
@@ -294,7 +336,6 @@ NONZER: ld a, d
 BRAIFNZ:jr nz, BRA
         jr NOBRA
 
-
 EQUAL:  ex af, af'
         jr BRAIFZ
 
@@ -310,9 +351,10 @@ LESEQU: ex af, af'
 GRTEQU: ex af, af'
         jr c, BRA
 
-;;; not-taken branch. Skip past brace and condition: point to jump symbol, then continue
+;;; Symbol: ( -- label. Just step past the label identifier
+LABEL:
+;;; not-taken branch. Skip past branch condition to destination symbol, then continue
 NOBRA:  inc ix
-        inc ix
         jp NEXT
 
 ID:     rst RST_PRS
@@ -323,7 +365,7 @@ ERROR:  rst RST_PRS
         defm " ERR "
         defb $00
         ld a, (ix+$00)
-        call OUTCH
+        COUTCH
         jr MONITOR
 
 ;;; Come here for unconditional Branch and for taken conditional branch.
@@ -336,8 +378,12 @@ ERROR:  rst RST_PRS
 ;;; Search for destination: first, search for label marker, then see if label symbol matches
 ;;; destination symbol.
 
+;;; TODO
 ;;; at 0ddd 31 fa 0f correct? LD SP, $0FFA -- cannot be correct: it would clear the user stack
-;;; but neither B1 nor 81 would work here, and code looks good without this instruction.
+;;; ..and to rather an odd value. But neither B1 nor 81 would work here, and code looks good
+;;; without this instruction.
+;;; I really don't know what this is doing here but it reminds me that this program never
+;;; sets the sp in normal operation; maybe it should do so on entry to the command loop.
 
 ;;; TODO bug: when BRALAB does not match the destination symbol it branches back to BRA1. However,
 ;;; HL is still pointing to the destination symbol that was checked. At BRA1 it gets tested to see
@@ -345,27 +391,25 @@ ERROR:  rst RST_PRS
 ;;; the program the second ( will get treated as the label marker and the next symbol treated as the
 ;;; label symbol. It's trivial to fix: change JP NZ below to JR to save 1 byte. In BRA1 move INC HL
 ;;; to after the OR and label it BRA2. In BRALAB, insert INC HL and change the branch destination to BRA2.
-BRA:    ld c, (ix+$02)
-        ld sp, $0FFA
+BRA:    ld c, (ix+$01)          ;fetch destination symbol
+        ld sp, $0FFA            ;TODO why??
         ld hl, SOP
         ld b, '('
 
 BRA1:   ld a, (hl)
         inc hl
         cp b
-        jr z, BRALAB
+        jr z, BRALAB            ;found label marker
         or a
-        jp nz, BRA1
+        jp nz, BRA1             ;not reached end of program so continue search
 
-;;; found 0 (end of program) without finding branch destination. Skip past branch marker
-;;; and condition; point to destination symbol, then report error
-        inc ix
+;;; found 0 (end of program) without finding branch destination. Skip past branch condition
+;;; to destination symbol, then report error
         inc ix
         rst RST_PRS
         defm "J"
         defb $00
         jr ID
-
 
 ;;; found label symbol. Does the destination symbol match?
 BRALAB: ld a, (hl)
@@ -379,18 +423,16 @@ BRALAB: ld a, (hl)
 NEXTI:  jp NEXT
 
 ;;; A indicates a variable; 1 -> @, 2 -> A, 3 -> B, 27 -> Z
-;;; double it (16-bit variables) then add to variables start address - 2 ($bbe)
-;;; to get address of storage. Would have been cleaner to index this from 0!!
+;;; double it (16-bit variables) then add to SOV-2
+;;; to get address of storage.
+;;; baseing variables from 1 instead of 0 makes code for ASSIGN
+;;; more efficient; relies on ?@A being consecutive ASCII codes
 VARADR: rlca
         ld c, a
         ld b, $00
-        ld hl, $0BBE
+        ld hl, SOV-2
         add hl, bc
         ret
-
-;;; Look-up table for hex->decimal conversion
-;;; 1, 16-bit value for each of the 5 decimal output digits
-NUMTAB: defw 10000, 1000, 100, 10, 1
 
 ;;; TODO ??? Return C if ASCII in A is non-numeric, otherwise
 ;;; multiply HL by 10 and add in value from A
@@ -410,21 +452,20 @@ XXXNUM: sub $30
         ret
 
 ;;; Get input character, echo it and return it in A
-ECHO:   call INCH
-        jp OUTCH
+ECHO:   INCH
+        JOUTCH
 
 ;;; List command: display until end-of-program (indicated by 0)
 ;;; also, called as a subroutine from Edit loop.
 LIST:   rst RST_PRS
         defb CHR_CR, $00
-        ld hl, SOPM1
-LIST1:  inc hl
-        ld a, (hl)
+        ld hl, SOP
+LIST1:  ld a, (hl)
         or a
         ret z
-        call OUTCH
+        COUTCH
+        inc hl
         jr LIST1
-
 
 ;;; Mark end of program at HL: two bytes of 0.
 ;;; TODO is the 2nd 0 necessary?? -- there might be some scenario where
@@ -435,7 +476,6 @@ MARKEOP:xor a
         ld (hl), a
 
 ;;; Command loop
-;;; TODO it would be tidier and same code size to avoid the double fall-through
 MONITOR:rst RST_PRS
         defb CHR_CR
         defm "M5:"
@@ -445,21 +485,21 @@ MONITOR:rst RST_PRS
         call z, LIST
         cp 'I'
         jp z, INPUT
+        cp 'E'
+        jr z, EDIT
         cp 'R'
-        jr nz, NOTRUN
+        jr nz, MONITOR          ;ignore illegal entries
+
 ;;; fall-through to Run command: CR then start executing symbols at SOP
         rst RST_PRS
         defb CHR_CR, $00
-        ld ix, SOPM1
+        ld ix, SOP-1
         jr NEXTI
 
-NOTRUN: cp 'E'
-        jr nz, MONITOR
-;;; fall-through to Edit command
-        push ix
+EDIT:   push ix
         pop hl
 
-EDIT:   ld c, (hl)
+EDIT1:  ld c, (hl)
         ld (hl), $7F
         push hl
         ld a, c
@@ -476,7 +516,7 @@ EDLOP1: call ECHO
         cp $44
         jr z, DELETE
         cp CHR_CR
-        jr z, EDIT
+        jr z, EDIT1
         cp '>'
         jr nz, NOTRT
 ;;; > (right) sub-command of Edit command
@@ -499,26 +539,28 @@ EDLOP2: cp 'R'
 EDLOP3: call ECHO
         cp ';'
         jr z, EDLOP1
-        push hl
 
-EDLOP4: ld c, (hl)
-        ld (hl), a
+;;; insert the character in A into the program by copying the
+;;; program along in memory by 1 byte to make space. End of
+;;; program is detected as 1 byte of 0, but marked with 2
+;;; bytes of 0.
+        push hl                 ;remember edit point
+EDLOP4: ld c, (hl)              ;get current char
+        ld (hl), a              ;replace with new char
+        inc hl                  ;point to next
+        ld a, c                 ;current char into A
+        or a                    ;is current char end-of-program?
+        jr nz, EDLOP4           ;no, carry on copying
+        ld (hl), a              ;A=0. Store to mark end of program
         inc hl
-        ld a, c
-        or a
-        jr nz, EDLOP4
-        ld (hl), a
-        inc hl
-        ld (hl), a
+        ld (hl), a              ;and a second 0
         pop hl
-        inc hl
-        jr EDLOP3
+        inc hl                  ;point past for next insertion
+        jr EDLOP3               ;still in Edit/Insert so loop
 
 ;;; Rewind sub-command of Edit command
-;;; TODO the coding here is perverse! Loading with SOP+1 then decrementing! And can all be
-;;; eliminated by jumping to the start of the edit command.. save 6 bytes
-REWIND: ld hl, $0EFF
-        dec hl
+;;; go back to start of program
+REWIND: ld hl, SOP
         jr EDLOP1
 
 ;;; Delete sub-command of Edit command
@@ -551,10 +593,8 @@ NEXTLN: ld a, (hl)
 INPUT:  rst RST_PRS
         defm "nput"
         defb CHR_CR, $00
-        ld hl, SOPM1
-
+        ld hl, SOP-1
 INOK:   inc hl
-
 INBAK:  call ECHO
         cp ';'
         jp z, MARKEOP
@@ -564,12 +604,8 @@ INBAK:  call ECHO
         dec hl
         jr INBAK
 
-        ; Start of unknown area $0EEE to $0EEE
-        defb $D4
-        ; End of unknown area $0EEE to $0EEE
+;;; Look-up table for hex->decimal conversion
+;;; 1, 16-bit value for each of the 5 decimal output digits
+NUMTAB: defw 10000, 1000, 100, 10, 1
 
-
-        org $0EFE
 SOP:    equ $
-SOPM1:  equ SOP-1
-

@@ -52,7 +52,7 @@ and included a hex dump of the code.
 I have never seen the official M5 documentation but I assume that the article
 was a straight reproduction of that documentation.
 
-The article was concse and well-written but contained many, many transcription
+The article was concise and well-written but contained many, many transcription
 errors. Some, for example "A-7" when "A-Z" was intended, were easy to spot;
 others less so.
 
