@@ -1,6 +1,15 @@
 #!/bin/sh
 #
-# $1 is the program base-name
+# build m5a for NASBUG T2/T4 and for NAS-SYS 1/3
 #
 # expect to find z80asm (from https://www.nongnu.org/z80asm/index.html) on $PATH
-z80asm ${1}.asm -l${1}.lst -o${1}.bin
+# expect to find nascon in ../converters
+#
+z80asm nassys1.asm m5a.asm -lm5a_nassys.lst -om5a_nassys.bin
+../converters/nascon m5a_nassys.bin m5a_nassys.nas -org c80
+
+z80asm nassys0.asm m5a.asm -lm5a_nasbug.lst -om5a_nasbug.bin
+../converters/nascon m5a_nasbug.bin m5a_nasbug.nas -org c50
+
+##
+##z80asm ${1}.asm -l${1}.lst -o${1}.bin

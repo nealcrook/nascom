@@ -29,10 +29,10 @@
 ;;; memory scratch: none
 ;;;
 ;;; ========================================================
-;;; 0-> assemble for T2/T4   I/O at address $0c50
-;;; 1-> assemble for NAS-SYS I/O at address $0c80
-NASSYS: equ 1
-
+;;; 0-> assemble for NASBUG T2/T4 I/O at address $0c50
+;;; 1-> assemble for NAS-SYS 1/3  I/O at address $0c80
+;;; get definition from file nassys1.asm or nassys0.asm
+;;; NASSYS: equ 1
 
 ;;; ========================================================
 ;;; ========================================================
@@ -377,31 +377,16 @@ ERROR:  rst RST_PRS
 ;;; m = destination symbol
 ;;; Search for destination: first, search for label marker, then see if label symbol matches
 ;;; destination symbol.
-
-;;; TODO
-;;; at 0ddd 31 fa 0f correct? LD SP, $0FFA -- cannot be correct: it would clear the user stack
-;;; ..and to rather an odd value. But neither B1 nor 81 would work here, and code looks good
-;;; without this instruction.
-;;; I really don't know what this is doing here but it reminds me that this program never
-;;; sets the sp in normal operation; maybe it should do so on entry to the command loop.
-
-;;; TODO bug: when BRALAB does not match the destination symbol it branches back to BRA1. However,
-;;; HL is still pointing to the destination symbol that was checked. At BRA1 it gets tested to see
-;;; if it is a label marker. Therefore, if you had a label (( and it's not the first label in
-;;; the program the second ( will get treated as the label marker and the next symbol treated as the
-;;; label symbol. It's trivial to fix: change JP NZ below to JR to save 1 byte. In BRA1 move INC HL
-;;; to after the OR and label it BRA2. In BRALAB, insert INC HL and change the branch destination to BRA2.
-BRA:    ld c, (ix+$01)          ;fetch destination symbol
-        ld sp, $0FFA            ;TODO why??
+BRA:    ld c, (ix+$01)          ;destination symbol to search for
         ld hl, SOP
-        ld b, '('
+        ld b, '('               ;label marker
 
 BRA1:   ld a, (hl)
-        inc hl
         cp b
         jr z, BRALAB            ;found label marker
         or a
-        jp nz, BRA1             ;not reached end of program so continue search
+BRA2:   inc hl
+        jr nz, BRA1             ;not reached end of program so continue search
 
 ;;; found 0 (end of program) without finding branch destination. Skip past branch condition
 ;;; to destination symbol, then report error
@@ -411,12 +396,13 @@ BRA1:   ld a, (hl)
         defb $00
         jr ID
 
-;;; found label symbol. Does the destination symbol match?
-BRALAB: ld a, (hl)
+;;; found label marker. Does the destination symbol match?
+BRALAB: inc hl                  ;point to label symbol
+        ld a, (hl)              ;get label symbol
         cp c
-        jr nz, BRA1
+        jr nz, BRA2             ;no; look for next label marker
 
-;;; yes, found match. Point IX to the label symbol then continue with next symbol
+;;; yes; found match. Point IX to the destination symbol then continue with next symbol
         push hl
         pop ix
 
@@ -455,6 +441,12 @@ XXXNUM: sub $30
 ECHO:   INCH
         JOUTCH
 
+;;; Like ECHO but ignore backspace
+ECHOX:  INCH
+        cp CHR_BS
+        jr z,ECHOX
+        JOUTCH
+
 ;;; List command: display until end-of-program (indicated by 0)
 ;;; also, called as a subroutine from Edit loop.
 LIST:   rst RST_PRS
@@ -476,6 +468,9 @@ MARKEOP:xor a
         ld (hl), a
 
 ;;; Command loop
+;;; TODO: this program never sets the sp in normal operation; maybe it should
+;;; reset it on entry to the command loop.. otherwise programming errors that leave
+;;; stuff on the stack could gradually degrade the operation.
 MONITOR:rst RST_PRS
         defb CHR_CR
         defm "M5:"
@@ -496,6 +491,7 @@ MONITOR:rst RST_PRS
         ld ix, SOP-1
         jr NEXTI
 
+;;; Edit command
 EDIT:   push ix
         pop hl
 
@@ -512,7 +508,7 @@ EDIT1:  ld c, (hl)
         defm "E:"
         defb $00
 
-EDLOP1: call ECHO
+EDLOP1: call ECHOX
         cp $44
         jr z, DELETE
         cp CHR_CR
@@ -536,7 +532,7 @@ EDLOP2: cp 'R'
         cp 'I'
         jr nz, EDLOP1
 
-EDLOP3: call ECHO
+EDLOP3: call ECHOX
         cp ';'
         jr z, EDLOP1
 

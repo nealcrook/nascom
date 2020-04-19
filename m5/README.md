@@ -117,3 +117,11 @@ program (see Computing Today review).
 * m5.odt/m5.pdf/m5_lsg.pdf/mv_review.pdf - all refer to this version
 * dis_rom - scripted disassembly of the binary created from m5.nas
 * m5.asm - the result of running dis_rom on m5.nas
+
+# Modified Version
+
+* m5a.asm - tided up source code with a few optimisations and bug-fixes. Can be used to build NASBUG and NAS-SYS versions
+* m5a_nasbug.bin/.nas - built version for NASBUG T2/T4. Load and execute at 0xc50
+* m5a_nassys.bin/.nas - built version for NAS-SYS 1/3. Load and execute at 0xc80
+* m5a.odt/.pdf - revised documentation for this modified version
+* build - script to rebuild m5a.asm
