@@ -1,0 +1,5 @@
+#!/bin/sh
+
+
+# -pfileline=1
+iverilog -Wall -Winfloop -Wno-timescale -Wno-implicit-dimensions -o nas2_vid_tb timescale.v nas2_vid_tb.v nas2_vid.v sn74ls157.v sn74ls163.v sn74ls30.v sn74ls123.v sn74ls00.v sn74ls04.v sn74ls20.v sn74ls11.v sn74ls32.v sn74ls165.v sn81ls97.v sn74ls273.v mcm6576.v prom_n2v.v eprom2716.v mk4118.v sn74ls74.v dp8304.v sn74ls10.v sn74ls13.v sn74ls14.v sn74ls193.v sn74ls161.v
