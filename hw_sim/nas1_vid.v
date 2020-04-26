@@ -1,6 +1,6 @@
 // Verilog netlist for video circuit of nascom1
 
-module nas1_vid
+module nas_vid
 (
  output       clk_cpu,
  output       to_ic32_p12,
@@ -484,16 +484,20 @@ module nas1_vid
     // misc
     sn74ls04 ic6 // Actually S04 not LS
       (//Out
-       .p6 (carry4_n),
        .p2 (div6_n),
        .p4 (div7_n),
+       .p6 (carry4_n),
        .p8 (div16_n),
+       .p10 (),
+       .p12 (),
 
        //In
-       .p5 (carry4),
        .p1 (div6),
        .p3 (div7),
-       .p9 (div16)
+       .p5 (carry4),
+       .p9 (div16),
+       .p11(),
+       .p13()
        );
 
 endmodule // nas1_vid

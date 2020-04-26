@@ -19,10 +19,6 @@ module nas_vid
  // TODO no reset input.. will need to add one.
  );
 
-    // Make portlist match between N1 and N2
-    wire      vram_n;
-    assign vram_n = vdusel_n;
-
 
     // TODO hack: break feedback loop of latches to aid debug
     // (forced from test-bench)
@@ -38,8 +34,8 @@ module nas_vid
     wire [7:0] vdu_d;
     wire [9:0] mux_a;
 
-    wire [6:0] chr_a;
-    wire [6:0] chr_d;
+    wire [7:0] chr_a;
+    wire [7:0] chr_d;
     wire [3:0] chr_rs;
     wire       chr_rs3_n;
 
@@ -62,11 +58,15 @@ module nas_vid
     wire       set_n, clr_n;
     wire       vdu_a_clk, vdu_line_clk, vdu_line_clk_n, vdu_addr_clr_n;
 
-//    wire       div9, div10, div11, div12, div13, div14, div15, div16;
-//    wire       div16_n, div6_n, div7_n;
-//    wire       carry1, carry2, carry3, carry4, carry4_n;
-//    wire       av_set, av_clr, ah_set, ah_clr;
-//    wire       vdu_wr_n, vdu_rd_n;
+    // Make portlist match between N1 and N2
+    wire      vram_n;
+    assign vram_n = vdusel_n;
+
+    // Make internal probed node match between N1 and N2
+    // TODO rename to match N1 if behavour/polarity is correct
+    wire      active_v;
+    assign active_v = vblank;
+
 
     // On the real board there is a jumper for selecting this
     assign clk_cpu = clk_2mhz;
@@ -75,6 +75,7 @@ module nas_vid
     sn74ls193 ic49 // clock divider
       (// Out
        .p13 (clk_xx),
+       .p12 (),
        .p7 (clk_1mhz),
        .p6 (clk_2mhz),
        .p2 (clk_4mhz),
@@ -259,11 +260,11 @@ module nas_vid
        .p9_ci1 (chr_rs[1]), // LSW11: chr_rs[1] for 14 rows (625 line). 1'b1 for 12 rows (525 line)
        .p10_ci2 (chr_rs[2]),
        .p11_ci3 (chr_rs[3]),
-
+       //
        .p3_bi1 (),
        .p4_bi2 (),
        .p5_bi3 (),
-
+       //
        .p1_ai1 (),
        .p2_ai2 (),
        .p13_ai3 ()
@@ -332,6 +333,7 @@ module nas_vid
     // divider TODO names above or on ic line? Inconsistent on N1
     sn74ls193 ic68
       (// Out
+       .p13 (),
        .p12 (vdu_a_clk), // TODO name
        .p7 (vdu_a[9]),
        .p6 (vdu_a[8]),
@@ -379,8 +381,6 @@ module nas_vid
        );
 
 
-    assign vdu_a[7] = div13;
-    assign vdu_a[6] = div12;
     assign vdu_a[5] = div7;
     assign vdu_a[4] = div6;
     assign vdu_a[3] = div5;
@@ -476,9 +476,8 @@ module nas_vid
        );
 
 
-
     // Video RAM read data path to CPU
-    dp8304 ic28
+    dp8304 ic70
       (// In/Out
        .p8  (vdu_d[7]), // note weird ordering
        .p1  (vdu_d[0]),
@@ -497,14 +496,14 @@ module nas_vid
        .p15 (cpu_d[4]),
        .p14 (cpu_d[5]),
        .p13 (cpu_d[6]),
-       //
+       // In
        .p11_dir  (), // TODO
        .p9_g     ()  // /OE
        );
 
 
     // Video RAM read data path to char generator
-    sn74ls273 ic17
+    sn74ls273 ic67
       (// Out
        .p2  (chr_a[6]), // Weird ordering so 6:0 match N1.
        .p5  (chr_a[5]),
@@ -527,6 +526,9 @@ module nas_vid
        .p11 (clk_1mhz_pulse), // clk
        .p1  (1'b1)            // clr
        );
+
+
+    assign alph_n = chr_a[7];
 
 
     sn74ls14 ic11
@@ -596,9 +598,5 @@ module nas_vid
        .cs_n    (graphics_n),
        .oe_n    (graphics_n)
        );
-
-
-    
-
 
 endmodule // nas_vid
