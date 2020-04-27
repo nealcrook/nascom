@@ -38,6 +38,14 @@ present the netlist and models in case anyone wants to develop the idea further.
 * other *.v files are (simple) verilog models of the components that make up the video
   sub-system.
 
+## TODO/Futures
+
+The counters have an "initial" statement in them to establish the count at time 0. It
+would be better to put a 'force' into the test-bench as it would be more apparent what is
+going on..
+
+Search for CHEAT and CHEATING in the code.
+
 ## Overview
 
 A couple of things to note: Firstly, this is only a functional (logical)

@@ -53,10 +53,9 @@ module nas_vid
 
     wire       s1, s2;
     wire       carry1, carry2;
-    wire       clk_1mhz_pulse;
     wire       chr_rst;
     wire       set_n, clr_n;
-    wire       vdu_a_clk, vdu_line_clk, vdu_line_clk_n, vdu_addr_clr_n;
+    wire       vdu_a_clk, vdu_line_clk, vdu_line_clk_n;
 
     // Make portlist match between N1 and N2
     wire      vram_n;
@@ -203,7 +202,7 @@ module nas_vid
 
        // In
        .p1  (1'b1),
-       .p2  (clk_1mhz_pulse),
+       .p2  (clk_xx),
        .p3  (1'b0),
        .p4  (1'b0),
        .p5  (1'b0),
@@ -224,7 +223,7 @@ module nas_vid
 
        // In
        .p1  (1'b1),
-       .p2  (clk_1mhz_pulse),
+       .p2  (clk_xx),
        .p3  (1'b0),
        .p4  (1'b0),
        .p5  (1'b0),
@@ -247,7 +246,11 @@ module nas_vid
        .p2  (div7_n),
        .p7  (1'b1),
        .p9  (1'b1),
-       .p10 (1'b1)
+       .p10 (1'b1),
+       .p3  (1'b1), // TODO no connection shown on N2 schematic. Floating to 1? or wired??
+       .p4  (1'b1), // TODO no connection shown on N2 schematic. Floating to 1? or wired??
+       .p5  (1'b1), // TODO no connection shown on N2 schematic. Floating to 1? or wired??
+       .p6  (1'b1)  // TODO no connection shown on N2 schematic. Floating to 1? or wired??
        );
 
 
@@ -345,7 +348,7 @@ module nas_vid
        .p5 (chr_rs3_n),
        .p9 (1'b1),
        .p10 (1'b0),
-       .p11 (vdu_a_clr_n),
+       .p11 (vdu_a_clr_n), // /LOAD
        .p15 (1'b1),
        .p14 (1'b0)
        );
@@ -354,15 +357,20 @@ module nas_vid
     // Divide by 2
     sn74ls74 ic13
       (// Out
-       .p9_q    (vdu_line_clk), // TODO name
-       .p8_qn   (vdu_line_clk_n),
-       // TODO other pair
-
+       .p5_q1    (),
+       .p6_q1_n  (),
+       .p9_q2    (vdu_line_clk), // TODO name
+       .p8_q2_n  (vdu_line_clk_n),
        // In
-       .p11_clk (vdu_a_clk),
-       .p12_d   (vdu_line_clk_n),
-       .p13_r_n (vdu_addr_clr_n), // TODO name
-       .p10_s_n (1'b1)
+       .p3_clk1 (),
+       .p2_d1   (),
+       .p1_r1_n (),
+       .p4_s1_n (),
+       //
+       .p11_clk2 (vdu_a_clk),
+       .p12_d2   (vdu_line_clk_n),
+       .p13_r2_n (vdu_a_clr_n), // TODO name
+       .p10_s2_n (1'b1)
        );
 
 
@@ -370,7 +378,7 @@ module nas_vid
     prom_n2v ic59
       (//Out
        .d1 (vblank), //TODO maybe
-       .d0 (), // has 330pF to ground. Why?
+       .d0 (vdu_a_clr_n), // has 330pF to ground. Why? TODO schematic is ambiguous.. connected to 7474 R etc?
 
        .ce_n (1'b0),
        .a4 (vdu_line_clk),
@@ -479,8 +487,8 @@ module nas_vid
     // Video RAM read data path to CPU
     dp8304 ic70
       (// In/Out
-       .p8  (vdu_d[7]), // note weird ordering
-       .p1  (vdu_d[0]),
+       .p8  (vdu_d[7]), // port A
+       .p1  (vdu_d[0]), // note weird ordering
        .p2  (vdu_d[1]),
        .p3  (vdu_d[2]),
        .p4  (vdu_d[3]),
@@ -488,7 +496,7 @@ module nas_vid
        .p6  (vdu_d[5]),
        .p7  (vdu_d[6]),
        //
-       .p12 (cpu_d[7]),
+       .p12 (cpu_d[7]), // port B
        .p19 (cpu_d[0]),
        .p18 (cpu_d[1]),
        .p17 (cpu_d[2]),
@@ -497,8 +505,8 @@ module nas_vid
        .p14 (cpu_d[5]),
        .p13 (cpu_d[6]),
        // In
-       .p11_dir  (), // TODO
-       .p9_g     ()  // /OE
+       .p11_dir  (), // 1 => A->B 0 => B->A
+       .p9_cd    ()  // 1 => tristate all outputs
        );
 
 
@@ -523,7 +531,7 @@ module nas_vid
        .p17 (vdu_d[0]),
        .p18 (vdu_d[7]),
        //
-       .p11 (clk_1mhz_pulse), // clk
+       .p11 (clk_char_ld), // clk
        .p1  (1'b1)            // clr
        );
 
@@ -564,7 +572,7 @@ module nas_vid
        .p7_a1   (chr_rs[1]),
        .p8_a0   (chr_rs[0]),
        //
-       .vpp     (),
+       .vpp     (1'b1),
        .cs_n    (alph_n),
        .oe_n    (alph_n)
        );
@@ -594,7 +602,7 @@ module nas_vid
        .p7_a1   (chr_rs[1]),
        .p8_a0   (chr_rs[0]),
        //
-       .vpp     (),
+       .vpp     (1'b1),
        .cs_n    (graphics_n),
        .oe_n    (graphics_n)
        );

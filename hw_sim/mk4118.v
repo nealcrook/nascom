@@ -26,7 +26,12 @@ module mk4118
    input oe_n
    );
 
-    initial $display("%m not yet modelled!!");
+    wire [7:0] d_i;
+    // for now, just model 1 output value
+    assign d_i = 8'b0000_0000;
+
+    assign {d7, d6, d5, d4, d3, d2, d1, d0} = (!oe_n & !oe_n) ? d_i : 8'hzz;
+
 endmodule // mk4118
 
 
