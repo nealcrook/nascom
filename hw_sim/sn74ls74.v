@@ -17,6 +17,15 @@ module sn74ls74
    input      p10_s2_n
    );
 
+    // CHEATING
+    initial begin
+        p5_q1 <= 1'b0;
+        p6_q1_n <= 1'b1;
+        p9_q2 <= 1'b0;
+        p8_q2_n <= 1'b1;
+    end
+
+
     always @(posedge p3_clk1 or negedge p1_r1_n or negedge p4_s1_n) begin
         if ((p1_r1_n == 1'b0) && (p4_s1_n == 1'b0)) begin
             $display("%0t - %m section1 set and reset asserted together: next-state is indeterminate",$time);

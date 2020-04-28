@@ -49,7 +49,7 @@ module nas_vid
     wire       vram_stg1;
     wire       vdu_a_clr_n;
     wire       alph_n, graphics_n;
-    wire       hblank, hblank_n, vblank;
+    wire       hblank, hblank_n, vblank_n;
 
     wire       s1, s2;
     wire       carry1, carry2;
@@ -64,7 +64,7 @@ module nas_vid
     // Make internal probed node match between N1 and N2
     // TODO rename to match N1 if behavour/polarity is correct
     wire      active_v;
-    assign active_v = vblank;
+    assign active_v = !vblank_n;
 
 
     // On the real board there is a jumper for selecting this
@@ -313,17 +313,39 @@ module nas_vid
     // RS latch
     sn74ls00 ic60
       (// Out
-       .p3(hblank), // TODO
-       .p6(hblank_n),
+       .p3(hblank_n), // TODO
+       .p6(hblank),
        .p8(),
        .p11(),
 
        // In
        .p1(set_n),
-       .p2(hblank_n),
+       .p2(hblank),
 
-       .p4(hblank),
+       .p4(hblank_n),
        .p5(clr_n),
+
+       .p9(),
+       .p10(),
+
+       .p12(),
+       .p13()
+       );
+
+    // combine horizontal and vertical blanking
+    sn74ls08 ic8
+      (// Out
+       .p3(blanking_n),
+       .p6(),
+       .p8(),
+       .p11(),
+
+       // In
+       .p1(hblank_n), // TODO??
+       .p2(vblank_n),
+
+       .p4(),
+       .p5(),
 
        .p9(),
        .p10(),
@@ -377,7 +399,7 @@ module nas_vid
     // PROM used as decoder
     prom_n2v ic59
       (//Out
-       .d1 (vblank), //TODO maybe
+       .d1 (vblank_n),
        .d0 (vdu_a_clr_n), // has 330pF to ground. Why? TODO schematic is ambiguous.. connected to 7474 R etc?
 
        .ce_n (1'b0),
@@ -478,9 +500,9 @@ module nas_vid
        .a1 (mux_a[1]),
        .a0 (mux_a[0]),
        //
-       .ce_n (), // TODO
-       .we_n (),
-       .oe_n ()
+       .ce_n (1'b0),
+       .we_n (1'b1), // TODO driven low during CPU write
+       .oe_n (1'b0)  // TODO driven high to allow CPU write
        );
 
 
@@ -505,8 +527,8 @@ module nas_vid
        .p14 (cpu_d[5]),
        .p13 (cpu_d[6]),
        // In
-       .p11_dir  (), // 1 => A->B 0 => B->A
-       .p9_cd    ()  // 1 => tristate all outputs
+       .p11_dir  (1'b0), // 1 => A->B 0 => B->A        // TODO controlled from CPU
+       .p9_cd    (1'b1)  // 1 => tristate all outputs  // TODO controlled from CPU
        );
 
 
@@ -532,7 +554,7 @@ module nas_vid
        .p18 (vdu_d[7]),
        //
        .p11 (clk_char_ld), // clk
-       .p1  (1'b1)            // clr
+       .p1  (1'b1)         // /clr
        );
 
 

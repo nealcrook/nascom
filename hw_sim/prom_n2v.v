@@ -19,20 +19,20 @@ module prom_n2v
     assign a = {a4, a3, a2, a1, a0};
 
     always @(a) begin
-        case (d_i)
-          // read off the listing in the Nascom 2 hardware manual
-          0: d_i = 2'b01;
-          1: d_i = 2'b00;
-          2: d_i = 2'b11;
-          3: d_i = 2'b11;
+        case (a)
+          // read off the listing in the NASCOM 2 hardware manual
+          0:  d_i = 2'b01;
+          1:  d_i = 2'b00;
+          2:  d_i = 2'b11;
+          3:  d_i = 2'b11;
 
-          4: d_i = 2'b11;
-          5: d_i = 2'b11;
-          6: d_i = 2'b11;
-          7: d_i = 2'b11;
+          4:  d_i = 2'b11;
+          5:  d_i = 2'b11;
+          6:  d_i = 2'b11;
+          7:  d_i = 2'b11;
 
-          8: d_i = 2'b11;
-          9: d_i = 2'b11;
+          8:  d_i = 2'b11;
+          9:  d_i = 2'b11;
           10: d_i = 2'b11;
           11: d_i = 2'b01;
 

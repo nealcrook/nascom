@@ -21,6 +21,11 @@ module sn74ls161
     reg [3:0] count;
     assign {p11, p12, p13, p14} = count;
 
+    // CHEATING
+    initial begin
+        count <= 4'b0000;
+    end
+
     always @(negedge p1 or posedge p2) begin
         if (p1 == 1'b0) begin
             // Async /CLR
