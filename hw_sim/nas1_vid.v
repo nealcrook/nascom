@@ -26,8 +26,9 @@ module nas_vid
     // Debug only! Video frame starts with line 15 then goes through lines 0-14.
     wire [3:0] vdu_line;
     assign vdu_line = vdu_a[9:6];
-
-
+    // Debug only! Divider chain - I did not name this sensibly
+    wire [16:0] div;
+    assign div = {div16, div15, div14, div13, div12, div10, div9, div8, div7, div6, div5, div4, div3, div2, 1'b0, 1'b0};
 
     wire [9:0] vdu_a;
     wire [7:0] vdu_d;
@@ -46,7 +47,7 @@ module nas_vid
     wire       div9, div10, div11, div12, div13, div14, div15, div16;
     wire       div16_n, div6_n, div7_n;
     wire       carry1, carry2, carry3, carry4, carry4_n;
-    wire       av_set, av_clr, ah_set, ah_clr;
+    wire       av_set, av_clr, ah_set, ah_clr; // TODO these should all be _n
     wire       vdu_wr_n, vdu_rd_n;
 
     // On the real board there is a jumper for selecting this

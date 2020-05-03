@@ -40,32 +40,26 @@ module nas_vid
     wire       chr_rs3_n;
 
     wire       clk_1mhz, clk_2mhz, clk_4mhz, clk_8mhz;
-    wire       clk_xx, clk_char_shift, clk_char_ld;
+    wire       clk_1mhz_pulse, clk_char_shift, clk_char_ld;
     wire       vid_shift_data;
     wire       div2, div3, div4, div5, div6, div6_n, div7, div7_n;
 
     wire       blanking_n;
     wire       vram_acc_n;
     wire       vram_stg1;
-    wire       vdu_a_clr_n;
+    wire       vsync_trigger_n;
     wire       alph_n, graphics_n;
-    wire       hblank, hblank_n, vblank_n;
+    wire       active_h_n, active_h, active_v;
 
-    wire       s1, s2;
+    wire       hsync, vsync;
     wire       carry1, carry2;
-    wire       chr_rst;
-    wire       set_n, clr_n;
+    wire       row_count_rst_n;
+    wire       ah_set_n, ah_clr_n;
     wire       vdu_a_clk, vdu_line_clk, vdu_line_clk_n;
 
     // Make portlist match between N1 and N2
     wire      vram_n;
     assign vram_n = vdusel_n;
-
-    // Make internal probed node match between N1 and N2
-    // TODO rename to match N1 if behavour/polarity is correct
-    wire      active_v;
-    assign active_v = !vblank_n;
-
 
     // On the real board there is a jumper for selecting this
     assign clk_cpu = clk_2mhz;
@@ -73,7 +67,7 @@ module nas_vid
 
     sn74ls193 ic49 // clock divider
       (// Out
-       .p13 (clk_xx),
+       .p13 (clk_1mhz_pulse),
        .p12 (),
        .p7 (clk_1mhz),
        .p6 (clk_2mhz),
@@ -130,9 +124,9 @@ module nas_vid
        .p6_bo  (),
        .p12_ao (vid_data),
        // In
-       .p9_ci1 (s2),
+       .p9_ci1 (hsync),
        .p10_ci2 (1'b1),
-       .p11_ci3 (s1),
+       .p11_ci3 (vsync),
 
        .p3_bi1 (),
        .p4_bi2 (),
@@ -168,15 +162,14 @@ module nas_vid
 
 
     // Monostable to generate video blanking
-    // TODO Calculate delays
     // Expect: hsync is 4.7us
     // vsync is ~10h
     // dly1 is associated with p1 trigger, dly2 with p10 trigger
     sn74ls123 #(.dly1(3700), .dly2(246750)) ic57
       (// Out
-       .p4  (s2),
+       .p4  (hsync),
        .p5  (),
-       .p12 (s1),
+       .p12 (vsync),
        .p13 (),
 
        // In
@@ -186,7 +179,7 @@ module nas_vid
        .p2  (1'b1),
        .p3  (1'b1),
        .p9  (1'b0),
-       .p10 (vdu_a_clr_n), // TODO name
+       .p10 (vsync_trigger_n),
        .p11 (1'b1)
        );
 
@@ -202,7 +195,7 @@ module nas_vid
 
        // In
        .p1  (1'b1),
-       .p2  (clk_xx),
+       .p2  (clk_1mhz_pulse),
        .p3  (1'b0),
        .p4  (1'b0),
        .p5  (1'b0),
@@ -223,7 +216,7 @@ module nas_vid
 
        // In
        .p1  (1'b1),
-       .p2  (clk_xx),
+       .p2  (clk_1mhz_pulse),
        .p3  (1'b0),
        .p4  (1'b0),
        .p5  (1'b0),
@@ -242,9 +235,9 @@ module nas_vid
        .p11 (chr_rs[3]),
 
        // In
-       .p1  (chr_rst), // TODO polarity
-       .p2  (div7_n),
-       .p7  (1'b1),
+       .p1  (row_count_rst_n), // This is so fast that it's not visible on the waves
+       .p2  (div7_n),          // ..just see the counter reset after 14 rows ie it goes
+       .p7  (1'b1),            // 01..9ABCD<reset>01..89ABDCD<reset>01..
        .p9  (1'b1),
        .p10 (1'b1),
        .p3  (1'b1), // TODO no connection shown on N2 schematic. Floating to 1? or wired??
@@ -256,7 +249,7 @@ module nas_vid
 
     sn74ls10 ic44
       (// Out
-       .p8_co  (chr_rst),
+       .p8_co  (row_count_rst_n),
        .p6_bo  (),
        .p12_ao (),
        // In
@@ -294,8 +287,8 @@ module nas_vid
     // Gate to decode set/reset control
     sn74ls13 ic55
       (// Out
-       .p6  (set_n),
-       .p8  (clr_n),
+       .p6  (ah_set_n),
+       .p8  (ah_clr_n),
 
        // In
        .p1  (div5),
@@ -313,17 +306,17 @@ module nas_vid
     // RS latch
     sn74ls00 ic60
       (// Out
-       .p3(hblank_n), // TODO
-       .p6(hblank),
+       .p3(active_h),
+       .p6(active_h_n),
        .p8(),
        .p11(),
 
        // In
-       .p1(set_n),
-       .p2(hblank),
+       .p1(ah_set_n),
+       .p2(active_h_n),
 
-       .p4(hblank_n),
-       .p5(clr_n),
+       .p4(active_h),
+       .p5(ah_clr_n),
 
        .p9(),
        .p10(),
@@ -332,7 +325,7 @@ module nas_vid
        .p13()
        );
 
-    // combine horizontal and vertical blanking
+    // combine horizontal and vertical active time
     sn74ls08 ic8
       (// Out
        .p3(blanking_n),
@@ -341,8 +334,8 @@ module nas_vid
        .p11(),
 
        // In
-       .p1(hblank_n), // TODO??
-       .p2(vblank_n),
+       .p1(active_h),
+       .p2(active_v),
 
        .p4(),
        .p5(),
@@ -354,8 +347,10 @@ module nas_vid
        .p13()
        );
 
+    wire      vsync_trigger_n_filtered;
+    assign    #4 vsync_trigger_n_filtered = vsync_trigger_n;
 
-    // divider TODO names above or on ic line? Inconsistent on N1
+
     sn74ls193 ic68
       (// Out
        .p13 (),
@@ -370,7 +365,7 @@ module nas_vid
        .p5 (chr_rs3_n),
        .p9 (1'b1),
        .p10 (1'b0),
-       .p11 (vdu_a_clr_n), // /LOAD
+       .p11 (vsync_trigger_n_filtered), // /LOAD
        .p15 (1'b1),
        .p14 (1'b0)
        );
@@ -391,7 +386,7 @@ module nas_vid
        //
        .p11_clk2 (vdu_a_clk),
        .p12_d2   (vdu_line_clk_n),
-       .p13_r2_n (vdu_a_clr_n), // TODO name
+       .p13_r2_n (vsync_trigger_n),
        .p10_s2_n (1'b1)
        );
 
@@ -399,8 +394,8 @@ module nas_vid
     // PROM used as decoder
     prom_n2v ic59
       (//Out
-       .d1 (vblank_n),
-       .d0 (vdu_a_clr_n), // has 330pF to ground. Why? TODO schematic is ambiguous.. connected to 7474 R etc?
+       .d1 (active_v),
+       .d0 (vsync_trigger_n), // has 330pF to ground. Why? TODO schematic is ambiguous.. connected to 7474 R etc?
 
        .ce_n (1'b0),
        .a4 (vdu_line_clk),

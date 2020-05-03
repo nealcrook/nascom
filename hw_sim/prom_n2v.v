@@ -21,7 +21,10 @@ module prom_n2v
     always @(a) begin
         case (a)
           // read off the listing in the NASCOM 2 hardware manual
-          0:  d_i = 2'b01;
+          //           /  /reset pulse to line counter
+          //           |
+          //           |/ /vblank
+          0:  d_i = 2'b01; // VDU Line 0
           1:  d_i = 2'b00;
           2:  d_i = 2'b11;
           3:  d_i = 2'b11;
@@ -31,7 +34,7 @@ module prom_n2v
           6:  d_i = 2'b11;
           7:  d_i = 2'b11;
 
-          8:  d_i = 2'b11;
+          8:  d_i = 2'b11; // VDU Line 8
           9:  d_i = 2'b11;
           10: d_i = 2'b11;
           11: d_i = 2'b01;

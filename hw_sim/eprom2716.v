@@ -29,7 +29,7 @@ module eprom2716
 
     wire [7:0] d_i;
     // for now, just model 1 output value
-    assign d_i = 8'b1010_1010;
+    assign d_i = 8'b1001_0011;
 
     assign {p17_d7, p16_d6, p15_d5, p14_d4, p13_d3, p11_d2, p10_d1, p9_d0} = (!oe_n & !cs_n) ? d_i : 8'hzz;
 

@@ -48,6 +48,7 @@ module nas_vid_tb
 
     integer i;
     initial begin
+        $timeformat(-9, 3, "ns", 20);
         $dumpfile("nas1_vid_tb.vcd");
         $dumpvars(0,nas_vid_tb);
         for (i = 1; i<10; i=i+1) begin
@@ -60,7 +61,7 @@ module nas_vid_tb
 
     always @(posedge u_nas_vid.active_v) begin
         if (frame_start != 0) begin
-            $display("Frame period is %t ns",$time - frame_start);
+            $display("Frame period is %t",$time - frame_start);
         end
         frame_start = $time;
     end

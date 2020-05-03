@@ -48,19 +48,25 @@ module nas_video_tb
 
     integer i;
     initial begin
+        $timeformat(-9, 3, "ns", 20);
         $dumpfile("nas2_vid_tb.vcd");
         $dumpvars(0,nas_video_tb);
         for (i = 1; i<10; i=i+1) begin
             $display("%d..", i);
-            #40000000;
+            #10000000;
         end
         $display("End");
         $finish();
     end
 
-    always @(posedge u_nas_vid.active_v) begin
+    // This signal is glitchy. Need to filter it in order
+    // to detect and report the frame periof correctly.
+    wire      active_v_filtered;
+    assign    #4 active_v_filtered = u_nas_vid.active_v;
+
+    always @(posedge active_v_filtered) begin
         if (frame_start != 0) begin
-            $display("Frame period is %t ns",$time - frame_start);
+            $display("Frame period is %t",$time - frame_start);
         end
         frame_start = $time;
     end
