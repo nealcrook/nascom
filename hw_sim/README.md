@@ -390,6 +390,7 @@ excessive CPU access to video RAM causes the blanking pulses to be noticable,
 particularly on a display where many pixels are lit. A simple test program that
 accesses the video RAM can show this:
 
+````
   0c80   3a 00 08  ld a, (£0800)
   0c83   32 00 08  ld (£0800), a
   0c86   00        nop
@@ -399,6 +400,7 @@ accesses the video RAM can show this:
   0c8a   00        nop
   0c8b   00        nop
   0c8c   c3 80 0c  jp £0c80
+````
 
 When executed, black stripes appear on the screen.
 
