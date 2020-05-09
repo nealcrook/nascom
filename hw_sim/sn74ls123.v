@@ -1,6 +1,13 @@
 `timescale 1ns/1ps
 `celldefine
 // dual retriggerable one-shot
+//
+// for C>1000pF, R in kohm, C in pF,
+// pulse in ns is 0.28 * R * C * (1 + 0.7/R)
+//
+// for C<1000pF, the delay is a non-linear function
+// of capacitance and delay and needs to be read
+// from a graph in the data-sheet.
 module sn74ls123
   #( parameter dly1 = 10000, dly2 = 10000)
 
