@@ -193,10 +193,6 @@ character is shifted out of the shift register.
 
 ## NASCOM 2 simulation waveforms
 
-As of April 2020 this is a Coronavirus Lockdown work-in-progress project. The N2
-sim is just about working but with some bugs. Hassle me to make progress if you
-are interested!
-
 The NASCOM 2 video design is software compatible with the NASCOM 1. Its
 implementation is slightly different (it uses a small PROM as a logic decoder to
 reduce the component count). Functionally, there are two differences:
@@ -521,9 +517,8 @@ access.
 time 0. It would be better to put a 'force' into the test-bench as it would be
 more apparent what is going on (search for CHEAT and CHEATING in the code).
 
-* Describe CPU accesss to video RAM and discuss the shortcomings of CPU
-contention mitigation which causes white snow on the NASCOM 1 and black snow(??)
-on the NASCOM 2.
+* Expand N1 description to cover the shortcomings of CPU contention mitigation
+which causes white snow.
 
 * Rework the N1 waves to make them clearer, and explain/debug the issue with
 shift register load.
