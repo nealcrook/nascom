@@ -16,7 +16,9 @@ the NASCOM 1 video schematic, created models of the components and ran an RTL
 simulation. I used the open-source "Icarus Verilog" simulator and the
 open-source GTKWave viewing tool.
 
-Some time later, I did the same with the NASCOM 2 video schematic.
+Some time later, I did the same with the NASCOM 2 video schematic. For the
+NASCOM 2 design, I wanted to understand the function of the N2V PROM and the
+circuit that blanks the video during a CPU access.
 
 I present some .pdf files that show the video timing in gory detail. I also
 present the netlists and models in case anyone wants to develop the idea further.
@@ -108,7 +110,7 @@ The simulation test bench reports the frame period, which stabilises at 19968us
 
 The black regions of the waveform show signals that are toggling too quickly for
 all the transitions to be visible at this zoom level. The shaded regions (on
-active_v) show a signal in an undefined state; it takes the av_set pulse to
+"active_v") show a signal in an undefined state; it takes the "av_set" pulse to
 bring this latch into a known state.
 
 The three "count" busses are the internal counters of the divider chain formed
@@ -208,83 +210,70 @@ reduce the component count). Functionally, there are two differences:
   objectionable but not ideal; in the limit, executing code from the VDU RAM
   caused the screen to be permanently blanked.
 
-Successive pictures 'zoom in' to parts of the frame:
+Successive pictures 'zoom in' to different parts of the frame:
 
 * doc/n2startup_frames.pdf    -- shows the 50 frame/second timing for 2 frame-times
-* doc/n2single_frame.pdf      -- shows the timing for the active part of a single frame
-* doc/n2single_line.pdf       -- shows the timing for one output line, 16 scan-lines
 * doc/n2single_scanline.pdf   -- shows the timing for one scan-line
+* doc/n2single_line.pdf       -- shows the timing for one output line, 14 scan-lines
+* doc/n2single_frame.pdf      -- shows the timing for the active part of a single frame
 * doc/n2hblank_to_7chars.pdf  -- shows the start of one scan-line
 * doc/n214chars_to_hblank.pdf -- shows the end of one scan-line
 
 ### n2startup_frames.pdf
 
-Two section of IC65 forms a crystal oscillator running at a frequency of
-16MHz. This is divided by IC49 to generate clocks at 8MHz, 4MHz, 2MHz and 1MHz,
-each with a nominal 50/50 duty cycle. A LSW selects between 2MHz and 4MHz clocks
-for the CPU clock.
+This picture shows 2 complete video frame times (active and blanking). The black
+regions of the waveform show signals that are toggling too quickly for all the
+transitions to be visible at this zoom level.
 
-"clk_8mhz" is used as the dot clock and clocks the video shift register, IC65.
+All the remaining pictures show the same set of signals, zooming in to show
+different detail.
 
-"clk_1mhz_pulse" has a short, low-going pulse at a 1MHz rate. It is used to
-clock the dividers for the video timing chain.
+Follow the schematic as you read these notes and look at the waveforms. Inspect
+n2_vid.v and see how it relates to the schematic. Trace signal names from the
+waveform to n2_vid.v and mark them up on your schematic; this will give you the
+best chance of following the descriptions here.
 
-IC71a combines the 1, 2, 4 and 8MHz clocks together to generate "clk_char_ld"
-which has a short low-going pulse at a 1MHz rate (later waveforms show the
-relationship between "clk_1mhz_pulse" and "clk_char_ld"). This is used to load
-the video shift register, IC65.
+Everything starts with the crystal XT1, centre-right on the schematic. Two
+section of IC65 forms a crystal oscillator running at a frequency of 16MHz. The
+oscillator output, "clk" blocks IC49 which is configured as a down-counter.
 
-IC51, IC52, IC53, IC68 form a divider chain that times a frame's active and
-blanking time. The period of "vblank_n" shows the frame period. The simulation
-test bench reports this period, which stabilises at 19712us (50.73Hz).
+IC49 to generates outputs at 8MHz, 4MHz, 2MHz and 1MHz, each with a nominal
+50/50 duty cycle, and "clk_1mhz_pulse" which is normally high but with a
+low-going pulse at a 1MHz rate. A LSW selects between 2MHz and 4MHz clocks for
+the CPU clock.
 
-The falling edge of "vsync_trigger_n" triggers monostable IC57 to generate
-"vsync", the vertical sync pulse to the vdu.
+"clk_8mhz" is used as the dot (pixel) clock and clocks the video shift register,
+IC65.
 
-The black regions of the waveform show signals that are toggling too quickly for
-all the transitions to be visible at this zoom level.
+Each character is 8 dots (bits) wide. The 8 bits are read from one of the
+character generators IC54, IC66 and loaded into IC65. IC65 must be loaded every
+8 dot-times, ie at clk_8mhz/8.
 
-### n2single_frame.pdf
+IC65 is loaded by "clk_char_ld". IC71a combines the 1, 2, 4 and 8MHz clocks
+together to generate this signal, which has a short low-going pulse at a 1MHz
+rate (later waveforms show the relationship between "clk_1mhz_pulse" and
+"clk_char_ld").
 
-"active_v" shows the active part of 1 frame (i.e., everything apart from
-vertical blanking). "active_h" shows the active part of each scan-line in the
-frame (and therefore there should be 16 lines * 14 scan-lines of them within a
-frame).
-
-"vdu_line" is the part of the address that defines the output line that is being
-read from the video RAM. This bus counts from f (15) through 0 and up to e
-during the active part of the frame, with the result that "line 16" is at the
-top of the frame, as on the NASCOM 1.
-
-TODO more about how the counters work and the role of the PROM.
-
-### n2single_line.pdf
-
-Shows one output line of characters, made up of 14 scan-lines. When "vdu_line"
-has a value of f, the top line of the frame is being generated. "chr_rs" counts
-from 0 through d, generating the row selects into the character
-generator. "active_v" asserts and remains asserted because this is the start of
-a video frame. "active_h" pulses high 14 times; once for each scan-line.
-"vid_shift_data" is the output of the shift register, IC65. It is combined with
-"active_h" and "active_v" in IC61a to generate "vid_data" which is the video
-data for the display: there are 14 bursts of activity, one for each scan-line of
-the output.
 
 ### n2single_scanline.pdf
 
-Shows one scan line. "vdu_line" is f and "chr_rs" is 0, showing that this is the
-first scan-line at the top of the frame; this is confirmed by seeing "active_v"
-assert.
+Shows one scan line. "vdu_line" is 0xf and "vdu_rs" is 0, showing that this is
+the first scan-line of the top line of the frame; this is confirmed by seeing
+"active_v" assert.
 
-The falling edge of "div7" triggers monostable IC57 to generate "hsync", the
-horizontal sync pulse to the vdu. "hsync" is combined with "vsync" in IC61c to
-generate "vid_sync" to the video output and video modulator. The voltage swing
-distinguishes sync from video, and the pulse width distinguishes horizontal from
-vertical sync pulses.
+IC51 and IC52 are clocked by "clk_1mhz_pulse" to generate a 6-bit counter
+"vdu_chr". This counts one line time. It is used to address 64 successive
+locations in the video RAM, IC50, via address MUX IC62, IC63. 48 of the
+locations are displayed, 16 are hidden.
 
-"active_h" is generated from a set/reset latch IC60a,b. The latch is set by
-"ah_set_n" and cleared by "ah_clr_n" which are decodes of timing chain count
-values, generated by IC55a,b.
+Decodes formed by IC55, IC56 generate set and reset pulses to the RS latch
+formed by IC60. IC60/3 is "active_h" (or, to think of its inverse, /HBLANK). As
+"vdu_chr" counts from 0 to 0x3f (63), the latch is set ("ah_set_n") as the count
+goes to 0xc (12) and cleared ("ah_clr_n") as the count goes to 0x3c (60) ao that
+"active_h" is asserted for a count of 48.
+
+Each time "vdu_chr" wraps from 0x3f..0, the high->low transition of the count
+MSB triggers IC57/1 to generate "hsync", the horizontal sync pulse to the vdu.
 
 "clk_char_ld" pulses once per character. The resolution's a bit low, but it
 should be possible to see:
@@ -296,27 +285,116 @@ period of "active_h"
 
 * (of which) 48 pulses occur while "active_h" is high
 
-Remember, the operation of the video RAM, character generator etc. continues
-through horizontal blanking; it's simply not visible because it's gated out of
-"vid_data".
+
+### n2single_line.pdf
+
+Starts at the same point as n2single_scanline.pdf but zooms out to show one
+output line of characters, made up of 14 scan-lines.
+
+"vdu_line" is 0xf and "vdu_chr" is counting too quickly to be readable at this
+resolution. "vdu_rs" is counting from 0 to 0xd (13), to count out the 14
+scanlines of the top line of characters. As "vdu_rs" wraps from 0xd to 0,
+"vdu_line" counts from 0xf to 1, the start of the second line of output.
+
+IC53 and IC44c generate "vdu_rs". Each time "vdu_chr" wraps from 0x3f..0, the
+high->low transition of the count MSB is inverted to generate a rising edge on
+the clock input, IC43/2. When the count value reaches 14 (or 12, depending upon
+the setting of LSW1/6) the counter is asynchronously cleared by "rs_rst_n". That
+means the count value of 0xe (14) only persists for a short time (related to
+gate delays - the reset pulse is truncated by its effect of resetting the count)
+so that the count value appears to go from 0xd to 0.
+
+"vdu_rs" is used to address one-of-16 rows within the character generator
+ROMs, to build up successive scan lines for a line of characters.
+
+### n2single_frame.pdf
+
+Starts at the same point as n2single_line.pdf but zooms out to show one full
+frame, made up of 16 lines of characters, each made up of 14 scan-lines.
+
+"vdu_chr" and "vdu_rs" are counting too quickly to be readable at this
+resolution. "vdu_line" counts from 0xf through 0 to 0xe for the 16 lines of the
+active part of the display, then counts 0xf, 0x0, 0xb, 0xc, 0xd, 0xe for the
+vertical blanking time. When it transitions from 0xe to 0xf this is the start of
+the active region of the next frame.
+
+The counters for this final part of the frame timing are formed by IC68, IC13b
+and the N2V PROM.
+
+IC68 is clocked using the same trick as IC53: when vid_rs is reset, the
+high->low transition of the count MSB is inverted to generate a rising edge on
+IC68/5. With no interference, the counter would count modulo 16.
+
+As the counter IC68 wraps from 0xf to 0, its carry output clocks IC13/b which is
+configured as a divide-by-2. The 4 bits of "vdu_line" are enough to count the
+active part of the video frame. The addition of the extra counter bit from the
+divide-by-2 provides the range to be able to count both the active and the
+blanking part of the video frame. However, as the waveforms show, it's not
+simply the case that this extra bit indicates active/blanking, it's a bit more
+complicated.. I named this extra bit from the divide-by-2 "vdu_line_hi" (I made
+up this name but I am not happy with it).
+
+"vdu_line" is used to address 16 successive groups of locations in the video
+RAM, IC50, via address MUX IC64.
+
+"vdu_line", and a fifth bit "vdu_line_hi" address the N2V PROM. This PROM acts
+as a decoder or look-up table. It has 8 outputs but only 2 are used/shown on the
+circuit diagram.
+
+The outputs of the PROM are shown as "active_v" (/VBLANK on the schematic) and
+"vsync_trigger_n". "active_v" is easy to describe: it is high for the 16
+character lines that form the active part of the display. "vsync_trigger_n" is
+more subtle, and it's best to inspect the contents of file "prom_n2v.v" to
+understand its operation (there are additional comments in that file).
+
+During the active part of the frame, "vdu_line" transitions from 0->1 with
+"vdu_line_hi"=1. During the blanking part of the frame, "vdu_line" transitions
+from 0->1 and "vdu_line_hi"=0, the PROM decodes a 0 on "vsync_trigger_n". This
+generates an asynchronous pulse on the /LOAD input of IC68 -- similar to the way
+in which the decode of vdu_rs reset IC53.
+
+The D/C/B/A inputs of IC53 are hard-wired to 0b1011 (11) and so the /LOAD pulse
+sets the count value to 0xb. Just as for IC53, the load is asynchronous and
+fast, and the change in the count value causes the /LOAD pulse to release; the
+waveforms show a very short pulse on "vsync_trigger_n".
+
+Aborting the "vdu_line" count in this way is the final step in establishing the
+video frame timing. The period of "active_v" shows the frame period. The
+simulation test bench reports this period, which stabilises at 19712us
+(50.73Hz).
+
+The falling edge of "vsync_trigger_n" triggers monostable IC57/10 to generate
+"vsync", the vertical sync pulse to the vdu.
+
+"vsync" and "hsync" are combined in IC61. The combined signal, "vid_sync" goes
+through R69 to the modulator/video output. The voltage swing distinguishes sync
+from video, and the pulse width distinguishes horizontal from vertical sync
+pulses.
+
+N2VPROM looks like an expensive solution to a trivial logic decode problem.
+
 
 ### n2hblank_to_7chars.pdf
 
-Zooms in further to the start of the first scan line. As before, "vdu_line" is
-f, "chr_rs" is 0, "active_v" asserts. The first visible character for line 16
-comes from video RAM address 0x0bca. The base address of the video RAM is 0x800,
-so address 0x0bca corresponds to address 0x3ca in the video RAM, IC50. Pins
-A[9:6] of the RAM select the line of the display (0-15) and pins A[5:0] select
-the charactor on the line (0-63).
+Now that we've seen the whole frame, we're zooming in again, to see the start of
+the first active scan line. See "active_v" assert, "vdu_line" is 0xf, "vdu_rs"
+is 0, "vdu_chr" is zero.
 
-Observe the value 0x3ca on "mux_a". Where the value changes from 0x3ca to 0x3cb,
-the data from the RAM, on chr_d (the ASCII code for the first character to be
-displayed) is clocked into IC67 on the rising edge of "clk_char_ld". The output,
-"chr_a" is used as part of the address for the character generator ROMs.
+The documentation shows that the first visible character for line 16 comes from
+video RAM address 0x0bca. The base address of the video RAM is 0x800, so address
+0x0bca corresponds to address 0x3ca in the video RAM, IC50. Pins A[9:6] of the
+RAM select the line of the display (0-15) and pins A[5:0] select the charactor
+on the line (0-63).
+
+The value on "mux_a" is the concatenation of "vdu_line" and "vdu_chr" so it's
+value starts at 0x3c0 and increments. When the value changes from 0x3ca to
+0x3cb, the data from the RAM, on chr_d (the ASCII code for the first character
+to be displayed) is clocked into IC67 on the rising edge of "clk_char_ld". The
+output, "chr_a" is used as part of the address for the character generator ROMs.
 
 "chr_a[7]" (from bit[7] of the byte stored in the video RAM) selects between the
 alphanumerics character generator ROM and the NAS-GRA ROM. For each 2Kbyte ROM,
-the 4-bit "chr_rs" is connected to the low-order address lines to select one of
+the 4-bit "vdu_rs" is connected to the low-order address lines to select one of
 16 rows (though only 14 are used). "chr_a[6:0]" provide the other 7 address
 lines, selecting one of 128 characters in the particular ROM.
 
@@ -332,17 +410,28 @@ from the character generator. So, the 0x93 is serialised MSB first, as 10010011.
 In the simulation models, the output from the character generator is a constant
 0x55 pattern, giving 3 high-pulses on "vid_data" for each output character.
 
+The process of addressing the video RAM and generating a serial video stream
+goes on continuously, including during horizontal blanking and vertical blanking
+times. It is the signals active_h, active_v which inhibit (in IC61a)
+"vid_shift_data" to generate the "blanked" signal, "vid_data" which goes to the
+modulator/video output.
+
+
 ### n2char_pipeline.pdf
 
 Zooms in further to show the pipeline from the first visible character being
 addressed, to that characters data coming out of the shift register.
+
 
 ### n214chars_to_hblank.pdf
 
 Shows the end of the first scan line. The value 0x3f9 on "mux_a" corresponds to
 the (first scan-line of the) last character on line 16, and the same pipe-line
 occurs as before, so that "active_h" goes low after the last dot of the
-character is shifted out of the shift register.
+character is shifted out of the shift register. At the end of the line, "mux_a"
+wraps from 0x3ff to 0x3c0 - it cycles back over the same sequence of video RAM
+addresses in order to generate the next scan line for this line of characters.
+
 
 ## Z80 access to video RAM (no .pdf for this)
 
@@ -382,8 +471,9 @@ corruption and the output of the video RAM IC50 and the associated data
 corruption at the output of the shift register IC65. The pulse width of IC58a
 should correspond to 8 bit-times.
 
-TODO in practise, both of those times are longer than I would expect to be
-necessary. Strictly, the best times are a function of the CPU frequency.
+(By inspection on my hardware, both of those times are longer than I would
+expect to be necessary. Strictly, the best times are a function of the CPU
+frequency.
 
 This part of the design fixes the "white snow" effect seen on the NASCOM 1 but
 excessive CPU access to video RAM causes the blanking pulses to be noticable,

@@ -24,20 +24,18 @@ module nas_vid
     // (forced from test-bench)
 //    wire      allow_feedback;
 
-    // Debug only! Video frame starts with line 15 then goes through lines 0-14.
+    // Video frame starts with line 15 then goes 0..14.
     wire [3:0] vdu_line;
-    assign vdu_line = vdu_a[9:6];
-
-
-
-    wire [9:0] vdu_a;
+    // Video row goes 0..12 or 0..14 for each line
+    wire [3:0] vdu_rs;
+    // Video character goes 0..63 on each line
+    wire [5:0] vdu_chr;
+    wire       vdu_rs3_n;
     wire [7:0] vdu_d;
     wire [9:0] mux_a;
 
     wire [7:0] chr_a;
     wire [7:0] chr_d;
-    wire [3:0] chr_rs;
-    wire       chr_rs3_n;
 
     wire       clk_1mhz, clk_2mhz, clk_4mhz, clk_8mhz;
     wire       clk_1mhz_pulse, clk_char_shift, clk_char_ld;
@@ -53,9 +51,9 @@ module nas_vid
 
     wire       hsync, vsync;
     wire       carry1, carry2;
-    wire       row_count_rst_n;
+    wire       rs_rst_n;
     wire       ah_set_n, ah_clr_n;
-    wire       vdu_a_clk, vdu_line_clk, vdu_line_clk_n;
+    wire       vdu_a_clk, vdu_line_hi, vdu_line_hi_n;
 
     // Make portlist match between N1 and N2
     wire      vram_n;
@@ -226,16 +224,18 @@ module nas_vid
        .p10 (carry1)
        );
 
+    wire      del_rs_rst_n;
+    delay u_d1(.z(del_rs_rst_n), .a(rs_rst_n));
 
     sn74ls161 ic53
       (//Out
-       .p14 (chr_rs[0]),
-       .p13 (chr_rs[1]),
-       .p12 (chr_rs[2]),
-       .p11 (chr_rs[3]),
+       .p14 (vdu_rs[0]),
+       .p13 (vdu_rs[1]),
+       .p12 (vdu_rs[2]),
+       .p11 (vdu_rs[3]),
 
        // In
-       .p1  (row_count_rst_n), // This is so fast that it's not visible on the waves
+       .p1  (del_rs_rst_n),    // Without delay it's instant on the waves
        .p2  (div7_n),          // ..just see the counter reset after 14 rows ie it goes
        .p7  (1'b1),            // 01..9ABCD<reset>01..89ABDCD<reset>01..
        .p9  (1'b1),
@@ -249,13 +249,13 @@ module nas_vid
 
     sn74ls10 ic44
       (// Out
-       .p8_co  (row_count_rst_n),
+       .p8_co  (rs_rst_n),
        .p6_bo  (),
        .p12_ao (),
        // In
-       .p9_ci1 (chr_rs[1]), // LSW11: chr_rs[1] for 14 rows (625 line). 1'b1 for 12 rows (525 line)
-       .p10_ci2 (chr_rs[2]),
-       .p11_ci3 (chr_rs[3]),
+       .p9_ci1 (vdu_rs[1]), // LSW11: vdu_rs[1] for 14 rows (625 line). 1'b1 for 12 rows (525 line)
+       .p10_ci2 (vdu_rs[2]),
+       .p11_ci3 (vdu_rs[3]),
        //
        .p3_bi1 (),
        .p4_bi2 (),
@@ -271,13 +271,13 @@ module nas_vid
     // 2 parts of this are used for the 16MHz oscillator, not modelled here
     sn74ls04 ic56 // Actually S04 not LS
       (//Out
-       .p6 (chr_rs3_n),
+       .p6 (vdu_rs3_n),
        .p2 (div6_n),
        .p4 (div7_n),
        .p8 (),
 
        //In
-       .p5 (chr_rs[3]),
+       .p5 (vdu_rs[3]),
        .p1 (div6),
        .p3 (div7),
        .p9 ()
@@ -347,25 +347,24 @@ module nas_vid
        .p13()
        );
 
-    wire      vsync_trigger_n_filtered;
-    assign    #4 vsync_trigger_n_filtered = vsync_trigger_n;
-
+    wire      del_vsync_trigger_n;
+    delay u_d2(.z(del_vsync_trigger_n), .a(vsync_trigger_n));
 
     sn74ls193 ic68
       (// Out
        .p13 (),
        .p12 (vdu_a_clk), // TODO name
-       .p7 (vdu_a[9]),
-       .p6 (vdu_a[8]),
-       .p2 (vdu_a[7]),
-       .p3 (vdu_a[6]),
+       .p7 (vdu_line[3]),
+       .p6 (vdu_line[2]),
+       .p2 (vdu_line[1]),
+       .p3 (vdu_line[0]),
        // In
        .p4 (1'b1),
        .p1 (1'b1),
-       .p5 (chr_rs3_n),
+       .p5 (vdu_rs3_n),
        .p9 (1'b1),
        .p10 (1'b0),
-       .p11 (vsync_trigger_n_filtered), // /LOAD
+       .p11 (del_vsync_trigger_n), // /LOAD
        .p15 (1'b1),
        .p14 (1'b0)
        );
@@ -376,8 +375,8 @@ module nas_vid
       (// Out
        .p5_q1    (),
        .p6_q1_n  (),
-       .p9_q2    (vdu_line_clk), // TODO name
-       .p8_q2_n  (vdu_line_clk_n),
+       .p9_q2    (vdu_line_hi),
+       .p8_q2_n  (vdu_line_hi_n),
        // In
        .p3_clk1 (),
        .p2_d1   (),
@@ -385,7 +384,7 @@ module nas_vid
        .p4_s1_n (),
        //
        .p11_clk2 (vdu_a_clk),
-       .p12_d2   (vdu_line_clk_n),
+       .p12_d2   (vdu_line_hi_n),
        .p13_r2_n (vsync_trigger_n),
        .p10_s2_n (1'b1)
        );
@@ -394,24 +393,30 @@ module nas_vid
     // PROM used as decoder
     prom_n2v ic59
       (//Out
+       .d7 (), // d6..d2c unused and not shown on schematic
+       .d6 (),
+       .d5 (),
+       .d4 (),
+       .d3 (),
+       .d2 (),
        .d1 (active_v),
        .d0 (vsync_trigger_n), // has 330pF to ground. Why? TODO schematic is ambiguous.. connected to 7474 R etc?
 
        .ce_n (1'b0),
-       .a4 (vdu_line_clk),
-       .a3 (vdu_a[9]),
-       .a2 (vdu_a[8]),
-       .a1 (vdu_a[7]),
-       .a0 (vdu_a[6])
+       .a4 (vdu_line_hi),
+       .a3 (vdu_line[3]),
+       .a2 (vdu_line[2]),
+       .a1 (vdu_line[1]),
+       .a0 (vdu_line[0])
        );
 
 
-    assign vdu_a[5] = div7;
-    assign vdu_a[4] = div6;
-    assign vdu_a[3] = div5;
-    assign vdu_a[2] = div4;
-    assign vdu_a[1] = div3;
-    assign vdu_a[0] = div2;
+    assign vdu_chr[5] = div7;
+    assign vdu_chr[4] = div6;
+    assign vdu_chr[3] = div5;
+    assign vdu_chr[2] = div4;
+    assign vdu_chr[1] = div3;
+    assign vdu_chr[0] = div2;
 
     // Address mux
     sn74ls157 ic62
@@ -422,13 +427,13 @@ module nas_vid
        .p12_o4 (mux_a[0]),
        // In
        .p2_a1 (cpu_a[3]),
-       .p3_b1 (vdu_a[3]),
+       .p3_b1 (vdu_chr[3]),
        .p5_a2 (cpu_a[2]),
-       .p6_b2 (vdu_a[2]),
+       .p6_b2 (vdu_chr[2]),
        .p11_a3 (cpu_a[1]),
-       .p10_b3 (vdu_a[1]),
+       .p10_b3 (vdu_chr[1]),
        .p14_a4 (cpu_a[0]),
-       .p13_b4 (vdu_a[0]),
+       .p13_b4 (vdu_chr[0]),
        .p1_sel (vram_n),
        .p15_enable_n (1'b0)
        );
@@ -441,9 +446,9 @@ module nas_vid
        .p12_o4 (),
        // In
        .p2_a1 (cpu_a[5]),
-       .p3_b1 (vdu_a[5]),
+       .p3_b1 (vdu_chr[5]),
        .p5_a2 (cpu_a[4]),
-       .p6_b2 (vdu_a[4]),
+       .p6_b2 (vdu_chr[4]),
        .p11_a3 (), // TODO are these really floating?
        .p10_b3 (),
        .p14_a4 (),
@@ -460,13 +465,13 @@ module nas_vid
        .p12_o4 (mux_a[6]),
        // In
        .p2_a1 (cpu_a[9]),
-       .p3_b1 (vdu_a[9]),
+       .p3_b1 (vdu_line[3]),
        .p5_a2 (cpu_a[8]),
-       .p6_b2 (vdu_a[8]),
+       .p6_b2 (vdu_line[2]),
        .p11_a3 (cpu_a[7]),
-       .p10_b3 (vdu_a[7]),
+       .p10_b3 (vdu_line[1]),
        .p14_a4 (cpu_a[6]),
-       .p13_b4 (vdu_a[6]),
+       .p13_b4 (vdu_line[0]),
        .p1_sel (vram_n),
        .p15_enable_n (1'b0)
        );
@@ -584,10 +589,10 @@ module nas_vid
        .p2_a6   (chr_a[2]),
        .p3_a5   (chr_a[1]),
        .p4_a4   (chr_a[0]),
-       .p5_a3   (chr_rs[3]),
-       .p6_a2   (chr_rs[2]),
-       .p7_a1   (chr_rs[1]),
-       .p8_a0   (chr_rs[0]),
+       .p5_a3   (vdu_rs[3]),
+       .p6_a2   (vdu_rs[2]),
+       .p7_a1   (vdu_rs[1]),
+       .p8_a0   (vdu_rs[0]),
        //
        .vpp     (1'b1),
        .cs_n    (alph_n),
@@ -614,10 +619,10 @@ module nas_vid
        .p2_a6   (chr_a[2]),
        .p3_a5   (chr_a[1]),
        .p4_a4   (chr_a[0]),
-       .p5_a3   (chr_rs[3]),
-       .p6_a2   (chr_rs[2]),
-       .p7_a1   (chr_rs[1]),
-       .p8_a0   (chr_rs[0]),
+       .p5_a3   (vdu_rs[3]),
+       .p6_a2   (vdu_rs[2]),
+       .p7_a1   (vdu_rs[1]),
+       .p8_a0   (vdu_rs[0]),
        //
        .vpp     (1'b1),
        .cs_n    (graphics_n),

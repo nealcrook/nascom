@@ -1,0 +1,71 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Wed May 13 07:49:39 2020
+[*]
+[dumpfile] "/home/crook/retro/nascom/hw_sim/nas2_vid_tb.vcd"
+[dumpfile_mtime] "Tue May 12 20:02:11 2020"
+[dumpfile_size] 92313682
+[savefile] "/home/crook/retro/nascom/hw_sim/n2_signals.gtkw"
+[timestart] 17592980000
+[size] 1571 1011
+[pos] -1 -1
+*-19.243101 -1 17855041250 32191041250 37567041250 51903041250 17919031250 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] nas_video_tb.
+[treeopen] nas_video_tb.u_nas_vid.
+[sst_width] 197
+[signals_width] 150
+[sst_expanded] 1
+[sst_vpaned_height] 291
+@28
+nas_video_tb.u_nas_vid.clk
+nas_video_tb.u_nas_vid.clk_8mhz
+nas_video_tb.u_nas_vid.clk_4mhz
+@29
+nas_video_tb.u_nas_vid.clk_2mhz
+@28
+nas_video_tb.u_nas_vid.clk_1mhz
+nas_video_tb.u_nas_vid.clk_1mhz_pulse
+nas_video_tb.u_nas_vid.clk_char_ld
+nas_video_tb.u_nas_vid.div2
+nas_video_tb.u_nas_vid.div3
+nas_video_tb.u_nas_vid.div4
+nas_video_tb.u_nas_vid.div5
+nas_video_tb.u_nas_vid.div6
+nas_video_tb.u_nas_vid.div7
+@22
+nas_video_tb.u_nas_vid.vdu_line[3:0]
+nas_video_tb.u_nas_vid.vdu_rs[3:0]
+@28
+nas_video_tb.u_nas_vid.rs_rst_n
+@800022
+nas_video_tb.u_nas_vid.vdu_chr[5:0]
+@28
+(0)nas_video_tb.u_nas_vid.vdu_chr[5:0]
+(1)nas_video_tb.u_nas_vid.vdu_chr[5:0]
+(2)nas_video_tb.u_nas_vid.vdu_chr[5:0]
+(3)nas_video_tb.u_nas_vid.vdu_chr[5:0]
+(4)nas_video_tb.u_nas_vid.vdu_chr[5:0]
+(5)nas_video_tb.u_nas_vid.vdu_chr[5:0]
+@1001200
+-group_end
+@28
+nas_video_tb.u_nas_vid.vdu_a_clk
+nas_video_tb.u_nas_vid.vdu_line_hi
+nas_video_tb.u_nas_vid.vsync_trigger_n
+nas_video_tb.u_nas_vid.ah_set_n
+nas_video_tb.u_nas_vid.ah_clr_n
+nas_video_tb.u_nas_vid.active_h
+nas_video_tb.u_nas_vid.active_v
+nas_video_tb.u_nas_vid.blanking_n
+nas_video_tb.u_nas_vid.hsync
+nas_video_tb.u_nas_vid.vsync
+nas_video_tb.u_nas_vid.vid_data
+nas_video_tb.u_nas_vid.vid_shift_data
+nas_video_tb.u_nas_vid.vid_sync
+@22
+nas_video_tb.u_nas_vid.mux_a[9:0]
+nas_video_tb.u_nas_vid.chr_d[7:0]
+@28
+nas_video_tb.u_nas_vid.clk_char_ld
+[pattern_trace] 1
+[pattern_trace] 0
