@@ -15,15 +15,16 @@ to run the UART as fast as it and NAS-SYS can go. The current design runs at
 ## Contents
 
 * photos/         -- photos of the hardware and of SERBOOT in operation
-* doc/            -- not yet done
 * NAScas.ino      -- the C code for the Arduino (includes wiring instructions)
 * messages.h      -- "
-* roms.h          -- "
 * parser.ino      -- "
+* roms.h          -- "
 
 See also:
 
 * nascom/host_programs/ which contains associated Z80 code for the NASCOM.
+* nascom/sdcard/nascom_sdcard/docs which contains a full manual, schematics and other documentation
+
 
 ## CAS format
 
@@ -63,8 +64,8 @@ NAScas>
 
 You can issue a command, followed by <ENTER>. There are 2 ways to exit the command loop and return to NAS-SYS:
 
-* Terminate a command with a period, "." (followed by <ENTER>)
-* Enter a period, "." by itself on a line (followed by <ENTER>)
+* Terminate a command with a period, "." (followed by \<ENTER\>)
+* Enter a period, "." by itself on a line (followed by \<ENTER\>)
 
 
 ## Usage Paradigm
