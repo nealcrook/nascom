@@ -136,8 +136,8 @@ TO xxxx - relocate program to specified address.
 
 ````
 DF - directory of Flash
-DV - directory of virtual disk (with pager). Error if no virtual disk mounted.
-DS - directory of SDcard (with pager). Error if no SDcard present.
+DV - directory of virtual disk (with per-screen pager). Error if no virtual disk mounted.
+DS - directory of SDcard (with per-screen pager). Error if no SDcard present.
 ````
 
 ````
@@ -158,6 +158,11 @@ RV <file.xx> - cue file for reading from virtual disk. File can have any legal P
 if illegal file name. Error if no SDcard present. Error if no virtual disk mounted. Error if file not found.
 RS <file.xxx> - cue file for reading from SDcard. File can have any legal DOS 8.3 name. Error if illegal
 file name. Error if no SDcard present. Error if file not found.
+````
+
+````
+WS <file.xxx> - cue file for writing to SDcard. File can have any legal DOS 8.3 name. Error if illegal
+file name. Error if no SDcard present.
 ````
 
 ````
@@ -218,6 +223,15 @@ N                                            -- back to normal command handling
 Z                                            -- back to BASIC
 CSAVE "A"                                    -- save encoded file as HANGMAN.CAS
 ````
+
+## MSDOS FAT (8.3) Filenames
+
+To save space in the Arduino image, the FAT filesystem is configured to only
+support "8.3" filenames, not the "long filenames" associated with the vfat
+extension. "8.3" filenames must use uppercase characters. If you have files with
+mixed or lower-case names they will appear as uppercase but some NAScas commands
+will ignore them. The best way to avoid confusion is to stick with upper-case
+names.
 
 
 ## Hardware
