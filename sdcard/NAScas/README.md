@@ -63,8 +63,8 @@ NAScas>
 
 You can issue a command, followed by <ENTER>. There are 2 ways to exit the command loop and return to NAS-SYS:
 
-1/ terminate a command with a period, "." (followed by <ENTER>)
-2/ enter a period, "." by itself on a line (followed by <ENTER>)
+* Terminate a command with a period, "." (followed by <ENTER>)
+* Enter a period, "." by itself on a line (followed by <ENTER>)
 
 
 ## Usage Paradigm
