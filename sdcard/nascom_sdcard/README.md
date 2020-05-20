@@ -5,9 +5,33 @@ nascom_sdcard is a project to provide SDcard-based storage for a NASCOM.
 My initial motivation was to provide a way to dump disk images from the machine,
 and so I wanted to minimise the complexity and footprint on the NASCOM itself.
 
-I used off-the-shelf hardware as much as possible. I used 3 circuit boards. The
-baseboard is an Arduino Uno -- these are cheap, easy to develop for and run at
-5V which makes them ideal for interfacing to old TTL/NMOS logic.
+The final design connects to the NASCOM Z80-PIO and acts as a virtual floppy
+disk drive, running the PolyDos operating system.
+
+## Contents
+
+* nascom_sdcard.ino -- the C code for the Arduino (includes wiring instructions)
+* photos/           -- photos of the assembled board sandwich
+* doc/              -- description of the protocol and the command-set, a full manual, schematics
+
+See also:
+
+* nascom/sdcard/host_programs/ which contains associated Z80 code for the NASCOM. A "library" of subroutines and some example programs for using them.
+* nascom/PolyDos/ which contains PolyDos disk images and documentation
+
+
+## Hardware
+
+The easiest way to build this is to use the PCB that I designed (contact me to
+see if I still have spares). The PCB is common between the NAScas design and the
+nascom_sdcard design. The PCB uses an Arduino nano and a tiny daughter-card that
+holds the SDcard socket and level shifters/power regulation so that it can
+connect to 5V; both of these are available from EBay/Banggood/Aliexpress.
+BangGood.
+
+My prototype used 3 circuit boards. The baseboard is an Arduino Uno -- these are
+cheap, easy to develop for and run at 5V which makes them ideal for interfacing
+to old TTL/NMOS logic.
 
 The second board is an Arduino prototyping card from BangGood. This is cheap but
 not ideal; there are some errors on the board (see notes below).
@@ -36,30 +60,14 @@ The CASDSK utility is complete. Multiple application disk images are present in 
 PolyDos/libs area. Construction details updated to show how to power the Arduino from
 the NASCOM.
 
+20May2020 - polydos_vfs is complete.
+
 Remaining tasks:
 
-* Complete polydos_vfs, a PERL-based file-system manipulator
 * Write SDSTDIN, to allow import of (eg BASIC) programs in ASCII format
 * Write a print spooler that spools to a file on the SD card
-
-
-## EPROM programming service
-
-If anyone is looking to build one of these and has an EPROM that they need
-erasing and programming, I will be happy to do this on a cost-of-postage
-basis. Contact me to make arrangements.
-
-
-## Contents
-
-* nascom_sdcard.ino -- the C code for the Arduino (includes wiring instructions)
-* photos/           -- photos of the assembled board sandwich
-* doc/              -- description of the protocol and the command-set
-
-See also:
-
-* nascom/host_programs/ which contains associated Z80 code for the NASCOM. A "library" of subroutines and some example programs for using them.
-* nascom/PolyDos/ which contains PolyDos disk images and documentation
+* Create a NASCOM ROM to interface NASDOS to this hardware
+* Merge the nascom_sdcard and NAScas code-bases so that you can connect to PIO and/or UART with the same board.
 
 
 ## Construction
@@ -107,4 +115,28 @@ Arduino (otherwise you will short the power rails).
 
 * The power tracks marked "GND" and "5V" are randomly wrong. Buzz each one out
   to see what it connects to before using it!
+
+## First Boot
+
+You need an EPROM on the NASCOM. The code is in
+nascom/sdcard/host_programs/polydos_util_rom.asm and suitable base addresses are
+0xd000 and 0xd800 -- there are pre-built binaries at each of those start
+addresses and you can use nascom/converters/nascon to convert the binary to
+other formats (eg, .hex .nas) to suit your programmer.
+
+Next, you need an FAT-formatted SDcard. The code expects to find disk images
+named DSK0.BIN, DSK1.BIN, DSK2.BIN, DSK3.BIN, which will be drives 0-3
+respectively. At least one of them must be bootable. I recommend that you copy
+all of the images from nascom/PolyDos/lib onto your SDcard, then make a copy of
+PD000.BIN as DSK0.BIN and copy three other images for the other disks. From
+PolyDos, use the SDDIR and SETDRV utilities to inspect the SDcard and mount
+different disk images.
+
+All the files should be copied to the root directory of the SDcard.
+
+
+### EPROM programming service
+
+If you want an EPROM erased and programmed with this code, I will be happy to do
+this on a cost-of-postage basis. Contact me to make arrangements.
 

@@ -236,10 +236,16 @@ names.
 
 ## Hardware
 
-As for nascom_sdcard, I used off-the-shelf hardware as much as possible. I used
-3 circuit boards. The baseboard is an Arduino Uno -- these are cheap, easy to
-develop for and run at 5V which makes them ideal for interfacing to old TTL/NMOS
-logic.
+The easiest way to build this is to use the PCB that I designed (contact me to
+see if I still have spares). The PCB is common between the NAScas design and the
+nascom_sdcard design. The PCB uses an Arduino nano and a tiny daughter-card that
+holds the SDcard socket and level shifters/power regulation so that it can
+connect to 5V; both of these are available from EBay/Banggood/Aliexpress.
+BangGood.
+
+My prototype used 3 circuit boards. The baseboard is an Arduino Uno -- these are
+cheap, easy to develop for and run at 5V which makes them ideal for interfacing
+to old TTL/NMOS logic.
 
 The second board is an Arduino prototyping card from BangGood. This is cheap but
 not ideal; there are some errors on the board (see notes below).
@@ -249,8 +255,8 @@ and level shifters/power regulation so that it can connect to 5V; also from
 BangGood.
 
 The daughtercard is attached to the prototyping card using double-sided sticky
-pads. A (shrouded, polarised) 16-way connector connects to the NASCOM Serial connector using
-ribbon cable. The interface connects to:
+pads. A (shrouded, polarised) 16-way connector connects to the NASCOM Serial
+connector using ribbon cable. The interface connects to:
 
 * Transmit clock
 * Receive clock
