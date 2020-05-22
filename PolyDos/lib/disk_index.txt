@@ -12,8 +12,8 @@ PD000 -- PolyDos 2 System disk and SDcard utilities
    0022 0001 c200 c200 L        Info.IN               "
    0023 0001 c800 0000 L        BSfh.OV               "
    0024 0010 b000 b000 L        BSdr.BR               "
-   0034 0005 1000 1000          FORMAT.GO             " DO NOT USE WITH SDCARD
-   0039 0003 1000 1000          BACKUP.GO             " DO NOT USE WITH SDCARD
+   0034 0005 1000 1000          FORMAT.GO             " NOTE1
+   0039 0003 1000 1000          BACKUP.GO             " NOTE1
    003c 0004 1000 1000          SZAP.GO               "
    0040 0016 1000 1000          PZAP.GO               "
    0056 0005 0000 0000          SYSEQU.SY             "
@@ -39,6 +39,17 @@ PD000 -- PolyDos 2 System disk and SDcard utilities
    01c4 0001 0c80 0c80          SD_RD1.GO             SD code to read file from SDcard to RAM
    01c5 0001 0000 0000          SDOFF.GO              SD utility to disable SDcard so that PIO can be used for something else
    01c6 0002 1000 1000          SCRAPE.GO             SD utility to scrape PolyDos disk to SDcard
+   01c3 0004 1000 1000          FORMAT3.GO            PolyDos NOTE2
+   01c7 0003 1000 1000          BACKUP3.GO            PolyDos NOTE2
+   01ca 0004 1000 1000          NUBLO.GO              Software for GM808 EPROM programmer
+   01ce 0008 0000 0000          VID80.TX              Source code for VID80.GO
+   01d6 0001 9000 9000          VID80.GO              Switch to 80-column video on MAP80 VFC board
+
+NOTE1: nascom_sdcard does not require the use of these PolyDos utilities. If you run them, they will
+(attempt to) talk to your disk drive hardware directly; useful if you do want to create physical
+magnetic media. These are the version for PolyDos 2 (and so they expect 35-track DS SD/DD drives).
+
+NOTE2: These are the versions for PolyDos3 (and so they expect 80-track SS DD drives).
 
 --------------------------------------------------------------------------------------
 PD100 -- Languages
