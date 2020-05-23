@@ -18,6 +18,9 @@ use the same set of subroutines and the subroutines are at the start of the
 program so that, having typed in one program, that part does not need to be
 retyped in order to run one of the other two programs.
 
+The read and write test programs use a hard-coded filename (NAS000.BIN) but
+the name can be patched in memory if required.
+
 
 ## ROMs
 
@@ -41,30 +44,39 @@ E DFF4 1000 800
 Calculate and report a checksum of the 800 (hex) bytes starting at address 1000 (hex).
 
 ````
-E DFF7 1000 1234
+E DFF7 1000 34
 ````
 
 Read file from SDcard into memory starting at address 1000 (hex). The transfer
-size is equal to the file size. The filename is NAS234.BIN - all but the number
-is hard-wired, and the number comes from the three digits come from the last 3
-digits of the argument (1234 in this example).
+size is equal to the file size. The filename is NAS034.BIN - all but the number
+is hard-wired; the number comes from the last 3 digits of the argument (so
+34, 034 and 1034 would all result in the same filename).
 
 ````
-E DFFA 1000 800 2345
-E DFFA 1000 800
+E DFFA 1000 17FF AB
+E DFFA 1000 17FF
 ````
 
-Write 800 (hex) bytes from memory to SDcard, starting at address 1000 (hex). In
-the first form, the filename is NAS345.BIN (see description above). In the
-second form, the filename is "auto-picked" -- the next free name of the form
+Write data from memory address range 1000-17FF (hex, inclusive) to SDcard. In
+the first form, the filename is NAS0AB.BIN (see description above). In the
+second form, the filename is "auto-picked" -- the next unused name of the form
 NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
+
+A note on auto-picked filenames: filenames explicitly specified by you can
+include hex digits, but the auto-pick algorithm (which runs on nascom_sdcard)
+uses decimal numbering. If you have created filenames NAS001.BIN, NAS002.BIN,
+NAS003.BIN, NAS004.BIN, NAS005.BIN, NAS008.BIN, NAS009.BIN, NAS00A.BIN,
+NAS012.NAS and then use auto-pick a few times, the auto-picked names will be
+NAS000.BIN, NAS006.BIN, NAS007.BIN, NAS010.BIN, NAS011.BIN,
+NAS013.BIN. Auto-pick will fail if all 1000 possible filenames are in use.
+
 
 ````
 E DFFD
 ````
 
 Access the PolyDos floppy disk in drive 0 and copy its contents to a file on
-SDcard. The filename is "auto-picked" -- the next free name of the form
+SDcard. The filename is "auto-picked" -- the next unused name of the form
 NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
 
 
