@@ -7,18 +7,21 @@
 # use. Derived from a version I wrote for FLEX; this version is far simpler.
 #
 # https://github.com/nealcrook/nascom
+# Neal Crook, May 2018.
+# foofoobedoo@gmail.com
 #
-# TODO: the imports would benefit from some tidying
+
+# FUTURE: the imports would benefit from some tidying:
 #
 # conv_import_raw  DONE
 # conv_import_txt  PART-DONE
 # conv_import_nas  DONE needs tidy
 # conv_import_cas  PART-DONE needs tidy
-
-# bug: make nascom convert (And others) report file name as they go
-# - looks at bad formats in files and see if it can be accommodated
+#
+# bug: make nascom convert (and others) report file name as they go
+# - look at bad formats in files and see if it can be accommodated
 # - try to extract execution address
-
+#
 # FUTURE: add optional y/n arg to delete.
 # FUTURE: THEN (command separator)
 # FUTURE: allow target of copy to be unique fs rather than simply drive name (ie copy
@@ -2873,8 +2876,7 @@ The first form starts an interactive session.
 The second form runs a sequence of commands from a file (See 'help scripts').
 The third form treats foo.bin as a disk image and does a mount/info/check/dir/exit.
 The fourth form treats *.bin as a set of disk images and does a
-mount/info/check/dir/exit
-on each in turn.
+mount/info/check/dir/exit on each image in turn.
 
 Commands are:
 
