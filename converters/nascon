@@ -53,7 +53,7 @@ use warnings;
 # - be contiguous
 # - ovelap
 # - be in order
-# However, all well-behaved .nas and .cas files will not have any nast characteristics
+# However, all well-behaved .nas and .cas files will not have any nasty characteristics
 # and so this program will check and may simply reject any badly-behaved data sets.
 #
 # $records[0]->{addr};          -- start address
@@ -72,6 +72,11 @@ $args{-in} = undef;
 $args{-out} = undef;
 $args{-org} = undef;
 $args{-csum} = 0;
+$args{-pad8} = 0;
+$args{-pad256} = 0;
+# these arguments are flags, the others supply a value
+my %flags = ( -csum => 1, -pad8 => 1, -pad256 => 1);
+
 
 ################################################################################
 # process command-line
@@ -79,8 +84,8 @@ while (my $arg = shift @ARGV) {
     if ($arg =~ /^-/) {
         help_exit() if (($arg eq '-h') or ($arg eq '-help'));
         if (exists ($args{$arg})) {
-            if ($arg eq '-csum') {
-                $args{-csum} = 1;
+            if (exists ($flags{$arg})) {
+                $args{$arg} = 1;
             }
             else {
                 $args{$arg} = lc(shift @ARGV);
@@ -161,6 +166,19 @@ my $sub = "read_as_$args{-in}";
 &$sub();
 
 ################################################################################
+# Pad file size (if required) by adding bytes of 0 to the last record
+my $total_bytes = 0;
+foreach my $rec_ref (@records) {
+    $total_bytes += $rec_ref->{len};
+}
+if ($args{-pad256} && ($total_bytes % 256 != 0)) {
+    pad(256 - ($total_bytes % 256));
+}
+elsif ($args{-pad8} && ($total_bytes % 8 != 0)) {
+    pad(8 - ($total_bytes % 8));
+}
+
+################################################################################
 # Output: process internal record format to generate output file
 $sub = "write_as_$args{-out}";
 &$sub();
@@ -223,10 +241,27 @@ with the first data byte.
 -csum -- when the output file is .nas adds a 9th byte to each line which is the
 checksum, and ends the line with 08 08 0D 0A (^H ^H CR LF) like NAS-SYS 1.
 
+-pad8 -- round up the file size to a multiple of 8 bytes by adding bytes
+of 0 to the last record.
+
+-pad256 -- round up the file size to a multiple of 256 bytes by adding bytes
+of 0 to the last record.
+
 Legal value for -org is a hexadecimal number (a sequence of hex digits with with no prefix)
 
 EOF
 exit 0;
+}
+
+
+################################################################################
+# Pad last record by adding $count bytes of zero.
+sub pad {
+    my $count = $_[0];
+    my $rec_ref = $records[-1]; # last record
+    my $padding = chr(0) x $count;
+    $rec_ref->{data} = $rec_ref->{data} . $padding;
+    $rec_ref->{len} += $count;
 }
 
 
@@ -248,7 +283,6 @@ sub read_as_cas {
 
 ################################################################################
 # Helpers for read_as_cas
-
 
 
 # Error when reading block header/data/footer
