@@ -239,13 +239,32 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Configuration
+
 // Define for use on NASCOM1, comment out for use on NASCOM2
 // If defined:
 // - baud rate reduced from 1200 to 600
 // - serial comms is non-inverted.
-//#define NASCOM1
+#define NASCOM1
 
+// Define which ROMS to include in the Flash filesystem; you may need
+// to omit some to make the code fit (especially if you enable CONSOLE)
+//#define ROM_INVADERS
+//#define ROM_PIRANHA
+#define ROM_LOLLIPOP
+#define ROM_ZEAP2
+#define ROM_NASDIS
 
+// Enable support for a console interface from a PC across the USB link
+// - for details, search for "void cmd_console" below
+#define CONSOLE
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 
 // If defined:
@@ -360,7 +379,7 @@ void open_sdcard(void);
 extern char to_upper(char c);
 extern int legal_char(char c);
 extern int parse_leading(char **buf);
-extern int parse_num(char **buf, unsigned int *result, int base);
+extern int parse_num(char **buf, unsigned long *result, int base);
 extern int parse_ai(char **buf);
 extern int parse_fname_msdos(char **buf, char * dest);
 extern int parse_fname_polydos(char **buf, char * dest);
@@ -370,7 +389,8 @@ extern int parse_fname_polydos(char **buf, char * dest);
 FatFile *working_dir;
 
 // Only ever have 1 file open at a time
-FatFile handle;
+// FatFile takes ~12 bytes less data but only File supports size() needed for console code.
+File handle;
 
 
 // Boot ROM and some applications/games - stored in FLASH to save resources.
@@ -612,6 +632,11 @@ void loop() {
         drive_on = 0;
         cmd_cass_rd();
     }
+#ifdef CONSOLE
+    else if (DEBSERIAL.available()) {
+        cmd_console();
+    }
+#endif
 }
 
 
@@ -930,7 +955,7 @@ void cmd_cass(void) {
     char erase_name[13]; // 8 + 1 + 3 + 1 bytes for null-terminated FAT file name
     int index = 0;
     int cmd = 0;
-    unsigned int destination;
+    unsigned long tmp_long;
 
     // Receive a null-terminated string from the Host into buf[]
     while (1) {
@@ -979,12 +1004,12 @@ void cmd_cass(void) {
         break;
 
     case ('T'<<8 | 'O'):      // TO xxxx - relocate boot loader to xxxx.
-        if (parse_leading(&pbuf) && parse_num(&pbuf, &destination, 16)) {
+        if (parse_leading(&pbuf) && parse_num(&pbuf, &tmp_long, 16)) {
             NASSERIAL.write((byte)0x55); // tell host: relocation will occur
-            NASSERIAL.write((byte)(destination & 0xff));      // low part
-            NASSERIAL.write((byte)((destination>>8) & 0xff)); // high
+            NASSERIAL.write((byte)(tmp_long & 0xff));      // low  byte of 16-bits
+            NASSERIAL.write((byte)((tmp_long>>8) & 0xff)); // high byte of 16-bits
             DEBSERIAL.print(F("TO to 0x"));
-            DEBSERIAL.println(destination, HEX);
+            DEBSERIAL.println(tmp_long, HEX);
             // break from here will result in an unneeded NUL being sent but
             // that is not a problem because the Host is in ZINLIN (either from
             // the NAS-SYS or the NAScas command loops) which accepts data from
@@ -997,7 +1022,8 @@ void cmd_cass(void) {
         break;
 
     case ('P'<<8 | 'A'):      // PAUSE nn - delay before supplying text file
-        if (parse_leading(&pbuf) && parse_num(&pbuf, &pause_delay, 10)) {
+        if (parse_leading(&pbuf) && parse_num(&pbuf, &tmp_long, 10)) {
+            pause_delay = (unsigned int)(tmp_long & 0xffff);
             // all done
         }
         else {
@@ -1007,7 +1033,8 @@ void cmd_cass(void) {
         break;
 
     case ('N'<<8 | 'U'):      // NULLS nn - delay between lines of text file
-        if (parse_leading(&pbuf) && parse_num(&pbuf, &nulls_delay, 10)) {
+        if (parse_leading(&pbuf) && parse_num(&pbuf, &tmp_long, 10)) {
+            nulls_delay = (unsigned int)(tmp_long & 0xffff);
             // all done
         }
         else {
@@ -1022,9 +1049,9 @@ void cmd_cass(void) {
 
     case ('A'<<8 | 'U'):      // AUTOGO [0 | 1] - execute a file after loading
         if (parse_leading(&pbuf)) {
-            if (parse_num(&pbuf, &destination, 10)) {
+            if (parse_num(&pbuf, &tmp_long, 10)) {
                 // set or clear the flag
-                cas_flags = (cas_flags & ~FM_AUTO_GO) | (destination? 1 << FS_AUTO_GO : 0);
+                cas_flags = (cas_flags & ~FM_AUTO_GO) | (tmp_long ? 1 << FS_AUTO_GO : 0);
             }
             else {
             // bad argument
@@ -1586,3 +1613,221 @@ void cmd_cass_wr(void) {
         NASSERIAL.read();
     }
 }
+
+
+#ifdef CONSOLE
+void console_dir_sdcard(void) {
+    char txtbuf[13];
+    char * txt = txtbuf;
+
+    working_dir->rewind();
+    while (handle.openNext(working_dir, O_RDONLY)) {
+        int len;
+        handle.getSFN(txt);
+        len = 15 - DEBSERIAL.write(txt);
+
+        if (handle.isDir()) {
+            DEBSERIAL.write('/');
+        }
+        else {
+            while (len > 0) {
+                DEBSERIAL.write(' ');
+                len--;
+            }
+
+            // Print file size in bytes. Max file size is 2gb ie 10 digits
+            int pad=0;
+            long i=1000000000;
+            long n = handle.fileSize();
+            long dig;
+
+            while (i > 0) {
+                dig = n/i; // integer division with truncation
+                n = n % i; // remainder
+                if ((dig > 0) | (pad==1) | (i==1)) {
+                    pad = 1;
+                    DEBSERIAL.write('0'+dig);
+                }
+                else {
+                    DEBSERIAL.write(' ');
+                }
+                i = i/10;
+            }
+            DEBSERIAL.write(" bytes");
+        }
+        DEBSERIAL.write("\x0d\x0a");
+        handle.close();
+    }
+}
+
+
+// Print "Ack n<cr><lf>" to DEBSERIAL, where n is the number given by "status"
+void console_ack(int status) {
+    DEBSERIAL.print(F("Ack "));
+    DEBSERIAL.println(status);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// The Arduino serial port (typically as a USB link to a PC) provides a
+// restricted command interface called the "console". As well as reporting
+// debug messages it supports commands for SDcard access:
+// DIRECTORY, ERASE file, WRITE file, READ file
+// The use-case is to allow code development on a PC without need to keep
+// swapping the SDcard back and forth.
+//
+// It is expected that the console interface will be accessed though a
+// special program on the PC, not simply a terminal interface. For that
+// reason there is almost zero error/sanity checking on arguments.
+//
+// Protocol: Directory
+// D<cr>
+//
+// only the D is significant. Any characters between D and <cr> are ignored.
+// Response is Ack 0<cr><lf>multiple lines of crlf-delimited text
+// or          Ack 1<cr><lf>  on error: no SDcard present
+//
+// (the response numbers are ASCII ie, 0 is 0x40, and Ack is a 3-character
+// ASCII string). Even Ack codes mean success, odd Ack codes are errors.
+//
+// Protocol: Erase
+// E filename <cr>
+//
+// only the E is significant. Any additional characters before the first
+// space are ignored. filename is an 8.3 MSDOS filename (format is
+// checked). Note the extra space at the end of the line, before the <cr>
+// Response is Ack 2<cr><lf> for success
+// or          Ack 1<cr><lf> on error: no SDcard present
+// or          Ack 3<cr><lf> on error: bad filename or file not found
+//
+// Protocol: Write
+// W filename length <cr>
+// only the W is significant. Any additional characters before the first
+// space are ignored. filename is an 8.3 MSDOS filename (format is
+// checked). Length is the number of bytes in the file (decimal number
+// in ASCII). Note the extra space at the end of the line, before the <cr>
+// Response is Ack 4<cr><lf>. for success
+// the "." indicates that the console should send the first chunk of
+// the file (512 or the runt/remaining bytes). An additional "." is
+// sent each time NAScas is ready for the next chunk. After the final
+// data transfer there is an Ack 8<cr><lf>.
+// or          Ack 1<cr><lf> on error: no SDcard present
+// or          Ack 5<cr><lf> on error: bad filename or file not found
+//
+// Protocol: Read
+// R filename <cr>
+// only the R is significant. Any additional characters before the first
+// space are ignored. filename is an 8.3 MSDOS filename (format is
+// checked). Note the extra space at the end of the line, before the <cr>
+// Response is Ack 6<cr><lf>length<cr><lf>bytestream
+// or          Ack 1<cr><lf> on error: no SDcard present
+// or          Ack 7<cr><lf> on error: bad filename or file not found
+//
+// Protocol: Other
+// For any other "command"
+// Response is Ack 1<cr><lf> on error: no SDcard present
+// Response is Ack 9<cr><lf> on error: command not recognised
+//
+void cmd_console(void) {
+    char buf[512]; // used for command line then as write data buffer
+    char * pbuf = &buf[0];
+    char file_name[13]; // 8 + 1 + 3 + 1 bytes for null-terminated FAT file name
+    int index = 0; // used to index buf[] in both of its applications
+    unsigned long file_length;
+
+    // Receive a CR-terminated string from the Host into buf[]
+    while (1) {
+        if (DEBSERIAL.available()) {
+            buf[index] = DEBSERIAL.read();
+            if (buf[index] == 0x0d) { // stop at end of line
+                break;
+            }
+            else {
+                index++;
+            }
+        }
+    }
+
+    if (cas_flags & FM_SD_FOUND) {
+        switch (buf[0]) {
+        case 'D':    // DIRECTORY
+            console_ack(0); // Directory Success. Directory text follows..
+            console_dir_sdcard();
+            break;
+
+        case 'E':    // ERASE
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, file_name)) {
+                // "handle" is undefined; it's just needed to allow the
+                // method to be called. SD.remove() is actually slightly smaller..
+                if (handle.remove(working_dir, file_name)) {
+                    console_ack(2); // Erase Success.
+                    break;
+                }
+            }
+            console_ack(3); // Error: bad filename or file not found or erase failed.
+            break;
+
+        case 'W':    // WRITE
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, file_name)
+                && parse_num(&pbuf, &file_length, 10)
+                && handle.open(file_name, FILE_WRITE | O_TRUNC)) {
+                // got the file name and the file size and opened the file successfully
+                console_ack(4); // Write success; ready for data
+
+                // send a "." to request each chunk of 512 bytes into the buffer; write the
+                // buffer when full or after the last transfer
+                index = 0;
+                DEBSERIAL.write('.');
+
+                for (unsigned long i=0; i<file_length; i++) {
+                    while (! DEBSERIAL.available()) {
+                    }
+                    buf[index++] = DEBSERIAL.read();
+                    if (index == 512) {
+                        handle.write(buf, index);
+                        index = 0;
+                        DEBSERIAL.write('.');
+                    }
+                }
+                // final bytes
+                if (index != 0) {
+                    handle.write(buf, index);
+                }
+                handle.close(); // does an implicit sync
+                console_ack(8); // Write success and finished
+                break;
+            }
+            console_ack(5); // Error: bad filename or missing length or open failed.
+            break;
+
+        case 'R':    // READ
+            if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, file_name)
+                && handle.open(file_name, FILE_READ)) {
+
+                console_ack(6); // So far, so good
+
+                // need to report the file size so that the console knows how many bytes
+                // to expect. Otherwise, no way to signal EOF while using a binary format.
+                file_length = handle.size();
+                DEBSERIAL.println(file_length);
+
+                // send the file
+                for (unsigned long i=0; i<file_length; i++) {
+                    DEBSERIAL.write(handle.read());
+                }
+
+                handle.close();
+                break;
+            }
+            console_ack(7); // Error: bad filename or file not found or open failed.
+            break;
+
+        default:
+            console_ack(9); // Error: command not recognised.
+        }
+    }
+    else {
+        console_ack(1); // Error: no SDcard present.
+    }
+}
+#endif // CONSOLE

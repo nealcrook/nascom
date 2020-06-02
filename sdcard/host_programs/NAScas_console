@@ -1,0 +1,349 @@
+#!/usr/bin/perl
+#
+# This is the console interface for NAScas. Run it on a PC and connect a USB
+# cable from the PC to the Arduino USB connector on the NAScas board. If
+# NAScas has been built to include the console code, you will now be able
+# to transfer files to and from the SDcard. Use "help" for commands/syntax.
+#
+# https://github.com/nealcrook/nascom
+#
+# usage: ./perl_console /dev/ttyUSB1
+#
+################################################################################
+# Serial comms and threading was inspired by material from here:
+# https://stackoverflow.com/questions/11365111/newbie-perl-serial-programming
+# https://stackoverflow.com/questions/28477868/perl-polling-a-file-handle
+#
+################################################################################
+# TODO
+# - nicer formatting here
+# - allow format conversion on-the-fly (using nascon)
+# - "idle" flag from thread to make CLI print a return/prompt
+# - kill thread on exit to avoid warning message
+# - find and fix root cause of messy start-up messaging/spurious errors
+#
+################################################################################
+
+use strict;
+use warnings;
+use threads;
+use threads::shared;
+use Device::SerialPort;  ## need to install this from CPAN
+
+my $device = $ARGV[0];
+my $PortObj=Device::SerialPort->new($device) || die "Fatal error: cannot open $device\n";
+
+$PortObj->databits(8);
+$PortObj->baudrate(115200);
+$PortObj->parity("none");
+$PortObj->stopbits(1);
+$PortObj->read_char_time(0);     # don't wait for each character
+$PortObj->read_const_time(1000); # 1 second per unfulfilled "read" call
+
+################################################################################
+# Data that is shared between the command-line interface here (which is
+# responsible for sending data to NAScas) and the thread which is responsible
+# for reading data from NAScas.
+#
+# 0: line-based echo
+# 1: expect file read
+# 2: in read, line-based, get length
+# 3: in read, character-based, save data to file.
+# 4: in write, flow-controlling write data from console
+my $state        :shared;
+$state = 0;
+# file name in local filesystem -- used by thread in state=2
+my $local_name   :shared;
+# increment each time NAScas requests 512 bytes during a write command
+my $gimme512     :shared;
+$gimme512=0;
+
+# remote (SDcard) file name
+my $remote_name;
+
+
+# Handle Rx from NAScas
+threads->create(\&serial_in_thread);
+
+
+# Handle command-line interpreter and Tx to NAScas
+while (1) {
+    print "NAScas console: ";
+    my $cmd = <>;
+    if (defined $cmd) {
+        chomp $cmd;
+        next if $cmd eq '';
+    }
+    else {
+        next;
+    }
+
+    my @bit = split " ", $cmd;
+    $bit[0] = uc $bit[0];
+
+    if ($bit[0] =~ /^D/) {
+        # Directory. Response comes asynchronously.
+        $PortObj->write("D\r");
+    }
+    elsif ($bit[0] =~ /^E/) {
+        # Erase. Response comes asynchronously.
+        $bit[1] = uc $bit[1];
+        if (legal_msdos_name($bit[1])) {
+            $PortObj->write("E $bit[1] \r");
+        }
+        else {
+            print "ERROR $bit[1] is not a legal MSDOS 8.3 filename\n";
+        }
+    }
+    elsif ($bit[0] =~ /^W/) {
+        # write file. Expect 1 or 2 arguments
+        if (scalar @bit == 3) {
+            $local_name = $bit[1];
+            $remote_name = uc $bit[2];
+        }
+        elsif (scalar @bit == 2) {
+            $local_name = uc $bit[1];
+            $remote_name = uc $bit[1];
+        }
+        else {
+            print "ERROR wrong number of arguments to write command\n";
+            next;
+        }
+        if (!legal_msdos_name($remote_name)) {
+            print "ERROR $remote_name is not a legal MSDOS 8.3 filename\n";
+            next;
+        }
+
+        if (open WFILE, $local_name) {
+            my $bytes = -s $local_name;
+
+            $gimme512 = 0;
+            $PortObj->write("W $remote_name $bytes \r");
+            my $byte;
+            my $count = 0;
+
+            my $response = 0;
+            my $bytes_this_time = 0;
+
+            while (read WFILE, $byte, 1) {
+                if ($bytes_this_time == 0) {
+                    # wait for flow control
+                    ##print "Start wait with $gimme512 and $response and count $count\n";
+                    while ($gimme512 == $response) {
+                    }
+                    $response = $gimme512;
+                    ##print "Send next chunk\n";
+                }
+                $bytes_this_time = ($bytes_this_time + 1) % 512;
+
+                $PortObj->write($byte);
+                $count++;
+            }
+            close WFILE;
+            print "\nINFO Wrote $count bytes to $remote_name -- file had $bytes bytes\n";
+        }
+        else {
+            print "ERROR no such local file $local_name\n";
+        }
+    }
+    elsif ($bit[0] =~ /^R/) {
+        # read file. Expect 1 or 2 arguments
+        if (scalar @bit == 3) {
+            $local_name = $bit[2];
+            $remote_name = uc $bit[1];
+        }
+        elsif (scalar @bit == 2) {
+            $local_name = uc $bit[1];
+            $remote_name = uc $bit[1];
+        }
+        else {
+            print "ERROR wrong number of arguments to read command\n";
+            next;
+        }
+        if (!legal_msdos_name($remote_name)) {
+            print "ERROR $remote_name is not a legal MSDOS 8.3 filename\n";
+            next;
+        }
+        print "Read $remote_name from SDcard and store as $local_name\n";
+        # tell thread to expect incoming data
+        $state = 1;
+
+        $PortObj->write("R $remote_name \r");
+
+        # do this better!! Sleep?
+        while ($state != 0) {
+            sleep(1);
+        }
+    }
+    elsif ($bit[0] =~ /^Q/) {
+        # sync: block until threads are done
+        #foreach my $thr ( threads->list ) {
+        #    $thr->join();
+        #}
+
+        exit;
+    }
+    elsif ($bit[0] =~ /^H/) {
+        help_msg();
+    }
+    else {
+        print "ERROR no such command\n";
+    }
+}
+
+
+# In general, just listens for debug messages and reports them.
+# When the console issues a command, it also sets a flag to indicate
+# the response expected, which is detected here and used to make this
+# routine handle the response in a pseudo-synchronous way
+sub serial_in_thread {
+    my $STALL_DEFAULT=10; # how many seconds to wait for new input
+    my $timeout=$STALL_DEFAULT;
+
+    my $buffer="";
+
+    my $rd_bytes_expected;
+    my $rd_bytes_actual;
+
+    # turn off buffering to allow transfer progress dots
+    $| = 1;
+
+##    while ($timeout>0) {
+    while (1) {
+        my ($count,$saw)=$PortObj->read(1); # will read _up to_ 255 chars
+        if ($count > 0) {
+            #print "Debug: got $saw state=$state $rd_bytes_expected $rd_bytes_actual\n";
+            if ($state == 3) {
+                print RFILE $saw;
+                $rd_bytes_actual += length($saw);
+                print "." if (($rd_bytes_actual % 512) == 0);
+                if ($rd_bytes_actual == $rd_bytes_expected) {
+                    printf "INFO read of file as %s; received %d bytes\n", $local_name, $rd_bytes_actual;
+                    $state = 0;
+                    close RFILE;
+                }
+            }
+            elsif ($state == 4) {
+                # each . signals a desire for 512 more characters
+                if ($saw eq ".") {
+                    $gimme512++;
+                    print $saw;
+                    ##print "Received . for next 512 bytes\n";
+                }
+                elsif ($saw eq "A") {
+                    # first letter of "Ack 8" signalling end of write
+                    # go back to normal state, leaving this in the buffer
+                    $buffer.= $saw;
+                    $state = 0;
+                }
+                else {
+                    print "Internal error: expected . got: $saw\n";
+                }
+            }
+            else {
+                # Line-based processing
+                $buffer.= $saw;
+                if ($buffer =~ /\r\n$/) {
+                    # Found complete line
+                    if ($buffer =~ /^Ack 6\r\n$/) {
+                        # Start of Read. Expect to be in state 1 TODO should I check?
+                        open RFILE, ">$local_name";
+                        $state = 2;
+                        $buffer = "";
+                    }
+                    elsif ($buffer =~ /^Ack 4\r\n$/) {
+                        # Ready for write data, doing flow control.
+                        $state = 4;
+                        $buffer = "";
+                    }
+                    elsif ($state == 2) {
+                        # this is the size of the file to be read
+                        $rd_bytes_expected = $buffer;
+                        $rd_bytes_actual = 0;
+                        $state = 3;
+                        $buffer = "";
+                    }
+                    else {
+                        print "$buffer";
+                        $buffer = "";
+                    }
+                }
+            }
+        }
+        else {
+            $timeout--;
+        }
+    }
+
+    if ($timeout==0) {
+        die "Waited $STALL_DEFAULT seconds and never saw what I wanted\n";
+    }
+}
+
+
+# return 1 if name is 8.3 using letters A-Z 0-9 _ -
+# minimum prefix length is 1 character. Minimum extension length is 1 character
+sub legal_msdos_name {
+    my $name = $_[0];
+    if ($name =~ /[A-Z0-9\_\-]{1,8}\.[A-Z0-9\_\-]{1,3}/) {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+
+sub help_msg {
+    print <<EOF
+Console for NAScas.
+
+Usage:
+
+./NAScas_console /dev/ttyUSB0
+
+Reports asynchronous status/debug messages from NAScas, and supports the following
+commands:
+
+dir                      - Directory of SDcard
+                           Error if SDcard not present
+
+erase filename           - Erase specified file from SDcard.
+                           Error if SDcard not present
+                           Error if filename is not a MSDOS 8.3 name
+                           Error if filename does not exist
+
+write filename           - write local file filename to SDcard. filename is valid MSDOS 8.3 name
+                           Error if SDcard not present
+                           Error if filename is not a MSDOS 8.3 name
+                           Error if filename does not exist on local filesystem
+
+write lfilename filename - write local file lfilename to SDcard as the name filename; filename is valid MSDOS 8.3 name
+                           Error if SDcard not present
+                           Error if filename is not a MSDOS 8.3 name
+                           Error if lfilename does not exist on local filesystem
+
+read filename            - read file filename from SDcard and save locally. filename is valid MSDOS 8.3 name
+                           Error if SDcard not present
+                           Error if filename is not a MSDOS 8.3 name
+                           Error if filename does not exist on SDcard
+
+read filename lfilename  - read file filename from SDcard and save locally as lfilename; filename is valid MSDOS 8.3 name
+                           Error if SDcard not present
+                           Error if filename is not a MSDOS 8.3 name
+                           Error if filename does not exist on SDcard
+
+help                     - this is it
+
+quit                     - leave NAScas_console
+
+Some commands report a response code, eg: "Ack 0". Even codes indicate
+success, odd codes indicate errors.
+
+For convenience, whatever is specified as filename is converted automatically to upper case; case is only important
+for lfilename.
+
+The NAScas command loop will only respond to one thing at a time.
+
+EOF
+}

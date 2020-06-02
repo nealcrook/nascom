@@ -64,10 +64,10 @@ int parse_leading(char **buf) {
 // Return true: number recognised, converted value is in result
 // Return fail: non-numeric character found
 // base can be 10 or 16
-// Designed for +ve 16-bit numbers but there is no overflow detection
-// so will parse an arbitrarily long numeric string and return the
-// low 16-bits of the result.
-int parse_num(char **buf, unsigned int *result, int base) {
+// Designed for +ve numbers upto 32-bit but there is no overflow
+// detection so will parse an arbitrarily long numeric string and
+// return the low 32-bits of the result.
+int parse_num(char **buf, unsigned long *result, int base) {
     int digits_converted = 0;
 
     *result = 0;
