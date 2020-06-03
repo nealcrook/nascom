@@ -7,8 +7,6 @@
 #
 # https://github.com/nealcrook/nascom
 #
-# usage: ./perl_console /dev/ttyUSB1
-#
 ################################################################################
 # Serial comms and threading was inspired by material from here:
 # https://stackoverflow.com/questions/11365111/newbie-perl-serial-programming
@@ -19,8 +17,8 @@
 # - nicer formatting here
 # - allow format conversion on-the-fly (using nascon)
 # - "idle" flag from thread to make CLI print a return/prompt
-# - kill thread on exit to avoid warning message
 # - find and fix root cause of messy start-up messaging/spurious errors
+# - "SDcard not present" error is not detected
 #
 ################################################################################
 
@@ -30,8 +28,10 @@ use threads;
 use threads::shared;
 use Device::SerialPort;  ## need to install this from CPAN
 
+die "Usage: ./NAScas_console /dev/ttyUSB1\n" if !defined $ARGV[0];
+
 my $device = $ARGV[0];
-my $PortObj=Device::SerialPort->new($device) || die "Fatal error: cannot open $device\n";
+my $PortObj=Device::SerialPort->new($device) || die "ERROR cannot open $device\n";
 
 $PortObj->databits(8);
 $PortObj->baudrate(115200);
@@ -81,21 +81,26 @@ while (1) {
     my @bit = split " ", $cmd;
     $bit[0] = uc $bit[0];
 
-    if ($bit[0] =~ /^D/) {
+    if ($bit[0] =~ /^DIR/) {
         # Directory. Response comes asynchronously.
         $PortObj->write("D\r");
     }
-    elsif ($bit[0] =~ /^E/) {
-        # Erase. Response comes asynchronously.
-        $bit[1] = uc $bit[1];
-        if (legal_msdos_name($bit[1])) {
-            $PortObj->write("E $bit[1] \r");
+    elsif ($bit[0] =~ /^ERASE/) {
+        # Erase. Expect 1 argument. Response comes asynchronously.
+        if (scalar @bit == 2) {
+            $remote_name = uc $bit[1];
         }
         else {
-            print "ERROR $bit[1] is not a legal MSDOS 8.3 filename\n";
+            print "ERROR wrong number of arguments to erase command\n";
+            next;
         }
+        if (!legal_msdos_name($remote_name)) {
+            print "ERROR $remote_name is not a legal MSDOS 8.3 filename\n";
+            next;
+        }
+        $PortObj->write("E $remote_name \r");
     }
-    elsif ($bit[0] =~ /^W/) {
+    elsif ($bit[0] =~ /^WRITE/) {
         # write file. Expect 1 or 2 arguments
         if (scalar @bit == 3) {
             $local_name = $bit[1];
@@ -146,7 +151,7 @@ while (1) {
             print "ERROR no such local file $local_name\n";
         }
     }
-    elsif ($bit[0] =~ /^R/) {
+    elsif ($bit[0] =~ /^READ/) {
         # read file. Expect 1 or 2 arguments
         if (scalar @bit == 3) {
             $local_name = $bit[2];
@@ -164,30 +169,26 @@ while (1) {
             print "ERROR $remote_name is not a legal MSDOS 8.3 filename\n";
             next;
         }
-        print "Read $remote_name from SDcard and store as $local_name\n";
-        # tell thread to expect incoming data
+        # tell thread to expect incoming data then issue command
         $state = 1;
-
         $PortObj->write("R $remote_name \r");
 
-        # do this better!! Sleep?
+        # wait for thread to signal completion of incoming data
         while ($state != 0) {
             sleep(1);
         }
     }
-    elsif ($bit[0] =~ /^Q/) {
-        # sync: block until threads are done
-        #foreach my $thr ( threads->list ) {
-        #    $thr->join();
-        #}
-
+    elsif ($bit[0] =~ /^QUIT/) {
+        foreach my $thr ( threads->list ) {
+            $thr->kill('INT')->join();
+        }
         exit;
     }
-    elsif ($bit[0] =~ /^H/) {
+    elsif ($bit[0] =~ /^HELP/) {
         help_msg();
     }
     else {
-        print "ERROR no such command\n";
+        print "ERROR no such command -- try 'help'\n";
     }
 }
 
@@ -197,6 +198,25 @@ while (1) {
 # the response expected, which is detected here and used to make this
 # routine handle the response in a pseudo-synchronous way
 sub serial_in_thread {
+    # mechanism that allows the main program's "quit" command to terminate this
+    # thread so that the program can exit gracefully.
+    $SIG{INT} = sub {threads->exit()};
+
+    # Convert status messages from NAScas into something useful
+    # (some of these will never be printed)
+    my %messages = (
+        'Ack 0' =>  'INFO Directory in progress',
+        'Ack 1' => 'ERROR no SDcard present',
+        'Ack 2' =>  'INFO Erase completed successfully',
+        'Ack 3' => 'ERROR Erase failed: bad filename or file not found',
+        'Ack 4' =>  'INFO Write accepted. Data transfer starting.',
+        'Ack 5' => 'ERROR Write failed: bad filename or file not found',
+        'Ack 6' =>  'INFO Read in progress',
+        'Ack 7' => 'ERROR Read failed: bad filename or file not found',
+        'Ack 8' =>  'INFO Write completed successfully',
+        'Ack 9' => 'ERROR Command not recognised',
+        );
+
     my $STALL_DEFAULT=10; # how many seconds to wait for new input
     my $timeout=$STALL_DEFAULT;
 
@@ -249,24 +269,32 @@ sub serial_in_thread {
                         # Start of Read. Expect to be in state 1 TODO should I check?
                         open RFILE, ">$local_name";
                         $state = 2;
-                        $buffer = "";
                     }
                     elsif ($buffer =~ /^Ack 4\r\n$/) {
                         # Ready for write data, doing flow control.
                         $state = 4;
-                        $buffer = "";
+                    }
+                    elsif ($buffer =~ /^Ack 7\r\n$/) {
+                        # Read failed. Report error and reset state
+                        print "$messages{'Ack 7'}\n";
+                        $state = 0;
                     }
                     elsif ($state == 2) {
                         # this is the size of the file to be read
                         $rd_bytes_expected = $buffer;
                         $rd_bytes_actual = 0;
                         $state = 3;
-                        $buffer = "";
                     }
                     else {
-                        print "$buffer";
-                        $buffer = "";
+                        $buffer =~ s/\r\n//;
+                        if (exists $messages{$buffer}) {
+                            print "$messages{$buffer}\n";
+                        }
+                        else {
+                            print "$buffer\n";
+                        }
                     }
+                    $buffer = "";
                 }
             }
         }
@@ -337,8 +365,7 @@ help                     - this is it
 
 quit                     - leave NAScas_console
 
-Some commands report a response code, eg: "Ack 0". Even codes indicate
-success, odd codes indicate errors.
+When you start NAScas_console, it resets NAScas; this is an Arduino design feature
 
 For convenience, whatever is specified as filename is converted automatically to upper case; case is only important
 for lfilename.
