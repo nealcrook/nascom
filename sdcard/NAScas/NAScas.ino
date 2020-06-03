@@ -249,7 +249,7 @@
 // If defined:
 // - baud rate reduced from 1200 to 600
 // - serial comms is non-inverted.
-#define NASCOM1
+//#define NASCOM1
 
 // Define which ROMS to include in the Flash filesystem; you may need
 // to omit some to make the code fit (especially if you enable CONSOLE)

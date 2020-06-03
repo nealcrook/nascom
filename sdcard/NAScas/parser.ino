@@ -24,20 +24,16 @@ int legal_char(char c) {
 // Each routine parses 1 space-delimited token
 // Return 0 for failure, 1 for success
 // In general, they move to the next token whether they
-// pass or fail
+// succeed or fail
 
 
-// Step over the token until the 1st space or the end of the string.
-// So, successive calls might leave the buffer pointer like this:
+// Advance to the start of the next token in a space-delimited
+// null-terminated buffer: skip current token (if any) and
+// leading whitespace. Example:
 //
-// "TO   12bc 1234"
-//  ^        ^        before and after first call
-//           ^    ^   before and after 2nd call
-
-
-// advance to 1st char in space-delimited string
 // "TOO MUCH"   "TOO   MUCH   "TOO  MUCH"
-//  ^---^           ^--^            ^      before and after (last one: no change)
+//   ^--^            ^-^            ^---^     before and after
+//   return 1        return 1       return 0
 //
 // Use this to step past the command to the first token and
 // use it from within another parser on error so that the parser
