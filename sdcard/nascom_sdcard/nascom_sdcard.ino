@@ -5,17 +5,12 @@
 // device for the purposes of:
 // - dumping data from the NASCOM
 // - providing virtual floppy disk capability
-// - (maybe/future) providing virtual ".NAS" and ".CAS" support
 //
 // The virtual floppy capability can work in conjunction with a
 // modified POLYDOS ROM in which the disk drivers address this hardware.
 //
-// Virtual NAS/CAS support would would work in conjunction with
-// a patched/modified NAS-SYS in which the R/W commands (or the I/O
-// tables) are modified to address this device.
-//
-// This is not "transparent" to the NASCOM - a utility program
-// runs on the NASCOM to control this hardware.
+// This hardware is not "transparent" to the NASCOM - a utility program
+// or modified code is needed on the NASCOM to control it.
 //
 // ** This software relies on the SdFat implementation. Download it
 // ** into your Arduino/libraries area and then edit SdFat/src/SdFatConfig.h
@@ -23,7 +18,7 @@
 //
 // Operations can be associated with upto 5 file-names on the
 // SD card. For example, associate 4 of them with virtual drive
-// images and use the other one for dumping binary streams.
+// images and use the other one for dumping binary streams or "printer".
 // Can seek by track/sector or by raw offset
 // Can read/write by sector or by specified byte count.
 //
@@ -139,24 +134,37 @@
 /////////////////////////////////////////////////////
 
 
+// Profile (stored in EEPROM) determines the default
+// disk image names and the disk geometry. This is the
+// layout of a profile:
+//
+#define SECTOR_CHUNK (128)
+typedef struct PROFILE {
+    char fnam_fext[4][8+1+3+1]; // Null-terminated MSDOS 8.3 names including dot
+    uint8_t nsect_per_track;  // sectors per track
+    uint8_t ntrack;           // tracks TODO not used.. could be used to detect illegal seek.
+    uint8_t first_sect;       // number associated with first sector
+    uint8_t sect_chunks;      // number of SECTOR_CHUNKs per sector
+} PROFILE;
 
-// TODO set geometry command to allow different disk types to be mixed?
-// TODO implement restore_state
-// TODO implement save_state
+// profile with default values - this is the setup for PolyDos2
+// (disk geometry is abstracted away by the PolyDos ROM so only
+// the file names and sector size matter).
+PROFILE profile {
+    {"DSK0.BIN", "DSK1.BIN", "DSK2.BIN", "DSK3.BIN"},
+    36, // 18 per track per side
+    35, // 35-track
+    0,  // first sector is sector 0
+    2   // 256 bytes per sector
+};
+
+// TODO EEPROM data consists of a magic number, a version number, a default profile number,
+// 4 (or 5?) profiles and a checksum.
+
+
 // TODO do error checking in n_rd
-// TODO consider removing CMD_DEFAULT as it doesn't seem useful in the way
-// that I orginally expected.
 // TODO could drive CMD=1 during T2H to indicate ABORT but would
 // have to be very careful to ensure both sides can track state.
-
-// change log:
-// Switch to SdFat library, including rework of cmd_dir
-// and cmd_info to use different methods (faster, smaller).
-// Move strings to Flash (reduce RAM usage).
-// Remove #define DEBUG and associated code, which was used long
-// ago for some proof-of-concept coding (tidy-up).
-// Always use NASCOM/ directory for files, if it exists (tidier,
-// be consistent with NAScas).
 
 
 /////////////////////////////////////////////////////
@@ -196,7 +204,7 @@
 #define CMD_N_RD     (0x38)
 #define CMD_SECT_WR  (0x40)
 #define CMD_N_WR     (0x48)
-#define CMD_DEFAULT  (0x50)
+// 0x50 is unused
 #define CMD_SIZE     (0x58)
 #define CMD_SIZE_RD  (0x60)
 #define CMD_CLOSE    (0x68)
@@ -204,10 +212,7 @@
 
 /////////////////////////////////////////////////////
 
-// Filename for state save/restore
-#define STATE_FILE "NASCOM.SD"
-
-// Number of bytes available
+// Size of command buffer. Probably can be much smaller.
 #define BUFFER (128)
 
 // Which files have known names and exist
@@ -216,18 +221,6 @@
 #define FLAG_DRV2 (0x04)
 #define FLAG_DRV1 (0x02)
 #define FLAG_DRV0 (0x01)
-
-// Constants for converting track/sector/side to offset
-// TODO maybe have "set geometry"?
-// These are correct for the version of PolyDos I'm running on jsnascom
-// but may be wrong for the version on my actual NASCOM. Also, not sure
-// how 2 sides are handled.. by doubling the tracks or otherwise?
-// ..actually, PolyDos doesn't care because it treats the disk as a linear
-// sequence of sectors and my low-level drivers do the same; don't consider
-// tracks/sectors at all.
-#define SECTORS_PER_TRACK (18)
-#define BYTES_PER_SECTOR (256)
-#define TRACKS (80)
 
 
 // *not* the standard Arduino library (which has some bugs and performance
@@ -241,9 +234,7 @@ long get_value32(void);
 void set_data_dir(int my_dir);
 int restore_state(int auto_restore);
 unsigned int get_value(void);
-char fid(char fid);
 //
-void cmd_default(char fid);
 void cmd_open(char fid, int mode);
 void cmd_close(char fid);
 void cmd_save_state(void);
@@ -265,18 +256,13 @@ void cmd_size_rd(char fid);
 // hint of next number to use when auto-generating file names
 int next_file;
 
-// default file ID
-char default_fid;
-
 // status of most recent command
 int status;
 
-// Work with upto 5 files. Low bits indicate which are valid/open
-// TODO only use this at restore time, then MSB at save time. In normal
-// operation use handles[] to show whether a FID is valid.
+// Work with upto 5 files. Use handles[] to show whether a FID is valid.
 // Need File rather than FatFile here because FatFile.size() does not exist.
-char flags;
-File handles[5];
+#define FIDS (5)
+File handles[FIDS]; // legal values are 0..(FID-1)
 
 // One-time initialisation is in setup().
 FatFile *working_dir;
@@ -297,7 +283,6 @@ SdFat SD;
 void setup()   {
     Serial.begin(115200);  // for Debug
 
-    flags = 0;
     buf[0] = 0;
     my_t2h = 0;
     next_file = 0;
@@ -375,108 +360,77 @@ void loop() {
     case 0x100 | CMD_OPEN | 2:
     case 0x100 | CMD_OPEN | 3:
     case 0x100 | CMD_OPEN | 4:
-    case 0x100 | CMD_OPEN | 5:
-    case 0x100 | CMD_OPEN | 7:
-        cmd_open(fid(cmd_data & 0x7), FILE_WRITE);
+        cmd_open(cmd_data & 0x7, FILE_WRITE);
         break;
     case 0x100 | CMD_OPENR | 0:
     case 0x100 | CMD_OPENR | 1:
     case 0x100 | CMD_OPENR | 2:
     case 0x100 | CMD_OPENR | 3:
     case 0x100 | CMD_OPENR | 4:
-    case 0x100 | CMD_OPENR | 5:
-    case 0x100 | CMD_OPENR | 7:
-        cmd_open(fid(cmd_data & 0x7), FILE_READ);
+        cmd_open(cmd_data & 0x7, FILE_READ);
         break;
     case 0x100 | CMD_CLOSE | 0:
     case 0x100 | CMD_CLOSE | 1:
     case 0x100 | CMD_CLOSE | 2:
     case 0x100 | CMD_CLOSE | 3:
     case 0x100 | CMD_CLOSE | 4:
-    case 0x100 | CMD_CLOSE | 5:
-    case 0x100 | CMD_CLOSE | 7:
-        cmd_close(fid(cmd_data & 0x7));
+        cmd_close(cmd_data & 0x7);
         break;
     case 0x100 | CMD_SEEK | 0:
     case 0x100 | CMD_SEEK | 1:
     case 0x100 | CMD_SEEK | 2:
     case 0x100 | CMD_SEEK | 3:
     case 0x100 | CMD_SEEK | 4:
-    case 0x100 | CMD_SEEK | 5:
-    case 0x100 | CMD_SEEK | 7:
-        cmd_seek(fid(cmd_data & 0x7));
+        cmd_seek(cmd_data & 0x7);
         break;
     case 0x100 | CMD_TS_SEEK | 0:
     case 0x100 | CMD_TS_SEEK | 1:
     case 0x100 | CMD_TS_SEEK | 2:
     case 0x100 | CMD_TS_SEEK | 3:
     case 0x100 | CMD_TS_SEEK | 4:
-    case 0x100 | CMD_TS_SEEK | 5:
-    case 0x100 | CMD_TS_SEEK | 7:
-        cmd_ts_seek(fid(cmd_data & 0x7));
+        cmd_ts_seek(cmd_data & 0x7);
         break;
     case 0x100 | CMD_SECT_RD | 0:
     case 0x100 | CMD_SECT_RD | 1:
     case 0x100 | CMD_SECT_RD | 2:
     case 0x100 | CMD_SECT_RD | 3:
     case 0x100 | CMD_SECT_RD | 4:
-    case 0x100 | CMD_SECT_RD | 5:
-    case 0x100 | CMD_SECT_RD | 7:
-        cmd_sect_rd(fid(cmd_data & 0x7));
+        cmd_sect_rd(cmd_data & 0x7);
         break;
     case 0x100 | CMD_SECT_WR | 0:
     case 0x100 | CMD_SECT_WR | 1:
     case 0x100 | CMD_SECT_WR | 2:
     case 0x100 | CMD_SECT_WR | 3:
     case 0x100 | CMD_SECT_WR | 4:
-    case 0x100 | CMD_SECT_WR | 5:
-    case 0x100 | CMD_SECT_WR | 7:
-        cmd_sect_wr(fid(cmd_data & 0x7));
+        cmd_sect_wr(cmd_data & 0x7);
         break;
     case 0x100 | CMD_N_RD | 0:
     case 0x100 | CMD_N_RD | 1:
     case 0x100 | CMD_N_RD | 2:
     case 0x100 | CMD_N_RD | 3:
     case 0x100 | CMD_N_RD | 4:
-    case 0x100 | CMD_N_RD | 5:
-    case 0x100 | CMD_N_RD | 7:
-        cmd_n_rd(fid(cmd_data & 0x7));
+        cmd_n_rd(cmd_data & 0x7);
         break;
     case 0x100 | CMD_N_WR | 0:
     case 0x100 | CMD_N_WR | 1:
     case 0x100 | CMD_N_WR | 2:
     case 0x100 | CMD_N_WR | 3:
     case 0x100 | CMD_N_WR | 4:
-    case 0x100 | CMD_N_WR | 5:
-    case 0x100 | CMD_N_WR | 7:
-        cmd_n_wr(fid(cmd_data & 0x7));
-        break;
-    case 0x100 | CMD_DEFAULT | 0:
-    case 0x100 | CMD_DEFAULT | 1:
-    case 0x100 | CMD_DEFAULT | 2:
-    case 0x100 | CMD_DEFAULT | 3:
-    case 0x100 | CMD_DEFAULT | 4:
-    case 0x100 | CMD_DEFAULT | 5:
-    case 0x100 | CMD_DEFAULT | 7:
-        cmd_default(fid(cmd_data & 0x7));
+        cmd_n_wr(cmd_data & 0x7);
         break;
     case 0x100 | CMD_SIZE | 0:
     case 0x100 | CMD_SIZE | 1:
     case 0x100 | CMD_SIZE | 2:
     case 0x100 | CMD_SIZE | 3:
     case 0x100 | CMD_SIZE | 4:
-    case 0x100 | CMD_SIZE | 5:
-    case 0x100 | CMD_SIZE | 7:
-        cmd_size(fid(cmd_data & 0x7));
+        cmd_size(cmd_data & 0x7);
         break;
     case 0x100 | CMD_SIZE_RD | 0:
     case 0x100 | CMD_SIZE_RD | 1:
     case 0x100 | CMD_SIZE_RD | 2:
     case 0x100 | CMD_SIZE_RD | 3:
     case 0x100 | CMD_SIZE_RD | 4:
-    case 0x100 | CMD_SIZE_RD | 5:
-    case 0x100 | CMD_SIZE_RD | 7:
-        cmd_size_rd(fid(cmd_data & 0x7));
+        cmd_size_rd(cmd_data & 0x7);
         break;
     default:
         // Not a command or not a recognised command.
@@ -592,13 +546,6 @@ void put_value(unsigned char val, char final_direction) {
 ////////////////////////////////////////////////////////////////
 // Miscellaneous helpers
 
-// given a fid, see wherher it references the default fid and,
-// if so, replace it
-char fid(char fid) {
-    return (fid == 7) ? default_fid : fid;
-}
-
-
 // if buffer is empty, auto-create the next unused name
 // of the form NASxxx.BIN
 // By using next_file as a hint we only have to do the (slow)
@@ -693,7 +640,7 @@ void cmd_restore_state(void) {
 
 
 // helper.
-// try to restore configuration from saved file.
+// try to restore configuration from EEPROM
 // if auto=0 restore if file exists
 // if auto=1 restore if file exists AND auto flag in file is 1
 //
@@ -702,45 +649,18 @@ void cmd_restore_state(void) {
 int restore_state(int auto_restore) {
     Serial.println(F("TODO restore_state"));
 
-    // TODO for now, just attempt to load DSK0.BIN etc.
-    buf[0] = 'D';
-    buf[1] = 'S';
-    buf[2] = 'K';
-    buf[3] = '0';
-    buf[4] = '.';
-    buf[5] = 'B';
-    buf[6] = 'I';
-    buf[7] = 'N';
-    buf[8] = 0;
-    handles[0].open(buf, FILE_WRITE);
-    buf[3] = '1';
-    handles[1].open(buf, FILE_WRITE);
-    buf[3] = '2';
-    handles[2].open(buf, FILE_WRITE);
-    buf[3] = '3';
-    handles[3].open(buf, FILE_WRITE);
+    // TODO for now, just use the default profile. There is no option to have fewer disks: error unless all 4 exist.
+    // TODO should we close them first? OK if only used at startup, but if an other times may want to close them first.
+    // Do I even need to do this or should an operation open and close the disk, in which case only need 1 handle.
+    for (int i=0; i<4; i++) {
+        handles[i].open(profile.fnam_fext[i], FILE_WRITE);
+    }
     // Success?
     return (handles[0].isOpen() && handles[1].isOpen() && handles[2].isOpen() && handles[3].isOpen());
 }
 
 // save configuration to file
-// create file if it does not exist, overwrite it if it does exist
-//
-// first byte is flags:
-// 7   auto
-// 6  RESERVED
-// 5  RESERVED
-// 4  file4  - raw file
-// 3  file3  - drive 3 file
-// 2  file2  - drive 2 file
-// 1  file1  - drive 1 file
-// 0  file0  - drive 0 file
-//
-// next 3 bytes are RESERVED
-// rest of file is set of null-terminated strings
-// one string for each bit set in flags[4:0]
-// string for flags[0] is first.
-// Each string is a file-name, relative to root
+// TODO not yet implemented.
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_save_state(void) {
@@ -771,7 +691,7 @@ void cmd_dir(void) {
         char * txt = txtbuf;
         int len = 15;
         handle.getSFN(txt);
-        Serial.println(txt);
+
         while (*txt != 0) {
             put_value(*txt++, OUTPUT);
             len--;
@@ -930,7 +850,7 @@ void cmd_ts_seek(char fid) {
         //    Serial.print(track,HEX);
         //    Serial.print(" sector" );
         //    Serial.println(sector,HEX);
-        long offset = ((long)SECTORS_PER_TRACK * (long)track + (long)sector) * (long)BYTES_PER_SECTOR;
+        long offset = ( (long)profile.nsect_per_track * (long)track + (long)sector - (long)profile.first_sect ) * (long)(profile.sect_chunks * SECTOR_CHUNK);
         status = handles[fid].seek(offset);
     }
     else {
@@ -997,7 +917,7 @@ void cmd_n_wr(char fid) {
 //
 // RESPONSE: send TRUE or FALSE response to host. Updates global status
 void cmd_sect_wr(char fid) {
-    n_wr(fid, BYTES_PER_SECTOR);
+    n_wr(fid, profile.sect_chunks * SECTOR_CHUNK);
 }
 
 
@@ -1042,7 +962,7 @@ void cmd_n_rd(char fid) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_sect_rd(char fid) {
-    n_rd(fid, BYTES_PER_SECTOR);
+    n_rd(fid, profile.sect_chunks * SECTOR_CHUNK);
 }
 
 
@@ -1053,14 +973,6 @@ void cmd_sect_rd(char fid) {
 // from most recent command that updates it
 void cmd_status(void) {
     put_value(status, INPUT);
-}
-
-
-// set the default file - used by OPEND etc.
-//
-// RESPONSE: none.
-void cmd_default(char fid) {
-    default_fid = fid;
 }
 
 
