@@ -17,6 +17,10 @@
 // This is not "transparent" to the NASCOM - a utility program
 // runs on the NASCOM to control this hardware.
 //
+// ** This software relies on the SdFat implementation. Download it
+// ** into your Arduino/libraries area and then edit SdFat/src/SdFatConfig.h
+// ** to change "#define USE_LONG_FILE_NAMES" from 1 to 0.
+//
 // Operations can be associated with upto 5 file-names on the
 // SD card. For example, associate 4 of them with virtual drive
 // images and use the other one for dumping binary streams.
@@ -145,9 +149,14 @@
 // TODO could drive CMD=1 during T2H to indicate ABORT but would
 // have to be very careful to ensure both sides can track state.
 
-
-// For testing
-//#define DEBUG
+// change log:
+// Switch to SdFat library, including rework of cmd_dir
+// and cmd_info to use different methods (faster, smaller).
+// Move strings to Flash (reduce RAM usage).
+// Remove #define DEBUG and associated code, which was used long
+// ago for some proof-of-concept coding (tidy-up).
+// Always use NASCOM/ directory for files, if it exists (tidier,
+// be consistent with NAScas).
 
 
 /////////////////////////////////////////////////////
@@ -221,7 +230,11 @@
 #define TRACKS (80)
 
 
-#include <SD.h>
+// *not* the standard Arduino library (which has some bugs and performance
+// problems). Download from https://github.com/greiman/SdFat
+#define SPI_SPEED SD_SCK_MHZ(50)
+#include <SdFat.h>
+
 
 // Prototypes
 long get_value32(void);
@@ -261,8 +274,12 @@ int status;
 // Work with upto 5 files. Low bits indicate which are valid/open
 // TODO only use this at restore time, then MSB at save time. In normal
 // operation use handles[] to show whether a FID is valid.
+// Need File rather than FatFile here because FatFile.size() does not exist.
 char flags;
 File handles[5];
+
+// One-time initialisation is in setup().
+FatFile *working_dir;
 
 // Buffer for accumulating string from host
 // BUFFER chars are available, 0..BUFFER-1
@@ -274,6 +291,8 @@ int my_t2h;
 
 // INPUT when receiving data OUTPUT when sending data
 char direction;
+
+SdFat SD;
 
 void setup()   {
     Serial.begin(115200);  // for Debug
@@ -294,12 +313,14 @@ void setup()   {
     digitalWrite(PIN_T2H, my_t2h);
     digitalWrite(PIN_ERROR, 0);
 
-    status = SD.begin();
+    // TODO handle SD not-found case!!
+    Serial.println(F("Init SD card"));
+    if (SD.begin(10, SPI_SPEED)) {
+        // move to NASCOM directory, if it exists.
+        SD.chdir("NASCOM", 1);
+        working_dir = SD.vwd();
 
-    Serial.println("Init SD card");
-    Serial.print(status);
-
-    if (status) {
+        Serial.println(F("OK"));
         restore_state(1);
     }
 
@@ -307,100 +328,10 @@ void setup()   {
     while (0 != rd_h2t()) {
     }
 
-    Serial.println("Start command loop");
+    Serial.println(F("Start command loop"));
 }
 
-#ifdef DEBUG
-// Simple test for read/write access to SD card. It all seems to work exactly as expected!
-void loop() {
-    buf[0] = 'A';
-    buf[1] = '.';
-    buf[2] = 'T';
-    buf[3] = 'X';
-    buf[4] = 'T';
-    buf[5] = 0;
-    handles[0] = SD.open(buf, FILE_WRITE);
-    buf[0] = 'B';
-    handles[1] = SD.open(buf, FILE_WRITE);
-    buf[0] = 'C';
-    handles[2] = SD.open(buf, FILE_WRITE);
-    buf[0] = 'D';
-    handles[3] = SD.open(buf, FILE_WRITE);
-    buf[0] = 'X';
-    handles[4] = SD.open(buf, FILE_READ);
-    if (handles[0]) Serial.println("Open OK for A.TXT");
-    if (handles[1]) Serial.println("Open OK for B.TXT");
-    if (handles[2]) Serial.println("Open OK for C.TXT");
-    if (handles[3]) Serial.println("Open OK for D.TXT");
-    if (handles[4]) Serial.println("Open OK for X.TXT");
-    // all of these will succeed except for X.TXT because
-    // the others are all open for FILE_WRITE and so will create a file if it does not exist
-    // X.TXT is open for FILE_READ. Since it does not exist it will fail.
-    Serial.println("Finished open test");
 
-    // Try reading first few bytes from each file
-    for (int i=0; i<5; i++) {
-        Serial.print("Read from file ");
-        Serial.print(i);
-        Serial.print(": ");
-        handles[i].seek(0L);
-        for (int j=0; j<16; j++) {
-            Serial.write(handles[i].read());
-        }
-        Serial.println();
-    }
-
-    // Replace some bytes in A.TXT
-    handles[0].seek(5L);
-    handles[0].write('I');
-    handles[0].write('S');
-    handles[0].flush();
-
-    // Try reading first few bytes from each file again
-    for (int i=0; i<5; i++) {
-        Serial.print("Read from file ");
-        Serial.print(i);
-        Serial.print(": ");
-        handles[i].seek(0L);
-        for (int j=0; j<16; j++) {
-            Serial.write(handles[i].read());
-        }
-        Serial.println();
-    }
-
-    // Restore bytes in A.TXT
-    handles[0].seek(5L);
-    handles[0].write('i');
-    handles[0].write('s');
-    handles[0].flush();
-
-    for (int i=0; i<5; i++) {
-        handles[i].close();
-    }
-
-    // try some auto-generated file names
-    // ..this is pretty slow. May want to restrict it to 100 files. BUT
-    // there is no failure mechanism..
-    for (int i=0; i<5; i++) {
-        buf[0] = 0;
-        auto_name(buf);
-        Serial.println(buf);
-        handles[0] = SD.open(buf, FILE_WRITE);
-        if (handles[0]) {
-            handles[0].write('x');
-            handles[0].flush();
-            handles[0].close();
-        }
-        else {
-            Serial.print("Tried to open ");
-            Serial.print(buf);
-            Serial.println(" but open failed");
-        }
-    }
-    while (1) {}
-}
-
-#else
 // Each pass through loop handles 1 command to completion
 // and leaves the Target set up as a receiver.
 void loop() {
@@ -410,7 +341,7 @@ void loop() {
     // Turn off the ERROR LED in anticipation
     digitalWrite(PIN_ERROR, 0);
 
-    Serial.print("Command ");
+    Serial.print(F("Command "));
     Serial.println(cmd_data,HEX);
 
     switch (cmd_data) {
@@ -554,7 +485,7 @@ void loop() {
         break;
     }
 }
-#endif
+
 
 ////////////////////////////////////////////////////////////////
 // Stuff that waggles pins
@@ -676,18 +607,18 @@ void auto_name(char *buffer) {
     if (buffer[0] == 0) {
         buffer[0] = 'N';
         buffer[1] = 'A';
-        buffer[2] = 'S';
+        buffer[2] = 'S'; // leave 3 bytes for file number
         buffer[6] = '.';
         buffer[7] = 'B';
         buffer[8] = 'I';
         buffer[9] = 'N';
-        buffer[10] = 0;
+        buffer[10] = 0;  // null-terminate the string
         while (next_file<1000) {
             buffer[3] = '0' + int(next_file/100);
             buffer[4] = '0' + ((int(next_file/10)) %10);
             buffer[5] = '0' + (next_file %10);
             next_file++;
-            if (! SD.exists(buffer)) {
+            if (! working_dir->exists(buffer)) {
                 // does not exist; just what we're looking for
                 return;
             }
@@ -769,7 +700,7 @@ void cmd_restore_state(void) {
 // return TRUE if file exists and readable
 // return FALSE otherwise
 int restore_state(int auto_restore) {
-    Serial.println("TODO restore_state");
+    Serial.println(F("TODO restore_state"));
 
     // TODO for now, just attempt to load DSK0.BIN etc.
     buf[0] = 'D';
@@ -781,14 +712,15 @@ int restore_state(int auto_restore) {
     buf[6] = 'I';
     buf[7] = 'N';
     buf[8] = 0;
-    handles[0] = SD.open(buf, FILE_WRITE);
+    handles[0].open(buf, FILE_WRITE);
     buf[3] = '1';
-    handles[1] = SD.open(buf, FILE_WRITE);
+    handles[1].open(buf, FILE_WRITE);
     buf[3] = '2';
-    handles[2] = SD.open(buf, FILE_WRITE);
+    handles[2].open(buf, FILE_WRITE);
     buf[3] = '3';
-    handles[3] = SD.open(buf, FILE_WRITE);
-    return (handles[0] && handles[1] && handles[2] && handles[3]);
+    handles[3].open(buf, FILE_WRITE);
+    // Success?
+    return (handles[0].isOpen() && handles[1].isOpen() && handles[2].isOpen() && handles[3].isOpen());
 }
 
 // save configuration to file
@@ -812,7 +744,7 @@ int restore_state(int auto_restore) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_save_state(void) {
-    Serial.println("TODO cmd_save_state");
+    Serial.println(F("TODO cmd_save_state"));
     put_value(1, INPUT);
 }
 
@@ -831,38 +763,41 @@ void cmd_loop(void) {
 //
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_dir(void) {
-    File root = SD.open("/");
-    root.rewindDirectory();
-    File entry;
+    FatFile handle;
+    char txtbuf[8+1+3+1]; // 8.3 name with terminating 0
 
-    while (entry = root.openNextFile()) {
+    working_dir->rewind();
+    while (handle.openNext(working_dir, O_RDONLY)) {
+        char * txt = txtbuf;
         int len = 15;
-        char * name = entry.name();
-        while (*name != 0) {
-            put_value(*name++, OUTPUT);
+        handle.getSFN(txt);
+        Serial.println(txt);
+        while (*txt != 0) {
+            put_value(*txt++, OUTPUT);
             len--;
         }
 
-        if (entry.isDirectory()) {
+        if (handle.isDir()) {
             put_value('/', OUTPUT);
         }
         else {
-            // Print file size in bytes. Max file size is 2gb ie 10 digits
-            int pad=0;
-            long i=1000000000;
-            long n = entry.size();
-            long dig;
-      
             while (len > 0) {
                 put_value(' ', OUTPUT);
                 len--;
             }
+
+            // Print file size in bytes. Max file size is 2gb ie 10 digits
+            int pad=0;
+            long i=1000000000;
+            long n = handle.fileSize();
+            long dig;
 
             while (i > 0) {
                 dig = n/i; // integer division with truncation
                 n = n % i; // remainder
                 if ((dig > 0) | (pad==1) | (i==1)) {
                     pad = 1;
+
                     put_value('0'+dig, OUTPUT);
                 }
                 else {
@@ -879,12 +814,10 @@ void cmd_dir(void) {
         }
         put_value(0x0d, OUTPUT);
         put_value(0x0a, OUTPUT);
-        entry.close();
+        handle.close();
     }
     // Tidy up and finish
     put_value(0,INPUT);
-    root.close();
-    return;
 }
 
 
@@ -893,25 +826,26 @@ void cmd_dir(void) {
 //
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_info(void) {
-    Serial.println("Info");
+    char *pbuf = buf;
+
+    Serial.println(F("Info"));
     for (int i=0; i<5; i++) {
         put_value(0x30 + i,OUTPUT);
         put_value(':',OUTPUT);
         put_value(' ',OUTPUT);
         Serial.print(i);
-        Serial.print(": ");
+        Serial.print(F(": "));
         if (handles[i]) {
-            char * name = handles[i].name();
-            while (*name != 0) {
-                Serial.print(*name);
-                put_value(*name++, OUTPUT);
+            handles[i].getName(pbuf, BUFFER);
+            Serial.println(pbuf);
+            while (*pbuf != 0) {
+                put_value(*pbuf++, OUTPUT);
             }
         }
         else {
+            Serial.println('-');
             put_value('-',OUTPUT);
-            Serial.print('-');
         }
-        Serial.println();
         put_value(0x0d,OUTPUT);
         put_value(0x0a,OUTPUT);
     }
@@ -929,7 +863,7 @@ void cmd_stop(void) {
     pinMode(PIN_T2H, INPUT);
     pinMode(PIN_CMD, INPUT);
     pinMode(PIN_ERROR, INPUT);
-    Serial.println("cmd_stop - wait for reset");
+    Serial.println(F("cmd_stop - wait for reset"));
     while (1) {
     }
 }
@@ -970,7 +904,7 @@ void cmd_open(char fid, int mode) {
         handles[fid].close();
     }
 
-    handles[fid] = SD.open(buf, mode);
+    handles[fid].open(buf, mode);
     if (handles[fid]) {
         status = handles[fid].seek(0);
     }
@@ -1000,7 +934,7 @@ void cmd_ts_seek(char fid) {
         status = handles[fid].seek(offset);
     }
     else {
-        Serial.print("Seek to track but no disk");
+        Serial.print(F("Seek to track but no disk"));
     }
     put_value(status, INPUT);
 }
@@ -1053,7 +987,7 @@ void n_wr(char fid, long count) {
 //
 // RESPONSE: send TRUE or FALSE response to host. Updates global status
 void cmd_n_wr(char fid) {
-    Serial.println("CMD_N_WR");
+    Serial.println(F("CMD_N_WR"));
     n_wr(fid, get_value32());
 }
 
