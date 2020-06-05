@@ -178,6 +178,16 @@ while (1) {
             sleep(1);
         }
     }
+    elsif ($bit[0] =~ /^PUT/) { # put address data (values in hex)
+        # this raw access is just for testing. It will be wrapped in a mechanism for defining the
+        # profiles properly.
+        $PortObj->write("P $bit[1] $bit[2] \r");
+    }
+    elsif ($bit[0] =~ /^GET/) { # get address (value in hex)
+        # this raw access is just for testing. It will be wrapped in a mechanism for defining the
+        # profiles properly.
+        $PortObj->write("G $bit[1] \r");
+    }
     elsif ($bit[0] =~ /^QUIT/) {
         foreach my $thr ( threads->list ) {
             $thr->kill('INT')->join();

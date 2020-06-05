@@ -86,6 +86,9 @@ Serial.write(pgm_read_byte(msg0));
 Serial.write(pgm_read_byte(msg0 + 1));
 Serial.write(pgm_read_byte(msg0 + 2));
 
+// works (null-terminated string)
+Serial.println((__FlashStringHelper*)msg0);
+
 // works
 int bar = 0;
 while ((pgm_read_byte(msg0 + bar) != 0)) { Serial.write(pgm_read_byte(msg0 + bar++)); }

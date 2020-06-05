@@ -331,6 +331,7 @@
 #include <SdFat.h>
 
 #include <SoftwareSerial.h>
+#include <EEPROM.h>
 
 // Virtual disks use the PolyDos file structure
 #define POLYDOS_BYTES_PER_SECTOR (256)
@@ -585,7 +586,7 @@ void setup()   {
     // from Flash using the directory index given by 'dirindex' and, provided
     // the auto-execute flag is set, it will go ahead and execute it.
     NASSERIAL.println(F("R"));
-    DEBSERIAL.println(F(".init"));
+    DEBSERIAL.println((__FlashStringHelper*)msg_info);
 }
 
 
@@ -891,7 +892,7 @@ void open_sdcard(void) {
 // "SD.ls(&NASSERIAL, LS_SIZE)" but this hand-cranked version has the advantage
 // that it can use the pager at the NASCOM end.
 void dir_sdcard(void) {
-    char txtbuf[13];
+    char txtbuf[8+1+3+1]; // 8.3 name with terminating 0
     char * txt = txtbuf;
 
     NASSERIAL.write((byte)0xff); // tell host: a message is coming
@@ -1723,11 +1724,29 @@ void console_ack(int status) {
 // or          Ack 1<cr><lf> on error: no SDcard present
 // or          Ack 7<cr><lf> on error: bad filename or file not found
 //
+// Protocol: Put byte to EEPROM
+// P address data <cr>
+// only the P is significant. Any additional characters before the first
+// space are ignored. Address is in hex, data is in hex. No range check
+// is done; if the command is incorrectly formatted it will return
+// success but not actually perform a write.
+// Response is Ack 10<cr><lf> for success
+// or          Ack 1<cr><lf> on error: no SDcard present
+//
+// Protocol: Get byte from EEPROM
+// G address <cr>
+// only the G is significant. Any additional characters before the first
+// space are ignored. Address is in hex. No range check is done.
+// Response is Ack 12<cr><lf>byte for success
+// or          Ack 1<cr><lf> on error: no SDcard present
+//
 // Protocol: Other
 // For any other "command"
-// Response is Ack 1<cr><lf> on error: no SDcard present
 // Response is Ack 9<cr><lf> on error: command not recognised
+// or          Ack 1<cr><lf> on error: no SDcard present
 //
+// The SDcard check is always done; that's why the error response can occur
+// even for commands that do not require SDcard.
 void cmd_console(void) {
     char buf[512]; // used for command line then as write data buffer
     char * pbuf = &buf[0];
@@ -1820,6 +1839,30 @@ void cmd_console(void) {
                 break;
             }
             console_ack(7); // Error: bad filename or file not found or open failed.
+            break;
+
+        case 'P':    // PUT
+            {
+                // use file_length to hold write address.
+                unsigned long int data;
+                if (parse_leading(&pbuf) && parse_num(&pbuf, &file_length, 16)
+                    && parse_num(&pbuf, &data, 16) ) {
+                    EEPROM.update(file_length, data);
+                }
+                console_ack(10); // EEPROM write success (even if it wasn't)
+                break;
+            }
+
+        case 'G':    // GET
+            // use file_length to hold write address and data
+            if (parse_leading(&pbuf) && parse_num(&pbuf, &file_length, 16) ) {
+                file_length = EEPROM.read(file_length);
+            }
+            else {
+                file_length = 0;
+            }
+            console_ack(12); // EEPROM read success (even if it wasn't)
+            DEBSERIAL.print((unsigned char)file_length, HEX);
             break;
 
         default:
