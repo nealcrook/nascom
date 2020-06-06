@@ -135,8 +135,10 @@
 
 
 // Profile (stored in EEPROM) determines the default
-// disk image names and the disk geometry. This is the
-// layout of a profile:
+// disk image names and the disk geometry. The layout
+// of a profile is shown below. Strictly, it is wasteful
+// to null-terminate the names, but it makes the code
+// simpler elsewhere and we have loads of space.
 //
 #define SECTOR_CHUNK (128)
 typedef struct PROFILE {
@@ -152,8 +154,8 @@ typedef struct PROFILE {
 // the file names and sector size matter).
 PROFILE profile {
     {"DSK0.BIN", "DSK1.BIN", "DSK2.BIN", "DSK3.BIN"},
-    36, // 18 per track per side
-    35, // 35-track
+    36, // 18 sectors per track per side
+    35, // 35 tracks
     0,  // first sector is sector 0
     2   // 256 bytes per sector
 };
@@ -186,8 +188,9 @@ PROFILE profile {
 // Commands
 
 #define CMD_NOP           (0x80)
+// CMD_RESTORE_STATE is deprecated: use CMD_PRESTORE instead.
 #define CMD_RESTORE_STATE (0x81)
-#define CMD_SAVE_STATE    (0x82)
+// 0x82 is unused
 #define CMD_LOOP          (0x83)
 #define CMD_DIR           (0x84)
 #define CMD_STATUS        (0x85)
@@ -209,19 +212,16 @@ PROFILE profile {
 #define CMD_SIZE_RD  (0x60)
 #define CMD_CLOSE    (0x68)
 
+// Bits [2:0] of these commands are the profile ID (PID)
+#define CMD_PBOOT    (0x70)
+#define CMD_PRESTORE (0x78)
+
 
 /////////////////////////////////////////////////////
 
-// Size of command buffer. Probably can be much smaller.
-#define BUFFER (128)
-
-// Which files have known names and exist
-#define FLAG_RAW (0x10)
-#define FLAG_DRV3 (0x08)
-#define FLAG_DRV2 (0x04)
-#define FLAG_DRV1 (0x02)
-#define FLAG_DRV0 (0x01)
-
+// Size of buffer big enough to hold null-terminated MSDOS 8.3
+// name (including the ".")
+#define BUFFER (8+1+3+1)
 
 // *not* the standard Arduino library (which has some bugs and performance
 // problems). Download from https://github.com/greiman/SdFat
@@ -232,26 +232,26 @@ PROFILE profile {
 // Prototypes
 long get_value32(void);
 void set_data_dir(int my_dir);
-int restore_state(int auto_restore);
+int prestore(char pid);
 unsigned int get_value(void);
 //
-void cmd_open(char fid, int mode);
-void cmd_close(char fid);
-void cmd_save_state(void);
-void cmd_restore_state(void);
+void cmd_prestore(char pid);
 void cmd_loop(void);
 void cmd_dir(void);
+void cmd_status(void);
 void cmd_info(void);
 void cmd_stop(void);
+void cmd_open(char fid, int mode);
+void cmd_close(char fid);
 void cmd_seek(char fid);
 void cmd_ts_seek(char fid);
-void cmd_status(void);
 void cmd_sect_rd(char fid);
 void cmd_sect_wr(char fid);
 void cmd_n_rd(char fid);
 void cmd_n_wr(char fid);
 void cmd_size(char fid);
 void cmd_size_rd(char fid);
+void cmd_pboot(char pid);
 
 // hint of next number to use when auto-generating file names
 int next_file;
@@ -267,11 +267,6 @@ File handles[FIDS]; // legal values are 0..(FID-1)
 // One-time initialisation is in setup().
 FatFile *working_dir;
 
-// Buffer for accumulating string from host
-// BUFFER chars are available, 0..BUFFER-1
-// but string is null-terminated which takes up 1 char.
-char buf[BUFFER];
-
 // Protocol bit
 int my_t2h;
 
@@ -283,7 +278,6 @@ SdFat SD;
 void setup()   {
     Serial.begin(115200);  // for Debug
 
-    buf[0] = 0;
     my_t2h = 0;
     next_file = 0;
     direction = INPUT;
@@ -306,7 +300,7 @@ void setup()   {
         working_dir = SD.vwd();
 
         Serial.println(F("OK"));
-        restore_state(1);
+        prestore(0); // TODO default, until proper profile handling is in place
     }
 
     // wait until handshake from host is idle
@@ -332,11 +326,8 @@ void loop() {
     switch (cmd_data) {
     case 0x100 | CMD_NOP:
         break; // let Host decide that we're alive
-    case 0x100 | CMD_RESTORE_STATE:
-        cmd_restore_state();
-        break;
-    case 0x100 | CMD_SAVE_STATE:
-        cmd_save_state();
+    case 0x100 | CMD_RESTORE_STATE: // TODO deprecated. Equivalent to prestore(0)
+        cmd_prestore(0);
         break;
     case 0x100 | CMD_LOOP:
         cmd_loop();
@@ -360,14 +351,14 @@ void loop() {
     case 0x100 | CMD_OPEN | 2:
     case 0x100 | CMD_OPEN | 3:
     case 0x100 | CMD_OPEN | 4:
-        cmd_open(cmd_data & 0x7, FILE_WRITE);
+        cmd_open(cmd_data & 0x7, O_RDWR | O_CREAT);
         break;
     case 0x100 | CMD_OPENR | 0:
     case 0x100 | CMD_OPENR | 1:
     case 0x100 | CMD_OPENR | 2:
     case 0x100 | CMD_OPENR | 3:
     case 0x100 | CMD_OPENR | 4:
-        cmd_open(cmd_data & 0x7, FILE_READ);
+        cmd_open(cmd_data & 0x7, O_RDONLY);
         break;
     case 0x100 | CMD_CLOSE | 0:
     case 0x100 | CMD_CLOSE | 1:
@@ -431,6 +422,18 @@ void loop() {
     case 0x100 | CMD_SIZE_RD | 3:
     case 0x100 | CMD_SIZE_RD | 4:
         cmd_size_rd(cmd_data & 0x7);
+        break;
+    case 0x100 | CMD_PBOOT | 0:
+    case 0x100 | CMD_PBOOT | 1:
+    case 0x100 | CMD_PBOOT | 2:
+    case 0x100 | CMD_PBOOT | 3:
+        cmd_pboot(cmd_data & 0x7);
+        break;
+    case 0x100 | CMD_PRESTORE | 0:
+    case 0x100 | CMD_PRESTORE | 1:
+    case 0x100 | CMD_PRESTORE | 2:
+    case 0x100 | CMD_PRESTORE | 3:
+        cmd_prestore(cmd_data & 0x7);
         break;
     default:
         // Not a command or not a recognised command.
@@ -629,43 +632,34 @@ void set_data_dir(int my_dir) {
 ////////////////////////////////////////////////////////////////
 // Commands
 
-// try to restore configuration from saved file.
+// try to restore configuration from specified profile
 // TRUE if file was found and read successfully.
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
-void cmd_restore_state(void) {
-    status = restore_state(0);
+void cmd_prestore(char pid) {
+    status = prestore(pid);
     put_value(status, INPUT);
 }
 
 
 // helper.
-// try to restore configuration from EEPROM
-// if auto=0 restore if file exists
-// if auto=1 restore if file exists AND auto flag in file is 1
+// try to restore profile pid from EEPROM
 //
-// return TRUE if file exists and readable
+// return TRUE if profile exists and readable
 // return FALSE otherwise
-int restore_state(int auto_restore) {
-    Serial.println(F("TODO restore_state"));
+int prestore(char pid) {
+    Serial.println(F("prestore"));
 
     // TODO for now, just use the default profile. There is no option to have fewer disks: error unless all 4 exist.
     // TODO should we close them first? OK if only used at startup, but if an other times may want to close them first.
     // Do I even need to do this or should an operation open and close the disk, in which case only need 1 handle.
+    // TODO in the case where file does not exist, does O_WRDWR create it? I think it does *not* because there
+    // is a separate flag O_CREAT
     for (int i=0; i<4; i++) {
-        handles[i].open(profile.fnam_fext[i], FILE_WRITE);
+        handles[i].open(profile.fnam_fext[i], O_RDWR);
     }
     // Success?
     return (handles[0].isOpen() && handles[1].isOpen() && handles[2].isOpen() && handles[3].isOpen());
-}
-
-// save configuration to file
-// TODO not yet implemented.
-//
-// RESPONSE: sends TRUE or FALSE response to host. Updates global status
-void cmd_save_state(void) {
-    Serial.println(F("TODO cmd_save_state"));
-    put_value(1, INPUT);
 }
 
 
@@ -684,16 +678,16 @@ void cmd_loop(void) {
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_dir(void) {
     FatFile handle;
-    char txtbuf[8+1+3+1]; // 8.3 name with terminating 0
+    char name[BUFFER];
 
     working_dir->rewind();
     while (handle.openNext(working_dir, O_RDONLY)) {
-        char * txt = txtbuf;
+        char * pname = name;
         int len = 15;
-        handle.getSFN(txt);
+        handle.getSFN(name);
 
-        while (*txt != 0) {
-            put_value(*txt++, OUTPUT);
+        while (*pname != 0) {
+            put_value(*pname++, OUTPUT);
             len--;
         }
 
@@ -746,7 +740,8 @@ void cmd_dir(void) {
 //
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_info(void) {
-    char *pbuf = buf;
+    char name[BUFFER];
+    char *pname = name;
 
     Serial.println(F("Info"));
     for (int i=0; i<5; i++) {
@@ -756,10 +751,10 @@ void cmd_info(void) {
         Serial.print(i);
         Serial.print(F(": "));
         if (handles[i]) {
-            handles[i].getName(pbuf, BUFFER);
-            Serial.println(pbuf);
-            while (*pbuf != 0) {
-                put_value(*pbuf++, OUTPUT);
+            handles[i].getName(pname, BUFFER);
+            Serial.println(pname);
+            while (*pname != 0) {
+                put_value(*pname++, OUTPUT);
             }
         }
         else {
@@ -807,25 +802,28 @@ void cmd_close(char fid) {
 //
 // close any existing file using this fid
 // attempt to open file
-// FILE_READ - error if file does not exist. FID
+// O_RDONLY - error if file does not exist. FID
 // is left unused.
-// FILE_WRITE - seek to start of file
+// O_RDWR | O_CREATE - seek to start of file. Create file if it
+// does not exist.
 //
 // RESPONSE: sends TRUE on success (fid is now associated
 // with a file) or FALSE on error (fid is now unused)
 // Updates global status
 void cmd_open(char fid, int mode) {
+    char name[BUFFER];
     status = 0;
 
-    get_filename(buf);
+    get_filename(name);
 
     if (handles[fid]) {
         // file handle is currently in use
         handles[fid].close();
     }
 
-    handles[fid].open(buf, mode);
+    handles[fid].open(name, mode);
     if (handles[fid]) {
+        // Documentation implies that this happens on OPEN but is not explicit
         status = handles[fid].seek(0);
     }
 
@@ -981,12 +979,12 @@ void cmd_status(void) {
 // RESPONSE: 4 bytes (file size, LS byte first),
 // followed by 1 status byte.
 void cmd_size(char fid) {
-    long size = handles[fid].size();
+    long size = handles[fid].size(); // always succeeds => no status.
     put_value( size        & 0xff, OUTPUT);
     put_value((size >> 8)  & 0xff, OUTPUT);
     put_value((size >> 16) & 0xff, OUTPUT);
     put_value((size >> 24) & 0xff, OUTPUT);
-    put_value(0, INPUT); // TODO get status
+    put_value(0, INPUT);
 }
 
 
@@ -1003,4 +1001,24 @@ void cmd_size_rd(char fid) {
     put_value((size >> 16) & 0xff, OUTPUT);
     put_value((size >> 24) & 0xff, OUTPUT);
     n_rd(fid, size);
+}
+
+
+// boot. Given a profile pid (as part of the command)
+// and no other parameters, load the profile and use
+// it to return 1 sector's worth of read data for the
+// profile's geometry: the first sector of the first
+// disk.
+//
+// RESPONSE: sends TRUE or FALSE response to host. Updates global status
+void cmd_pboot(char pid) {
+    prestore(pid);
+    handles[0].seek(0);
+    // errors up to now will be ignored, but will make the read fail.
+    // If the read fails it returns the correct amount of data, but the
+    // data is all-0. n_rd updates the global status so that the final
+    // response byte indicates whether the whole process has been successful
+    n_rd(0, profile.sect_chunks * SECTOR_CHUNK);
+    // n_rd
+    put_value(status, INPUT);
 }
