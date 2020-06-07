@@ -50,6 +50,7 @@ $PortObj->read_const_time(1000); # 1 second per unfulfilled "read" call
 # 2: in read, line-based, get length
 # 3: in read, character-based, save data to file.
 # 4: in write, flow-controlling write data from console
+# 5: in EEPROM programming cycle
 my $state        :shared;
 $state = 0;
 # file name in local filesystem -- used by thread in state=2
@@ -65,8 +66,11 @@ my $remote_name;
 # Handle Rx from NAScas
 threads->create(\&serial_in_thread);
 
+# Signal-handling for main program (CLI)
+$SIG{HUP} = sub {print "INFO: received a SIGHUP. Not currently handled";};
 
-# Handle command-line interpreter and Tx to NAScas
+
+# Handle command-line and Tx to NAScas
 while (1) {
     print "NAScas console: ";
     my $cmd = <>;
@@ -178,16 +182,31 @@ while (1) {
             sleep(1);
         }
     }
-    elsif ($bit[0] =~ /^PUT/) { # put address data (values in hex)
+    elsif ($bit[0] =~ /^PUT/) { # put address data (values in hex) TODO not yet documented!!
         # this raw access is just for testing. It will be wrapped in a mechanism for defining the
         # profiles properly.
         $PortObj->write("P $bit[1] $bit[2] \r");
     }
-    elsif ($bit[0] =~ /^GET/) { # get address (value in hex)
+    elsif ($bit[0] =~ /^GET/) { # get address (value in hex) TODO not yet documented!!
         # this raw access is just for testing. It will be wrapped in a mechanism for defining the
         # profiles properly.
         $PortObj->write("G $bit[1] \r");
     }
+    elsif ($bit[0] =~ /^PROFILE/) { # TODO not yet documented!!
+        # Create and program (to EEPROM) the default profile settings
+        my $pref = gen_default_profile();
+        foreach my $addr (0..$#$pref) {
+            $state = 5;
+            my $cmd = sprintf("P %x %x \r", $addr, $pref->[$addr]);
+            $PortObj->write($cmd);
+            while ($state != 0) {
+            }
+            print ".";
+        }
+        print "\n";
+    }
+
+
     elsif ($bit[0] =~ /^QUIT/) {
         foreach my $thr ( threads->list ) {
             $thr->kill('INT')->join();
@@ -280,6 +299,10 @@ sub serial_in_thread {
                         open RFILE, ">$local_name";
                         $state = 2;
                     }
+                    elsif ($buffer =~ /^Ack 10\r\n$/) {
+                        # EEPROM program done.
+                        $state = 0;
+                    }
                     elsif ($buffer =~ /^Ack 4\r\n$/) {
                         # Ready for write data, doing flow control.
                         $state = 4;
@@ -330,6 +353,58 @@ sub legal_msdos_name {
         return 0;
     }
 }
+
+
+# Create a default profile setup for storage in EEPROM; return reference to an
+# array containing the EEPROM data. This also acts as a definition of the format.
+sub gen_default_profile {
+    my @record;
+
+    # Byte sequence
+    $record[0] = ord("N"); # Magic to suggest a valid record
+    $record[1] = ord("A"); # "
+    $record[2] = ord("S"); # "
+    $record[3] = 0;        # Default profile selects PolyDos
+    $record[4] = 0;        # checksum; bytes sum to 0.
+    # PolyDos                                                                        TPS  TRK 1ST SIZ
+    add_profile(\@record, "POLYDOS0.DSK","POLYDOS1.DSK","POLYDOS2.DSK","POLYDOS3.DSK",36, 35, 0, 2); # 256-byte sectors
+    # NAS-DOS
+    add_profile(\@record, "NASDOS0.DSK", "NASDOS1.DSK", "NASDOS2.DSK", "NASDOS3.DSK", 32, 80, 1, 2); # 256-byte sectors
+    # CP/M
+    add_profile(\@record, "CPM0.DSK",    "CPM1.DSK",    "CPM2.DSK",    "CPM3.DSK",    10, 77, 1, 4); # 512-byte sectors
+    # BootMenu
+    add_profile(\@record, "SDBOOT0.DSK", "SDBOOT1.DSK", "SDBOOT2.DSK", "SDBOOT3.DSK", 36, 35, 0, 4); # 512-byte sectors
+
+    # calculate and insert checksum
+    my $csum = 0;
+    foreach my $byte (@record) {
+        $csum += $byte;
+    }
+    $record[4] = 0xff & (($csum^0xff) + 1);
+    return \@record;
+}
+
+sub add_profile {
+    my $ref = $_[0];
+
+    # insert 4 file names, each null-terminated in a 13-byte field
+    for my $name (1..4) {
+        for my $i (0..12) {
+            no warnings 'substr';
+            if (defined substr($_[$name], $i, 1)) {
+                push @$ref, ord(substr ($_[$name], $i, 1));
+            }
+            else {
+                push @$ref, 0;
+            }
+        }
+    }
+    push @$ref, $_[5]; # sectors per track
+    push @$ref, $_[6]; # number of tracks
+    push @$ref, $_[7]; # first sector
+    push @$ref, $_[8]; # number of 128-byte chunks per sector
+}
+
 
 
 sub help_msg {
