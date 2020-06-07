@@ -134,34 +134,48 @@
 /////////////////////////////////////////////////////
 
 
-// Profile (stored in EEPROM) determines the default
-// disk image names and the disk geometry. The layout
-// of a profile is shown below. Strictly, it is wasteful
-// to null-terminate the names, but it makes the code
-// simpler elsewhere and we have loads of space.
+// EEPROM holds a "profile record" consisting of a header followed by
+// 4 profiles. Each profile defines 4 virtual disk images and the disk
+// geometry. The 5 bytes of header are: N A S x y  where:
+// NAS are ASCII values for those letters
+// x is the default profile to use at reset (numeric code, not ASCII)
+// y is the checksum of the whole record, such that the modulo-256
+// sum of the bytes (including the checksum) is 0. The layout of a
+// profile is shown below. (Strictly, it is wasteful to null-terminate
+// the file names, but it makes the code simpler elsewhere and we have
+// enough space.) The profile record can be edited using the console
+// interface.
 //
 #define SECTOR_CHUNK (128)
 typedef struct PROFILE {
     char fnam_fext[4][8+1+3+1]; // Null-terminated MSDOS 8.3 names including dot
-    uint8_t nsect_per_track;  // sectors per track
-    uint8_t ntrack;           // tracks TODO not used.. could be used to detect illegal seek.
-    uint8_t first_sect;       // number associated with first sector
-    uint8_t sect_chunks;      // number of SECTOR_CHUNKs per sector
+    uint8_t nsect_per_track;    // sectors per track
+    uint8_t ntrack;             // tracks TODO not used.. could be used to detect illegal seek.
+    uint8_t first_sect;         // number associated with first sector
+    uint8_t sect_chunks;        // number of SECTOR_CHUNKs per sector
 } PROFILE;
+
+
+// Overlay the profile with a char array - makes it simple
+// to populate from a byte stream of EEPROM reads.
+typedef union UPROFILE {
+    struct PROFILE f;
+    char b[56];
+} UPROFILE;
+
 
 // profile with default values - this is the setup for PolyDos2
 // (disk geometry is abstracted away by the PolyDos ROM so only
 // the file names and sector size matter).
-PROFILE profile {
-    {"DSK0.BIN", "DSK1.BIN", "DSK2.BIN", "DSK3.BIN"},
-    36, // 18 sectors per track per side
-    35, // 35 tracks
-    0,  // first sector is sector 0
-    2   // 256 bytes per sector
+UPROFILE profile {
+    {
+        {"DSK0.BIN", "DSK1.BIN", "DSK2.BIN", "DSK3.BIN"},
+         36, // 18 sectors per track per side
+         35, // 35 tracks
+         0,  // first sector is sector 0
+         2   // 256 bytes per sector
+    }
 };
-
-// TODO EEPROM data consists of a magic number, a version number, a default profile number,
-// 4 (or 5?) profiles and a checksum.
 
 
 // TODO do error checking in n_rd
@@ -227,6 +241,8 @@ PROFILE profile {
 // problems). Download from https://github.com/greiman/SdFat
 #define SPI_SPEED SD_SCK_MHZ(50)
 #include <SdFat.h>
+
+#include <EEPROM.h>
 
 
 // Prototypes
@@ -299,8 +315,7 @@ void setup()   {
         SD.chdir("NASCOM", 1);
         working_dir = SD.vwd();
 
-        Serial.println(F("OK"));
-        prestore(0); // TODO default, until proper profile handling is in place
+        prestore(7);
     }
 
     // wait until handshake from host is idle
@@ -633,7 +648,7 @@ void set_data_dir(int my_dir) {
 // Commands
 
 // try to restore configuration from specified profile
-// TRUE if file was found and read successfully.
+// TRUE if virtual disks were opened successfully.
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_prestore(char pid) {
@@ -642,21 +657,47 @@ void cmd_prestore(char pid) {
 }
 
 
-// helper.
-// try to restore profile pid from EEPROM
+// Helper for cmd_prestore(), cmd_pboot()
 //
-// return TRUE if profile exists and readable
+// if EEPROM profile record is good, use the supplied pid to restore
+// a profile. If it is missing or not good, stay with the ROM-based default.
+// A pid of 0, 1, 2, 3 restores that pid.
+// A pid of 7 indirects the default pid stored in the profile record.
+//
+// return TRUE if virtual disks were opened successfully.
 // return FALSE otherwise
 int prestore(char pid) {
     Serial.println(F("prestore"));
 
-    // TODO for now, just use the default profile. There is no option to have fewer disks: error unless all 4 exist.
-    // TODO should we close them first? OK if only used at startup, but if an other times may want to close them first.
+    // profile record is 5 bytes + 4 profile entries of 56 bytes each
+    unsigned char csum = 0;
+    for (int i=0; i<(5+4*56); i++) {
+        csum = csum + EEPROM.read(i);
+    }
+
+    if (csum == 0) {
+        Serial.println(F("using profile record"));
+        if (pid == 7) {
+            pid = EEPROM.read(3);
+        }
+
+        // get stuff from EEPROM
+        int base = 5 + (pid * sizeof(struct PROFILE));
+        for (int i=0; i<sizeof(struct PROFILE); i++) {
+            profile.b[i] = EEPROM.read(base+i);
+        }
+    }
+
+    // TODO there is no option to have fewer disks: error unless all 4 exist.
     // Do I even need to do this or should an operation open and close the disk, in which case only need 1 handle.
-    // TODO in the case where file does not exist, does O_WRDWR create it? I think it does *not* because there
+    // TODO in the case where file does not exist, does O_RDWR create it? I think it does *not* because there
     // is a separate flag O_CREAT
     for (int i=0; i<4; i++) {
-        handles[i].open(profile.fnam_fext[i], O_RDWR);
+        if (handles[i]) {
+            // file handle is currently in use
+            handles[i].close();
+        }
+        handles[i].open(profile.f.fnam_fext[i], O_RDWR);
     }
     // Success?
     return (handles[0].isOpen() && handles[1].isOpen() && handles[2].isOpen() && handles[3].isOpen());
@@ -848,7 +889,7 @@ void cmd_ts_seek(char fid) {
         //    Serial.print(track,HEX);
         //    Serial.print(" sector" );
         //    Serial.println(sector,HEX);
-        long offset = ( (long)profile.nsect_per_track * (long)track + (long)sector - (long)profile.first_sect ) * (long)(profile.sect_chunks * SECTOR_CHUNK);
+        long offset = ( (long)profile.f.nsect_per_track * (long)track + (long)sector - (long)profile.f.first_sect ) * (long)(profile.f.sect_chunks * SECTOR_CHUNK);
         status = handles[fid].seek(offset);
     }
     else {
@@ -915,7 +956,7 @@ void cmd_n_wr(char fid) {
 //
 // RESPONSE: send TRUE or FALSE response to host. Updates global status
 void cmd_sect_wr(char fid) {
-    n_wr(fid, profile.sect_chunks * SECTOR_CHUNK);
+    n_wr(fid, profile.f.sect_chunks * SECTOR_CHUNK);
 }
 
 
@@ -960,7 +1001,7 @@ void cmd_n_rd(char fid) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_sect_rd(char fid) {
-    n_rd(fid, profile.sect_chunks * SECTOR_CHUNK);
+    n_rd(fid, profile.f.sect_chunks * SECTOR_CHUNK);
 }
 
 
@@ -1018,7 +1059,6 @@ void cmd_pboot(char pid) {
     // If the read fails it returns the correct amount of data, but the
     // data is all-0. n_rd updates the global status so that the final
     // response byte indicates whether the whole process has been successful
-    n_rd(0, profile.sect_chunks * SECTOR_CHUNK);
-    // n_rd
+    n_rd(0, profile.f.sect_chunks * SECTOR_CHUNK);
     put_value(status, INPUT);
 }
