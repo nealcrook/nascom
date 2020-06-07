@@ -362,7 +362,7 @@ typedef struct FDIRENT {
 } FDIRENT;
 
 
-// Sometimes it's conventient to access a directory entry as a byte
+// Sometimes it's convenient to access a directory entry as a byte
 // stream, so overlay it with a char array.
 typedef union UDIRENT {
     struct DIRENT f;
@@ -837,7 +837,7 @@ int foreach_vdisk_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
         unsigned int last = ((dirent.b[2] & 0xff) | (dirent.b[3] << 8)) - 0xc418;
         last = (last/sizeof(struct DIRENT)) - 1;
 
-        for (int i=0; i<last; i++) {
+        for (int i=0; i<=last; i++) {
             handle.read(dirent.b, sizeof(struct DIRENT));
 
             if (dirent.f.fsfl & 2) {
