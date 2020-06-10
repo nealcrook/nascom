@@ -18,7 +18,10 @@
 ;;; $ SETDRV 1 DRV0.BIN
 ;;;
 ;;; Unmount any SDcard file currently associated with drive (FID)
-;;; n (0..3) and mount filename.
+;;; n (0..4) and mount filename.
+;;;
+;;; 0..3 correspond to PolyDos drives. 4 corresponds to the
+;;; file reserved as a print spool (not yet implemented..)
 ;;;
 ;;; filename must be a legal FAT "8.3" name.
 ;;;
@@ -114,7 +117,7 @@ setdrv: ld      hl, (CLINP)
         ;; should be drive number
         cp      '0'
         jp      c, baddrv
-        cp      '4'
+        cp      '5'
         jr      nc, baddrv
 
         ;; convert drive number from ASCII to binary and save in d
@@ -196,35 +199,41 @@ endext: ld      a,3
 ;;; file to replace it with. If the FID is currently in use, its file will get unmounted
 ;;; cleanly so there is nothing we need to care about in that regard.
 
+;;; if we COPEN a non-existent file, it will get created with a file size of
+;;; 0, which then causes all sorts of Bad Things when you try to use it. The
+;;; way to check if a file exists is to COPENR it and error or, if
+;;; successfull, COPEN it.
+
         ld      a,(DDRV)        ;is the directory buffer associated
         cp      d               ;with the drive to be replaced?
-        jr      nz, open        ;no
+        jr      nz, openr       ;no
         ld      a,$ff           ;yes, so
         ld      (DDRV), a       ;invalidate directory buffer
 
-open:   ld      a,COPEN
+openr:  push    hl              ;preserve pointer to file name
+                                ;also need D but nothing's messing with that
+
+        ld      a,COPENR
         or      d               ;merge in the FID
 
-        call    putcmd
-
-sendnam:ld      a,(hl)          ;get char of filename
-        call    putval          ;corrupts A
-        ld      a,(hl)          ;get it again
-        inc     hl              ;point to next character
-
-        or      a               ;did we just send end-of-filename?
-        jr      nz,sendnam      ;no, so continue
-
-        call    gorx
-        call    getval
-        call    gotx            ;preserves A
-
-        or      a               ;set flags on status
+        call    cnam
 
         ;;; z => error (unlike PolyDos)
-        jr      nz, ok          ;exit with no error
+        jr      nz, open        ;good! file exists
 
-        ld      a, 44           ;unknown error
+        ld      a, $30          ;can't find that file
+        jr      exit
+
+open:   pop     hl
+        ld      a,COPEN
+        or      d               ;merge in the FID
+
+        call    cnam
+
+        ;;; z => error (unlike PolyDos)
+        jr      nz, ok          ;exit successfully
+
+        ld      a, $23          ;record not found
         jr      exit
 
 ;;; missing extension. Report error and exit
@@ -260,6 +269,29 @@ ok:     xor     a               ;A=0 => no error
 ;;; come here with A=0 for good exit, else error code in A
 exit:   SCAL    ZCKER
         SCAL    ZMRET
+
+
+;;; SUBROUTINE
+;;; come here with command in A (COPEN or COPENR)
+;;; filename at (HL)
+;;; send command and filename.
+;;; return with status in A, flags set accordingly.
+cnam:   call    putcmd
+
+sendnam:ld      a,(hl)          ;get char of filename
+        call    putval          ;corrupts A
+        ld      a,(hl)          ;get it again
+        inc     hl              ;point to next character
+
+        or      a               ;did we just send end-of-filename?
+        jr      nz,sendnam      ;no, so continue
+
+        call    gorx
+        call    getval
+        call    gotx            ;preserves A
+
+        or      a               ;set flags on status
+        ret
 
 
 ;;; pad to 512bytes to be tidy
