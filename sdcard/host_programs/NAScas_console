@@ -69,18 +69,13 @@ threads->create(\&serial_in_thread);
 # Signal-handling for main program (CLI)
 $SIG{HUP} = sub {print "INFO: received a SIGHUP. Not currently handled";};
 
-
 # Handle command-line and Tx to NAScas
 while (1) {
     print "NAScas console: ";
-    my $cmd = <>;
-    if (defined $cmd) {
-        chomp $cmd;
-        next if $cmd eq '';
-    }
-    else {
-        next;
-    }
+    my $cmd = <STDIN>;
+    chomp $cmd;
+    $cmd =~ s/^\s+//;
+    next if $cmd eq '';
 
     my @bit = split " ", $cmd;
     $bit[0] = uc $bit[0];
@@ -211,6 +206,7 @@ while (1) {
         foreach my $thr ( threads->list ) {
             $thr->kill('INT')->join();
         }
+        $PortObj->close();
         exit;
     }
     elsif ($bit[0] =~ /^HELP/) {
@@ -260,6 +256,12 @@ sub serial_in_thread {
 ##    while ($timeout>0) {
     while (1) {
         my ($count,$saw)=$PortObj->read(1); # will read _up to_ 255 chars
+        if (!defined $count) {
+            print "ERROR lost contact with target. USB disconnected?\n";
+            # not very polite, but better than spewing out messages forever.
+            exit;
+        }
+
         if ($count > 0) {
             #print "Debug: got $saw state=$state $rd_bytes_expected $rd_bytes_actual\n";
             if ($state == 3) {
@@ -272,7 +274,7 @@ sub serial_in_thread {
                     close RFILE;
                 }
             }
-            elsif ($state == 4) {
+            elsif ($state == 4) { # file write
                 # each . signals a desire for 512 more characters
                 if ($saw eq ".") {
                     $gimme512++;
@@ -316,7 +318,16 @@ sub serial_in_thread {
                         # this is the size of the file to be read
                         $rd_bytes_expected = $buffer;
                         $rd_bytes_actual = 0;
-                        $state = 3;
+                        if ($rd_bytes_expected == 0) {
+                            # special case of zero-byte file: we're
+                            # already done.
+                            printf "INFO read of file as %s; received %d bytes\n", $local_name, $rd_bytes_actual;
+                            $state = 0;
+                            close RFILE;
+                        }
+                        else {
+                            $state = 3;
+                        }
                     }
                     else {
                         $buffer =~ s/\r\n//;
