@@ -286,6 +286,10 @@ FatFile *working_dir;
 // Protocol bit
 int my_t2h;
 
+// Mechanism to detect that the NASCOM wants to do disk operations across
+// the PIO interface.
+int train_count;
+
 // INPUT when receiving data OUTPUT when sending data
 char direction;
 
@@ -294,7 +298,6 @@ SdFat SD;
 void setup()   {
     Serial.begin(115200);  // for Debug
 
-    my_t2h = 0;
     next_file = 0;
     direction = INPUT;
 
@@ -318,19 +321,32 @@ void setup()   {
         prestore(7);
     }
 
-    // wait until handshake from host is idle
-    while (0 != rd_h2t()) {
-    }
+    my_t2h = rd_h2t();
+    train_count = 0;
 
     Serial.println(F("Start command loop"));
 }
 
 
-// Each pass through loop handles 1 command to completion
-// and leaves the Target set up as a receiver.
+// Each pass through loop polls for a command. The check hs_differ is non-blocking
+// which allows this loop to be extended with other options.
 void loop() {
-    //Serial.println("Start command wait");
+    if (hs_differ()) {
+        if (train_count == 4) {
+            cmd_disk();
+        }
+        else {
+            Serial.println(F("Train.."));
+            train_count++;
+            set_hs_match(); // Ack to host
+        }
+    }
+}
 
+
+// Come here when there is a disk command: get_value will not block.
+// On entry and exit, the Target is set up as a receiver.
+void cmd_disk() {
     int cmd_data = get_value();
     // Turn off the ERROR LED in anticipation
     digitalWrite(PIN_ERROR, 0);
@@ -460,12 +476,20 @@ void loop() {
 
 
 ////////////////////////////////////////////////////////////////
-// Stuff that waggles pins
+// Stuff that tests/waggles pins
 
 // get value of H2T. My current implementation maps this to A7
 // which can only be read using analogRead
 int rd_h2t(void) {
     return analogRead(PIN_H2T) > 500;
+}
+
+
+// poll to see if incoming handshake differs from our value. During
+// transfers initiated by the Host (cmd/parameters/data and got2h)
+// it's an indication that we need to do something.
+int hs_differ(void) {
+    return my_t2h != rd_h2t();
 }
 
 
