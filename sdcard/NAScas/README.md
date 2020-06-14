@@ -14,7 +14,6 @@ to run the UART as fast as it and NAS-SYS can go. The current design runs at
 
 ## Contents
 
-* photos/         -- photos of the hardware and of SERBOOT in operation
 * NAScas.ino      -- the C code for the Arduino (includes wiring instructions)
 * messages.h      -- "
 * parser.ino      -- "
@@ -22,8 +21,9 @@ to run the UART as fast as it and NAS-SYS can go. The current design runs at
 
 See also:
 
-* nascom/host_programs/ which contains associated Z80 code for the NASCOM.
-* nascom/sdcard/nascom_sdcard/docs which contains a full manual, schematics and other documentation
+* nascom/sdcard/host_programs/ -- associated Z80 code for the NASCOM and other support software
+* nascom/sdcard/doc/ -- full manual, schematics and other documentation
+* nascom/sdcard/photos/ -- photos of the hardware and of the software in action
 
 
 ## CAS format

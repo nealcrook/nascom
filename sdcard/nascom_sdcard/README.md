@@ -11,13 +11,14 @@ disk drive, running the PolyDos operating system.
 ## Contents
 
 * nascom_sdcard.ino -- the C code for the Arduino (includes wiring instructions)
-* photos/           -- photos of the assembled board sandwich
-* doc/              -- description of the protocol and the command-set, a full manual, schematics
 
 See also:
 
-* nascom/sdcard/host_programs/ which contains associated Z80 code for the NASCOM. A "library" of subroutines and some example programs for using them.
-* nascom/PolyDos/ which contains PolyDos disk images and documentation
+* nascom/sdcard/host_programs/ -- associated Z80 code for the NASCOM. A "library" of subroutines and some example programs for using them.
+* nascom/sdcard/photos/ -- photos of the assembled PCB and the prototype board sandwich
+* nascom/sdcard/doc/ -- description of the protocol and the command-set, a full manual, schematics
+
+* nascom/PolyDos/ -- PolyDos disk images and documentation
 
 
 ## Hardware
