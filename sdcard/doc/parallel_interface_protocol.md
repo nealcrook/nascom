@@ -28,16 +28,16 @@ is undefined.
 
 ## 1a: Send command byte from Host to Target
 
-* Host: put xd=command byte, put cmd=1
+* Host: put xd=command byte, put CMD=1
 * Host: invert H2T
 * Host: wait until T2H == H2T
 * Target: wait until H2T != T2H
-* Target: sample value of xd, cmd
+* Target: sample value of xd, CMD
 * Target: put T2H = H2T
 
 ## 1b: Send data byte from Host to Target
 
-* Same as 1a, except cmd=0
+* Same as 1a, except CMD=0
 
 ## 2: Send data byte from Target to Host
 
@@ -68,7 +68,7 @@ is undefined.
 can run at any speed down to DC.
 * For patterns where the Host is driving the bus, the idle state of
 the handshakes is that they match.
-* For patterns where the Targer is driving the bus, the idle state of
+* For patterns where the Target is driving the bus, the idle state of
 the handshakes is that they differ
 
 Thus:
