@@ -10,7 +10,7 @@
 
 # Internals
 
-* parallel_interface_command_set.md
+* [Parallel interface command set](parallel_interface_command_set.md)
 
 
 Elsewhere:
