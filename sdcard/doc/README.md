@@ -11,6 +11,7 @@
 # Internals
 
 * [Parallel interface command set](parallel_interface_command_set.md)
+* [Parallel interface protocol](parallel_interface_protocol.md)
 
 
 Elsewhere:
