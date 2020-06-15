@@ -8,6 +8,11 @@
 * nascom_sd_REVA_schematic.pdf -- schematic of REV A PCB
 * nascom_sd_REVA_eco.pdf -- schematic marked up with ECO (4 cuts, 4 wires)
 
+# Internals
+
+* parallel_interface_command_set.md
+
+
 Elsewhere:
 
 * The Z80 assembly listings in the host_program/ directory are commented
