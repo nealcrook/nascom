@@ -1,6 +1,18 @@
 # PolyDos
 
-There is material here (ROM, disk images and documentation) for PolyDos 2 and PolyDos 3.
+PolyDos was written for the NASCOM by Anders Hejlesberg. Anders wrote (29 April 2018):
+
+> Hi Neal,
+>
+> First, absolutely feel free to share anything you have related to PolyDos or any of the other software I wrote for the NASCOM 2. I’d be delighted to see any or all of it in the public domain.
+>
+> I noticed that http://www.nascomhomepage.com/ already has copies of the PolyDos manuals. My, what a trip down memory lane it is to read those. Makes me long for the good old days when programming was a craft and it was all about fitting as much as possible into an impossibly small amount of memory.
+>
+>BTW, an interesting little historical fact is that PolyDos was heavily inspired by the operating system of the S-100 based machines from Polymorphic Systems (https://en.wikipedia.org/wiki/Polymorphic_Systems_(computers)). Our company, PolyData, for several years was the Danish distributor of their systems.
+>
+>Congrats on getting your old NASCOM 2 working again. I wish I had kept mine. That little machine probably taught me more about the basic principles of computers and programming than anything after it.
+>
+>Anders
 
 ## Versions
 
@@ -24,8 +36,43 @@ ROM. Sectors are allocated starting from the first track and allocating both
 sides before moving to the next track. The same format is used for the disk
 images here.
 
-The disk structure (directory format, file format etc.) is documented in the
-PolyDos system programmers guide, which is part of the .pdf bundle here.
+## Material available here
+
+* [boot-ROM (source and binary) for PolyDos 2 and PolyDos 3](rom/README.md)
+* [disk images for PolyDos 2 and PolyDos 3](disk/README.md)
+* [documentation set in PDF format](doc/README.md)
+* [indexed library of software on PolyDos disk images](lib/README.md)
+
+## Help Wanted
+
+If you have a copy of PolyDos 1 or PolyDos 4 or any other PolyDos-related
+information, I'd love to see it; please get in touch.
+
+If you have documentation for the PolyText word processing system, I'd love to
+see it; please get in touch.
+
+## Help Offered
+
+If you want to run this code on your old NASCOM system but you need help burning
+a ROM or getting it working, feel free to get in touch (raise an "Issue" through
+github).
+
+
+## PolyDos-related material elsewhere in this repository
+
+
+In nascom/converters is a PERL program called polydos_vfs. This allows
+manipulation of PolyDos disk images. It is highly capable and contains extensive
+built-in help.
+
+In nascom/converters is a PERL program called sy_extract. This can convert a
+compiled symbol table file written by the PolyZap assembler so that it can be
+used as an "include" file for the GNU Z80 assembler.
+
+In nascom/sdcard is the design and control software for a NASCOM solid-state
+disk. It uses an SDcard for storage and attaches to the NASCOM PIO. You can
+throw away your floppy disks (and floppy disk controller) and still run PolyDos.
+
 
 
 ## PolyDos-related material elsewhere
@@ -51,7 +98,3 @@ PolyDos system programmers guide, which is part of the .pdf bundle here.
 * 80-Bus News, Volume 3 issue 5, "PolyDos File Name Listing" is a program to build a unified file index by examining the directories on a set of disks.
 
 * 80-Bus News, Volume 3 issue 6, "Lawrence and the PolyDos User Group"
-
-
-
-

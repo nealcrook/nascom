@@ -92,15 +92,3 @@ manipulation of PolyDos disk images. It contains extensive built-in help.
 
 In nascom/sdcard is the design and control software for a NASCOM solid-state
 disk that runs PolyDos.
-
-
-## Wanted!
-
-There were other versions of PolyDos. If you have one (ROMS, disk images) and
-you would be prepared to donate a copy, I'd love to hear from you (raise an "Issue" through github).
-
-
-## Help Offered
-
-If you want to run this code on your old NASCOM system but you need help burning
-a ROM or getting it working, feel free to get in touch (raise an "Issue" through github).
