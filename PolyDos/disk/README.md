@@ -77,18 +77,5 @@ The PolyDos2_files/ and PolyDos3_files/ directories contain set of unmodified
 files extracted from each disk image. In particular, "unmodified" means .TX
 files retain the original Ctrl-M line endings.
 
-
-## Other Stuff
-
-In nascom/converters is a PERL program called polydos_vfs. This allows
-manipulation of PolyDos disk images. It contains extensive built-in help. (As of
-May2018 it is a work-in-progress).
-
-In nascom/converters is a PERL program called sy_extract. This can convert a
-compiled symbol table file written by the PolyZap assembler so that it can be
-used as an "include" file for the GNU Z80 assembler.
-
-manipulation of PolyDos disk images. It contains extensive built-in help.
-
-In nascom/sdcard is the design and control software for a NASCOM solid-state
-disk that runs PolyDos.
+The PolyDos disk structure (directory format, file format etc.) is documented in
+the PolyDos system programmers guide, which is part of the .pdf bundle in ../doc
