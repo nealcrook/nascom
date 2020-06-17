@@ -12,11 +12,16 @@
 
 * [Parallel interface command set](parallel_interface_command_set.md)
 * [Parallel interface protocol](parallel_interface_protocol.md)
+* [Parallel interface programming examples](parallel_interface_programming.md)
+* [Console interface command set](console_interface_command_set.md)
+* [Serial interface command set](serial_interface_command_set.md)
+* [Profile record format](profile_record_format.md)
+* [Boot loader](boot_loader.md)
 
 
 Elsewhere:
 
-* The Z80 assembly listings in the host_program/ directory are commented
+* The Z80 assembly listings in the host_programs/ directory are commented
 examples of how to "talk" to the Arduino board.
 
 * The header of nascom_arduino.ino has a complete description of the hardware
