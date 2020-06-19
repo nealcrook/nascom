@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 #
-# This is the console interface for NAScas. Run it on a PC and connect a USB
-# cable from the PC to the Arduino USB connector on the NAScas board. If
-# NAScas has been built to include the console code, you will now be able
-# to transfer files to and from the SDcard. Use "help" for commands/syntax.
+# This is the console interface for nascom_sdcard. Run it on a PC and connect a USB
+# cable from the PC to the Arduino USB connector on the nascom_sdcard board.
+# You will now be able to transfer files to and from the SDcard. Use "help" for
+# commands/syntax.
 #
 # https://github.com/nealcrook/nascom
 #
@@ -17,7 +17,6 @@
 # - nicer formatting here
 # - allow format conversion on-the-fly (using nascon)
 # - "idle" flag from thread to make CLI print a return/prompt
-# - find and fix root cause of messy start-up messaging/spurious errors
 # - "SDcard not present" error is not detected
 #
 ################################################################################
@@ -28,7 +27,7 @@ use threads;
 use threads::shared;
 use Device::SerialPort;  ## need to install this from CPAN
 
-die "Usage: ./NAScas_console /dev/ttyUSB1\n" if !defined $ARGV[0];
+die "Usage: ./NASconsole /dev/ttyUSB1\n" if !defined $ARGV[0];
 
 my $device = $ARGV[0];
 my $PortObj=Device::SerialPort->new($device) || die "ERROR cannot open $device\n";
@@ -71,7 +70,7 @@ $SIG{HUP} = sub {print "INFO: received a SIGHUP. Not currently handled";};
 
 # Handle command-line and Tx to NAScas
 while (1) {
-    print "NAScas console: ";
+    print "NASconsole: ";
     my $cmd = <STDIN>;
     chomp $cmd;
     $cmd =~ s/^\s+//;
@@ -101,13 +100,12 @@ while (1) {
     }
     elsif ($bit[0] =~ /^WRITE/) {
         # write file. Expect 1 or 2 arguments
+        $local_name = $bit[1];
         if (scalar @bit == 3) {
-            $local_name = $bit[1];
             $remote_name = uc $bit[2];
         }
         elsif (scalar @bit == 2) {
-            $local_name = uc $bit[1];
-            $remote_name = uc $bit[1];
+            $remote_name = uc $local_name;
         }
         else {
             print "ERROR wrong number of arguments to write command\n";
@@ -116,6 +114,19 @@ while (1) {
         if (!legal_msdos_name($remote_name)) {
             print "ERROR $remote_name is not a legal MSDOS 8.3 filename\n";
             next;
+        }
+
+        # ignore/work-around mismatched case in $local_name
+        if (not -e $local_name){
+            if (-e uc($local_name)) {
+                $local_name = uc $local_name;
+                print "INFO Using local file $local_name instead\n";
+            }
+            elsif (-e lc($local_name)) {
+                $local_name = lc $local_name;
+                print "INFO Using local file $local_name instead\n";
+            }
+            # if neither work the open will fail.. we tried our hardest!
         }
 
         if (open WFILE, $local_name) {
@@ -147,7 +158,7 @@ while (1) {
             print "\nINFO Wrote $count bytes to $remote_name -- file had $bytes bytes\n";
         }
         else {
-            print "ERROR no such local file $local_name\n";
+            print "ERROR Could not open local file $local_name\n";
         }
     }
     elsif ($bit[0] =~ /^READ/) {
@@ -161,7 +172,7 @@ while (1) {
             $remote_name = uc $bit[1];
         }
         else {
-            print "ERROR wrong number of arguments to read command\n";
+            print "ERROR Wrong number of arguments to read command\n";
             next;
         }
         if (!legal_msdos_name($remote_name)) {
@@ -213,7 +224,7 @@ while (1) {
         help_msg();
     }
     else {
-        print "ERROR no such command -- try 'help'\n";
+        print "ERROR No such command -- try 'help'\n";
     }
 }
 
@@ -231,7 +242,7 @@ sub serial_in_thread {
     # (some of these will never be printed)
     my %messages = (
         'Ack 0' =>  'INFO Directory in progress',
-        'Ack 1' => 'ERROR no SDcard present',
+        'Ack 1' => 'ERROR No SDcard present',
         'Ack 2' =>  'INFO Erase completed successfully',
         'Ack 3' => 'ERROR Erase failed: bad filename or file not found',
         'Ack 4' =>  'INFO Write accepted. Data transfer starting.',
@@ -257,7 +268,7 @@ sub serial_in_thread {
     while (1) {
         my ($count,$saw)=$PortObj->read(1); # will read _up to_ 255 chars
         if (!defined $count) {
-            print "ERROR lost contact with target. USB disconnected?\n";
+            print "ERROR Lost contact with target. USB disconnected?\n";
             # not very polite, but better than spewing out messages forever.
             exit;
         }
@@ -288,7 +299,7 @@ sub serial_in_thread {
                     $state = 0;
                 }
                 else {
-                    print "Internal error: expected . got: $saw\n";
+                    print "ERROR Internal error: expected . got: $saw\n";
                 }
             }
             else {
@@ -424,7 +435,7 @@ Console for NAScas.
 
 Usage:
 
-./NAScas_console /dev/ttyUSB0
+./NASconsole /dev/ttyUSB0
 
 Reports asynchronous status/debug messages from NAScas, and supports the following
 commands:
@@ -459,14 +470,15 @@ read filename lfilename  - read file filename from SDcard and save locally as lf
 
 help                     - this is it
 
-quit                     - leave NAScas_console
+quit                     - leave NASconsole
 
-When you start NAScas_console, it resets NAScas; this is an Arduino design feature
+When you start NASconsole, it resets the nascom_sdcard hardware; this is an Arduino design feature
 
-For convenience, whatever is specified as filename is converted automatically to upper case; case is only important
-for lfilename.
+For convenience, whatever is specified as "filename" is converted automatically to upper case; case
+is only important for "lfilename" (for write: if "lfilename" is not found, try to use the upper-case
+equivalent then the lower-case equivalent before giving up).
 
-The NAScas command loop will only respond to one thing at a time.
+The NASconsole command loop will only respond to one thing at a time.
 
 EOF
 }

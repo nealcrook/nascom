@@ -201,7 +201,13 @@ Usually, if you issue RS repeatedly, you will always read the same file. Usually
 
 ### The TS Command
 
-Use this to send a text file to the NASCOM exactly as though you had typed it in by hand. For example, you could grab a BASIC program from somewhere on the 'net and then deliver it to BASIC (which will tokenize it line by line and store it in memory) and then save it using CLOAD. The session to do this would be something like this:
+Use this to send a text file to the NASCOM exactly as though you had typed it in
+by hand. The NASCOM uses CR (0x0d) line endings and ignores LF (0x0a), so your
+text file should use MSDOS line endings (Unix line endings will not work).
+
+For example, you could grab a BASIC program from somewhere on the 'net and then
+deliver it to BASIC (which will tokenize it line by line and store it in memory)
+and then save it using CLOAD. The session to do this would be something like this:
 
 ````
 NAScas> WS HANGMAN.CAS                       -- encoded file will be save here
