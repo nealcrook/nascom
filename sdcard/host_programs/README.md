@@ -1,6 +1,6 @@
 # Host programs for nascom_sdcard
 
-These are programs in z80 assembler intended to run on the NASCOM.
+These are programs in z80 assembler intended to run on the NASCOM and associated with the nascom_sdcard board.
 
 ## Common code
 
@@ -93,8 +93,8 @@ NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
 
 * serboot.asm - boot loader for NASCOM digital tape recorder. A utility program that is loaded through the serial interface and which provides a simple command-line environment for communicating with the NASCOM digital tape recorder. The NASCOM digital tape recorder uses an ATMEL controller and an SDcard to provide solid-state storage for a NASCOM through an unmodified serial/cassette interface.
 * dskboot.asm - boot loader for virtual disk. Refer to the comments in the code.
-* SDBOOT.asm - sample bootstrap program, invoked by sdboot. Refer to the comments in dskboot.asm.
-* NAScas_console - a PERL program to run on a PC that is attached to NAScas hardware. Allows file exchange between PC and the SDcard without the need to remove the SDcard or interrupt the NASCOM session.
+* SDBOOT0.asm - sample bootstrap program, invoked by sdboot. Refer to the comments in dskboot.asm.
+* NAScas_console - a PERL program to run on a PC that is attached to nascom_sdcard hardware. Allows file exchange between PC and the SDcard without the need to remove the SDcard or interrupt the NASCOM session.
 
 ## Tools
 

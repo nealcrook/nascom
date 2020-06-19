@@ -1,2 +1,13 @@
 serboot.bin
 *.lst
+# don't want to wildcard ignore .bin files because I commit the ROM binaries here. Therefore, manually list all the others..
+casdsk.bin
+SDBOOT0.bin
+dskboot.bin
+scrape.bin
+scrape5.bin
+sd_loop.bin
+sd_rd1.bin
+sd_util_b800.bin
+sd_wr1.bin
+sdoff.bin

@@ -16,9 +16,9 @@ Programs can be divided into two groups:
   already been initialised and the program can start issuing commands straight
   away.
 
-It is pretty-much essential to write programs in z80 assembler. This can be done
-either on the NASCOM directly or on some other machine; I tend to develop on a
-PC running Linux, using the nongnu z80 assembler.
+It is pretty-much essential to write in z80 assembler. This can be done either
+on the NASCOM directly or on some other machine; I tend to develop on a PC
+running Linux, using the nongnu z80 assembler.
 
 The program [sd_util.asm](../host_programs/sd_util.asm) is an example of a self-contained/stand-alone program.
 
@@ -35,12 +35,12 @@ contains a set of low-level subroutines for implementing the protocol:
 * getval -- read an 8-bit data value
 
 After initialisation, the interface is set to transmit (ie, to send data from
-the NASCOM to the Target). At the completions of every command, the interface
+the NASCOM to the Target). At the completion of every command, the interface
 should be set back to transmit, ready for the next command.
 
 The [Parallel interface command set](parallel_interface_command_set.md)
 describes all of the commands supported by the Target. For example, the command
-LOOP accepts 1 byte argument and sends 1 byte response.
+LOOP accepts a 1 byte argument and sends a 1 byte response.
 
 Therefore, the command sequence would look like this:
 
