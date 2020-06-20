@@ -676,8 +676,8 @@ sub cmd_unlock {
 
 
 sub cmd_attrib {
-    my ($fs, $new_fexa, $new_flda) = check_arg('fs hi ohi', @_);
-    return unless defined($new_fexa);
+    my ($fs, $new_flda, $new_fexa) = check_arg('fs hi ohi', @_);
+    return unless defined($new_flda);
 
     my ($file,$ext,$drive) = fs_to_fed($fs);
 
@@ -690,14 +690,14 @@ sub cmd_attrib {
 
     printf " INFO %d files match $file.$ext:$drive\n", scalar @$match if scalar @$match != 1;
 
-    # must have $new_fexa
+    # must have $new_flda
     foreach my $i (@{$match}) {
-        $dsk[$drive]->{fcb}->[$i]->{fexa} = hex $new_fexa;
+        $dsk[$drive]->{fcb}->[$i]->{flda} = hex $new_flda;
     }
-    # may have $new_flda;
-    if (defined $new_flda) {
+    # may have $new_fexa;
+    if (defined $new_fexa) {
         foreach my $i (@{$match}) {
-            $dsk[$drive]->{fcb}->[$i]->{flda} = hex $new_flda;
+            $dsk[$drive]->{fcb}->[$i]->{fexa} = hex $new_fexa;
         }
     }
     wr_dir($drive);
@@ -2604,14 +2604,14 @@ EOF
     }
     elsif ($cmd eq 'attrib') {
         print <<EOF
-    attrib <virtual drive number> | <file specifier> exe-hex [ load-hex ]
+    attrib <virtual drive number> | <file specifier> load-hex [ exe-hex ]
 
     Change attributes on all of the files on the specified virtual drive,
     or all of the files that match the file specifier.  The file specifier can
     include * used as a wildcard.
 
-    exe-hex is the new execution address for the file. load-hex, if present, is
-    the new load address for the file; both values must be in hex
+    load-hex is the new load address for the file. exe-hex, if present, is
+    the new execution address for the file; both values must be in hex.
 
     Examples:
     attrib 2 1000
@@ -2897,7 +2897,7 @@ Commands are:
     undelete   - clear delete (D) flag on file(s) from virtual drive
     lock       - set lock (L) flag on file(s) from virtual drive
     unlock     - clear lock (L) flag on file(s) from virtual drive
-    attrib     - change execution/load address on file(s) from virtual drive
+    attrib     - change load/execution address on file(s) from virtual drive
     pack       - remove deleted files and free up disk space and directory entries
     create     - create file from sector(s) on the free list
     repair     - interactively correct directory structure errors

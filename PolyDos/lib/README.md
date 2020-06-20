@@ -241,7 +241,7 @@ PD404 -- BASIC Games (from Neal's collection)
    00c4 0007 10d6 0000          MULTTEST.BS
    00cb 0005 10d6 0000          REACTIME.BS
    00d0 0008 10d6 0000          SUBMARIN.BS
-   00d8 0007 00d6 0000          DRIVING.BS
+   00d8 0007 10d6 0000          DRIVING.BS
    00df 0007 10d6 0000          AMBUSH.BS
    00e6 0003 10d6 0000          SPACER.BS
    00e9 000c 10d6 0000          ROADRACE.BS
@@ -255,8 +255,8 @@ PD404 -- BASIC Games (from Neal's collection)
    018e 0009 10d6 0000          CALENDER.BS
    0197 0011 10d6 0000          LONGADD.BS
    01a8 0017 10d6 0000          CAMEL.BS
-   01bf 003c 10d6 10d6          ADVENTUR.BS
-   01fb 0020 10d6 10d6          GOLF.BS
+   01bf 003c 10d6 0000          ADVENTUR.BS
+   01fb 0020 10d6 0000          GOLF.BS
    021b 000f 10d6 0000          FOXHON.BS
    022a 0061 10d6 0000          VALLEY.BS
    028b 0039 10d6 0000          ALILAB.BS
