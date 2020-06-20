@@ -9,6 +9,8 @@ assembler programs intended to run on the NASCOM.
 * polydos_rom.asm - version of the PolyDos boot ROM that accesses the SDcard. Can be executed from RAM or ROM. 2Kbytes.
 * polydos_util_rom.asm - version of the PolyDos boot ROM that accesses the SDcard, combined with a cut-down version of the utils (so that they still fit in 2K). Can be executed from RAM or ROM. 2Kbytes. There are pre-built binaries and listings for this code, at origins of $B800 and $D800.
 
+polydos_rom/polydos_util_rom are based on the PolyDos 2 ROM code and are configured for a virtual disk size of 315Kbytes.
+
 The (ROM-based) utilities executed through a jump-table at the end of the ROM. The execution addresses shown below assume a ROM assembled at address $D800
 
 * E DFF4 -- CSUM
