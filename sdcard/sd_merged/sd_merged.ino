@@ -525,7 +525,7 @@ File handles[FIDS]; // legal values are 0..(FID-1)
 // Protocol bit
 int my_t2h;
 
-// Mechanism to detect that the NASCOM want's to do disk operations across
+// Mechanism to detect that the NASCOM wants to do disk operations across
 // the PIO interface.
 int train_count;
 
@@ -657,10 +657,30 @@ int rd_drive(void) {
     }
 }
 
+// bit set and clear macros
+#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+
+
+
+
+
 
 void setup()   {
     pinMode(PIN_LED, OUTPUT);
-    pinMode(PIN_DRV, INPUT);
+//    pinMode(PIN_DRV, INPUT);
+
+    // The PIN_DRV and PIN_H2T are input-only analog pins that can only be
+    // read by doing an ADC conversion (do NOT call pinMode on them; it can
+    // do weird stuff)
+    // Speed up ADC conversion by changing prescaler from /128 to /16
+    // This has negligible effect on the cassette (sensing PIN_DRV) but
+    // speeds up "disk" transfers a lot because the PIN_H2T is tested for 
+    // each byte. For a 64Kbyte save, this change reduced the time from
+    // 22s to 9s.
+    sbi(ADCSRA, ADPS2);
+    cbi(ADCSRA, ADPS1);
+    cbi(ADCSRA, ADPS0);
 
     // Generate output clock that will be used as 16x clock for the NASCOM UART.
     // The output pin options are shown in the I/O Multiplexing table of the
@@ -704,7 +724,7 @@ void setup()   {
     direction = INPUT;
 
     // H2T, T2H, CMD have fixed direction
-    pinMode(PIN_H2T, INPUT);
+//    pinMode(PIN_H2T, INPUT);
     pinMode(PIN_T2H, OUTPUT);
     pinMode(PIN_CMD, INPUT);
     pinMode(PIN_ERROR, OUTPUT);
@@ -2287,7 +2307,7 @@ void cmd_info(void) {
 // RESPONSE: none.
 void cmd_stop(void) {
     set_data_dir(INPUT);
-    pinMode(PIN_H2T, INPUT);
+//    pinMode(PIN_H2T, INPUT);
     pinMode(PIN_T2H, INPUT);
     pinMode(PIN_CMD, INPUT);
     pinMode(PIN_ERROR, INPUT);
