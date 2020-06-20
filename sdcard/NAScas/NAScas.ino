@@ -1617,6 +1617,15 @@ void cmd_cass_wr(void) {
 
 
 #ifdef CONSOLE
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Console interface: commands issued through the DEBSERIAL port, which
+// is the USB connection to a PC.
+//
+// For command/protocol description, see
+// ../doc/console_interface_command_set.md
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 void console_dir_sdcard(void) {
     char txtbuf[13];
     char * txt = txtbuf;
@@ -1669,84 +1678,7 @@ void console_ack(int status) {
 }
 
 
-////////////////////////////////////////////////////////////////////////////////
-// The Arduino serial port (typically as a USB link to a PC) provides a
-// restricted command interface called the "console". As well as reporting
-// debug messages it supports commands for SDcard access:
-// DIRECTORY, ERASE file, WRITE file, READ file
-// The use-case is to allow code development on a PC without need to keep
-// swapping the SDcard back and forth.
-//
-// It is expected that the console interface will be accessed though a
-// special program on the PC, not simply a terminal interface. For that
-// reason there is almost zero error/sanity checking on arguments.
-//
-// Protocol: Directory
-// D<cr>
-//
-// only the D is significant. Any characters between D and <cr> are ignored.
-// Response is Ack 0<cr><lf>multiple lines of crlf-delimited text
-// or          Ack 1<cr><lf>  on error: no SDcard present
-//
-// (the response numbers are ASCII ie, 0 is 0x40, and Ack is a 3-character
-// ASCII string). Even Ack codes mean success, odd Ack codes are errors.
-//
-// Protocol: Erase
-// E filename <cr>
-//
-// only the E is significant. Any additional characters before the first
-// space are ignored. filename is an 8.3 MSDOS filename (format is
-// checked). Note the extra space at the end of the line, before the <cr>
-// Response is Ack 2<cr><lf> for success
-// or          Ack 1<cr><lf> on error: no SDcard present
-// or          Ack 3<cr><lf> on error: bad filename or file not found
-//
-// Protocol: Write
-// W filename length <cr>
-// only the W is significant. Any additional characters before the first
-// space are ignored. filename is an 8.3 MSDOS filename (format is
-// checked). Length is the number of bytes in the file (decimal number
-// in ASCII). Note the extra space at the end of the line, before the <cr>
-// Response is Ack 4<cr><lf>. for success
-// the "." indicates that the console should send the first chunk of
-// the file (512 or the runt/remaining bytes). An additional "." is
-// sent each time NAScas is ready for the next chunk. After the final
-// data transfer there is an Ack 8<cr><lf>.
-// or          Ack 1<cr><lf> on error: no SDcard present
-// or          Ack 5<cr><lf> on error: bad filename or file not found
-//
-// Protocol: Read
-// R filename <cr>
-// only the R is significant. Any additional characters before the first
-// space are ignored. filename is an 8.3 MSDOS filename (format is
-// checked). Note the extra space at the end of the line, before the <cr>
-// Response is Ack 6<cr><lf>length<cr><lf>bytestream
-// or          Ack 1<cr><lf> on error: no SDcard present
-// or          Ack 7<cr><lf> on error: bad filename or file not found
-//
-// Protocol: Put byte to EEPROM
-// P address data <cr>
-// only the P is significant. Any additional characters before the first
-// space are ignored. Address is in hex, data is in hex. No range check
-// is done; if the command is incorrectly formatted it will return
-// success but not actually perform a write.
-// Response is Ack 10<cr><lf> for success
-// or          Ack 1<cr><lf> on error: no SDcard present
-//
-// Protocol: Get byte from EEPROM
-// G address <cr>
-// only the G is significant. Any additional characters before the first
-// space are ignored. Address is in hex. No range check is done.
-// Response is Ack 12<cr><lf>byte for success
-// or          Ack 1<cr><lf> on error: no SDcard present
-//
-// Protocol: Other
-// For any other "command"
-// Response is Ack 9<cr><lf> on error: command not recognised
-// or          Ack 1<cr><lf> on error: no SDcard present
-//
-// The SDcard check is always done; that's why the error response can occur
-// even for commands that do not require SDcard.
+// Command-handler for console interface.
 void cmd_console(void) {
     char buf[512]; // used for command line then as write data buffer
     char * pbuf = &buf[0];
