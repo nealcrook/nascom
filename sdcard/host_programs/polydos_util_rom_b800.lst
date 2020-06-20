@@ -1716,7 +1716,8 @@ be33 3e 01		        ld	a,1
 be35 d3 07		        out     (PIOBC), a      ;port B LSB is input 
 be37 d3 05		        out     (PIOBD), a      ;init outputs H2T=0, CMD=0 
 be39			 
-be39			;;; train the interface? May not need this any more. 
+be39			;;; Training sequence gets the protocol to a known state and enables 
+be39			;;; processing of NASdsk commands in the Arduino command loop. 
 be39 06 08		        ld      b, 8            ;number of times to do it 
 be3b 3e 80		train:	ld      a, CNOP 
 be3d cd e8 bd			call    putcmd 
@@ -2092,79 +2093,92 @@ bf7a e5			nxtblk: push    hl              ;total #sectors
 bf7b 01 00 0a		        ld      bc,$a00         ;a is #sectors, 0 is drive number 
 bf7e 21 00 10		        ld      hl,$1000        ;where to put it 
 bf81			 
-bf81			        SCAL    ZDRD            ;TODO Check/report exit status 
+bf81			        SCAL    ZDRD 
 bf81 df			        RST 18H 
 bf82 81			        DB ZDRD 
 bf83			        ENDM 
 # End of macro SCAL
-bf83			 
-bf83 3e 2e		        ld      a,'.'           ;show progress - could do * for error? 
-bf85 f7			        rst     ROUT 
-bf86			 
-bf86			        ;; hl, bc unchanged 
-bf86			        ;; bc = $a00 - the number of bytes to write out to SD 
-bf86			        ;; need to fix c if using drive 1 etc. 
-bf86			 
-bf86 3e 48		        ld      a, CNWR         ;write 
-bf88 cd e8 bd		        call    putcmd 
-bf8b 79			        ld      a, c            ;length in bytes, LS first 
-bf8c cd f0 bd		        call    putval 
-bf8f 78			        ld      a, b 
+bf83 3e 2a		        ld      a,'*'           ;BAD reads 
+bf85 20 02		        jr      nz, report 
+bf87 3e 2e		        ld      a,'.'           ;GOOD reads 
+bf89 f7			report: rst     ROUT 
+bf8a			 
+bf8a			        ;; hl, bc unchanged 
+bf8a			        ;; bc = $a00 - the number of bytes to write out to SD 
+bf8a			        ;; need to fix c if using drive 1 etc. 
+bf8a			 
+bf8a 3e 48		        ld      a, CNWR         ;write 
+bf8c cd e8 bd		        call    putcmd 
+bf8f 79			        ld      a, c            ;length in bytes, LS first 
 bf90 cd f0 bd		        call    putval 
-bf93 af			        xor     a 
+bf93 78			        ld      a, b 
 bf94 cd f0 bd		        call    putval 
 bf97 af			        xor     a 
 bf98 cd f0 bd		        call    putval 
-bf9b			 
-bf9b			        ;; data transfer 
-bf9b 7e			snext:  ld      a, (hl) 
+bf9b af			        xor     a 
 bf9c cd f0 bd		        call    putval 
-bf9f 23			        inc     hl 
-bfa0 0b			        dec     bc 
-bfa1 78			        ld      a,b 
-bfa2 b1			        or      c 
-bfa3 20 f6		        jr      nz, snext 
-bfa5			 
-bfa5			        ;; get status, return if OK, msg/exit on error 
-bfa5 cd a5 be		        call    ft2rs2t 
-bfa8			 
-bfa8			        ;; we're done if hl=de 
-bfa8 e1			        pop     hl 
-bfa9 7c			        ld      a,h 
-bfaa ba			        cp      d 
-bfab 20 06		        jr      nz, nxt1 
-bfad 7d			        ld      a,l 
-bfae bb			        cp      e 
-bfaf 20 02		        jr      nz, nxt1 
-bfb1			        SCAL    ZMRET 
-bfb1 df			        RST 18H 
-bfb2 5b			        DB ZMRET 
-bfb3			        ENDM 
+bf9f			 
+bf9f			        ;; data transfer 
+bf9f 7e			snext:  ld      a, (hl) 
+bfa0 cd f0 bd		        call    putval 
+bfa3 23			        inc     hl 
+bfa4 0b			        dec     bc 
+bfa5 78			        ld      a,b 
+bfa6 b1			        or      c 
+bfa7 20 f6		        jr      nz, snext 
+bfa9			 
+bfa9			        ;; get status, return if OK, msg/exit on error 
+bfa9 cd a5 be		        call    ft2rs2t 
+bfac			 
+bfac 13			        inc     de              ;increment sector count by 
+bfad 13			        inc     de              ;the number we've just copied 
+bfae 13			        inc     de 
+bfaf 13			        inc     de 
+bfb0 13			        inc     de 
+bfb1			 
+bfb1 13			        inc     de 
+bfb2 13			        inc     de 
+bfb3 13			        inc     de 
+bfb4 13			        inc     de 
+bfb5 13			        inc     de              ;crude but effective! 
+bfb6			 
+bfb6			        ;; we're done if hl=de 
+bfb6 e1			        pop     hl 
+bfb7 7c			        ld      a,h 
+bfb8 ba			        cp      d 
+bfb9 20 06		        jr      nz, nxt1 
+bfbb 7d			        ld      a,l 
+bfbc bb			        cp      e 
+bfbd 20 02		        jr      nz, nxt1 
+bfbf			        SCAL    ZMRET 
+bfbf df			        RST 18H 
+bfc0 5b			        DB ZMRET 
+bfc1			        ENDM 
 # End of macro SCAL
-bfb3			 
-bfb3 13			nxt1:   inc     de              ;increment sector count 
-bfb4 13			        inc     de              ;by the number we've copied 
-bfb5 13			        inc     de 
-bfb6 13			        inc     de 
-bfb7 13			        inc     de 
-bfb8			 
-bfb8 13			        inc     de 
-bfb9 13			        inc     de 
-bfba 13			        inc     de 
-bfbb 13			        inc     de 
-bfbc 13			        inc     de              ;crude but effective! 
-bfbd			 
-bfbd 18 bb		        jr      nxtblk 
-bfbf			 
-bfbf			 
-bfbf			 
-bfbf			 
-bfbf			;;; pad ROM to 2Kbytes. 
-bfbf			SIZE:   EQU $ - PDCROM 
-bfbf			PAD1:   EQU 800h - SIZE 
-bfbf			;;; 12 is the size of the jump table 
-bfbf			PAD2:   EQU PAD1 - 12 
-bfbf 0xff...		        DS  PAD2, 0ffh 
+bfc1			 
+bfc1 13			nxt1:   inc     de              ;increment sector count 
+bfc2 13			        inc     de              ;by the number we've copied 
+bfc3 13			        inc     de 
+bfc4 13			        inc     de 
+bfc5 13			        inc     de 
+bfc6			 
+bfc6 13			        inc     de 
+bfc7 13			        inc     de 
+bfc8 13			        inc     de 
+bfc9 13			        inc     de 
+bfca 13			        inc     de              ;crude but effective! 
+bfcb			 
+bfcb 18 ad		        jr      nxtblk 
+bfcd			 
+bfcd			 
+bfcd			 
+bfcd			 
+bfcd			;;; pad ROM to 2Kbytes. 
+bfcd			SIZE:   EQU $ - PDCROM 
+bfcd			PAD1:   EQU 800h - SIZE 
+bfcd			;;; 12 is the size of the jump table 
+bfcd			PAD2:   EQU PAD1 - 12 
+bfcd 0xff...		        DS  PAD2, 0ffh 
 bff4			 
 bff4			;;; Jump table to keep consistent entry points 
 bff4 c3 c7 be		        jp      csum 

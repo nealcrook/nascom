@@ -95,7 +95,9 @@ entry:  call    a2out           ;port A to outputs
         out     (PIOBC), a      ;port B LSB is input
         out     (PIOBD), a      ;init outputs H2T=0, CMD=0
 
-;;; train the interface? May not need this any more.
+
+;;; Training sequence gets the protocol to a known state and enables
+;;; processing of NASdsk commands in the Arduino command loop.
         ld      b, 8            ;number of times to do it
 train:	ld      a, CNOP
 	call    putcmd

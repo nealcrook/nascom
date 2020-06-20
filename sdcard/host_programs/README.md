@@ -1,34 +1,15 @@
 # Host programs for nascom_sdcard
 
-These are programs in z80 assembler intended to run on the NASCOM and associated with the nascom_sdcard board.
-
-## Common code
-
-* sd_sub1.asm - common subroutines used by several other programs. Accessed by "including" this file.
-
-
-## Development programs
-
-* sd_loop.asm - test program that uses the loopback command to send values and check that they are received back correctly.
-* sd_rd1.asm - test program for reading a file from SDcard into RAM
-* sd_wr1.asm - test program for writing RAM to SDcard
-
-These are designed to be small so that they can be typed in by hand. They all
-use the same set of subroutines and the subroutines are at the start of the
-program so that, having typed in one program, that part does not need to be
-retyped in order to run one of the other two programs.
-
-The read and write test programs use a hard-coded filename (NAS000.BIN) but
-the name can be patched in memory if required.
-
+These are programs associated with the nascom_sdcard hardware. Most of them are z80
+assembler programs intended to run on the NASCOM.
 
 ## ROMs
 
-* sd_util.asm - Set of utilities for read/write to SDcard. Slightly more polite than the "development programs" versions. Can be executed from RAM or ROM. Padded to 2Kbytes.
+* sd_util.asm - Set of utilities for read/write to SDcard. Can be executed from RAM or ROM. Padded to 2Kbytes.
 * polydos_rom.asm - version of the PolyDos boot ROM that accesses the SDcard. Can be executed from RAM or ROM. 2Kbytes.
-* polydos_util_rom.asm - version of the PolyDos boot ROM that accesses the SDcard, combined with a cut-down version of the utils (so that they still fit in 2K). Can be executed from RAM or ROM. 2Kbytes.
+* polydos_util_rom.asm - version of the PolyDos boot ROM that accesses the SDcard, combined with a cut-down version of the utils (so that they still fit in 2K). Can be executed from RAM or ROM. 2Kbytes. There are pre-built binaries and listings for this code, at origins of $B800 and $D800.
 
-The (rom-based) utilities executed through a jump-table at the end of the ROM. The execution addresses shown below assume a ROM assembled at address $D800
+The (ROM-based) utilities executed through a jump-table at the end of the ROM. The execution addresses shown below assume a ROM assembled at address $D800
 
 * E DFF4 -- CSUM
 * E DFF7 -- RDFILE
@@ -95,6 +76,33 @@ NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
 * dskboot.asm - boot loader for virtual disk. Refer to the comments in the code.
 * SDBOOT0.asm - sample bootstrap program, invoked by sdboot. Refer to the comments in dskboot.asm.
 * NASconsole - a PERL program to run on a PC that is attached to nascom_sdcard hardware. Allows file exchange between PC and the SDcard without the need to remove the SDcard or interrupt the NASCOM session.
+
+
+## Library code
+
+* sd_sub1.asm - common subroutines used by several other programs. Accessed by "including" this file. Refer to [Parallel interface programming examples](parallel_interface_programming.md)
+
+## Development programs
+
+* sd_loop.asm - test program that uses the loopback command to send values and check that they are received back correctly.
+* sd_rd1.asm - test program for reading a file from SDcard into RAM
+* sd_wr1.asm - test program for writing RAM to SDcard
+
+These were used as test programs during the development of the nascom_sdcard
+hardware.
+
+sd_util.asm provides the same functionality (and more) in more user-friendly
+form. The chief virtues of these programs are:
+
+1. They are very small, so that they can be typed in by hand.
+
+2. They all start with a lump of common code (the sd_sub1.asm code) so that,
+having typed in one program, that part does not need to be retyped in order to
+run one of the other programs.
+
+sd_wr1.asm and sd_rd1.asm both use a hard-coded filename (NAS000.BIN) but the
+name can be patched in memory if required.
+
 
 ## Tools
 

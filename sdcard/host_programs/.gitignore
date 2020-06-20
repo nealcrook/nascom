@@ -8,6 +8,7 @@ scrape.bin
 scrape5.bin
 sd_loop.bin
 sd_rd1.bin
-sd_util_b800.bin
+sd_util.bin
 sd_wr1.bin
 sdoff.bin
+polydos_rom.bin
