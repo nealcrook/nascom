@@ -35,12 +35,12 @@ between [NASconsole](../host_programs/NASconsole) and the Arduino code.
 
 ````D<cr>````
 
-Only the D is significant. Any characters between D and <cr> are ignored.
+Only the D is significant. Any characters between D and \<cr\> are ignored.
 
-Response (success):
+Response (success):<br />
 ````Ack 0<cr><lf>multiple lines of crlf-delimited text````
 
-Error response:
+Error response:<br />
 ````Ack 1<cr><lf>```` - no SDcard present.
 
 The responses are ASCII, so "Ack 1" is the 5 bytes 0x41, 0x63, 0x6b, 0x20, 0x31.
@@ -51,14 +51,14 @@ Even Ack codes signal success, odd Ack codes signal errors.
 ````E filename <cr>````
 
 Only the E is significant. Any additional characters before the first
-space are ignored. filename is an 8.3 MSDOS filename (format is
-checked). Note the extra space at the end of the line, before the <cr>.
+space are ignored. ````filename```` is an 8.3 MSDOS filename (format is
+checked). Note the extra space at the end of the line, before the \<cr\>.
 
-Response (success):
+Response (success):<br />
 ````Ack 2<cr><lf>````
 
-Error responses:
-````Ack 1<cr><lf>```` - no SDcard present.
+Error responses:<br />
+````Ack 1<cr><lf>```` - no SDcard present.<br />
 ````Ack 3<cr><lf>```` - bad filename or file not found.
 
 ## Write
@@ -66,18 +66,18 @@ Error responses:
 ````W filename length <cr>````
 
 Only the W is significant. Any additional characters before the first
-space are ignored. filename is an 8.3 MSDOS filename (format is
-checked). Length is the number of bytes in the file (decimal number
-in ASCII). Note the extra space at the end of the line, before the <cr>.
+space are ignored. ````filename```` is an 8.3 MSDOS filename (format is
+checked). ````length```` is the number of bytes in the file (decimal number
+in ASCII). Note the extra space at the end of the line, before the \<cr\>.
 
-Response (success):
+Response (success):<br />
 ````Ack 4<cr><lf>.```` - the "." indicates that the console should send the first chunk of
 the file (512 or the runt/remaining bytes). An additional "." is
 sent as a request for each successive chunk of data. When all the data bytes have been transferred there is a final response
 of ````Ack 8<cr><lf>````.
 
-Error responses:
-````Ack 1<cr><lf>```` - no SDcard present.
+Error responses:<br />
+````Ack 1<cr><lf>```` - no SDcard present.<br />
 ````Ack 5<cr><lf>```` - bad filename or file not found.
 
 ## Read
@@ -85,15 +85,15 @@ Error responses:
 ````R filename <cr>````
 
 Only the R is significant. Any additional characters before the first
-space are ignored. filename is an 8.3 MSDOS filename (format is
-checked). Note the extra space at the end of the line, before the <cr>.
+space are ignored. ````filename```` is an 8.3 MSDOS filename (format is
+checked). Note the extra space at the end of the line, before the \<cr\>.
 
-Response (success):
-````Ack 6<cr><lf>length<cr><lf>bytestream```` - Length is the number of bytes in the file (decimal number
+Response (success):<br />
+````Ack 6<cr><lf>length<cr><lf>bytestream```` - ````length```` is the number of bytes in the file (decimal number
 in ASCII).
 
-Error responses:
-````Ack 1<cr><lf>```` - no SDcard present.
+Error responses:<br />
+````Ack 1<cr><lf>```` - no SDcard present.<br />
 ````Ack 7<cr><lf>```` - bad filename or file not found.
 
 ## Put byte to EEPROM
@@ -101,14 +101,14 @@ Error responses:
 ````P address data <cr>````
 
 Only the P is significant. Any additional characters before the first
-space are ignored. Address is in hex, data is in hex. No range check
+space are ignored. ````address```` is in hex, ````data```` is in hex. No range check
 is done; if the command is incorrectly formatted it will return
-success but not actually perform a write.
+success but not actually perform a write. Note the extra space at the end of the line, before the \<cr\>.
 
-Response (success):
+Response (success):<br />
 ````Ack 10<cr><lf>````
 
-Error response:
+Error response:<br />
 ````Ack 1<cr><lf>```` - no SDcard present.
 
 ## Get byte from EEPROM
@@ -116,20 +116,20 @@ Error response:
 ````G address <cr>````
 
 Only the G is significant. Any additional characters before the first
-space are ignored. Address is in hex. No range check is done.
+space are ignored. ````address```` is in hex. No range check is done. Note the extra space at the end of the line, before the \<cr\>.
 
-Response (success):
+Response (success):<br />
 ````Ack 12<cr><lf>byte````
 
-Error response:
+Error response:<br />
 ````Ack 1<cr><lf>```` - no SDcard present.
 
 ## Unrecognised commands
 
 For any other "command"
 
-Error responses:
-````Ack 9<cr><lf>```` - command not recognised.
+Error responses:<br />
+````Ack 9<cr><lf>```` - command not recognised.<br />
 ````Ack 1<cr><lf>```` - no SDcard present.
 
 The SDcard check is always done; that's why the error response can occur even
