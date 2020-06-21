@@ -10,7 +10,7 @@
 
 # Internals
 
-* [Parallel interface command set](parallel_interface_command_set.md)
+* [Parallel interface command set](parallel_interface_command_set.md) aka "NASdsk command set"
 * [Parallel interface protocol](parallel_interface_protocol.md)
 * [Parallel interface programming examples](parallel_interface_programming.md)
 * [Console interface command set](console_interface_command_set.md)
