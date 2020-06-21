@@ -13,8 +13,8 @@
 * [Parallel interface command set](parallel_interface_command_set.md) aka "NASdsk command set"
 * [Parallel interface protocol](parallel_interface_protocol.md)
 * [Parallel interface programming examples](parallel_interface_programming.md)
-* [Console interface command set](console_interface_command_set.md)
-* [Serial interface command set](serial_interface_command_set.md)
+* [Console interface command set](console_interface_command_set.md) aka "NASconsole command set"
+* [Serial interface command set](serial_interface_command_set.md) aka "NAScas command set"
 * [Profile record format](profile_record_format.md)
 * [Boot loader](boot_loader.md)
 
