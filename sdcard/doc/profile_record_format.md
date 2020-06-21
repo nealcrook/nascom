@@ -15,12 +15,13 @@ Each profile is associated with an operating system/environment as follows:
 * Profile 2: CP/M
 * Profile 3: Stand-alone boot environment
 
-Each profile defines file names for 4 disks and defines the geometry used by the
-disk. The geometry is used by the NASdsk software TS_SEEK and PBOOT commands
-(see [Parallel interface command set](parallel_interface_command_set.md)).
-
 There is a 5th profile, the "default profile" which is used if the profile
 record is corrupt or missing.
+
+Each profile defines file names for 4 disks and defines the geometry used by the
+disk. The geometry is used by the NASdsk TS_SEEK and PBOOT commands (see
+[Parallel interface command set](parallel_interface_command_set.md)).
+
 
 ## Format
 
@@ -66,7 +67,7 @@ fnam_fext[3]    = DSK3.BIN
 nsect_per_track = 36
 ntrack          = 35
 first_sect      = 0
-sect_chunks     = 2 (ie, 256 bytes per sector
+sect_chunks     = 2 (ie, 256 bytes per sector)
 ````
 
 Profile 0:
@@ -95,9 +96,7 @@ first_sect      = 1
 sect_chunks     = 2 (ie, 256 bytes per sector)
 ````
 
-Profile 2:
-
-(this reflects the format for the Lucas/NASCOM implementation of CP/M)
+Profile 2 (this reflects the format for the Lucas/NASCOM implementation of CP/M):
 
 ````
 fnam_fext
@@ -127,28 +126,28 @@ sect_chunks     = 4 (ie, 512 bytes per sector)
 ## Writing and editing the profile record
 
 The profile record is not part of the nascom_sdcard sketch. Therefore, when the
-Arduino if first programmed, no profile record will be present and the default
+Arduino is first programmed, no profile record will be present and the default
 profile will be used.
 
 Currently:
 
-* The only way to program the profile record is to use the "PROFILE" command in [NASconsole](../host_programs/NASconsole).
+* The only way to program the profile record is to use the PROFILE command in [NASconsole](../host_programs/NASconsole).
 * There is no way to modify the profile record (except by editing the source code of [NASconsole](../host_programs/NASconsole)).
 
 In the future there may be:
 
-* A stand-alone tool to program the profile record, or a way to program it through a simple terminal emulator
+* A stand-alone tool to program the profile record, or a way to program it through a simple terminal emulator.
 * Extensions to [NASconsole](../host_programs/NASconsole) to allow editing of the profile record.
 
 
 ## Internals: use of geometry information
 
 A floppy disk contains sector number and track number information recorded as
-part of the formatting operation, and the format is OS-specific (and based on
-history and somewhat arbitrary decisions). Most notably, some OS number the
-sectors from 0 and some number the sectors from 1. The formula for translating
-from a track/sector to a linear address needs to know both the sector size and
-the number associated with the first sector.
+part of the formatting operation. The format is OS-specific (and based on
+history and somewhat arbitrary decisions). Some OS number the sectors from 0 and
+some number the sectors from 1. The formula for translating from a track/sector
+to a linear address needs to know both the sector size and the number associated
+with the first sector.
 
 The NASdsk SEEK_TS command uses the disk geometry information of the selected
 profile.
@@ -168,10 +167,11 @@ A well-behaved boot ROM will not rely on the correct profile being selected,
 instead, it will use the NASdsk PRESTORE(pid) command to select the appropriate
 profile.
 
-(Historical note: the original PolyDos NASdsk ROM pre-dates the concept of the
+Historical note: the original PolyDos NASdsk ROM pre-dates the concept of the
 profile record and performs a RESTORE_STATE command, which is equivalent to a
-PRESTORE(0)).
+PRESTORE(0).
 
 ## Internals: Profile 3
 
-Profile 3 is intended for use by the [boot loader](boot_loader.md) function.
+Profile 3 is intended for use by the [boot loader](boot_loader.md) function,
+specifically by a program called [dskboot](../host_programs/dskboot.asm):
