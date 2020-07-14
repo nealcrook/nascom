@@ -874,9 +874,9 @@ void cmd_ts_seek(char fid) {
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_seek(char fid) {
     status = 0;
-
+    long offset = get_value32();
     if (handles[fid]) {
-        status = handles[fid].seek(get_value32());
+        status = handles[fid].seek(offset);
     }
     put_value(status, INPUT);
 }
@@ -923,7 +923,7 @@ void cmd_n_wr(char fid) {
 //
 // RESPONSE: send TRUE or FALSE response to host. Updates global status
 void cmd_sect_wr(char fid) {
-    n_wr(fid, profile.f.sect_chunks * SECTOR_CHUNK);
+    n_wr(fid, (long)(profile.f.sect_chunks * SECTOR_CHUNK));
 }
 
 
@@ -968,7 +968,7 @@ void cmd_n_rd(char fid) {
 //
 // RESPONSE: sends TRUE or FALSE response to host. Updates global status
 void cmd_sect_rd(char fid) {
-    n_rd(fid, profile.f.sect_chunks * SECTOR_CHUNK);
+    n_rd(fid, (long)(profile.f.sect_chunks * SECTOR_CHUNK));
 }
 
 
@@ -1026,6 +1026,6 @@ void cmd_pboot(char pid) {
     // If the read fails it returns the correct amount of data, but the
     // data is all-0. n_rd updates the global status so that the final
     // response byte indicates whether the whole process has been successful
-    n_rd(0, profile.f.sect_chunks * SECTOR_CHUNK);
+    n_rd(0, (long)(profile.f.sect_chunks * SECTOR_CHUNK));
     put_value(status, INPUT);
 }
