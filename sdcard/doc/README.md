@@ -16,7 +16,7 @@
 * [Console interface command set](console_interface_command_set.md) aka "NASconsole command set"
 * [Serial interface command set](serial_interface_command_set.md) aka "NAScas command set"
 * [Profile record format](profile_record_format.md)
-* [Boot loader](boot_loader.md) - the NASdsk PBOOT command, the [diskboot](../host_programs/dskboot.asm) program and the [SDBOOT0](../host_programs/SDBOOT.asm) disk image
+* [Boot loader](boot_loader.md) - the NASdsk PBOOT command, the [diskboot](../host_programs/dskboot.asm) program and the [SDBOOT0](../host_programs/SDBOOT0.asm) disk image
 
 
 Elsewhere:
