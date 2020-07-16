@@ -158,19 +158,21 @@ Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
 
 ## SECT_RDn (n= 0,1,2,3,4)
 
-Read 256 bytes from the specified file at the current position.
+Read 1 sector of data (typically 256 or 512 bytes) from the specified file at
+the current position. The sector size is defined by the current profile.
 
 Arguments: None
 
-Response: 256 bytes, followed by 1 byte of status; FALSE (0) for error, TRUE
+Response: 1 sector-worth of data bytes, followed by 1 byte of status; FALSE (0) for error, TRUE
 (non-zero) for success.
 
 
 ## SECT_WRn (n= 0,1,2,3,4)
 
-Write 256 bytes to the specified file at the current position.
+Write 1 sector of data (typically 256 or 512 bytes) to the specified file at the
+current position. The sector size is defined by the current profile.
 
-Arguments: 256 data bytes.
+Arguments: 1 sector-worth of data bytes.
 
 Response: 1 byte response; FALSE (0) for error, TRUE (non-zero) for success.
 

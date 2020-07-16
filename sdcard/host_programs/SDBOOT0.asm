@@ -1,16 +1,33 @@
-;;; Support program for testing sd_boot program on NASCOM SDcard
+;;; Support program for testing dskboot program on NASCOM SDcard
 ;;; https://github.com/nealcrook/nascom
 ;;;
-;;; pad to 512 bytes and store in a file named SDBOOT0.DSK on
-;;; the SDcard.
+;;; Loaded via dskboot, like this:
+;;; NAScas> RS DSKBOOT.CAS
+;;; NAScas> .
+;;; R
+;;; E C80 <optional args -- see below>
 ;;;
-;;; This code is loaded by the utility sd_boot as a test of
-;;; the CMD_PBOOT command.
+;;; This program (SDBOOT0.asm) is used to create a disk image
+;;; which should be named SDBOOT0.DSK on the SDcard.
 ;;;
-;;; by adding a data table to the end of this program you
-;;; can append ROM images to it and have them copied to
-;;; the desired place in memory.
+;;; - SDBOOT0.asm assembles to a 512-byte binary.
+;;; - One or more NASCOM ROM images (in binary format) should
+;;;   be appended to the end of it.
+;;; - A data structure in the SDBOOT0 binary is configured
+;;;   (in the .asm) or patched (in the binary) to describe the
+;;;   appended ROM images.
+;;; - The data structure also contains a 16-bit bit-map which
+;;;   controls the set of ROM images that are to be loaded
+;;; - Finally, the data structure contains an execution address
+;;;   which allows one of the images to be executed, or
+;;;   allows a clean return to NAS-SYS.
 ;;;
+;;; The arguments to dskboot can be used to override the
+;;; load bit-map and the execution address:
+;;;
+;;; E C80            - use settings in the SDBOOT0 binary
+;;; E C80 aaaa       - load bitmap aaaa and return to NAS-SYS
+;;; E C80 aaaa bbbb  - load bitmap aaaa and execute at bbbb
 
 START:        EQU     $1000
 
@@ -27,6 +44,12 @@ RDEL:   EQU     $38
 ZERRM:  EQU     $6b
 ZMRET:  EQU     $5b
 
+;;; Equates for NAS-SYS workspace
+ARGN:   EQU     $0c0b
+ARG1:   EQU     $0c0c
+ARG2:   EQU     $0c0e
+ARG3:   EQU     $0c10
+
 ; Commands for the SDcard interface
 FID:          EQU     $0
 CNOP:         EQU     $80       ;no-operation
@@ -42,40 +65,64 @@ PIOBC:        EQU      $7
         ORG     START
 
         jp      entry
-        DS      5, $0           ; pad to xple of 8
+        nop
+ldmap:  DW      $0002           ; map of ROM images to load. LSB=image 0, MSB=image 15
+exitjp: DW      $0000           ; where to go on termination. 0 means "rst mret" - back to NAS-SYS.
 
 ;;; An arbitrary set of ROM images are appended to this binary in order to form the
-;;; "boot disk image". This data structure describes what's present and controls,
-;;; on an entry-by-entry basis, whether it should be loaded into memory. It's at a
-;;; Known place in memory so that it can be patched.
+;;; "boot disk image". This data structure describes what's present.
+;;; It's at a Known place in memory so that it can be patched.
+;;; The LDMAP above (or a command-line argument) determines which, if any, of the
+;;; ROM images are loaded.
 ;;;
-;;; sector size is 512 bytes. Each entry here is 8 bytes
-;;; The low byte of the 32-bit byte offset has a double-meaning. Since all the ROM images are
-;;; multiples of 1K, the low byte should always be 0. Therefore..
-;;; value of  0 means: load this image
-;;; value of  1 means: skip this image
-;;; value of ff means: no more images
+;;; There are 16 entries here; each entry is 8 bytes.
+;;; The low byte of the 32-bit byte offset should always be 0. A value of $ff is
+;;; used to mark the end of the table.
+;;; This image is 512 (0x200) bytes in size, so the first appended ROM will have
+;;; an offset of 0x0000.0200
 copy:
-        ;; RAM-based NASDOS: 4Kbytes at C000
+        ;; Image 0: NASDOS original 4Kbytes at D000
         defb    $00, $02, $00, $00 ;32-bit byte offset to start of image, low byte first
         defw    $1000              ;16-bit byte count to transfer, low byte first
-        defw    $c000              ;16-bit destination address, low byte first
+        defw    $d000              ;16-bit destination address, low byte first
+        ;; Image 1: NASDOS for nascom_sdcard 4Kbytes at D000
+        defb    $00, $12, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $1000              ;16-bit byte count to transfer, low byte first
+        defw    $d000              ;16-bit destination address, low byte first
+        ;; Image 2: PolyDos 2: 2Kbytes at D000
+        defb    $00, $22, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $0800              ;16-bit byte count to transfer, low byte first
+        defw    $d000              ;16-bit destination address, low byte first
+        ;; Image 3: PolyDos for nascom_sdcard: 2Kbytes at D800
+        defb    $00, $2a, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $0800              ;16-bit byte count to transfer, low byte first
+        defw    $d800              ;16-bit destination address, low byte first
+        ;; Image 4: ZEAP (ROM version): 4Kbytes at D000
+        defb    $00, $32, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $1000              ;16-bit byte count to transfer, low byte first
+        defw    $d000              ;16-bit destination address, low byte first
+        ;; Image 5: NASCOM ROM BASIC (ROM version): 8Kbytes at E000
+        defb    $00, $42, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $2000              ;16-bit byte count to transfer, low byte first
+        defw    $e000              ;16-bit destination address, low byte first
+        ;; Image 6: PolyData PASCAL (ROM version): 12Kbytes at D000
+        defb    $00, $62, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $3000              ;16-bit byte count to transfer, low byte first
+        defw    $d000              ;16-bit destination address, low byte first
+        ;; Image 7: NAS-PEN (ROM version): 2Kbytes at B800
+        defb    $00, $92, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $0800              ;16-bit byte count to transfer, low byte first
+        defw    $b800              ;16-bit destination address, low byte first
+
         ;; space for more images..
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
-        ds      8, $ff
+        ds      8, $ff          ; Image 8
+        ds      8, $ff          ; Image 9
+        ds      8, $ff          ; Image 10
+        ds      8, $ff          ; Image 11
+        ds      8, $ff          ; Image 12
+        ds      8, $ff          ; Image 13
+        ds      8, $ff          ; Image 14
+        ds      8, $ff          ; Image 15
         defb    $ff             ; end of table
 
 ;;; Low-level subroutines
@@ -86,15 +133,8 @@ copy:
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 entry:  rst     PRS
-        defm    'If you see this message it means that the',$0d
-        defm    'CMD_PRESTORE command worked successfully.',$0d
+        defm    'Start SDBOOT0..',$0d
         defb    0
-
-;;; now process the copy list. Remember, the images are not present
-;;; in memory yet: they are in the disk image. They need to be pulled in
-;;; by using NASdsk commands. The NASdsk interface is already initialised
-;;; (it was used to get us here) and the disk with FID=0 is mounted.
-;;; Just need to seek and read/load.
 
 ;;; should not need this..
         ld      b, 8            ;number of times to do it
@@ -102,16 +142,39 @@ train:	ld      a, CNOP
 	call    putcmd
         djnz    train
 
+;;; Use (ARG2) as temporary storage for the load map. If dskboot
+;;; was invoked with 1 argument, (ARG2) was not supplied on the
+;;; command line (the dskboot invocation) so copy it from the
+;;; SDBOOT0 binary.
+        ld      a,(ARGN)
+        cp      1
+        jr      nz, gotmap
+;;; 1 argument to dskboot invocation => (ARG2) is not valid
+        ld      hl, (ldmap)
+        ld      (ARG2), hl
+gotmap:
 
+;;; Process the copy list. Remember, the images are not present
+;;; in memory yet: they are in the disk image. They need to be pulled in
+;;; using NASdsk commands. The NASdsk interface is already initialised
+;;; (it was used to get us here) and the disk with FID=0 is mounted.
+;;; Just need to seek and read/load.
         ld      hl, copy - 8    ;first time
 next:   ld      de, 8
         or      a               ;clear carry
         adc     hl, de          ;skip to next entry
 next1:  ld      a,(hl)          ;fetch seek ls byte
         cp      $ff
-        jr      z, exit         ;no more to do
-        or      a
-        jr      nz, next        ;skip to next entry
+        jr      z, done         ;no more to do
+
+;;; shift (ARG2) right and use LSB to decide whether to load this image
+        push    hl
+        ld      hl, (ARG2)
+        rr      h
+        rr      l
+        ld      (ARG2), hl
+        pop     hl
+        jr      nc, next        ;0 - skip this image
 
 ;;; process copy table entry at HL
         ld      a, CSEEK
@@ -176,6 +239,19 @@ error:  SCAL    ZERRM
         ;; back to NAS-SYS
 exit:   SCAL    ZMRET
 
+;;; After loading all the images, jump to (ARG3) if valid, or to
+;;; (exitjp) otherwise.
+done:   ld      hl, (ARG3)
+        ld      a, (ARGN)
+        cp      3
+        jp      z, gotdest
+        ld      hl, (exitjp)
+gotdest:ld      a, h
+        or      l
+;;; go!
+        jr      z, exit         ;convert destination of 0 to NAS-SYS warm start
+        push    hl
+        ret
 
 ;;; pad binary to 512 bytes
 SIZE:   EQU     $ - START

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+./build SDBOOT0
+NASDOS=../../../nascom_other/nascom_nasdos/NASDOS/nasdos.rom
+NASDOSSD=../../../nascom_other/nascom_nasdos/NASDOS/nasdos_sd.rom
+POLY2=../../PolyDos/rom/PolyDos_2_Boot_ROM.bin
+POLYSD=polydos_util_rom_d800.bin
+ZEAP=../../ROM/zeap/zeap_d000.bin
+NASPEN=../../ROM/naspen/naspen_b800.bin
+BASIC=../../ROM/basic/basic.bin
+PASCAL=../../ROM/pascal/bls_pascal2_d000.bin
+
+cat SDBOOT0.bin $NASDOS $NASDOSSD $POLY2 $POLYSD $ZEAP $BASIC $PASCAL $NASPEN > SDBOOT0.DSK

@@ -26,11 +26,15 @@ called [dskboot](../host_programs/dskboot.asm):
   $1000.
 
 The code in SDBOOT can do anything. There is a sample/test program in
-[SDBOOT0.asm](../host_programs/SDBOOT0.asm) which just displays a message and
-terminates.
+[SDBOOT0.asm](../host_programs/SDBOOT0.asm) which loads ROM images into
+memory. This can be used as a way to build a "soft" NASCOM which loads
+images like ZEAP, NAS-PEN, BASIC, PASCAL or the ROM for PolyDos or NAS-DOS.
 
-SDBOOT0 could support a soft NASCOM in which a multiple ROM images (part of
-SDBOOT0 code) are loaded into memory though a menu system.
+The SDBOOT0 example could be extended so that images are selected/loaded though
+a menu system.
+
+The behaviour of SDBOOT0 is affected/controlled by the command-line arguments
+passed to the dskboot program.
 
 The advantage of using NAScas to bootstrap load dskboot is that files can be
 loaded much more quickly through the NASdsk interface than through the NAScas
