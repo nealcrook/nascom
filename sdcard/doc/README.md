@@ -7,6 +7,7 @@
 * nascom_sdcard_user_guide.odt -- as above, but open office format
 * nascom_sd_REVA_schematic.pdf -- schematic of REV A PCB
 * nascom_sd_REVA_eco.pdf -- schematic marked up with ECO (4 cuts, 4 wires)
+* nascom_sd_REVB_schematic.pdf -- schematic of REV B PCB
 
 # Internals
 
