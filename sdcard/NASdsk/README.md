@@ -1,6 +1,6 @@
-# nascom_sdcard
+# NASdsk
 
-nascom_sdcard is a project to provide SDcard-based storage for a NASCOM.
+NASdsk is a project to provide PIO-attached SDcard-based storage for a NASCOM.
 
 My initial motivation was to provide a way to dump disk images from the machine,
 and so I wanted to minimise the complexity and footprint on the NASCOM itself.
@@ -8,9 +8,12 @@ and so I wanted to minimise the complexity and footprint on the NASCOM itself.
 The final design connects to the NASCOM Z80-PIO and acts as a virtual floppy
 disk drive, running the PolyDos operating system.
 
+As of July 2020, this code is obsolete; use the code in sd_merged instead; it
+combines the NASdsk and NAScas functionality.
+
 ## Contents
 
-* nascom_sdcard.ino -- the C code for the Arduino (includes wiring instructions)
+* NASdsk.ino -- the C code for the Arduino (includes wiring instructions)
 
 See also:
 
@@ -25,7 +28,7 @@ See also:
 
 The easiest way to build this is to use the PCB that I designed (contact me to
 see if I still have spares). The PCB is common between the NAScas design and the
-nascom_sdcard design. The PCB uses an Arduino nano and a tiny daughter-card that
+NASdsk design. The PCB uses an Arduino nano and a tiny daughter-card that
 holds the SDcard socket and level shifters/power regulation so that it can
 connect to 5V; both of these are available from EBay/Banggood/Aliexpress.
 BangGood.
@@ -67,9 +70,6 @@ Remaining tasks:
 
 * Write SDSTDIN, to allow import of (eg BASIC) programs in ASCII format
 * Write a print spooler that spools to a file on the SD card
-* Create a NASCOM ROM to interface NASDOS to this hardware
-* Merge the nascom_sdcard and NAScas code-bases so that you can connect to PIO and/or UART with the same board.
-
 
 ## Construction
 
@@ -95,7 +95,7 @@ The first four are easy and cheap to source from Banggood or Aliexpress. For exa
 For the Arduino, I recommend getting one with a socketed DIL AVR chip.
 
 
-Use the notes in nascom_sdcard.ino and doc/nascom_pio.pdf and the photos to guide you. There are about 20 wires to connect.
+Use the notes in NASdsk.ino and doc/nascom_pio.pdf and the photos to guide you. There are about 20 wires to connect.
 
 ## Powering the Arduino
 

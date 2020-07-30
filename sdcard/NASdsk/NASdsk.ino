@@ -1,4 +1,4 @@
-// nascom_sdcard                             -*- c -*-
+// NASdsk                             -*- c -*-
 // https://github.com/nealcrook/nascom
 //
 // ARDUINO connected to NASCOM 2 PIO to act as mass-storage
