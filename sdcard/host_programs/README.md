@@ -82,7 +82,11 @@ NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
 
 ## Library code
 
-* sd_sub1.asm - common subroutines used by several other programs. Accessed by "including" this file. Refer to [Parallel interface programming examples](../doc/parallel_interface_programming.md)
+All of these are accessed by "including" the relevant file(s). Refer to [Parallel interface programming examples](../doc/parallel_interface_programming.md)
+
+* sd_sub_defs.asm - common defines used by several other programs.
+* sd_sub1.asm - common subroutines used by several other programs.
+* sd_sub2.asm - common subroutine used by several other programs for interface setup and training.
 
 ## Development programs
 

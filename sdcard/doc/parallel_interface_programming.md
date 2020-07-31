@@ -24,8 +24,11 @@ The program [sd_util.asm](../host_programs/sd_util.asm) is an example of a self-
 
 The program [sddir.asm](../host_programs/sddir.asm) is an example of a PolyDos utility.
 
-Both of these programs start with some defines for command names and then
-include the file [sd_sub1.asm](../host_programs/sd_sub1.asm) -- that file
+Both of these programs start by with some program-specific defines
+and then include the file [sd_sub_defs.asm](../host_programs/sd_sub_defs.asm) -- that file
+contains defines for the PIO ports and for the NASdsk commands.
+
+Next, the programs include the file [sd_sub1.asm](../host_programs/sd_sub1.asm) -- that file
 contains a set of low-level subroutines for implementing the protocol:
 
 * putcmd -- send an 8-bit command
@@ -34,9 +37,17 @@ contains a set of low-level subroutines for implementing the protocol:
 * gotx -- change direction to transmit
 * getval -- read an 8-bit data value
 
-After initialisation, the interface is set to transmit (ie, to send data from
-the NASCOM to the Target). At the completion of every command, the interface
-should be set back to transmit, ready for the next command.
+Self-contained/stand-alone programs like
+[sd_util.asm](../host_programs/sd_util.asm) also include the file
+[sd_sub2.asm](../host_programs/sd_sub2.asm) -- that file contains a code
+sequence for initialising the PIO ports and for training the NASdsk
+interface. It is not needed for utilities like
+[sddir.asm](../host_programs/sddir.asm) because such programs run in an
+environment where the hardware is already initialised.
+
+At the end of this initialisation, the interface is set to transmit (ie, to send
+data from the NASCOM to the Target). At the completion of every command, the
+interface should be set back to transmit, ready for the next command.
 
 The [Parallel interface command set](parallel_interface_command_set.md)
 describes all of the commands supported by the Target. For example, the command
