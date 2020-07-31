@@ -26,8 +26,8 @@ CSZRD:        EQU     $60 + FID
 CCLOSE:       EQU     $68 + FID
 
 PID:          EQU     $0        ;0, 1, 2, 3 (Profile)
-PBOOT:        EQU     $70 + PID
-PRES:         EQU     $78 + PID
+CPBOOT:       EQU     $70 + PID
+CPRES:        EQU     $78 + PID
 
 ; Equates for NASCOM I/O -- the Z80 PIO registers
 PIOAD:        EQU      $4

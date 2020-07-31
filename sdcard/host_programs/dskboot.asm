@@ -55,16 +55,6 @@
 
 START:        EQU     $0c80
 
-; Commands for the SDcard interface
-CNOP:         EQU     $80       ;no-operation
-CPBOOT:       EQU     $70       ;boot specified profile
-
-; Equates for NASCOM I/O -- the Z80 PIO registers
-PIOAD:        EQU      $4
-PIOBD:        EQU      $5
-PIOAC:        EQU      $6
-PIOBC:        EQU      $7
-
 ;;; Macros for using NAS-SYS routines
 SCAL:   MACRO FOO
         RST 18H
@@ -78,7 +68,8 @@ ZMRET:  EQU     $5b
 
         jp      entry
 
-;;; Low-level subroutines
+;;; Defines and low-level subroutines
+        include "sd_sub_defs.asm"
         include "sd_sub1.asm"
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

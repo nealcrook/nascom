@@ -50,17 +50,8 @@ ARG1:   EQU     $0c0c
 ARG2:   EQU     $0c0e
 ARG3:   EQU     $0c10
 
-; Commands for the SDcard interface
-FID:          EQU     $0
-CNOP:         EQU     $80       ;no-operation
-CSEEK:        EQU     $20 + FID ;seek by byte offset
-CNRD:         EQU     $38 + FID ;read bytes
-
-; Equates for NASCOM I/O -- the Z80 PIO registers
-PIOAD:        EQU      $4
-PIOBD:        EQU      $5
-PIOAC:        EQU      $6
-PIOBC:        EQU      $7
+;;; Defines
+        include "sd_sub_defs.asm"
 
         ORG     START
 
