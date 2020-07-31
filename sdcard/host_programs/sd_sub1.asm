@@ -2,10 +2,22 @@
 ;;; subroutines for low-level access to nascom_sdcard
 ;;; https://github.com/nealcrook/nascom
 ;;;
-;;; putting them at the start means that the start of each test
+;;; Putting them at the start means that the start of each test
 ;;; program is identical - useful if you are hand-typing the hex
 ;;; in (as I did when testing)
+;;;
+;;; PIO port A is used for data and is switched between in and out
+;;; PIO port B is used for control (3 bits)
+;;;
+;;; portB[2] - CMD Input  "Command"         mask 4
+;;; portB[1] - H2T Output "Host to Target"  mask 2
+;;; portB[0] - T2H Input  "Target to host"  mask 1
+;;;
+;;; The behaviour of the handshakes is illustrated here:
+;;; https://github.com/nealcrook/nascom/blob/master/sdcard/doc/protocol.pdf
+;;;
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;;; assume: currently in OUTPUT
 ;;; command is in A
