@@ -1,19 +1,33 @@
-;;; Z80 assembler subroutine for nascom_sdcard HW setup and train
+;;; Z80 assembler routine for nascom_sdcard HW setup and train
 ;;; https://github.com/nealcrook/nascom
 ;;;
 ;;; Common code to be included like this:
 ;;;          jp entry
 ;;;          include "sd_sub_defs.asm"
 ;;;          include "sd_sub1.asm"
+;;;
+;;; entry:
 ;;;          include "sd_sub2.asm"
+;;;          <continues>
+;;;
+;;; or like this:
+;;;
+;;; Common code to be included like this:
+;;;          jp entry
+;;;          include "sd_sub_defs.asm"
+;;;          include "sd_sub1.asm"
+;;; hwinit:
+;;;          include "sd_sub2.asm"
+;;;          ret
 ;;;
 ;;; entry:   call hwinit
+;;;
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; setup: initialise the PIO and the interface.
 ;;; By experiment, the output word has to be the next thing
 ;;; written, not simply the next thing written to that port.
-hwinit: call    a2out           ;port A to outputs
+        call    a2out           ;port A to outputs
         ld      a, $cf          ;"control" mode
         out     (PIOBC), a
         ld	a,1
@@ -26,6 +40,6 @@ hwinit: call    a2out           ;port A to outputs
 train:	ld      a, CNOP
 	call    putcmd
         djnz    train
-        ret
+;;; FALL-THROUGH
 
 ;;; end

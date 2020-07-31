@@ -67,7 +67,9 @@ ARG4:   EQU     $0c12
 ;;; Defines and low-level subroutines
         include "sd_sub_defs.asm"
         include "sd_sub1.asm"
-        include "sd_sub2.asm"
+
+hwinit: include "sd_sub2.asm"
+        ret
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; more subroutines, just for these utilities.
