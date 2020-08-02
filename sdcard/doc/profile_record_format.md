@@ -129,16 +129,17 @@ The profile record is not part of the nascom_sdcard sketch. Therefore, when the
 Arduino is first programmed, no profile record will be present and the default
 profile will be used.
 
-Currently:
+Currently there are 2 ways to program the profile record:
 
-* The only way to program the profile record is to use the PROFILE command in [NASconsole](../host_programs/NASconsole).
-* There is no way to modify the profile record (except by editing the source code of [NASconsole](../host_programs/NASconsole)).
+* By installing the Arduino sketch named "setup"
+* By using the (undocumented) PROFILE command in [NASconsole](../host_programs/NASconsole).
 
-In the future there may be:
+Currently, there is no way to modify the profile record (except by editing the
+source code of [NASconsole](../host_programs/NASconsole) or the "setup" sketch).
 
-* A stand-alone tool to program the profile record, or a way to program it through a simple terminal emulator.
-* Extensions to [NASconsole](../host_programs/NASconsole) to allow editing of the profile record.
-
+In the future there may be extensions to
+[NASconsole](../host_programs/NASconsole) and/or "setup" to allow editing of the profile record
+(currently, I can't think of any use-case that requires changing the profile record).
 
 ## Internals: use of geometry information
 
