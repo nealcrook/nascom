@@ -302,7 +302,7 @@
 // NASCOM2 defaults
 #define BAUD_RATE (2400)
 #define BAUD_DIVISOR (208)
-#define COUNT_FOR_RD (15000)
+#define COUNT_FOR_RD (30000)
 #define SOFTSERIAL_INVERT (1)
 #define DRIVE_INVERT (1)
 #endif
