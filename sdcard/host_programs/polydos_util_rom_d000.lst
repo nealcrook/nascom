@@ -1,0 +1,2244 @@
+# File polydos_util_rom.asm
+0000			;---------------------------------------------- 
+0000			; 
+0000			;	PolyDos 2 (Version ??) 
+0000			;       PolyDos Controller ROM 
+0000			; 
+0000			;       By Anders Hejlsberg 
+0000			;       Copyright (C) 1982 
+0000			;       Poly-Data microcenter ApS 
+0000			; 
+0000			;---------------------------------------------- 
+0000			 
+0000			;;	REFS	SYSEQU 
+0000			;;	REF 
+0000			        include "SYSEQU.asm" 
+0000			VRAM:		EQU	0080AH 
+0000			STACK:		EQU	01000H 
+0000			RAM:		EQU	01000H 
+0000			TOP:		EQU	0C000H 
+0000			PDCROM:		EQU	0D000H 
+0000			RESET:		EQU	00000H 
+0000			RIN:		EQU	00008H 
+0000			RCALH:		EQU	00010H 
+0000			SCALH:		EQU	00018H 
+0000			BRKPT:		EQU	00020H 
+0000			PRS:		EQU	00028H 
+0000			ROUT:		EQU	00030H 
+0000			RDEL:		EQU	00038H 
+0000			STMON:		EQU	0000DH 
+0000			ZMRET:		EQU	0005BH 
+0000			ZSCALJ:		EQU	0005CH 
+0000			ZTDEL:		EQU	0005DH 
+0000			ZFFLP:		EQU	0005EH 
+0000			ZMFLP:		EQU	0005FH 
+0000			ZARGS:		EQU	00060H 
+0000			ZKBD:		EQU	00061H 
+0000			ZIN:		EQU	00062H 
+0000			ZINLIN:		EQU	00063H 
+0000			ZNUM:		EQU	00064H 
+0000			ZCRT:		EQU	00065H 
+0000			ZTBCD3:		EQU	00066H 
+0000			ZTBCD2:		EQU	00067H 
+0000			ZB2HEX:		EQU	00068H 
+0000			ZSPACE:		EQU	00069H 
+0000			ZCRLF:		EQU	0006AH 
+0000			ZERRM:		EQU	0006BH 
+0000			ZTX1:		EQU	0006CH 
+0000			ZSOUT:		EQU	0006DH 
+0000			ZXOUT:		EQU	0006EH 
+0000			ZSRLX:		EQU	0006FH 
+0000			ZSRLIN:		EQU	00070H 
+0000			ZNOM:		EQU	00071H 
+0000			ZNIM:		EQU	00072H 
+0000			ZATE:		EQU	00073H 
+0000			ZXKBD:		EQU	00074H 
+0000			ZUOUT:		EQU	00075H 
+0000			ZUIN:		EQU	00076H 
+0000			ZNNOM:		EQU	00077H 
+0000			ZNNIM:		EQU	00078H 
+0000			ZRLIN:		EQU	00079H 
+0000			ZB1HEX:		EQU	0007AH 
+0000			ZBLINK:		EQU	0007BH 
+0000			ZCPOS:		EQU	0007CH 
+0000			ZRKBD:		EQU	0007DH 
+0000			ZSP2:		EQU	0007EH 
+0000			ZSCALI:		EQU	0007FH 
+0000			ZDSIZE:		EQU	00080H 
+0000			ZDRD:		EQU	00081H 
+0000			ZDWR:		EQU	00082H 
+0000			ZRDIR:		EQU	00083H 
+0000			ZWDIR:		EQU	00084H 
+0000			ZCFS:		EQU	00085H 
+0000			ZLOOK:		EQU	00086H 
+0000			ZENTER:		EQU	00087H 
+0000			ZCOV:		EQU	00088H 
+0000			ZCOVR:		EQU	00089H 
+0000			ZCKER:		EQU	0008AH 
+0000			ZCKBRK:		EQU	0008BH 
+0000			ZCFMA:		EQU	0008CH 
+0000			ZSSCV:		EQU	0008DH 
+0000			ZJUMP:		EQU	0008EH 
+0000			ZPOUT:		EQU	0008FH 
+0000			BS:		EQU	00008H 
+0000			TAB:		EQU	00009H 
+0000			LF:		EQU	0000AH 
+0000			FF:		EQU	0000CH 
+0000			CR:		EQU	0000DH 
+0000			CUL:		EQU	00011H 
+0000			CUR:		EQU	00012H 
+0000			CUU:		EQU	00013H 
+0000			CUD:		EQU	00014H 
+0000			CSL:		EQU	00015H 
+0000			CSR:		EQU	00016H 
+0000			CH:		EQU	00017H 
+0000			CCR:		EQU	00018H 
+0000			ESC:		EQU	0001BH 
+0000			FNAM:		EQU	00000H 
+0000			FEXT:		EQU	00008H 
+0000			FSFL:		EQU	0000AH 
+0000			FUFL:		EQU	0000BH 
+0000			FSEC:		EQU	0000CH 
+0000			FNSC:		EQU	0000EH 
+0000			FLDA:		EQU	00010H 
+0000			FEXA:		EQU	00012H 
+0000			PORT0:		EQU	00C00H 
+0000			KMAP:		EQU	00C01H 
+0000			ARGC:		EQU	00C0AH 
+0000			ARGN:		EQU	00C0BH 
+0000			ARG1:		EQU	00C0CH 
+0000			ARG2:		EQU	00C0EH 
+0000			ARG3:		EQU	00C10H 
+0000			ARG4:		EQU	00C12H 
+0000			ARG5:		EQU	00C14H 
+0000			ARG6:		EQU	00C16H 
+0000			ARG7:		EQU	00C18H 
+0000			ARG8:		EQU	00C1AH 
+0000			ARG9:		EQU	00C1CH 
+0000			ARG10:		EQU	00C1EH 
+0000			NUMN:		EQU	00C20H 
+0000			NUMV:		EQU	00C21H 
+0000			BRKADR:		EQU	00C23H 
+0000			BRKVAL:		EQU	00C25H 
+0000			CONFLG:		EQU	00C26H 
+0000			KOPT:		EQU	00C27H 
+0000			XOPT:		EQU	00C28H 
+0000			CURSOR:		EQU	00C29H 
+0000			ARGX:		EQU	00C2BH 
+0000			MONSTK:		EQU	00C61H 
+0000			RBC:		EQU	00C61H 
+0000			RDE:		EQU	00C63H 
+0000			RHL:		EQU	00C65H 
+0000			RAF:		EQU	00C67H 
+0000			RPC:		EQU	00C69H 
+0000			RSP:		EQU	00C6BH 
+0000			KTABL:		EQU	00C6DH 
+0000			KTAB:		EQU	00C6FH 
+0000			STAB:		EQU	00C71H 
+0000			OUTTA:		EQU	00C73H 
+0000			INTA:		EQU	00C75H 
+0000			UOUTJ:		EQU	00C77H 
+0000			UOUTA:		EQU	00C78H 
+0000			UINJ:		EQU	00C7AH 
+0000			UINA:		EQU	00C7BH 
+0000			NMIJ:		EQU	00C7DH 
+0000			NMIA:		EQU	00C7EH 
+0000			WORKSP:		EQU	0C000H 
+0000			MDRV:		EQU	0C000H 
+0000			DDRV:		EQU	0C001H 
+0000			DRVCOD:		EQU	0C002H 
+0000			FIRST:		EQU	0C003H 
+0000			ERRFLG:		EQU	0C004H 
+0000			ERRCOD:		EQU	0C005H 
+0000			BREAK:		EQU	0C006H 
+0000			BRAM:		EQU	0C008H 
+0000			BNSC:		EQU	0C00AH 
+0000			CFFLG:		EQU	0C00BH 
+0000			CFDRV:		EQU	0C00CH 
+0000			CFSEC:		EQU	0C00DH 
+0000			CFNSC:		EQU	0C00FH 
+0000			CFSBP:		EQU	0C010H 
+0000			RKROW:		EQU	0C011H 
+0000			RKBIT:		EQU	0C012H 
+0000			RKVAL:		EQU	0C013H 
+0000			RKCNT:		EQU	0C014H 
+0000			BLINKF:		EQU	0C016H 
+0000			PLCT:		EQU	0C017H 
+0000			PPOS:		EQU	0C018H 
+0000			CLINP:		EQU	0C019H 
+0000			CLIN:		EQU	0C01BH 
+0000			OVFCB:		EQU	0C04BH 
+0000			S1FCB:		EQU	0C055H 
+0000			S2FCB:		EQU	0C069H 
+0000			DSKWSP:		EQU	0C07DH 
+0000			SYSWSP:		EQU	0C083H 
+0000			USRWSP:		EQU	0C0C0H 
+0000			SCTB:		EQU	0C100H 
+0000			SCTBS:		EQU	0C07EH 
+0000			INFOFA:		EQU	0C200H 
+0000			CURCHR:		EQU	0C200H 
+0000			CURBLR:		EQU	0C201H 
+0000			RKLON:		EQU	0C202H 
+0000			RKSHO:		EQU	0C204H 
+0000			PLPP:		EQU	0C210H 
+0000			PBMG:		EQU	0C211H 
+0000			PCPL:		EQU	0C212H 
+0000			PLMG:		EQU	0C213H 
+0000			INSLEN:		EQU	0C214H 
+0000			INSTR:		EQU	0C215H 
+0000			PCHR:		EQU	0C240H 
+0000			SECBUF:		EQU	0C300H 
+0000			DIRBUF:		EQU	0C400H 
+0000			DNAME:		EQU	0C400H 
+0000			NXTSEC:		EQU	0C414H 
+0000			NXTFCB:		EQU	0C416H 
+0000			FCBS:		EQU	0C418H 
+0000			OVAREA:		EQU	0C800H 
+0000			OVNAM:		EQU	0C800H 
+0000			OVRLY:		EQU	0C804H 
+0000			 
+0000			 
+# End of file SYSEQU.asm
+0000			 
+0000			SCAL:   MACRO FOO 
+0000			        RST 18H 
+0000			        DB FOO 
+0000			        ENDM 
+0000			 
+0000			;; the RCAL pseudo-op is not documented in the polyzap manual.. 
+0000			RCAL:   MACRO FOO 
+0000			        RST 10H 
+0000			        DB FOO - $ - 1 
+0000			        ENDM 
+0000			 
+0000			;; the HIGH() function is not documented in the polyzap manual 
+0000			 
+0000			 
+0000			;;; 4 virtual drives, 0-3. 
+0000			MAXDRV:	EQU	4 
+0000			FFLP:	EQU	0045H 
+0000			 
+0000			 
+0000				ORG	PDCROM 
+d000			;;[NAC HACK 2018Mar30] defines the load and execute address 
+d000			;;	IDNT	$,$ 
+d000			 
+d000			 
+d000			;---------------------------------------------- 
+d000			; Here on power-up or RESET 
+d000			;---------------------------------------------- 
+d000			 
+d000 c3 03 d0			JP	$+3		;RESET jump 
+d003 31 00 10			LD	SP,STACK	;Set SP 
+d006 cd 0d 00			CALL	STMON		;Initialize NAS-SYS 
+d009 ef				RST	PRS		;Prompt user 
+d00a .. 00			DB	'Boot which drive? ',0 
+d01d			 
+d01d			PDC1:	SCAL	ZBLINK		;Get drive number 
+d01d df			        RST 18H 
+d01e 7b			        DB ZBLINK 
+d01f			        ENDM 
+# End of macro SCAL
+d01f fe 4e			cp	'N'		;NAS-SYS? 
+d021 20 06			JR	NZ,PDC2		;No => skip 
+d023 ef				RST	PRS		;Clear screen 
+d024 1b 00			DB	ESC,0 
+d026 c3 05 00			JP	5		;Go to NAS-SYS 
+d029 fe 30		PDC2:	CP	'0'		;Test drive number 
+d02b 38 f0			JR	C,PDC1 
+d02d fe 35			CP	MAXDRV+'0'+1 
+d02f 30 ec			JR	NC,PDC1 
+d031 f7				RST	ROUT		;Print it 
+d032 d6 30			SUB	'0'		;Adjust 
+d034 f5				PUSH	AF		;Save on stack 
+d035 21 00 c0			LD	HL,TOP		;Initialize workspace 
+d038 06 00			LD	B,0 
+d03a 36 00		PDC3:	LD	(HL),0 
+d03c 23				INC	HL 
+d03d 10 fb			DJNZ	PDC3 
+d03f 3e ff			LD	A,-1 
+d041 32 01 c0			LD	(DDRV),A	;No directory 
+d044 32 02 c0			LD	(DRVCOD),A	;No drive selected 
+d047 32 00 c8			LD	(OVNAM),A	;No overlay 
+d04a 2a 71 0c			LD	HL,(STAB)	;Get start addr of 
+d04d 11 82 00			LD	DE,82H		;NAS-SYS SCAL table 
+d050 19				ADD	HL,DE 
+d051 11 00 c1			LD	DE,SCTB		;Copy to SCTB 
+d054 01 78 00			LD	BC,3CH*2 
+d057 ed b0			LDIR 
+d059 21 1b d5			LD	HL,PDSCTB	;Get start addr of 
+d05c 01 26 00			LD	BC,13H*2	;PolyDos SCAL table 
+d05f ed b0			LDIR			;Copy to SCTB 
+d061 21 7e c0			LD	HL,SCTBS	;Activate SCAL table 
+d064 22 71 0c			LD	(STAB),HL 
+d067 21 9d d0			LD	HL,PDOSW	;Modify MRET vector 
+d06a				SCAL	ZSSCV 
+d06a df			        RST 18H 
+d06b 8d			        DB ZSSCV 
+d06c			        ENDM 
+# End of macro SCAL
+d06c 5b				DB	ZMRET 
+d06d 21 c7 d3			LD	HL,CRT		;Modify CRT vector 
+d070				SCAL	ZSSCV 
+d070 df			        RST 18H 
+d071 8d			        DB ZSSCV 
+d072			        ENDM 
+# End of macro SCAL
+d072 65				DB	ZCRT 
+d073 21 19 d4			LD	HL,BLINK	;Modify BLINK vector 
+d076				SCAL	ZSSCV 
+d076 df			        RST 18H 
+d077 8d			        DB ZSSCV 
+d078			        ENDM 
+# End of macro SCAL
+d078 7b				DB	ZBLINK 
+d079 21 10 d4			LD	HL,DNNIM	;Modify NNIM vector 
+d07c				SCAL	ZSSCV 
+d07c df			        RST 18H 
+d07d 8d			        DB ZSSCV 
+d07e			        ENDM 
+# End of macro SCAL
+d07e 78				DB	ZNNIM 
+d07f				SCAL	ZNNIM		;Activate input table 
+d07f df			        RST 18H 
+d080 78			        DB ZNNIM 
+d081			        ENDM 
+# End of macro SCAL
+d081 21 38 d3			LD	HL,POUT		;Make printer user 
+d084 22 78 0c			LD	(UOUTA),HL	;output device 
+d087 21 c4 d2			LD	HL,DBREAK	;Initialize BREAK jump 
+d08a 22 06 c0			LD	(BREAK),HL	;vector 
+d08d f1				POP	AF		;Restore drive number 
+d08e 32 00 c0			LD	(MDRV),A	;Make master drive 
+d091 4f				LD	C,A		;Put in C 
+d092 cd 41 d5			CALL	INIT		;Initialize controller 
+d095 28 06			JR	Z,PDOSW		;Skip if no error 
+d097 32 05 c0			LD	(ERRCOD),A	;Save error code 
+d09a c3 c8 d2			JP	ABORT		;Abort PolyDos 
+d09d			 
+d09d			 
+d09d			;---------------------------------------------- 
+d09d			; MRET routine entry point 
+d09d			;---------------------------------------------- 
+d09d			 
+d09d 31 00 10		PDOSW:	LD	SP,STACK	;Set SP 
+d0a0 af				XOR	A		;Clear A 
+d0a1				SCAL	ZCOV		;Invoke Exec 
+d0a1 df			        RST 18H 
+d0a2 88			        DB ZCOV 
+d0a3			        ENDM 
+# End of macro SCAL
+d0a3 ..				DB	'Exec' 
+d0a7 18 f4			JR	PDOSW		;Loop if Exec returns 
+d0a9			 
+d0a9			 
+d0a9			; Disk read 
+d0a9			;---------------------------------------------- 
+d0a9			; Entry: HL:  Memory address 
+d0a9			;	 DE:  Disk address 
+d0a9			;	 B:   Number of sectors 
+d0a9			;	 C:   Drive 
+d0a9			; Exit:  HL:  Unchanged 
+d0a9			;	 DE:  Unchanged 
+d0a9			;	 BC:  Unchanged 
+d0a9			;	 AF:  Status 
+d0a9			;---------------------------------------------- 
+d0a9			 
+d0a9 af			DRD:	XOR	A		;A=0 => read 
+d0aa 18 02			JR	DRW 
+d0ac			 
+d0ac			 
+d0ac			; Disk write 
+d0ac			;---------------------------------------------- 
+d0ac			; Entry: HL:  Memory address 
+d0ac			;	 DE:  Disk address 
+d0ac			;	 B:   Number of sectors 
+d0ac			;	 C:   Drive 
+d0ac			; Exit:  HL:  Unchanged 
+d0ac			;	 DE:  Unchanged 
+d0ac			;	 BC:  Unchanged 
+d0ac			;	 AF:  Status 
+d0ac			;---------------------------------------------- 
+d0ac			 
+d0ac 3e ff		DWR:	LD	A,-1		;A=-1 => write 
+d0ae d5			DRW:	PUSH	DE		;Save 
+d0af c5				PUSH	BC 
+d0b0 e5				PUSH	HL 
+d0b1 cd 55 d5			CALL	RWSCTS		;Do read/write 
+d0b4 e1				POP	HL		;Restore 
+d0b5 c1				POP	BC 
+d0b6 d1				POP	DE 
+d0b7 c9				RET 
+d0b8			 
+d0b8			 
+d0b8			; Read directory 
+d0b8			;---------------------------------------------- 
+d0b8			; Entry: C:   Drive number 
+d0b8			; Exit:  HL:  Unchanged 
+d0b8			;	 DE:  Unchanged 
+d0b8			;	 BC:  Unchanged 
+d0b8			;---------------------------------------------- 
+d0b8			 
+d0b8 3a 01 c0		RDIR:	LD	A,(DDRV)	;Is directory already 
+d0bb 91				SUB	C		;there? 
+d0bc c8				RET	Z		;Yes => return 
+d0bd 79				LD	A,C		;Save as new directory 
+d0be 32 01 c0			LD	(DDRV),A	;drive number 
+d0c1 c5				PUSH	BC		;Save 
+d0c2 d5				PUSH	DE 
+d0c3 e5				PUSH	HL 
+d0c4 21 00 c4			LD	HL,DIRBUF	;Read into DIRBUF 
+d0c7 11 00 00			LD	DE,0		;From sector 0 
+d0ca 06 04			LD	B,4		;4 sectors 
+d0cc				SCAL	ZDRD		;Do the read 
+d0cc df			        RST 18H 
+d0cd 81			        DB ZDRD 
+d0ce			        ENDM 
+# End of macro SCAL
+d0ce e1				POP	HL		;Restore 
+d0cf d1				POP	DE 
+d0d0 c1				POP	BC 
+d0d1 c8				RET	Z		;No error => return 
+d0d2 e5				PUSH	HL		;Save 
+d0d3 21 01 c0			LD	HL,DDRV		;Make directory invalid 
+d0d6 36 ff			LD	(HL),-1 
+d0d8 e1				POP	HL		;Restore 
+d0d9 c9				RET 
+d0da			 
+d0da			 
+d0da			; Write directory 
+d0da			;---------------------------------------------- 
+d0da			; Entry: No parameters required 
+d0da			; Exit:  HL:  Unchanged 
+d0da			;	 DE:  Unchanged 
+d0da			;	 BC:  Unchanged 
+d0da			;---------------------------------------------- 
+d0da			 
+d0da c5			WDIR:	PUSH	BC		;Save 
+d0db d5				PUSH	DE 
+d0dc e5				PUSH	HL 
+d0dd 21 00 c4			LD	HL,DIRBUF	;Write from DIRBUF 
+d0e0 11 00 00			LD	DE,0		;To sector 0 
+d0e3 06 04			LD	B,4		;4 sectors 
+d0e5 3a 01 c0			LD	A,(DDRV)	;On drive DDRV 
+d0e8 4f				LD	C,A 
+d0e9				SCAL	ZDWR		;Do the write 
+d0e9 df			        RST 18H 
+d0ea 82			        DB ZDWR 
+d0eb			        ENDM 
+# End of macro SCAL
+d0eb e1				POP	HL		;Restore 
+d0ec d1				POP	DE 
+d0ed c1				POP	BC 
+d0ee c9				RET 
+d0ef			 
+d0ef			 
+d0ef			; Convert a file specifier 
+d0ef			;---------------------------------------------- 
+d0ef			; Entry: HL:  FCB address 
+d0ef			;	 DE:  Line buffer address 
+d0ef			;	 B:   B0=1  Name optional 
+d0ef			;	      B1=1  Extension optional 
+d0ef			;	      B2=1  Drive optional 
+d0ef			; Exit:  HL:  Unchanged 
+d0ef			;	 DE:  Next line buffer address 
+d0ef			;	 B:   B0=1  No name 
+d0ef			;	      B1=1  No extension 
+d0ef			;	      B2=1  No drive 
+d0ef			;	 C:   Drive number (MDRV if B.B2=1) 
+d0ef			;---------------------------------------------- 
+d0ef			 
+d0ef e5			CFS:	PUSH	HL		;Save FCB addr 
+d0f0 78				LD	A,B		;Compute flag mask 
+d0f1 2f				CPL 
+d0f2 e6 07			AND	111B 
+d0f4 f5				PUSH	AF		;Save on stack 
+d0f5 01 09 07			LD	BC,709H		;Init flags and counter 
+d0f8 1a			CFS1:	LD	A,(DE)		;Get character 
+d0f9 fe 20			CP	' '		;Jump to CFS3 if it is 
+d0fb 28 2b			JR	Z,CFS3		;a delimiter 
+d0fd fe 2e			CP	'.' 
+d0ff 28 27			JR	Z,CFS3 
+d101 fe 3a			CP	':' 
+d103 28 23			JR	Z,CFS3 
+d105 fe 2c			CP	',' 
+d107 28 1f			JR	Z,CFS3 
+d109 fe 3b			CP	';' 
+d10b 28 1b			JR	Z,CFS3 
+d10d fe 0d			CP	CR 
+d10f 28 17			JR	Z,CFS3 
+d111 fe 09			CP	TAB 
+d113 28 13			JR	Z,CFS3 
+d115 b7				OR	A 
+d116 28 10			JR	Z,CFS3 
+d118				RCAL	TSTCH		;Test character 
+d118 d7			        RST 10H 
+d119 5f			        DB TSTCH - $ - 1 
+d11a			        ENDM 
+# End of macro RCAL
+d11a 0d				DEC	C		;8 characters done? 
+d11b 28 07			JR	Z,CFS2		;Yes => skip 
+d11d 77				LD	(HL),A		;Save in FCB 
+d11e 23				INC	HL		;Point to next 
+d11f 13				INC	DE 
+d120 cb 80			RES	0,B		;Name specified 
+d122 18 d4			JR	CFS1 
+d124 3e 11		CFS2:	LD	A,11H		;Error 11 
+d126 18 4b			JR	CFS9 
+d128 79			CFS3:	LD	A,C		;Get counter 
+d129 0d			CFS4:	DEC	C		;Filling done? 
+d12a 28 09			JR	Z,CFS11		;Yes => skip 
+d12c fe 09			CP	9		;Was name specified? 
+d12e 28 02			JR	Z,CFS12		;No => skip 
+d130 36 20			LD	(HL),' '	;Blank fill 
+d132 23			CFS12:	INC	HL		;Point to next 
+d133 18 f4			JR	CFS4		;Repeat 
+d135 1a			CFS11:	LD	A,(DE)		;Get character 
+d136 fe 2e			CP	'.'		;Period? 
+d138 20 0b			JR	NZ,CFS5		;No => skip 
+d13a 13				INC	DE		;Point to next 
+d13b				RCAL	GETCH		;Get and test 
+d13b d7			        RST 10H 
+d13c 3a			        DB GETCH - $ - 1 
+d13d			        ENDM 
+# End of macro RCAL
+d13d 77				LD	(HL),A		;Save in FEXT 
+d13e 23				INC	HL		;Point to next 
+d13f				RCAL	GETCH		;Get and test 
+d13f d7			        RST 10H 
+d140 36			        DB GETCH - $ - 1 
+d141			        ENDM 
+# End of macro RCAL
+d141 77				LD	(HL),A		;Save in FEXT 
+d142 23				INC	HL		;Point to next 
+d143 cb 88			RES	1,B		;Extension specified 
+d145 3a 00 c0		CFS5:	LD	A,(MDRV)	;Default is MDRV 
+d148 4f				LD	C,A 
+d149 1a				LD	A,(DE)		;Get character 
+d14a fe 3a			CP	':'		;Colon? 
+d14c 20 0e			JR	NZ,CFS6		;No => skip 
+d14e 13				INC	DE		;Point to next 
+d14f 1a				LD	A,(DE)		;Get character 
+d150 13				INC	DE		;Point to next 
+d151 d6 30			SUB	'0'		;Adjust 
+d153 38 1c			JR	C,CFS8		;Error => skip 
+d155 fe 05			CP	MAXDRV+1	;Too big? 
+d157 30 18			JR	NC,CFS8		;Yes => skip 
+d159 4f				LD	C,A		;Put drive number in C 
+d15a cb 90			RES	2,B		;Drive specified 
+d15c 1a			CFS6:	LD	A,(DE)		;Skip blanks 
+d15d fe 20			CP	' ' 
+d15f 20 03			JR	NZ,CFS7 
+d161 13				INC	DE 
+d162 18 f8			JR	CFS6 
+d164 f1			CFS7:	POP	AF		;Get flag mask 
+d165 e1				POP	HL		;Get FCB addr 
+d166 a0				AND	B		;Flags ok? 
+d167 c8				RET	Z		;Yes => return 
+d168 06 12			LD	B,12H		;Compute error code 
+d16a 04			CFS10:	INC	B 
+d16b 1f				RRA 
+d16c 30 fc			JR	NC,CFS10 
+d16e 78				LD	A,B		;Put in A 
+d16f b7				OR	A		;Indicate error 
+d170 c9				RET 
+d171 3e 12		CFS8:	LD	A,12H		;Error 12 
+d173 e1			CFS9:	POP	HL		;Adjust 
+d174 e1				POP	HL		;Get FCB addr 
+d175 b7				OR	A		;Indicate error 
+d176 c9				RET 
+d177			 
+d177 1a			GETCH:	LD	A,(DE)		;Get character 
+d178 13				INC	DE		;Point to next 
+d179 fe 21		TSTCH:	CP	21H		;Control character? 
+d17b 38 03			JR	C,TCH1		;Yes => skip 
+d17d fe 80			CP	80H		;Graphic character 
+d17f d8				RET	C		;No => return 
+d180 e1			TCH1:	POP	HL		;Adjust 
+d181 3e 10			LD	A,10H		;Error 10 
+d183 18 ee			JR	CFS9 
+d185			 
+d185			; Lookup file in current directory 
+d185			;---------------------------------------------- 
+d185			; Entry: HL:  Lookup FCB address 
+d185			;	 DE:  Previous directory FCB address 
+d185			;	 B:   B0=1  Don't match file name 
+d185			;	      B1=1  Don't match extension 
+d185			;	      B4=1  Copy dir FCB to look FCB 
+d185			;	      B5=1  Include locked files 
+d185			;	      B6=1  Include deleted files 
+d185			;	      B7=1  Not first look 
+d185			; Exit:  HL:  Unchanged 
+d185			;	 DE:  Directory FCB address 
+d185			;	 B:   B7 set, B6-B0 unchanged 
+d185			;	 C:   Unchanged 
+d185			;---------------------------------------------- 
+d185			 
+d185 cb 78		LOOK:	BIT	7,B		;First look? 
+d187 20 05			JR	NZ,LK1		;No => skip 
+d189 11 04 c4			LD	DE,FCBS-20	;Start with first FCB 
+d18c cb f8			SET	7,B		;Next time not first 
+d18e e5			LK1:	PUSH	HL		;Save FCB addr 
+d18f 21 14 00		LK2:	LD	HL,20		;Point to next FCB 
+d192 19				ADD	HL,DE 
+d193 eb				EX	DE,HL		;Put in DE 
+d194 2a 16 c4			LD	HL,(NXTFCB)	;Done all FCBs? 
+d197 37				SCF 
+d198 ed 52			SBC	HL,DE 
+d19a e1				POP	HL		;(restore FCB addr) 
+d19b 30 04			JR	NC,LK3		;No => skip 
+d19d 3e 30			LD	A,30H		;Error 30 
+d19f b7				OR	A 
+d1a0 c9				RET 
+d1a1 e5			LK3:	PUSH	HL		;Save lookup FCB addr 
+d1a2 d5				PUSH	DE		;Save dir FCB addr 
+d1a3 3e 08			LD	A,8		;Compare names 
+d1a5				RCAL	CMPS 
+d1a5 d7			        RST 10H 
+d1a6 38			        DB CMPS - $ - 1 
+d1a7			        ENDM 
+# End of macro RCAL
+d1a7 28 04			JR	Z,LK4		;Match => skip 
+d1a9 cb 40			BIT	0,B		;Should they match? 
+d1ab 28 0a			JR	Z,LK5		;Yes => skip 
+d1ad 3e 02		LK4:	LD	A,2		;Compare extensions 
+d1af				RCAL	CMPS 
+d1af d7			        RST 10H 
+d1b0 2e			        DB CMPS - $ - 1 
+d1b1			        ENDM 
+# End of macro RCAL
+d1b1 28 07			JR	Z,LK6		;Match => skip 
+d1b3 cb 48			BIT	1,B		;Should thay match? 
+d1b5 20 03			JR	NZ,LK6		;No => skip 
+d1b7 d1			LK5:	POP	DE		;Restore dir FCB addr 
+d1b8 18 d5			JR	LK2		;Try next 
+d1ba 1a			LK6:	LD	A,(DE)		;Locked? 
+d1bb cb 47			BIT	0,A 
+d1bd 28 04			JR	Z,LK7		;No => skip 
+d1bf cb 68			BIT	5,B		;Include locked files? 
+d1c1 28 f4			JR	Z,LK5		;No => try next 
+d1c3 cb 4f		LK7:	BIT	1,A		;Deleted? 
+d1c5 28 04			JR	Z,LK8		;No => skip 
+d1c7 cb 70			BIT	6,B		;Include deleted files? 
+d1c9 28 ec			JR	Z,LK5		;No => try next 
+d1cb d1			LK8:	POP	DE		;Restore dir FCB addr 
+d1cc e1				POP	HL		;Restore look FCB addr 
+d1cd cb 60			BIT	4,B		;Copy directory FCB? 
+d1cf 28 0c			JR	Z,LK9		;No => skip 
+d1d1 c5				PUSH	BC		;Save 
+d1d2 d5				PUSH	DE 
+d1d3 e5				PUSH	HL 
+d1d4 eb				EX	DE,HL		;Copy FCB 
+d1d5 01 14 00			LD	BC,20 
+d1d8 ed b0			LDIR 
+d1da e1				POP	HL		;Restore 
+d1db d1				POP	DE 
+d1dc c1				POP	BC 
+d1dd af			LK9:	XOR	A		;No error 
+d1de c9				RET 
+d1df			 
+d1df			; Compare string at DE to string at HL for 
+d1df			; A characters 
+d1df			 
+d1df c5			CMPS:	PUSH	BC		;Save BC 
+d1e0 47				LD	B,A		;Put length in B 
+d1e1 0e 00			LD	C,0		;Clear C 
+d1e3 1a			CPS1:	LD	A,(DE)		;Get character 
+d1e4 be				CP	(HL)		;Match? 
+d1e5 28 01			JR	Z,CPS2		;Yes => skip 
+d1e7 0d				DEC	C		;No match 
+d1e8 23			CPS2:	INC	HL		;Point to next 
+d1e9 13				INC	DE 
+d1ea 10 f7			DJNZ	CPS1		;Fall thru when done 
+d1ec 0c				INC	C		;Status to Z flag 
+d1ed 0d				DEC	C 
+d1ee c1				POP	BC		;Restore BC 
+d1ef c9				RET 
+d1f0			 
+d1f0			 
+d1f0			; Enter file in current directory 
+d1f0			;---------------------------------------------- 
+d1f0			; Entry: HL:  Address of FCB to be entered 
+d1f0			; Exit:  HL:  Unchanged 
+d1f0			;	 DE:  Directory FCB address 
+d1f0			;	 BC:  Unchanged 
+d1f0			;---------------------------------------------- 
+d1f0			 
+d1f0 c5			ENTER:	PUSH	BC		;Save 
+d1f1 e5				PUSH	HL 
+d1f2 06 20			LD	B,00100000B	;Look it up 
+d1f4				SCAL	ZLOOK 
+d1f4 df			        RST 18H 
+d1f5 86			        DB ZLOOK 
+d1f6			        ENDM 
+# End of macro SCAL
+d1f6 20 04			JR	NZ,ENT1		;Non-existing => skip 
+d1f8 3e 31			LD	A,31H		;Error 31 
+d1fa 18 29			JR	ENT2 
+d1fc ed 5b 16 c4	ENT1:	LD	DE,(NXTFCB)	;Is directory full? 
+d200 21 00 c8			LD	HL,FCBS+50*20 
+d203 37				SCF 
+d204 ed 52			SBC	HL,DE 
+d206 3e 32			LD	A,32H		;(Error 32 if so) 
+d208 38 1b			JR	C,ENT2		;Yes => skip 
+d20a e1				POP	HL		;Restore FCB addr 
+d20b e5				PUSH	HL 
+d20c 01 14 00			LD	BC,20		;Copy 20 bytes 
+d20f ed b0			LDIR 
+d211 ed 53 16 c4		LD	(NXTFCB),DE	;Save new end addr 
+d215 11 fa ff			LD	DE,FNSC-20	;Get FNSC into DE 
+d218 19				ADD	HL,DE 
+d219 5e				LD	E,(HL) 
+d21a 23				INC	HL 
+d21b 56				LD	D,(HL) 
+d21c 2a 14 c4			LD	HL,(NXTSEC)	;Add FNSC to NXTSEC 
+d21f 19				ADD	HL,DE 
+d220 22 14 c4			LD	(NXTSEC),HL 
+d223				SCAL	ZWDIR		;Write dir to disk 
+d223 df			        RST 18H 
+d224 84			        DB ZWDIR 
+d225			        ENDM 
+# End of macro SCAL
+d225 e1			ENT2:	POP	HL		;Restore 
+d226 c1				POP	BC 
+d227 b7				OR	A		;Status to Z flag 
+d228 c9				RET 
+d229			 
+d229			 
+d229			; Call an overlay 
+d229			;---------------------------------------------- 
+d229			; Entry: Registers defined by overlay 
+d229			; Exit:  Registers defined by overlay 
+d229			;---------------------------------------------- 
+d229			 
+d229 e3			COV:	EX	(SP),HL		;Get overlay name 
+d22a cd 96 d2			CALL	TROVN 
+d22d e3				EX	(SP),HL 
+d22e cd 53 d2			CALL	GETOV		;Read overlay 
+d231 c3 04 c8			JP	OVRLY		;Go to it 
+d234			 
+d234			 
+d234			; Call an overlay and restore current overlay 
+d234			;---------------------------------------------- 
+d234			; Entry: Registers defined by overlay 
+d234			; Exit:  Registers defined by overlay 
+d234			;---------------------------------------------- 
+d234			 
+d234 e3			COVR:	EX	(SP),HL		;Get overlay name 
+d235 cd 96 d2			CALL	TROVN 
+d238 e3				EX	(SP),HL 
+d239 e5				PUSH	HL		;Save return addr 
+d23a 2a 00 c8			LD	HL,(OVNAM)	;Push name of current 
+d23d e3				EX	(SP),HL		;overlay onto stack 
+d23e e5				PUSH	HL 
+d23f 2a 02 c8			LD	HL,(OVNAM+2) 
+d242 e3				EX	(SP),HL 
+d243 cd 53 d2			CALL	GETOV		;Read new overlay 
+d246 cd 04 c8			CALL	OVRLY		;Call it 
+d249 e3				EX	(SP),HL		;Get previous overlay 
+d24a 22 4d c0			LD	(OVFCB+2),HL	;name 
+d24d e1				POP	HL 
+d24e e3				EX	(SP),HL 
+d24f 22 4b c0			LD	(OVFCB),HL 
+d252 e1				POP	HL 
+d253			 
+d253			; Read overlay in OVFCB into memory 
+d253			 
+d253 f5			GETOV:	PUSH	AF		;Save all 
+d254 c5				PUSH	BC 
+d255 d5				PUSH	DE 
+d256 e5				PUSH	HL 
+d257 21 4b c0			LD	HL,OVFCB+FNAM	;Is it there already? 
+d25a 11 00 c8			LD	DE,OVNAM 
+d25d 3e 04			LD	A,4 
+d25f cd df d1			CALL	CMPS 
+d262 28 2d			JR	Z,GOV2		;Yes => don't read 
+d264 06 04			LD	B,4		;Blank fill remainder 
+d266 36 20		GOV1:	LD	(HL),' ' 
+d268 23				INC	HL 
+d269 10 fb			DJNZ	GOV1 
+d26b 36 4f			LD	(HL),'O'	;Insert extension 
+d26d 23				INC	HL 
+d26e 36 56			LD	(HL),'V' 
+d270 3a 00 c0			LD	A,(MDRV)	;Read from MDRV 
+d273 4f				LD	C,A 
+d274				SCAL	ZRDIR		;Read directory 
+d274 df			        RST 18H 
+d275 83			        DB ZRDIR 
+d276			        ENDM 
+# End of macro SCAL
+d276				SCAL	ZCKER		;Check for error 
+d276 df			        RST 18H 
+d277 8a			        DB ZCKER 
+d278			        ENDM 
+# End of macro SCAL
+d278 21 4b c0			LD	HL,OVFCB	;Look it up 
+d27b 06 20			LD	B,00100000B	;Include locked files 
+d27d				SCAL	ZLOOK 
+d27d df			        RST 18H 
+d27e 86			        DB ZLOOK 
+d27f			        ENDM 
+# End of macro SCAL
+d27f				SCAL	ZCKER		;Check for error 
+d27f df			        RST 18H 
+d280 8a			        DB ZCKER 
+d281			        ENDM 
+# End of macro SCAL
+d281 21 0c 00			LD	HL,FSEC		;Point to FSEC slot 
+d284 19				ADD	HL,DE 
+d285 5e				LD	E,(HL)		;Get FSEC into DE 
+d286 23				INC	HL 
+d287 56				LD	D,(HL) 
+d288 23				INC	HL 
+d289 46				LD	B,(HL)		;Get FNSC into B 
+d28a 21 00 c8			LD	HL,OVAREA	;Read into OVAREA 
+d28d				SCAL	ZDRD		;Do the read 
+d28d df			        RST 18H 
+d28e 81			        DB ZDRD 
+d28f			        ENDM 
+# End of macro SCAL
+d28f				SCAL	ZCKER		;Check for error 
+d28f df			        RST 18H 
+d290 8a			        DB ZCKER 
+d291			        ENDM 
+# End of macro SCAL
+d291 e1			GOV2:	POP	HL		;Restore all 
+d292 d1				POP	DE 
+d293 c1				POP	BC 
+d294 f1				POP	AF 
+d295 c9				RET 
+d296			 
+d296			; Transfer overlay name to OVFCB 
+d296			 
+d296 f5			TROVN:	PUSH	AF 
+d297 c5				PUSH	BC 
+d298 d5				PUSH	DE 
+d299 11 4b c0			LD	DE,OVFCB+FNAM 
+d29c 01 04 00			LD	BC,4 
+d29f ed b0			LDIR 
+d2a1 d1				POP	DE 
+d2a2 c1				POP	BC 
+d2a3 f1				POP	AF 
+d2a4 c9				RET 
+d2a5			 
+d2a5			 
+d2a5			; Check for error 
+d2a5			;---------------------------------------------- 
+d2a5			; Entry: A:   Error code (0 => no error) 
+d2a5			; Exit:  If no error, all registers unchanged 
+d2a5			;	 otherwise CKER never returns 
+d2a5			;---------------------------------------------- 
+d2a5			 
+d2a5 b7			CKER:	OR	A		;Error? 
+d2a6 c8				RET	Z		;No => bye 
+d2a7 47				LD	B,A		;Put code in B 
+d2a8				SCAL	ZNNOM		;Normal output 
+d2a8 df			        RST 18H 
+d2a9 77			        DB ZNNOM 
+d2aa			        ENDM 
+# End of macro SCAL
+d2aa 3a 04 c0			LD	A,(ERRFLG)	;Second error? 
+d2ad b7				OR	A 
+d2ae 20 18			JR	NZ,ABORT	;Yes => trouble 
+d2b0 3d				DEC	A		;Set error flag 
+d2b1 32 04 c0			LD	(ERRFLG),A 
+d2b4 78				LD	A,B		;Save error code 
+d2b5 32 05 c0			LD	(ERRCOD),A 
+d2b8				SCAL	ZCOV		;Call Emsg to print the 
+d2b8 df			        RST 18H 
+d2b9 88			        DB ZCOV 
+d2ba			        ENDM 
+# End of macro SCAL
+d2ba ..				DB	'Emsg'		;error message 
+d2be				SCAL	ZCRLF 
+d2be df			        RST 18H 
+d2bf 6a			        DB ZCRLF 
+d2c0			        ENDM 
+# End of macro SCAL
+d2c0 af				XOR	A		;Clear error flag 
+d2c1 32 04 c0			LD	(ERRFLG),A 
+d2c4			DBREAK:	SCAL	ZCFMA		;Abort cmd file mode 
+d2c4 df			        RST 18H 
+d2c5 8c			        DB ZCFMA 
+d2c6			        ENDM 
+# End of macro SCAL
+d2c6				SCAL	ZMRET		;Back to Exec 
+d2c6 df			        RST 18H 
+d2c7 5b			        DB ZMRET 
+d2c8			        ENDM 
+# End of macro SCAL
+d2c8			 
+d2c8			; Abort PolyDos, print error code, and return 
+d2c8			; control to NAS-SYS 
+d2c8			 
+d2c8 cd 0d 00		ABORT:	CALL	STMON		;Initialize NAS-SYS 
+d2cb ef				RST	PRS		;Print error message 
+d2cc .. 00			DB	'(Error ',0 
+d2d4 3a 05 c0			LD	A,(ERRCOD) 
+d2d7				SCAL	ZB2HEX 
+d2d7 df			        RST 18H 
+d2d8 68			        DB ZB2HEX 
+d2d9			        ENDM 
+# End of macro SCAL
+d2d9 ef				RST	PRS 
+d2da .. 0d 00			DB	')',CR,0 
+d2dd				SCAL	ZMRET		;Back to NAS-SYS 
+d2dd df			        RST 18H 
+d2de 5b			        DB ZMRET 
+d2df			        ENDM 
+# End of macro SCAL
+d2df			 
+d2df			 
+d2df			; Check for break 
+d2df			;---------------------------------------------- 
+d2df			; If CTRL/SHIFT/@ is pressed, abort any 
+d2df			; operation, and return to via MRET 
+d2df			;---------------------------------------------- 
+d2df			 
+d2df 3e 02		CKBRK:	LD	A,2		;Reset KBD pointer 
+d2e1 cd 45 00			CALL	FFLP 
+d2e4 db 00			IN	A,(0)		;Read first row 
+d2e6 f6 80			OR	80H		;Ignore bit 7 
+d2e8 fe c7			CP	-1-38H		;CTRL/SHIFT/@? 
+d2ea c0				RET	NZ		;No => bye 
+d2eb 3a 16 c0			LD	A,(BLINKF)	;Aborted from BLINK? 
+d2ee b7				OR	A 
+d2ef 28 08			JR	Z,CKB1		;No => skip 
+d2f1 2a 29 0c			LD	HL,(CURSOR)	;Reinsert character 
+d2f4 77				LD	(HL),A		;at cursor 
+d2f5 af				XOR	A		;Clear BLINK flag 
+d2f6 32 16 c0			LD	(BLINKF),A 
+d2f9 2a 06 c0		CKB1:	LD	HL,(BREAK)	;Go to BREAK handler 
+d2fc e9				JP	(HL) 
+d2fd			 
+d2fd			 
+d2fd			; Abort command file mode 
+d2fd			;---------------------------------------------- 
+d2fd			; If command file mode is active, abort it and 
+d2fd			; display (Cmdf abort) 
+d2fd			;---------------------------------------------- 
+d2fd			 
+d2fd 21 0b c0		CFMA:	LD	HL,CFFLG	;Is CFFLG set? 
+d300 af				XOR	A 
+d301 be				CP	(HL) 
+d302 c8				RET	Z		;No => bye 
+d303 77				LD	(HL),A		;Clear it 
+d304 ef				RST	PRS		;Display message 
+d305 .. 0d 00			DB	'(Cmdf abort)',CR,0 
+d313 c9				RET 
+d314			 
+d314			 
+d314			; Set SCAL vector 
+d314			;---------------------------------------------- 
+d314			; Entry: HL:  New jump vector address 
+d314			;	 Call is followed by routine number 
+d314			; Exit:  HL:  Previous jump vector address 
+d314			;	 DE:  Junk 
+d314			;	 BC:  Junk 
+d314			;---------------------------------------------- 
+d314			 
+d314 e3			SSCV:	EX	(SP),HL		;Get routine number 
+d315 5e				LD	E,(HL) 
+d316 23				INC	HL 
+d317 e3				EX	(SP),HL 
+d318 e5				PUSH	HL		;Save HL 
+d319 16 00			LD	D,0		;Clear D 
+d31b 2a 71 0c			LD	HL,(STAB)	;Calculate addr in 
+d31e 19				ADD	HL,DE		;SCAL table 
+d31f 19				ADD	HL,DE 
+d320 c1				POP	BC		;Get new vector 
+d321 5e				LD	E,(HL)		;Read old 
+d322 71				LD	(HL),C		;Save new 
+d323 23				INC	HL		;Point to next byte 
+d324 56				LD	D,(HL)		;Read old 
+d325 70				LD	(HL),B		;Save new 
+d326 eb				EX	DE,HL		;Put old vector in HL 
+d327 c9				RET 
+d328			 
+d328			 
+d328			;Execute jump table 
+d328			;---------------------------------------------- 
+d328			; Entry: A:   Jump vector number 
+d328			;	 Jump vectors follow call as DW's 
+d328			; Exit:  Jumps to selected routine with all 
+d328			;	 registers intact 
+d328			;---------------------------------------------- 
+d328			 
+d328 e3			JUMP:	EX	(SP),HL		;Point to jump table 
+d329 d5				PUSH	DE		;Save 
+d32a f5				PUSH	AF 
+d32b 5f				LD	E,A		;Calculate vector addr 
+d32c 16 00			LD	D,0 
+d32e 19				ADD	HL,DE 
+d32f 19				ADD	HL,DE 
+d330 5e				LD	E,(HL)		;Get vector into DE 
+d331 23				INC	HL 
+d332 56				LD	D,(HL) 
+d333 eb				EX	DE,HL		;Put into HL 
+d334 f1				POP	AF		;Restore 
+d335 d1				POP	DE 
+d336 e3				EX	(SP),HL 
+d337 c9				RET			;Go there 
+d338			 
+d338			 
+d338			; Output character to printer 
+d338			;---------------------------------------------- 
+d338			; Entry: A:   Holds character to be printed 
+d338			; Exit:  HL:  Junk 
+d338			;	 DE:  Junk 
+d338			;	 BC:  Junk 
+d338			;	 AF:  Unchanged 
+d338			;---------------------------------------------- 
+d338			 
+d338 f5			POUT:	PUSH	AF		;Save char 
+d339 21 18 c0			LD	HL,PPOS		;Point to PPOS 
+d33c fe 0d			CP	CR		;Is it CR? 
+d33e 20 21			JR	NZ,PO4		;No => skip 
+d340 cd b7 d3			CALL	PRCH		;Print it 
+d343 36 00			LD	(HL),0		;Clear PPOS 
+d345 2b				DEC	HL		;Point to PLCT 
+d346 34				INC	(HL)		;Increment it 
+d347 3a 11 c2			LD	A,(PBMG)	;Get PBMG 
+d34a 47				LD	B,A		;Put into B 
+d34b 3a 10 c2			LD	A,(PLPP)	;Get PLPP 
+d34e 90				SUB	B		;Subtract PBMG 
+d34f 96				SUB	(HL)		;Subtract PLCT 
+d350 20 57			JR	NZ,PO11		;Not zero => skip 
+d352 04			PO1:	INC	B		;Adjust B 
+d353 05			PO2:	DEC	B		;Decrement count 
+d354 28 08			JR	Z,PO3		;Zero => skip 
+d356 3e 0d			LD	A,CR		;Print CR/LF 
+d358 cd b7 d3			CALL	PRCH 
+d35b 34				INC	(HL)		;Increment PLCT 
+d35c 18 f5			JR	PO2 
+d35e 70			PO3:	LD	(HL),B		;Clear PLCT 
+d35f 18 48			JR	PO11		;Done 
+d361 fe 0c		PO4:	CP	FF		;Is it FF? 
+d363 20 0a			JR	NZ,PO5		;No => skip 
+d365 36 00			LD	(HL),0		;Clear PPOS 
+d367 2b				DEC	HL		;Point to PLCT 
+d368 3a 10 c2			LD	A,(PLPP)	;Calculate number of 
+d36b 96				SUB	(HL)		;CR/LFs to print 
+d36c 47				LD	B,A		;Put in B 
+d36d 18 e3			JR	PO1		;Go print them 
+d36f 3a 12 c2		PO5:	LD	A,(PCPL)	;At right margin? 
+d372 be				CP	(HL) 
+d373 20 09			JR	NZ,PO6		;No => skip 
+d375 c5				PUSH	BC 
+d376 e5				PUSH	HL 
+d377 3e 0d			LD	A,CR		;Move to next line 
+d379 cd 38 d3			CALL	POUT 
+d37c e1				POP	HL 
+d37d c1				POP	BC 
+d37e 7e			PO6:	LD	A,(HL)		;Is PPOS zero? 
+d37f b7				OR	A 
+d380 20 0f			JR	NZ,PO8		;No => skip 
+d382 3a 13 c2			LD	A,(PLMG)	;Get PLMG 
+d385 47				LD	B,A		;Put in B 
+d386 04				INC	B		;Adjust 
+d387 05			PO7:	DEC	B		;Decrement count 
+d388 28 07			JR	Z,PO8		;Zero => skip 
+d38a 3e 20			LD	A,' '		;Print blank 
+d38c cd ab d3			CALL	PRCHT 
+d38f 18 f6			JR	PO7 
+d391 f1			PO8:	POP	AF		;Restore char 
+d392 f5				PUSH	AF 
+d393 fe 09			CP	TAB		;Is it TAB? 
+d395 06 01			LD	B,1		;(Print 1 char if not) 
+d397 20 0b			JR	NZ,PO10		;No => skip 
+d399 3a 13 c2			LD	A,(PLMG)	;Calculate number of 
+d39c 96				SUB	(HL)		;blanks to expand the 
+d39d 3d				DEC	A		;TAB into 
+d39e e6 07			AND	7 
+d3a0 3c				INC	A 
+d3a1 47				LD	B,A		;Put in B 
+d3a2 3e 20		PO9:	LD	A,' '		;Print blank(s) 
+d3a4 cd ab d3		PO10:	CALL	PRCHT		;Print character 
+d3a7 10 f9			DJNZ	PO9		;Fall thru when done 
+d3a9 f1			PO11:	POP	AF		;Restore char 
+d3aa c9				RET 
+d3ab			 
+d3ab			; Print character with right margin test 
+d3ab			 
+d3ab 4f			PRCHT:	LD	C,A		;Put char in C 
+d3ac 3a 12 c2			LD	A,(PCPL)	;Still room on line? 
+d3af be				CP	(HL) 
+d3b0 c8				RET	Z		;No => return 
+d3b1 79				LD	A,C		;Get char 
+d3b2 cd b7 d3			CALL	PRCH		;Print it 
+d3b5 34				INC	(HL)		;Increment PPOS 
+d3b6 c9				RET 
+d3b7			 
+d3b7			; Transfer character to user defined output 
+d3b7			; routine, and add a LF in case of CR 
+d3b7			 
+d3b7 c5			PRCH:	PUSH	BC		;Save 
+d3b8 e5				PUSH	HL 
+d3b9 f5				PUSH	AF 
+d3ba cd 40 c2			CALL	PCHR		;Call user routine 
+d3bd f1				POP	AF		;Restore 
+d3be e1				POP	HL 
+d3bf c1				POP	BC 
+d3c0 fe 0d			CP	CR		;Was it CR? 
+d3c2 c0				RET	NZ		;No => return 
+d3c3 3e 0a			LD	A,LF		;Supply LF 
+d3c5 18 f0			JR	PRCH 
+d3c7			 
+d3c7			 
+d3c7			; Output to CRT 
+d3c7			;---------------------------------------------- 
+d3c7			; Output character in A to the CRT. TAB chars 
+d3c7			; are expanded into one or more spaces 
+d3c7			;---------------------------------------------- 
+d3c7			 
+d3c7 fe 20		CRT:	CP	' '		;Control char 
+d3c9 30 2b			JR	NC,CRTC		;No => go print 
+d3cb b7				OR	A		;Zero? 
+d3cc c8				RET	Z		;Yes => bye 
+d3cd f5				PUSH	AF		;Save char 
+d3ce fe 09			CP	TAB		;Is it TAB? 
+d3d0 28 0d			JR	Z,CRT1		;Yes => skip 
+d3d2 47				LD	B,A		;Put char in B 
+d3d3 3a 06 00			LD	A,(6)		;Get NAS-SYS byte 
+d3d6 fe fe			CP	0FEH		;NAS-SYS 3? 
+d3d8 78				LD	A,B		;(Restore char) 
+d3d9 c2 52 01			JP	NZ,152H		;Yes => jump 
+d3dc c3 93 01			JP	193H		;Must be NAS-SYS 1 
+d3df 3a 29 0c		CRT1:	LD	A,(CURSOR)	;Expand TAB 
+d3e2 e6 3f			AND	3FH 
+d3e4 2f				CPL 
+d3e5 c6 0a			ADD	A,10 
+d3e7 e6 07			AND	7 
+d3e9 3c				INC	A 
+d3ea 47				LD	B,A		;Put count in B 
+d3eb c5			CRT2:	PUSH	BC		;Save BC 
+d3ec 3e 20			LD	A,' '		;Print blank 
+d3ee cd f6 d3			CALL	CRTC 
+d3f1 c1				POP	BC		;Restore BC 
+d3f2 10 f7			DJNZ	CRT2		;Fall thru when done 
+d3f4 f1				POP	AF		;Restore char 
+d3f5 c9				RET 
+d3f6 f5			CRTC:	PUSH	AF		;Save char 
+d3f7 2a 29 0c			LD	HL,(CURSOR)	;Store at cursor 
+d3fa 77				LD	(HL),A 
+d3fb 23				INC	HL		;Move cursor right 
+d3fc 7e				LD	A,(HL)		;Is there a margin? 
+d3fd b7				OR	A 
+d3fe 28 05			JR	Z,CRTC1		;Yes => skip 
+d400 22 29 0c			LD	(CURSOR),HL	;Save new cursor 
+d403 f1				POP	AF		;Restore char 
+d404 c9				RET 
+d405 3a 06 00		CRTC1:	LD	A,(6)		;NAS-SYS 3? 
+d408 fe fe			CP	0FEH 
+d40a c2 0e 02			JP	NZ,20EH		;Yes => jump 
+d40d c3 4f 02			JP	24FH		;Must be NAS-SYS 1? 
+d410			 
+d410			 
+d410			; Normalize input table 
+d410			;---------------------------------------------- 
+d410			; Restores normal input channels, i.e. routines 
+d410			; RKBD and SRLIN. On exit HL contains address 
+d410			; of previous input table 
+d410			;---------------------------------------------- 
+d410			 
+d410 21 16 d4		DNNIM:	LD	HL,INTBL 
+d413				SCAL	ZNIM 
+d413 df			        RST 18H 
+d414 72			        DB ZNIM 
+d415			        ENDM 
+# End of macro SCAL
+d415 c9				RET 
+d416			 
+d416 7d 70 00		INTBL:	DB	ZRKBD,ZSRLIN,0 
+d419			 
+d419			 
+d419			; Input from keyboard or command file 
+d419			;---------------------------------------------- 
+d419			; If command file mode is active, get the 
+d419			; character from the command file, else input 
+d419			; it with a blinking cursor as normally. 
+d419			; Pressing CTRL/SHIFT/@ will warm-boot the 
+d419			; system 
+d419			;---------------------------------------------- 
+d419			 
+d419 3a 0b c0		BLINK:	LD	A,(CFFLG)	;Command file mode? 
+d41c b7				OR	A 
+d41d 20 28			JR	NZ,BL3		;Yes => skip 
+d41f 2a 29 0c		BL1:	LD	HL,(CURSOR)	;Get char at cursor 
+d422 7e				LD	A,(HL) 
+d423 32 16 c0			LD	(BLINKF),A	;Save in BLINKF 
+d426 3a 00 c2			LD	A,(CURCHR)	;Put cursor on screen 
+d429 77				LD	(HL),A 
+d42a				RCAL	BIN		;Scan KBD 
+d42a d7			        RST 10H 
+d42b 10			        DB BIN - $ - 1 
+d42c			        ENDM 
+# End of macro RCAL
+d42c f5				PUSH	AF		;Save char 
+d42d 3a 16 c0			LD	A,(BLINKF)	;Restore char at cursor 
+d430 77				LD	(HL),A 
+d431 af				XOR	A		;Clear BLINK flag 
+d432 32 16 c0			LD	(BLINKF),A 
+d435 f1				POP	AF		;Restore input char 
+d436 d8				RET	C		;Character => return 
+d437				RCAL	BIN		;Scan KBD 
+d437 d7			        RST 10H 
+d438 03			        DB BIN - $ - 1 
+d439			        ENDM 
+# End of macro RCAL
+d439 30 de			JR	NC,BLINK	;No char => repeat 
+d43b c9				RET 
+d43c 3a 01 c2		BIN:	LD	A,(CURBLR)	;Get blink rate 
+d43f 5f				LD	E,A		;Put in E 
+d440			BIN1:	SCAL	ZIN		;Scan inputs 
+d440 df			        RST 18H 
+d441 62			        DB ZIN 
+d442			        ENDM 
+# End of macro SCAL
+d442 d8				RET	C		;Char => return 
+d443 1d				DEC	E		;Decrement count 
+d444 20 fa			JR	NZ,BIN1		;Loop until done 
+d446 c9				RET 
+d447 cd df d2		BL3:	CALL	CKBRK		;Check for break 
+d44a 3a 10 c0			LD	A,(CFSBP)	;Get sector buffer ptr 
+d44d b7				OR	A		;Buffer empty? 
+d44e 20 25			JR	NZ,BL4		;No => skip 
+d450 3a 0f c0			LD	A,(CFNSC)	;Get sector count 
+d453 32 0b c0			LD	(CFFLG),A	;Save as flag 
+d456 b7				OR	A		;Zero? 
+d457 28 c6			JR	Z,BL1		;Yes => skip 
+d459 3d				DEC	A		;Decrement count 
+d45a 32 0f c0			LD	(CFNSC),A	;Save it 
+d45d 21 00 c3			LD	HL,SECBUF	;Read into SECBUF 
+d460 ed 5b 0d c0		LD	DE,(CFSEC)	;From CFSEC 
+d464 c5				PUSH	BC		;Save BC 
+d465 06 01			LD	B,1		;Read one sector 
+d467 3a 0c c0			LD	A,(CFDRV)	;From CFDRV 
+d46a 4f				LD	C,A 
+d46b				SCAL	ZDRD		;Do the read 
+d46b df			        RST 18H 
+d46c 81			        DB ZDRD 
+d46d			        ENDM 
+# End of macro SCAL
+d46d				SCAL	ZCKER		;Check for error 
+d46d df			        RST 18H 
+d46e 8a			        DB ZCKER 
+d46f			        ENDM 
+# End of macro SCAL
+d46f c1				POP	BC		;Restore BC 
+d470 13				INC	DE		;Increment sector addr 
+d471 ed 53 0d c0		LD	(CFSEC),DE	;Save it 
+d475			;;[NAC HACK 2018Mar30] no way to implement this as a macro.. 
+d475			;;BL4:	LD	H,HIGH(SECBUF)	;Set MSB of address 
+d475			 
+d475 26 c3		BL4:	LD	H,SECBUF>>8	;Set MSB of address 
+d477			 
+d477 6f			LD	L,A		;Set LSB 
+d478 3c				INC	A		;Increment pointer 
+d479 32 10 c0			LD	(CFSBP),A	;Save it 
+d47c 7e				LD	A,(HL)		;Get char 
+d47d b7				OR	A		;Filler? 
+d47e 28 c7			JR	Z,BL3		;Yes => repeat 
+d480 c9				RET 
+d481			 
+d481			 
+d481			; Scan keyboard with repeat 
+d481			;---------------------------------------------- 
+d481			; If character is available it is returned in A 
+d481			; with carry set. Otherwise carry is cleared. 
+d481			; Registers HL, DE, and BC are modified. 
+d481			; Pressing CTRL/SHIFT/@ warm-boots system. 
+d481			;---------------------------------------------- 
+d481			 
+d481 cd df d2		RKBD:	CALL	CKBRK		;Check for break 
+d484 2a 11 c0			LD	HL,(RKROW)	;Get bit/row into HL 
+d487 2c				INC	L		;Is row zero? 
+d488 2d				DEC	L 
+d489 28 17			JR	Z,RK3		;Yes => no repeat char 
+d48b 06 08			LD	B,8		;Do all 8 rows 
+d48d 3e 01		RK1:	LD	A,1		;Move to next row 
+d48f cd 45 00			CALL	FFLP 
+d492 f5				PUSH	AF		;Delay 
+d493 f1				POP	AF 
+d494 7d				LD	A,L		;Repeat key row? 
+d495 b8				CP	B 
+d496 20 04			JR	NZ,RK2		;No => skip 
+d498 db 00			IN	A,(0)		;Read row status 
+d49a 2f				CPL			;Complement 
+d49b 4f				LD	C,A		;Put in C 
+d49c 10 ef		RK2:	DJNZ	RK1		;Fall thru when done 
+d49e 7c				LD	A,H		;Is repeat key down? 
+d49f a1				AND	C 
+d4a0 20 4f			JR	NZ,RK11		;Yes => skip 
+d4a2 21 01 0c		RK3:	LD	HL,KMAP		;Point to KMAP 
+d4a5 db 00			IN	A,(0)		;Read first row 
+d4a7 2f				CPL			;Complement 
+d4a8 77				LD	(HL),A		;Store in KMAP 
+d4a9 06 08			LD	B,8		;Do 8 rows 
+d4ab 3e 01		RK4:	LD	A,1		;Move to next row 
+d4ad cd 45 00			CALL	FFLP 
+d4b0 23				INC	HL		;Increment KMAP pointer 
+d4b1 db 00			IN	A,(0)		;Read row status 
+d4b3 2f				CPL			;Complement 
+d4b4 e6 7f			AND	7FH		;Ignore bit 7 
+d4b6 ae				XOR	(HL)		;Same as last time? 
+d4b7 20 07			JR	NZ,RK7		;No => find out why 
+d4b9 10 f0		RK5:	DJNZ	RK4		;Fall thru when done 
+d4bb af			RK6:	XOR	A		;Clear carry 
+d4bc 32 11 c0			LD	(RKROW),A	;No repeat key 
+d4bf c9				RET 
+d4c0 0e ff		RK7:	LD	C,-1		;Compute bit mask and 
+d4c2 16 00			LD	D,0		;column number 
+d4c4 37				SCF 
+d4c5 cb 12		RK8:	RL	D 
+d4c7 0c				INC	C 
+d4c8 1f				RRA 
+d4c9 30 fa			JR	NC,RK8 
+d4cb 7a				LD	A,D		;Get bit mask 
+d4cc ae				XOR	(HL)		;Update map 
+d4cd 77				LD	(HL),A 
+d4ce 7a				LD	A,D		;Get bit mask 
+d4cf a6				AND	(HL)		;Key released? 
+d4d0 28 e7			JR	Z,RK5		;Yes => ignore 
+d4d2 21 11 c0			LD	HL,RKROW	;Point to KBD data 
+d4d5 70				LD	(HL),B		;Save row number 
+d4d6 23				INC	HL 
+d4d7 72				LD	(HL),D		;Save bit mask 
+d4d8 3a 06 00			LD	A,(6)		;NAS-SYS 3? 
+d4db fe fe			CP	0FEH 
+d4dd 20 05			JR	NZ,RK9		;No => skip 
+d4df cd 13 01			CALL	113H		;Call NAS-SYS 3  
+d4e2 18 03			JR	RK10 
+d4e4 cd c9 00		RK9:	CALL	0C9H		;Call NAS-SYS 1 
+d4e7 30 d2		RK10:	JR	NC,RK6		;Undefined key => skip 
+d4e9 32 13 c0			LD	(RKVAL),A	;Save ASCII value 
+d4ec 2a 02 c2			LD	HL,(RKLON)	;Long delay 
+d4ef 18 0b			JR	RK12 
+d4f1 2a 14 c0		RK11:	LD	HL,(RKCNT)	;Get counter 
+d4f4 2b				DEC	HL		;Decrement 
+d4f5 7c				LD	A,H		;Zero? 
+d4f6 b5				OR	L 
+d4f7 20 07			JR	NZ,RK13		;No => skip 
+d4f9 2a 04 c2			LD	HL,(RKSHO)	;Short delay 
+d4fc 3a 13 c0		RK12:	LD	A,(RKVAL)	;Get ASCII value 
+d4ff 37				SCF			;Indicate char 
+d500 22 14 c0		RK13:	LD	(RKCNT),HL	;Save counter 
+d503 c9				RET 
+d504			 
+d504			 
+d504			; Print 2 spaces 
+d504			;---------------------------------------------- 
+d504			; Print 2 spaces using the SPACE routine 
+d504			;---------------------------------------------- 
+d504			 
+d504			SP2:	SCAL	ZSPACE 
+d504 df			        RST 18H 
+d505 69			        DB ZSPACE 
+d506			        ENDM 
+# End of macro SCAL
+d506				SCAL	ZSPACE 
+d506 df			        RST 18H 
+d507 69			        DB ZSPACE 
+d508			        ENDM 
+# End of macro SCAL
+d508 c9				RET 
+d509			 
+d509			 
+d509			; Call routine number E 
+d509			;---------------------------------------------- 
+d509			; Call SCAL routine number E 
+d509			;---------------------------------------------- 
+d509			 
+d509 e5			SCALI:	PUSH	HL 
+d50a d5				PUSH	DE 
+d50b f5				PUSH	AF 
+d50c 16 00			LD	D,0 
+d50e 2a 71 0c			LD	HL,(STAB) 
+d511 19				ADD	HL,DE 
+d512 19				ADD	HL,DE 
+d513 5e				LD	E,(HL) 
+d514 23				INC	HL 
+d515 56				LD	D,(HL) 
+d516 eb				EX	DE,HL 
+d517 f1				POP	AF 
+d518 d1				POP	DE 
+d519 e3				EX	(SP),HL 
+d51a c9				RET 
+d51b			 
+d51b			 
+d51b			;---------------------------------------------- 
+d51b			; PolyDos SCAL table (routines 7DH to 8FH) 
+d51b			;---------------------------------------------- 
+d51b			 
+d51b 81 d4		PDSCTB:	DW	RKBD		;7DH 
+d51d 04 d5			DW	SP2		;7EH 
+d51f 09 d5			DW	SCALI		;7FH 
+d521 4a d5			DW	DSIZE		;80H 
+d523 a9 d0			DW	DRD		;81H 
+d525 ac d0			DW	DWR		;82H 
+d527 b8 d0			DW	RDIR		;83H 
+d529 da d0			DW	WDIR		;84H 
+d52b ef d0			DW	CFS		;85H 
+d52d 85 d1			DW	LOOK		;86H 
+d52f f0 d1			DW	ENTER		;87H 
+d531 29 d2			DW	COV		;88H 
+d533 34 d2			DW	COVR		;89H 
+d535 a5 d2			DW	CKER		;8AH 
+d537 df d2			DW	CKBRK		;8BH 
+d539 fd d2			DW	CFMA		;8CH 
+d53b 14 d3			DW	SSCV		;8DH 
+d53d 28 d3			DW	JUMP		;8EH 
+d53f 38 d3			DW	POUT		;8FH 
+d541			 
+d541			;---------------------------------------------- 
+d541			; 
+d541			;	PolyDos 2 (Version ??) 
+d541			;	Disk Driver Routines Section 
+d541			; 
+d541			;	By Neal Crook 
+d541			; 
+d541			;	Routines will control a nascom_sdcard 
+d541			;	board attached to the PIO and providing 
+d541			;	up to four virtual floppy disk drives. 
+d541			;	Each drive is Double-sided, 
+d541			;	35 tracks/side, 256 byte per sector. 
+d541			; 
+d541			;---------------------------------------------- 
+d541			 
+d541			;;; The geometry may be different between CP/M and Polydos; looks as 
+d541			;;; though Polydos starts tracks and sectors at 0 but CP/M starts tracks at 1 
+d541			 
+d541			; Initialize disk drivers and select drive C 
+d541			;;; This is called during the ROM init 
+d541			 
+d541 cd 2c d6		INIT:   call    hwinit		;Set up PIO etc. 
+d544 cd be d5			CALL	CNVCOD		;Convert drive code 
+d547 c3 c5 d5			JP	TSTDSK		;Test for disk 
+d54a			 
+d54a			; Return disk size of drive C in HL 
+d54a			;;; This is a Polydos SCAL 
+d54a			;;; Corrupts: AF 
+d54a			 
+d54a 3e 04		DSIZE:	LD	A,MAXDRV	;Too big? 
+d54c b9				CP	C 
+d54d 3e 28			LD	A,28H		;(Error 28 if so) 
+d54f d8				RET	C		;Yes => return 
+d550 af				XOR	A		;No error 
+d551 21 ec 04			LD      HL,35*2*18	;35-trk, DS, DD 
+d554 c9				RET 
+d555			 
+d555			; Read or write B sectors starting at sector DE 
+d555			; on drive C to or from memory starting at HL. 
+d555			; A=0 indicates read, A=-1 indicates write 
+d555			;;; This is the main driver routine called from the 
+d555			;;; portable part of the ROM. 
+d555			;;; corrupts: AF, BC, DE, HL 
+d555			 
+d555 f5			RWSCTS:	PUSH	AF		;Save R/W flag 
+d556 3e 04		        ld      a,MAXDRV        ;Too big? 
+d558 b9			        cp      c 
+d559 3e 28			LD	A,28H		;(Error 28 if so) 
+d55b 38 5e		        jr      c,RWS2		;Yes => return 
+d55d			 
+d55d 79			        ld      a,c 
+d55e 32 02 c0		        ld      (DRVCOD),a      ;Probably never used.. 
+d561			 
+d561 f6 20		        or      CSEEK           ;merge seek with fid 
+d563 cd e8 d5		        call    putcmd 
+d566			 
+d566			;;; send 32-bit byte offset formed by DE*256 (trivial!) 
+d566			;;; 
+d566 af			        xor     a 
+d567 cd f0 d5		        call    putval          ;LS byte of count 
+d56a 7b			        ld      a,e 
+d56b cd f0 d5		        call    putval          ;next byte of count 
+d56e 7a			        ld      a,d 
+d56f cd f0 d5		        call    putval          ;next byte of count 
+d572 af			        xor     a 
+d573 cd f0 d5		        call    putval          ;MS byte of count 
+d576			 
+d576 cd 47 d6		        call    t2rs2t          ;Get status in A 
+d579			        ;; 0 = error so Z => error 
+d579			 
+d579 28 3e		        jr      z,RWS2A         ;[NAC HACK 2018Apr22] error code?? 
+d57b			 
+d57b			 
+d57b f1			        pop     af              ;Restore R/W flag 
+d57c f5			        push    af 
+d57d b7			        or      a               ;0=>read 
+d57e 28 1b		        jr      z,rs 
+d580			 
+d580			;;; write. Data from HL, B sectors of 256 bytes each 
+d580			 
+d580 79			ws:     ld      a,c             ;FID 
+d581 f6 40		        or      CSWR            ;sector write: 256 bytes 
+d583 cd e8 d5		        call    putcmd 
+d586			 
+d586 c5			        push    bc 
+d587 06 00		        ld      b,0             ;counts as 256 
+d589 7e			wd:     ld      a,(hl)          ;write data for 1 sector 
+d58a cd f0 d5		        call    putval 
+d58d 23			        inc     hl 
+d58e 10 f9		        djnz    wd              ;write data loop for 1 sector 
+d590 c1			        pop     bc 
+d591			 
+d591 cd 47 d6		        call    t2rs2t          ;Get status in A 
+d594			        ;; 0 = error so Z => error 
+d594			 
+d594 28 23		        jr      z,RWS2A         ;[NAC HACK 2018Apr22] error code?? 
+d596			 
+d596			 
+d596 10 e8		        djnz    ws              ;write data loop for B sectors 
+d598			 
+d598 af			        xor     a               ;success 
+d599 18 20		        jr      RWS2            ;tidy stack and return 
+d59b			 
+d59b			;;; read. Data to HL, B sectors of 256 bytes each 
+d59b			 
+d59b 79			rs:     ld      a,c             ;FID 
+d59c f6 30		        or      CSRD            ;sector read: 256 bytes 
+d59e cd e8 d5		        call    putcmd 
+d5a1 cd 05 d6		        call    gorx 
+d5a4			 
+d5a4 c5			        push    bc 
+d5a5 06 00		        ld      b,0             ;counts as 256 
+d5a7 cd 1e d6		rd:     call    getval          ;read data for 1 sector 
+d5aa 77			        ld      (hl),a 
+d5ab 23			        inc     hl 
+d5ac 10 f9		        djnz    rd              ;read data loop for 1 sector 
+d5ae c1			        pop     bc 
+d5af			 
+d5af cd 4a d6		        CALL    rs2t            ;Get status in A 
+d5b2			        ;; 0 = error so Z => error 
+d5b2			 
+d5b2 28 05		        jr      z,RWS2A         ;[NAC HACK 2018Apr22] error code?? 
+d5b4			 
+d5b4 10 e5		        djnz    rs              ;read data loop for B sectors 
+d5b6			 
+d5b6 af			        xor     a               ;success 
+d5b7 18 02		        jr      RWS2            ;tidy stack and return 
+d5b9			 
+d5b9 3e 29		RWS2A:  LD	A,29H		;Error 29 
+d5bb e1			RWS2:	POP	HL		;Adjust 
+d5bc b7				OR	A		;Status to Z flag 
+d5bd c9				RET 
+d5be			 
+d5be			; Convert drive number in C to a drive code 
+d5be			;;; ..and save in DRVCOD. 
+d5be			;;; bits 1:0 of drive number are the physical drive 
+d5be			;;; bit 2 is the DD bit. The drive code is the 1-hot 
+d5be			;;; value written to the FDC control register 
+d5be			;;; where bits 0:3 select physical drives 0-3 
+d5be			;;; respectively and bit 4 is the DD select. 
+d5be			;;; For nascom_sdcard, store the FID in DRVCOD. 
+d5be			;;; Initialisation code shows DRVCOD=-1 means 
+d5be			;;; "no drive selected". However, original TSTDSK 
+d5be			;;; sets DRVCOD=0 to mean "no drive selected". 
+d5be			;;; This TSTDSK uses -1. 
+d5be			;;; Corrupts: AF 
+d5be			 
+d5be 79			CNVCOD: LD      A,C		;Drive number == FID 
+d5bf e6 03		        AND     0x03		;Sanity 
+d5c1 32 02 c0			LD	(DRVCOD),A	;Save as drive code 
+d5c4 c9				RET 
+d5c5			 
+d5c5			 
+d5c5			; Test that a disk is present in selected drive 
+d5c5			;;; selected drive means the drive indicated by 
+d5c5			;;; (DRVCOD). 
+d5c5			;;; Achieved by doing a seek t=0, s=1 and checking 
+d5c5			;;; the status. Seek to t=0, s=1 is no good because 
+d5c5			;;; it may be a zero-byte file created by opening a 
+d5c5			;;; non-existent file name. 
+d5c5			;;; Return OK: Z set 
+d5c5			;;; Return Err: Z clear, error code in A 
+d5c5			;;; Corrupts: AF 
+d5c5 c5			TSTDSK:	PUSH	BC		;Save BC 
+d5c6 3a 02 c0		        LD      A,(DRVCOD) 
+d5c9 f6 28		        OR      CTSEEK          ;Seek + FID 
+d5cb cd e8 d5		        CALL    putcmd 
+d5ce af			        XOR     A 
+d5cf cd f0 d5		        CALL    putval          ;Track 0 
+d5d2 3e 01		        LD      A,1 
+d5d4 cd f0 d5		        CALL    putval          ;Sector 1 
+d5d7			 
+d5d7 cd 47 d6		        call    t2rs2t          ;Get status in A 
+d5da			        ;; 0 = error so Z => error 
+d5da			;;; [NAC HACK 2018Apr22] maybe I should change that all the 
+d5da			;;; way back to the Arduino command set. Much nicer to say 0=success 
+d5da			;;; and non=zero is error with error code, as Polydos does. 
+d5da			 
+d5da 3e 00		        ld      a, 0            ;don't mess with Z flag 
+d5dc 20 07		        jr      nz, TD3 
+d5de			 
+d5de			        ;; error 
+d5de 3e ff		        ld      a, -1 
+d5e0 32 02 c0			LD	(DRVCOD),A	;No drive selected 
+d5e3 3e 27			LD	A,27H		;Error 27 
+d5e5			 
+d5e5 c1			TD3:	POP	BC		;Restore BC 
+d5e6 b7				OR	A		;Status to Z flag 
+d5e7 c9				RET 
+d5e8			 
+d5e8			 
+d5e8			 
+d5e8			;;; Defines and low-level subroutines 
+d5e8			        include "sd_sub_defs.asm" 
+d5e8			;;; Z80 assembler defines for use with nascom_sdcard 
+d5e8			;;; https://github.com/nealcrook/nascom 
+d5e8			;;; 
+d5e8			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d5e8			 
+d5e8			; Commands for the SDcard interface 
+d5e8			FID:          EQU     $0        ;0, 1, 2, 3 or 4 
+d5e8			CNOP:         EQU     $80       ;no-operation 
+d5e8			CRES:         EQU     $81       ;restore state (deprecated; use PRES) 
+d5e8			 
+d5e8			CLOOP:        EQU     $83       ;loopback 
+d5e8			CDIR:         EQU     $84       ;directory 
+d5e8			CSTAT:        EQU     $85       ;command status 
+d5e8			CINFO:        EQU     $86       ;info on mounted drives 
+d5e8			CSTOP:        EQU     $87       ;stop interface (require reset) 
+d5e8			 
+d5e8			COPEN:        EQU     $10 + FID 
+d5e8			COPENR:       EQU     $18 + FID 
+d5e8			CSEEK:        EQU     $20 + FID ;seek by byte offset 
+d5e8			CTSEEK:       EQU     $28 + FID ;seek by track/sector offset 
+d5e8			CSRD:         EQU     $30 + FID 
+d5e8			CNRD:         EQU     $38 + FID 
+d5e8			CSWR:         EQU     $40 + FID 
+d5e8			CNWR:         EQU     $48 + FID 
+d5e8			CSZRD:        EQU     $60 + FID 
+d5e8			CCLOSE:       EQU     $68 + FID 
+d5e8			 
+d5e8			PID:          EQU     $0        ;0, 1, 2, 3 (Profile) 
+d5e8			CPBOOT:       EQU     $70 + PID 
+d5e8			CPRES:        EQU     $78 + PID 
+d5e8			 
+d5e8			; Equates for NASCOM I/O -- the Z80 PIO registers 
+d5e8			PIOAD:        EQU      $4 
+d5e8			PIOBD:        EQU      $5 
+d5e8			PIOAC:        EQU      $6 
+d5e8			PIOBC:        EQU      $7 
+d5e8			 
+d5e8			;;; end 
+# End of file sd_sub_defs.asm
+d5e8			        include "sd_sub1.asm" 
+d5e8			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d5e8			;;; subroutines for low-level access to nascom_sdcard 
+d5e8			;;; https://github.com/nealcrook/nascom 
+d5e8			;;; 
+d5e8			;;; Putting them at the start means that the start of each test 
+d5e8			;;; program is identical - useful if you are hand-typing the hex 
+d5e8			;;; in (as I did when testing) 
+d5e8			;;; 
+d5e8			;;; PIO port A is used for data and is switched between in and out 
+d5e8			;;; PIO port B is used for control (3 bits) 
+d5e8			;;; 
+d5e8			;;; portB[2] - CMD Input  "Command"         mask 4 
+d5e8			;;; portB[1] - H2T Output "Host to Target"  mask 2 
+d5e8			;;; portB[0] - T2H Input  "Target to host"  mask 1 
+d5e8			;;; 
+d5e8			;;; The behaviour of the handshakes is illustrated here: 
+d5e8			;;; https://github.com/nealcrook/nascom/blob/master/sdcard/doc/protocol.pdf 
+d5e8			;;; 
+d5e8			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d5e8			 
+d5e8			 
+d5e8			;;; assume: currently in OUTPUT 
+d5e8			;;; command is in A 
+d5e8			;;; send command, toggle handshake, wait for handshake in to match 
+d5e8			;;; to show that target has received it. 
+d5e8			;;; corrupts: A,F 
+d5e8 d3 04		putcmd: out     (PIOAD), a      ;send command 
+d5ea db 05		        in      a, (PIOBD) 
+d5ec f6 04		        or      4               ;CMD=1 
+d5ee 18 06		        jr      pvx             ;common code for cmd/data 
+d5f0			 
+d5f0			 
+d5f0			;;; assume: currently in OUTPUT 
+d5f0			;;; value is in A 
+d5f0			;;; send value, toggle handshake, wait for handshake in to match 
+d5f0			;;; to show that target has received it. 
+d5f0			;;; corrupts: A,F 
+d5f0 d3 04		putval: out     (PIOAD), a      ;send value 
+d5f2 db 05		pv0:    in      a, (PIOBD) 
+d5f4 e6 fb		        and     $fb             ;CMD=0 
+d5f6			 
+d5f6 ee 02		pvx:    xor     2               ;toggle H2T 
+d5f8 d3 05		        out     (PIOBD), a 
+d5fa			 
+d5fa			        ;; fall-through and subroutine 
+d5fa			        ;; wait until handshakes match 
+d5fa			        ;; corrupts A,F 
+d5fa db 05		waitm:  in      a, (PIOBD)      ;get status 
+d5fc e6 03		        and     3               ;look at handshakes 
+d5fe 28 04		        jr      z, wdone        ;both 0 => done 
+d600 fe 03		        cp      3               ;both 1 
+d602 20 f6		        jr      nz, waitm       ;not both 1 => wait 
+d604 c9			wdone:  ret			;done 
+d605			 
+d605			 
+d605			;;; assume: currently in OUTPUT. Go to INPUT 
+d605			;;; leave CMD=0 (but irrelevant) 
+d605			;;; corrupts: A,F 
+d605 3e cf		gorx:   ld      a, $cf          ;"control" mode 
+d607 d3 06		        out     (PIOAC), a 
+d609 3e ff		        ld      a, $ff 
+d60b d3 06		        out     (PIOAC), a      ;port A all input 
+d60d 18 14		        jr      getend 
+d60f			 
+d60f			 
+d60f			;;; assume: currently in INPUT. Go to OUTPUT 
+d60f			;;; leave CMD bit unchanged 
+d60f			;;; corrupts: NOTHING 
+d60f f5			gotx:   push    af 
+d610 cd fa d5		        call    waitm           ;wait for hs to match 
+d613 f1			        pop     af 
+d614			 
+d614			        ;; fall-through and subroutine 
+d614			        ;; set port A to output 
+d614			        ;; corrupts nothing 
+d614 f5			a2out:  push    af 
+d615 3e cf		        ld      a, $cf          ;"control" mode 
+d617 d3 06		        out     (PIOAC), a 
+d619 af			        xor     a               ;A=0 
+d61a d3 06		        out     (PIOAC), a      ;port A all output 
+d61c f1			        pop     af 
+d61d c9			        ret 
+d61e			 
+d61e			 
+d61e			;;; assume: currently in INPUT 
+d61e			;;; get a byte; return it in A 
+d61e			;;; corrupts: A,F 
+d61e cd fa d5		getval: call    waitm           ;wait for hs to match 
+d621 db 04		        in      a, (PIOAD)      ;get data byte 
+d623			 
+d623			        ;; fall-through and subroutine 
+d623			        ;; toggle H2T. 
+d623 f5			getend: push    af 
+d624 db 05		        in      a, (PIOBD) 
+d626 ee 02		        xor     2               ;toggle H2T 
+d628 d3 05		        out     (PIOBD), a 
+d62a f1			        pop     af 
+d62b c9			        ret 
+d62c			 
+d62c			;;; end 
+# End of file sd_sub1.asm
+d62c			 
+d62c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d62c			;;; more subroutines, just for the polydos SD support 
+d62c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d62c			 
+d62c			hwinit: include "sd_sub2.asm"   ;Set up PIO etc. and train interface 
+d62c			;;; Z80 assembler routine for nascom_sdcard HW setup and train 
+d62c			;;; https://github.com/nealcrook/nascom 
+d62c			;;; 
+d62c			;;; Common code to be included like this: 
+d62c			;;;          jp entry 
+d62c			;;;          include "sd_sub_defs.asm" 
+d62c			;;;          include "sd_sub1.asm" 
+d62c			;;; 
+d62c			;;; entry: 
+d62c			;;;          include "sd_sub2.asm" 
+d62c			;;;          <continues> 
+d62c			;;; 
+d62c			;;; or like this: 
+d62c			;;; 
+d62c			;;; Common code to be included like this: 
+d62c			;;;          jp entry 
+d62c			;;;          include "sd_sub_defs.asm" 
+d62c			;;;          include "sd_sub1.asm" 
+d62c			;;; hwinit: 
+d62c			;;;          include "sd_sub2.asm" 
+d62c			;;;          ret 
+d62c			;;; 
+d62c			;;; entry:   call hwinit 
+d62c			;;; 
+d62c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d62c			 
+d62c			;;; setup: initialise the PIO and the interface. 
+d62c			;;; By experiment, the output word has to be the next thing 
+d62c			;;; written, not simply the next thing written to that port. 
+d62c cd 14 d6		        call    a2out           ;port A to outputs 
+d62f 3e cf		        ld      a, $cf          ;"control" mode 
+d631 d3 07		        out     (PIOBC), a 
+d633 3e 01		        ld	a,1 
+d635 d3 07		        out     (PIOBC), a      ;port B LSB is input 
+d637 d3 05		        out     (PIOBD), a      ;init outputs H2T=0, CMD=0 
+d639			 
+d639			;;; Training sequence gets the protocol to a known state and enables 
+d639			;;; processing of NASdsk commands in the Arduino command loop. 
+d639 06 08		        ld      b, 8            ;number of times to do it 
+d63b 3e 80		train:	ld      a, CNOP 
+d63d cd e8 d5			call    putcmd 
+d640 10 f9		        djnz    train 
+d642			;;; FALL-THROUGH 
+d642			 
+d642			;;; end 
+# End of file sd_sub2.asm
+d642 3e 81		        ld      a, CRES         ;Restore the default drives 
+d644 cd e8 d5		        call    putcmd          ;fall-through - ignore status 
+d647			 
+d647			 
+d647			;;; FALL-THROUGH and subroutine 
+d647			;;; go from tx to rx, get status then go to tx. 
+d647			;;; Set flags based on status byte 
+d647			;;; corrupts: AF 
+d647 cd 05 d6		t2rs2t: call    gorx 
+d64a			 
+d64a			;;; FALL-THROUGH and subroutine 
+d64a			;;; get status then go to tx. 
+d64a			;;; Set flags based on status byte 
+d64a			;;; corrupts: AF 
+d64a cd 1e d6		rs2t:   call    getval          ;status 
+d64d cd 0f d6		        call    gotx            ;does not affect A 
+d650 b7			        or      a               ;update flags 
+d651 c9			        ret 
+d652			 
+d652			 
+d652			 
+d652			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d652			;;; ROMable utilities for accessing an arduino-based nascom_sdcard 
+d652			;;; device attached to the NASCOM PIO. 
+d652			;;; https://github.com/nealcrook/nascom 
+d652			;;; 
+d652			;;; Assemble at address xxx0, (optionally) burn to EPROM. 
+d652			;;; 
+d652			;;; Provides 5 different utilites, all invoked from NAS-SYS at 
+d652			;;; different offsets from the start address. 
+d652			;;; 
+d652			;;; 1) CHECKSUM 
+d652			;;; 
+d652			;;; E dff4 ssss eeee 
+d652			;;; 
+d652			;;; Compute checksum of memory from ssss to eeee inclusive. 
+d652			;;; Checksum is the sum of all bytes and is reported as a 
+d652			;;; 16-bit value. Carry off the MSB is lost/ignored. 
+d652			;;; 
+d652			;;; 2) READ FILE 
+d652			;;; 
+d652			;;; E dff7 ssss nnn 
+d652			;;; 
+d652			;;; Where nnn are exactly 3 decimal digits (000..999). 
+d652			;;; 
+d652			;;; - Locate file NASnnn.BIN 
+d652			;;; - Load it to memory starting at address ssss 
+d652			;;; - Report the file size 
+d652			;;; 
+d652			;;; 3) WRITE FILE 
+d652			;;; 
+d652			;;; E dffa ssss eeee [nnn]<-optional 
+d652			;;; 
+d652			;;; If nnn - exactly 3 decimal digits (000..999): 
+d652			;;; - Create file NASnnn.BIN 
+d652			;;; - Save memory from ssss to eeee inclusive to the file 
+d652			;;; 
+d652			;;; Without nnn: 
+d652			;;; - Auto-pick next free file name in the form NASnnn.BIN 
+d652			;;; - Save memory from ssss to eeee inclusive to the file 
+d652			;;; 
+d652			;;; 4) SCRAPE DISK 
+d652			;;; 
+d652			;;; E dffd [nnn]<-optional 
+d652			;;; 
+d652			;;; If nnn - exactly 3 decimal digits (000..999). 
+d652			;;; - Create file NASnnn.BIN 
+d652			;;; - Read all sectors of drive 0 and write them to the file 
+d652			;;; 
+d652			;;; Without nnn: 
+d652			;;; - Auto-pick next free file name in the form NASnnn.BIN 
+d652			;;; - Read all sectors of drive 0 and write them to the file 
+d652			;;; 
+d652			;;; This will ONLY work if the system has been booted into 
+d652			;;; DISK Polydos, so that the Polydos SCAL table is available. 
+d652			;;; 
+d652			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d652			 
+d652			 
+d652			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d652			;;; more subroutines, just for these utilities. 
+d652			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d652			 
+d652			;;; open a file for READ. Fatal error on fail, return on 
+d652			;;; success. 
+d652			;;; filename is NASxxx.BIN where xxx comes from low 
+d652			;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII 
+d652			;;; corrupts: HL, AF, DE 
+d652 3e 18		fopenr: ld      a, COPENR 
+d654 cd e8 d5		        call    putcmd 
+d657 18 09		        jr      fman 
+d659			 
+d659			;;; open a file. Fatal error on fail, return on success. 
+d659			;;; Carry=0 -> auto-pick filename 
+d659			;;; Carry=1 -> filename is NASxxx.BIN where xxx comes from low 
+d659			;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII 
+d659			;;; corrupts: HL, AF, DE 
+d659 f5			fopen:  push    af              ;preserve C 
+d65a 3e 10		        ld      a, COPEN 
+d65c cd e8 d5		        call    putcmd 
+d65f			 
+d65f f1			        pop     af 
+d660 30 3f		        jr      nc,fauto 
+d662			 
+d662 3e 4e		fman:   ld      a,'N' 
+d664 cd f0 d5		        call    putval 
+d667 3e 41		        ld      a,'A' 
+d669 cd f0 d5		        call    putval 
+d66c 3e 53		        ld      a,'S' 
+d66e cd f0 d5		        call    putval 
+d671			 
+d671			;;; number in HL used as xxx part of file name 
+d671 7c			        ld      a,h 
+d672 e6 0f		        and     0fh             ;ms digit 
+d674 c6 30		        add     30h             ;convert to ASCII 
+d676 cd f0 d5		        call    putval 
+d679 7d			        ld      a,l 
+d67a 1f			        rra                     ;shift nibble down 
+d67b 1f			        rra 
+d67c 1f			        rra 
+d67d 1f			        rra 
+d67e e6 0f		        and     0fh             ;mid digit 
+d680 c6 30		        add     30h             ;convert to ASCII 
+d682 cd f0 d5		        call    putval 
+d685 7d			        ld      a,l 
+d686 e6 0f		        and     0fh             ;ls digit 
+d688 c6 30		        add     30h             ;convert to ASCII 
+d68a cd f0 d5		        call    putval 
+d68d			 
+d68d			;;; extension 
+d68d 3e 2e		        ld      a,'.' 
+d68f cd f0 d5		        call    putval 
+d692 3e 42		        ld      a,'B' 
+d694 cd f0 d5		        call    putval 
+d697 3e 49		        ld      a,'I' 
+d699 cd f0 d5		        call    putval 
+d69c 3e 4e		        ld      a,'N' 
+d69e cd f0 d5		        call    putval 
+d6a1			 
+d6a1 af			fauto:  xor     a 
+d6a2 cd f0 d5		        call    putval          ;0-length/end of filename 
+d6a5			        ;; get status, return if OK, msg/exit on error 
+d6a5			 
+d6a5			 
+d6a5			;;; FALL-THROUGH and subroutine 
+d6a5			;;; THESE ARE FATAL-EXIT VERSIONS OF t2rs2t, rs2t USED IN THE 
+d6a5			;;; POLYDOS ROM CODE 
+d6a5			;;; go from tx to rx, get status then go to tx. 
+d6a5			;;; Interpret status byte; on error, print message at (DE) 
+d6a5			;;; then exit. On success, return. 
+d6a5			;;; corrupts: AF 
+d6a5 cd 05 d6		ft2rs2t:call    gorx 
+d6a8			 
+d6a8			;;; FALL-THROUGH and subroutine 
+d6a8			;;; get status then go to tx. 
+d6a8			;;; Interpret status byte; on error, print message at (DE) 
+d6a8			;;; then exit. On success, return. 
+d6a8			;;; corrupts: AF 
+d6a8 cd 1e d6		frs2t:  call    getval          ;status 
+d6ab cd 0f d6		        call    gotx            ;does not affect A 
+d6ae b7			        or      a               ;update flags 
+d6af 28 01		        jr      z,mexit 
+d6b1 c9			        ret 
+d6b2			 
+d6b2			;;; Exit with Error message. Used for error/fatal exit. 
+d6b2			;;; "Error" then return to NAS-SYS. 
+d6b2			;;; Come here by CALL or JP/JR -- NAS-SYS will clean up the 
+d6b2			;;; stack if necessary. 
+d6b2			mexit:  SCAL    ZERRM 
+d6b2 df			        RST 18H 
+d6b3 6b			        DB ZERRM 
+d6b4			        ENDM 
+# End of macro SCAL
+d6b4			        SCAL    ZMRET 
+d6b4 df			        RST 18H 
+d6b5 5b			        DB ZMRET 
+d6b6			        ENDM 
+# End of macro SCAL
+d6b6			 
+d6b6			;;; Start address in (ARG2), end address in (ARG3). Exit with 
+d6b6			;;; HL=start, BC=byte count. 
+d6b6			;;; corrupts: AF 
+d6b6 ed 5b 0e 0c	e2len:  ld      de,(ARG2)       ;start address 
+d6ba 2a 10 0c		        ld      hl,(ARG3)       ;end address 
+d6bd			        ;; compute end - start + 1 
+d6bd b7			        or      a               ;clear carry flag 
+d6be ed 52		        sbc     hl,de 
+d6c0 23			        inc     hl              ;byte count in hl 
+d6c1 44			        ld      b,h 
+d6c2 4d			        ld      c,l             ;byte count in bc 
+d6c3			 
+d6c3 2a 0e 0c		        ld      hl,(ARG2)       ;start address in hl 
+d6c6 c9			        ret 
+d6c7			 
+d6c7			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d6c7			;;; CSUM 
+d6c7			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d6c7 3a 0b 0c		csum:   ld      a,(ARGN) 
+d6ca fe 03		        cp      3               ;expect 3 arguments 
+d6cc c2 b2 d6		        jp      nz, mexit 
+d6cf			 
+d6cf cd b6 d6		        call    e2len           ;hl=start, bc=count 
+d6d2 16 00		        ld      d,0 
+d6d4 5a			        ld      e,d             ;accumulate in de 
+d6d5			 
+d6d5 78			c1:     ld      a,b             ;is byte count zero? 
+d6d6 b1			        or      c 
+d6d7 28 0a		        jr      z,cdone         ;if so, we're done 
+d6d9			 
+d6d9 7b			        ld      a,e             ;get lo accumulator 
+d6da 86			        add     a,(hl)          ;add next byte 
+d6db 30 01		        jr      nc,c2 
+d6dd 14			        inc     d               ;carry to hi accumlator 
+d6de 5f			c2:     ld      e,a             ;store lo accumulator 
+d6df 23			        inc     hl              ;next byte 
+d6e0 0b			        dec     bc 
+d6e1 18 f2		        jr      c1              ;loop 
+d6e3			 
+d6e3 62			cdone:  ld      h,d             ;move sum from de to hl 
+d6e4 6b			        ld      l,e 
+d6e5			 
+d6e5			        SCAL    ZTBCD3          ;print hl 
+d6e5 df			        RST 18H 
+d6e6 66			        DB ZTBCD3 
+d6e7			        ENDM 
+# End of macro SCAL
+d6e7			        SCAL    ZCRLF 
+d6e7 df			        RST 18H 
+d6e8 6a			        DB ZCRLF 
+d6e9			        ENDM 
+# End of macro SCAL
+d6e9			        SCAL    ZMRET           ;done. 
+d6e9 df			        RST 18H 
+d6ea 5b			        DB ZMRET 
+d6eb			        ENDM 
+# End of macro SCAL
+d6eb			 
+d6eb			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d6eb			;;; WRFILE 
+d6eb			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d6eb			 
+d6eb cd 2c d6		wrfile: call    hwinit 
+d6ee			 
+d6ee 3a 0b 0c		        ld      a,(ARGN) 
+d6f1 fe 03		        cp      3               ;expect 3 or 4 arguments 
+d6f3 28 09		        jr      z,wopen         ;3 arguments, C=0 -> autopick 
+d6f5 fe 04		        cp      4               ;4 arguments? 
+d6f7 c2 b2 d6		        jp      nz, mexit       ;no, so fail 
+d6fa 2a 12 0c		        ld      hl, (ARG4)      ;hl is number for file name 
+d6fd 37			        scf                     ;C=1 -> use hl for file name 
+d6fe			 
+d6fe cd 59 d6		wopen:  call    fopen 
+d701 cd b6 d6		        call    e2len           ;hl=start, bc=count 
+d704			 
+d704 3e 48		        ld      a, CNWR         ;write 
+d706 cd e8 d5		        call    putcmd 
+d709 79			        ld      a, c            ;length in bytes, LS first 
+d70a cd f0 d5		        call    putval 
+d70d 78			        ld      a, b 
+d70e cd f0 d5		        call    putval 
+d711 af			        xor     a 
+d712 cd f0 d5		        call    putval 
+d715 af			        xor     a 
+d716 cd f0 d5		        call    putval 
+d719			 
+d719			        ;; data transfer 
+d719 7e			wnext:  ld      a, (hl) 
+d71a cd f0 d5		        call    putval 
+d71d 23			        inc     hl 
+d71e 0b			        dec     bc 
+d71f 78			        ld      a,b 
+d720 b1			        or      c 
+d721 20 f6		        jr      nz, wnext 
+d723			 
+d723			        ;; get status, return if OK, msg/exit on error 
+d723 cd a5 d6		        call    ft2rs2t 
+d726			        SCAL    ZMRET 
+d726 df			        RST 18H 
+d727 5b			        DB ZMRET 
+d728			        ENDM 
+# End of macro SCAL
+d728			 
+d728			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d728			;;; RDFILE 
+d728			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d728			 
+d728 cd 2c d6		rdfile: call    hwinit 
+d72b			 
+d72b 3a 0b 0c		        ld      a,(ARGN) 
+d72e fe 03		        cp      3               ;expect 3 arguments 
+d730 c2 b2 d6		        jp      nz, mexit 
+d733			 
+d733 2a 10 0c		        ld      hl,(ARG3) 
+d736 cd 52 d6		        call    fopenr          ;open file by name 
+d739			 
+d739			;;; get the file size and read it all 
+d739 3e 60		        ld      a, CSZRD        ;read size and data 
+d73b cd e8 d5		        call    putcmd 
+d73e cd 05 d6		        call    gorx 
+d741 cd 1e d6		        call    getval 
+d744 4f			        ld      c, a            ;length, LS byte 
+d745 cd 1e d6		        call    getval 
+d748 47			        ld      b, a            ;length 
+d749			        ;; require the next two to be zero 
+d749 cd 1e d6		        call    getval 
+d74c 67			        ld      h, a 
+d74d cd 1e d6		        call    getval 
+d750 b4			        or      h 
+d751 c2 b2 d6		        jp      nz, mexit 
+d754			 
+d754 c5			        push    bc              ;save file size 
+d755 2a 0e 0c		        ld      hl, (ARG2)      ;destination 
+d758			 
+d758			        ;; data transfer - maybe 0 bytes 
+d758 78			rnext:  ld      a,b 
+d759 b1			        or      c 
+d75a 28 08		        jr      z, rdone 
+d75c			 
+d75c cd 1e d6		        call    getval          ;data byte 
+d75f 77			        ld      (hl), a         ;store it 
+d760 23			        inc     hl 
+d761 0b			        dec     bc 
+d762 18 f4		        jr      rnext 
+d764			 
+d764			        ;; get status or die 
+d764 cd a8 d6		rdone:  call    frs2t 
+d767			 
+d767 e1			        pop     hl              ;file size 
+d768			        SCAL    ZTBCD3          ;display file size 
+d768 df			        RST 18H 
+d769 66			        DB ZTBCD3 
+d76a			        ENDM 
+# End of macro SCAL
+d76a			        SCAL    ZMRET 
+d76a df			        RST 18H 
+d76b 5b			        DB ZMRET 
+d76c			        ENDM 
+# End of macro SCAL
+d76c			 
+d76c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d76c			;;; SCRAPE 
+d76c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+d76c			 
+d76c cd 2c d6		scrape: call    hwinit 
+d76f			 
+d76f b7			        or      a               ;C=0 
+d770 cd 59 d6		        call    fopen           ;open new file, auto-pick the name 
+d773			 
+d773 0e 00		        ld      c,0 
+d775			        SCAL    ZDSIZE 
+d775 df			        RST 18H 
+d776 80			        DB ZDSIZE 
+d777			        ENDM 
+# End of macro SCAL
+d777			;;; hl = number of sectors on drive 0 
+d777			 
+d777			;;; sectors are 256 bytes (0x100) each. Tried reading 8 at a time 
+d777			;;; but the whole disk is NOT a xple of 8, leading to a messy 
+d777			;;; end condition. Overall, easier to just read 2 at a time (all 
+d777			;;; disks have an even number of sectors..) 
+d777			;;; and buffer them in RAM at $1000. However, to be fast I'll 
+d777			;;; do 10 (0xa) at a time. 
+d777			 
+d777 11 00 00		        ld      de,0            ;start at 1st sector 
+d77a			 
+d77a e5			nxtblk: push    hl              ;total #sectors 
+d77b 01 00 0a		        ld      bc,$a00         ;a is #sectors, 0 is drive number 
+d77e 21 00 10		        ld      hl,$1000        ;where to put it 
+d781			 
+d781			        SCAL    ZDRD 
+d781 df			        RST 18H 
+d782 81			        DB ZDRD 
+d783			        ENDM 
+# End of macro SCAL
+d783 3e 2a		        ld      a,'*'           ;BAD reads 
+d785 20 02		        jr      nz, report 
+d787 3e 2e		        ld      a,'.'           ;GOOD reads 
+d789 f7			report: rst     ROUT 
+d78a			 
+d78a			        ;; hl, bc unchanged 
+d78a			        ;; bc = $a00 - the number of bytes to write out to SD 
+d78a			        ;; need to fix c if using drive 1 etc. 
+d78a			 
+d78a 3e 48		        ld      a, CNWR         ;write 
+d78c cd e8 d5		        call    putcmd 
+d78f 79			        ld      a, c            ;length in bytes, LS first 
+d790 cd f0 d5		        call    putval 
+d793 78			        ld      a, b 
+d794 cd f0 d5		        call    putval 
+d797 af			        xor     a 
+d798 cd f0 d5		        call    putval 
+d79b af			        xor     a 
+d79c cd f0 d5		        call    putval 
+d79f			 
+d79f			        ;; data transfer 
+d79f 7e			snext:  ld      a, (hl) 
+d7a0 cd f0 d5		        call    putval 
+d7a3 23			        inc     hl 
+d7a4 0b			        dec     bc 
+d7a5 78			        ld      a,b 
+d7a6 b1			        or      c 
+d7a7 20 f6		        jr      nz, snext 
+d7a9			 
+d7a9			        ;; get status, return if OK, msg/exit on error 
+d7a9 cd a5 d6		        call    ft2rs2t 
+d7ac			 
+d7ac 13			        inc     de              ;increment sector count by 
+d7ad 13			        inc     de              ;the number we've just copied 
+d7ae 13			        inc     de 
+d7af 13			        inc     de 
+d7b0 13			        inc     de 
+d7b1			 
+d7b1 13			        inc     de 
+d7b2 13			        inc     de 
+d7b3 13			        inc     de 
+d7b4 13			        inc     de 
+d7b5 13			        inc     de              ;crude but effective! 
+d7b6			 
+d7b6			        ;; we're done if hl=de 
+d7b6 e1			        pop     hl 
+d7b7 7c			        ld      a,h 
+d7b8 ba			        cp      d 
+d7b9 20 06		        jr      nz, nxt1 
+d7bb 7d			        ld      a,l 
+d7bc bb			        cp      e 
+d7bd 20 02		        jr      nz, nxt1 
+d7bf			        SCAL    ZMRET 
+d7bf df			        RST 18H 
+d7c0 5b			        DB ZMRET 
+d7c1			        ENDM 
+# End of macro SCAL
+d7c1			 
+d7c1 13			nxt1:   inc     de              ;increment sector count 
+d7c2 13			        inc     de              ;by the number we've copied 
+d7c3 13			        inc     de 
+d7c4 13			        inc     de 
+d7c5 13			        inc     de 
+d7c6			 
+d7c6 13			        inc     de 
+d7c7 13			        inc     de 
+d7c8 13			        inc     de 
+d7c9 13			        inc     de 
+d7ca 13			        inc     de              ;crude but effective! 
+d7cb			 
+d7cb 18 ad		        jr      nxtblk 
+d7cd			 
+d7cd			 
+d7cd			 
+d7cd			 
+d7cd			;;; pad ROM to 2Kbytes. 
+d7cd			SIZE:   EQU $ - PDCROM 
+d7cd			PAD1:   EQU 800h - SIZE 
+d7cd			;;; 12 is the size of the jump table 
+d7cd			PAD2:   EQU PAD1 - 12 
+d7cd 0xff...		        DS  PAD2, 0ffh 
+d7f4			 
+d7f4			;;; Jump table to keep consistent entry points 
+d7f4 c3 c7 d6		        jp      csum 
+d7f7 c3 28 d7		        jp      rdfile 
+d7fa c3 eb d6		        jp      wrfile 
+d7fd c3 6c d7		        jp      scrape 
+d800			 
+d800			$END:	END 
+# End of file polydos_util_rom.asm
+d800
