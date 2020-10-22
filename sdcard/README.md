@@ -28,6 +28,8 @@ Other stuff here:
 * host_programs -- z80 software related to these two projects, including
 software for "scraping" a floppy disk into a binary virtual disk image.
 
+* kicad -- the kicad database for the schematic and PCB.
+
 Relevant stuff elsewhere:
 
 ../converters has software for converting files between various formats,
