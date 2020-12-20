@@ -1,0 +1,315 @@
+#!/usr/bin/perl
+#
+# This script builds an SDcard image for use by the NASCOM-NG
+# Special Boot ROM.
+#
+# Eventually SBR might understand FAT but for now deal with raw SDcard
+# blocks; 512 bytes per block: the image must be put onto the SDcard
+# using dd (unix) or rawrite (windows) or equivalent.
+#
+# The image looks like this:
+#
+# block
+# 0-7     menu. This is just text, formatted for a 48-character screen.
+#         It contains UNIX line endings and is 0-terminated. The space
+#         reserved is bigger than a NASCOM screen in case I want to use
+#         it for something additional later (or a menu on an 80-column
+#         screen)
+# 8-33    26 "profiles" Each profile can load one or more ROM images to
+#         memory, perform memory and I/O writes, and should terminate by
+#         passing control to the monitor or a loaded image.
+# 34      first block of appended ROM images.
+#
+# This tool generates the image. In particular, it will:
+#
+# - pad the menu to the correct size
+# - create the profiles from high-level descriptions here, in a way that
+#   is immune to size/ordering changes of the ROM images
+# - convert the ROM images from .NAS to binary format, pad them (if
+#   necessary)
+#
+# This is not an interactive tool; all the work that it does is coded in
+# this source file.
+#
+# foofoobedoo@gmail.com
+################################################################################
+
+##[NAC HACK 2020Dec11] - Add profile that uses NAS-SYS3 in RAM
+
+use warnings;
+use strict;
+
+# use nascon to convert images to binary format if necessary.
+my $nascon_exe = "../converters/nascon";
+# name to use for temporary file
+my $tempfname = "temp";
+# name to use for the output image file
+my $imgfname = "nascom_sdcard.img";
+# number of blocks for menu
+my $menu_blocks = 8;
+# number of profiles, one block per profile
+my $profile_blocks = 26;
+
+
+################################################################################
+# Data structure describing ROM images
+
+my @roms;
+
+add_image("NASBUGT2", 0x0000, "nasbugt2/NASBUGT2.NAS");
+add_image("NASBUGT4", 0x0000, "nasbugt4/NASBUGT4.NAS");
+add_image("BBUG",     0x0000, "bbug/BBUG_fixcsum.NAS");
+add_image("NASSYS1",  0x0000, "nassys1/NAS-SYS_1.NAS");
+add_image("NASSYS3",  0x0000, "nassys3/NAS-SYS_3.NAS");
+add_image("BASIC",    0xE000, "basic/basic.nas");
+add_image("ZEAP",     0xD000, "zeap/zeap.nas");
+add_image("NASPEN",   0xB800, "naspen/naspen_b800.bin");
+add_image("POLYDOS2", 0xD000, "../PolyDos/rom/PolyDos_2_Boot_ROM.bin");
+add_image("POLYDOS3", 0xD000, "../PolyDos/rom/PolyDos_3_Boot_ROM.bin");
+add_image("PASCAL",   0xD000, "pascal/bls_pascal2_d000.bin");
+add_image("NASDOS",   0xD000, "../../nascom_other/nascom_nasdos/nasdos_disassembled/nasdos.rom");
+add_image("NASCPM",   0xF000, "../../nascom_other/cpm_polydos/bootrom/cpmboot.go");
+add_image("LOLLIPOP", 0x1000, "/home/crook/Arduino/VGANoFrameBufferNAS/data/lollipop.bin");
+add_image("DISDEB",   0xC000, "../../nascom_other/Odebdis.nas");
+add_image("INVADERS", 0x1000, "../../nascom_other/Spaceii.nas");
+
+# calculate the start block for each image, given the overhead
+set_block_offsets($menu_blocks + $profile_blocks);
+
+
+################################################################################
+# Data structure describing the menu
+
+#    123456789012345678901234567890123456789012345678
+my $menu =
+    "A: BBUG\r" .
+    "B: T2\r" .
+    "C: T4       + ZEAP + BASIC\r" .
+    "D: NAS-SYS1 + ZEAP + BASIC\r" .
+    "E: NAS-SYS3 + ZEAP + BASIC + DISDEBUG\r" .
+    "F: NAS-SYS3 + BASIC + POLYDOS2   G: + POLYDOS3\r" .
+    "H  NAS-SYS3 + BASIC + NASDOS\r" .
+    "I: NAS-SYS3 + PASCAL\r" .
+    "J: NASCOM CP/M\r" .
+    "K: MAP80 VFC CP/M\r" .
+    "L: NAS-SYS3 + LOLLIPOP\r" .
+    "M: NAS-SYS3 + INVADERS\r" .
+    "N: NAS-SYS3\r" .
+    "O: NAS-SYS1\r" ;
+
+my $pad = $menu_blocks * 512 - length($menu);
+if ($pad < 0) {
+    die "ERROR menu is too big!";
+}
+$menu = $menu . (chr(0) x $pad);
+
+
+################################################################################
+# Data structures describing the profiles
+# Specify the profile number (0-25) then a list of arguments. Arguments are:
+# "W1234=5678" -- memory write: write to address 1234 with data 5678.
+# "P12=56"     -- I/O write: write to port 12 with data 56.
+# "G1000=40"   -- Go! write 40 to port 3 (memory remap) and jump to 1000
+#                 the implementation is more subtle because it jumps via RAM
+# "L:BBUG"     -- Load image. Converted to "I1234 L4000=8"
+#                 which means Image at block 1234 is loaded to memory
+#                 for 8 blocks.
+#
+# All numeric arguments are in HEX, with upper-case letters. Leading zeros can
+# be omitted.
+# Each argument is space-separated from the next.
+# The final argument is space-terminated
+# The remainder of the profile is filled with spaces.
+# Expected that the "active" part of every profile ends with a G so there is no
+# need to detect the end of the block. Anything after the G is ignored and
+# can be, for example, text description of the profile.
+#
+# Values to write to port 3 as part of a G command:
+#
+# b7 0
+# b6 0
+# b5 0
+# b4 MAP VFC autoboot
+# b3 enable NAS-SYS3 ROM
+# b2 enable special boot ROM
+# b1 vRAM high (for NASCOM CP/M)
+# b0 enable nascom vRAM
+#
+# 09 for normal stuff with internal NAS-SYS3 ROM
+# 01 when loading another monitor program
+# 03 for NASCOM CP/M
+
+my @profiles;
+
+add_profile('A', "L:BBUG", "G0=1");
+add_profile('B', "L:NASBUGT2", "G0=1");
+add_profile('C', "L:NASBUGT4", "L:ZEAP", "L:BASIC", "G0=1");
+add_profile('D', "L:NASSYS1", "L:ZEAP",  "L:BASIC", "G0=1");
+add_profile('E',              "L:DISDEB", "L:ZEAP",  "L:BASIC", "G0=9");
+add_profile('F',              "L:POLYDOS2", "L:BASIC", "GD000=9");
+add_profile('G',              "L:POLYDOS3", "L:BASIC", "GD000=9");
+add_profile('H',              "L:NASDOS",   "L:BASIC", "GD000=9");
+add_profile('I',                            "L:PASCAL", "GD000=9");
+add_profile('J', "L:NASCPM",                            "GF000=3");
+add_profile('K',                            "PEE=0",    "G0=10");   # MAP80 CP/M
+add_profile('L',               "L:LOLLIPOP",            "G1000=9");
+add_profile('M',               "L:INVADERS",            "G1000=9");
+add_profile('N', "L:NASSYS3",                           "G0=1"); # NAS-SYS3 in RAM
+add_profile('O', "L:NASSYS1",                           "G0=1"); # NAS-SYS3 in ROM
+
+################################################################################
+# Generate the image
+
+build_image("NASCOM_NG_SD.bin");
+
+################################################################################
+# Tidy up
+
+if (-e $tempfname) {
+    unlink $tempfname;
+}
+
+
+################################################################################
+################################################################################
+# Subroutines
+
+
+# add entry to %roms database
+# $roms[n]->[0] = name
+#           [1] = length in blocks
+#           [2] = load address
+#           [3] = block offset
+#           [4] = binary (padded to xple of 512)
+
+sub add_image {
+    my $name = $_[0];
+    my $org = $_[1];
+    my $file = $_[2];
+
+    if (($file =~ /\.[Bb][Ii][Nn]$/) or ($file =~ /\.[Rr][Oo][Mm]$/) or ($file =~ /\.[Gg][Oo]$/)) {
+        # binary file; open as-is
+    }
+    elsif ($file =~ /\.[Nn][Aa][Ss]$/) {
+        # .NAS file. Convert to binary
+        print "INFO convert $file to binary..\n";
+        system("$nascon_exe $file $tempfname -out bin");
+        $file = $tempfname;
+    }
+    else {
+        die "ERROR file format of $file is not recognised";
+    }
+
+    my $data;
+    open BINFILE, $file or die "ERROR cannot open $file";
+    my $size = read BINFILE, $data, 1024 * 64 + 1;
+    close BINFILE;
+
+    if ($size == 1024 * 64 + 1) {
+        die "ERROR file is bigger than 64Kbytes. That's bigger than the memory";
+    }
+
+    my $runt = $size % 512;
+    my $blocks = int($size / 512);
+    if ($runt != 0) {
+        $data = $data . (chr(0) x (512 - $runt));
+        $blocks++;
+    }
+
+    # 0 is the offset; populated later
+    my @stuff = ($name, $blocks, $org, 0, $data);
+    push @roms, \@stuff;
+}
+
+
+# $overhead is the first block number used by the ROM images
+# update $roms[n]->[3] for each entry.
+sub set_block_offsets {
+    my $start = $_[0];
+
+    foreach my $ref (@roms) {
+        $ref->[3] = $start;
+        $start = $start + $ref->[1];
+    }
+}
+
+
+sub add_profile {
+    my $profile = shift @_;
+    my $data = "";
+    my $error = 0;
+
+    my $profile_num = ord($profile) - ord('A');
+    if (($profile_num < 0) or ($profile_num > 25)) {
+        print "ERROR: profile $profile_num not supported: must be A-Z\n";
+        $error++;
+    }
+
+    foreach my $arg (@_) {
+        if ($arg =~ /^W[0-9A-F]{1,4}\=[0-9A-F]{1,4}$/) {
+            # perfect.
+            $data = $data . $arg . " ";
+        }
+        elsif ($arg =~ /^P[0-9A-F]{1,2}\=[0-9A-F]{1,2}$/) {
+            # perfect.
+            $data = $data . $arg . " ";
+        }
+        elsif ($arg =~ /^G[0-9A-F]{1,4}\=[0-9A-F]{1,2}$/) {
+            # perfect.
+            $data = $data . $arg . " ";
+        }
+        elsif ($arg =~ /^L:([A-Z\-0-9]+)$/) {
+            my $name = $1;
+            my $found = 0;
+            foreach my $ref (@roms) {
+                if ($name eq $ref->[0]) {
+                    $data = $data . sprintf("I%X L%X=%X ", $ref->[3], $ref->[2], $ref->[1]);
+                    $found = 1;
+                    last;
+                }
+            }
+            if ($found == 0) {
+                print "ERROR image $name is not found\n";
+                $error++;
+            }
+        }
+        else {
+            print "ERROR: argument $arg is not recognised or is formatted incorrectly\n";
+            $error++;
+        }
+    }
+    die "ERROR fix those errors and rerun" if $error != 0;
+
+    print "INFO profile $profile as $data\n";
+
+    my $pad = 512 - length($data);
+    if ($pad < 0) {
+        die "ERROR profile $profile is too long!";
+    }
+    $data = $data . (chr(0) x $pad);
+    $profiles[$profile_num] = $data;
+}
+
+
+sub build_image {
+    open OUT, ">$imgfname" or die "ERROR could not open $imgfname";
+
+    print OUT $menu;
+
+    my $empty = chr(0) x 512;
+    foreach my $i (0..$profile_blocks - 1) {
+        if (exists $profiles[$i]) {
+            printf "INFO add profile %s\n", chr($i + ord 'A');
+            print OUT $profiles[$i];
+        }
+        else {
+            print OUT $empty;
+        }
+    }
+    foreach my $ref (@roms) {
+        print "INFO add binary $ref->[0] ($ref->[1] blocks)\n";
+        print OUT $ref->[4];
+    }
+    close OUT;
+    print "INFO created image $imgfname\n";
+}
