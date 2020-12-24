@@ -95,7 +95,9 @@ my $menu =
     "L: NAS-SYS3 + LOLLIPOP\r" .
     "M: NAS-SYS3 + INVADERS\r" .
     "N: NAS-SYS3\r" .
-    "O: NAS-SYS1\r" ;
+    "O: NAS-SYS1\r" .
+    "P: NAS-SYS3 + NASPEN\r" ;
+
 
 my $pad = $menu_blocks * 512 - length($menu);
 if ($pad < 0) {
@@ -124,38 +126,40 @@ $menu = $menu . (chr(0) x $pad);
 # need to detect the end of the block. Anything after the G is ignored and
 # can be, for example, text description of the profile.
 #
-# Values to write to port 3 as part of a G command:
+# Values to write to port 0x18 as                  Values to write to port 0x19
+# part of a G command:
+# b7 0                                                b7 unused
+# b6 0                                                b6 protect E000-FFFF
+# b5 MAP VFC autoboot                                 b5 protect D000-DFFF
+# b4 enable WS RAM                                    b4 protect C000-CFFF
+# b3 enable NAS-SYS3 ROM                              b3 protect B000-BFFF
+# b2 enable special boot ROM                          b2 protect A000-AFFF
+# b1 vRAM high (for NASCOM CP/M)                      b1 unused
+# b0 enable nascom vRAM                               b0 protect 0000-7FFF
 #
-# b7 0
-# b6 0
-# b5 0
-# b4 MAP VFC autoboot
-# b3 enable NAS-SYS3 ROM
-# b2 enable special boot ROM
-# b1 vRAM high (for NASCOM CP/M)
-# b0 enable nascom vRAM
-#
-# 09 for normal stuff with internal NAS-SYS3 ROM
-# 01 when loading another monitor program
+# 19 for normal stuff with internal NAS-SYS3 ROM
+# 11 when loading another monitor program
 # 03 for NASCOM CP/M
+# 20 for MAP80 CP/M
 
 my @profiles;
 
-add_profile('A', "L:BBUG", "G0=1");
-add_profile('B', "L:NASBUGT2", "G0=1");
-add_profile('C', "L:NASBUGT4", "L:ZEAP", "L:BASIC", "G0=1");
-add_profile('D', "L:NASSYS1", "L:ZEAP",  "L:BASIC", "G0=1");
-add_profile('E',              "L:DISDEB", "L:ZEAP",  "L:BASIC", "G0=9");
-add_profile('F',              "L:POLYDOS2", "L:BASIC", "GD000=9");
-add_profile('G',              "L:POLYDOS3", "L:BASIC", "GD000=9");
-add_profile('H',              "L:NASDOS",   "L:BASIC", "GD000=9");
-add_profile('I',                            "L:PASCAL", "GD000=9");
-add_profile('J', "L:NASCPM",                            "GF000=3");
-add_profile('K',                            "PEE=0",    "G0=10");   # MAP80 CP/M
-add_profile('L',               "L:LOLLIPOP",            "G1000=9");
-add_profile('M',               "L:INVADERS",            "G1000=9");
-add_profile('N', "L:NASSYS3",                           "G0=1"); # NAS-SYS3 in RAM
-add_profile('O', "L:NASSYS1",                           "G0=1"); # NAS-SYS3 in ROM
+add_profile('A', "L:BBUG",                                      "P19=01", "G0=11");
+add_profile('B', "L:NASBUGT2",                                  "P19=01", "G0=11");
+add_profile('C', "L:NASBUGT4", "L:ZEAP", "L:BASIC",             "P19=61", "G0=11");
+add_profile('D', "L:NASSYS1", "L:ZEAP",  "L:BASIC",             "P19=61", "G0=11");
+add_profile('E',              "L:DISDEB", "L:ZEAP",  "L:BASIC", "P19=70", "G0=19");
+add_profile('F',              "L:POLYDOS2", "L:BASIC",          "P19=60", "GD000=19");
+add_profile('G',              "L:POLYDOS3", "L:BASIC",          "P19=60", "GD000=19");
+add_profile('H',              "L:NASDOS",   "L:BASIC",          "P19=60", "GD000=19");
+add_profile('I',                            "L:PASCAL",         "P19=60", "GD000=19");
+add_profile('J', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
+add_profile('K',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
+add_profile('L',               "L:LOLLIPOP",                              "G1000=19");
+add_profile('M',               "L:INVADERS",                              "G1000=9");
+add_profile('N', "L:NASSYS3",                                   "P19=01", "G0=11"); # NAS-SYS3 in RAM
+add_profile('O', "L:NASSYS1",                                   "P19=01", "G0=11"); # NAS-SYS3 in ROM
+add_profile('P', "L:NASPEN",                                    "P19=08", "G0=19");
 
 ################################################################################
 # Generate the image
