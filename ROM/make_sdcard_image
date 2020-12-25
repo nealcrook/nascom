@@ -72,6 +72,7 @@ add_image("NASCPM",   0xF000, "../../nascom_other/cpm_polydos/bootrom/cpmboot.go
 add_image("LOLLIPOP", 0x1000, "/home/crook/Arduino/VGANoFrameBufferNAS/data/lollipop.bin");
 add_image("DISDEB",   0xC000, "../../nascom_other/Odebdis.nas");
 add_image("INVADERS", 0x1000, "../../nascom_other/Spaceii.nas");
+add_image("MEMTEST",  0x0c80, "../../nascom_other/m80memtp/m80memtp.bin");
 
 # calculate the start block for each image, given the overhead
 set_block_offsets($menu_blocks + $profile_blocks);
@@ -82,21 +83,19 @@ set_block_offsets($menu_blocks + $profile_blocks);
 
 #    123456789012345678901234567890123456789012345678
 my $menu =
-    "A: BBUG\r" .
-    "B: T2\r" .
-    "C: T4       + ZEAP + BASIC\r" .
-    "D: NAS-SYS1 + ZEAP + BASIC\r" .
-    "E: NAS-SYS3 + ZEAP + BASIC + DISDEBUG\r" .
-    "F: NAS-SYS3 + BASIC + POLYDOS2   G: + POLYDOS3\r" .
-    "H  NAS-SYS3 + BASIC + NASDOS\r" .
-    "I: NAS-SYS3 + PASCAL\r" .
-    "J: NASCOM CP/M\r" .
-    "K: MAP80 VFC CP/M\r" .
-    "L: NAS-SYS3 + LOLLIPOP\r" .
-    "M: NAS-SYS3 + INVADERS\r" .
-    "N: NAS-SYS3\r" .
-    "O: NAS-SYS1\r" .
-    "P: NAS-SYS3 + NASPEN\r" ;
+    "A: T2  B: BBUG  C: T4  D: NAS-SYS1  E: NAS-SYS3\r" .
+    "F: T4       + ZEAP + BASIC\r" .
+    "G: NAS-SYS1 + ZEAP + BASIC\r" .
+    "H: NAS-SYS3 + ZEAP + BASIC + DISDEBUG\r" .
+    "I: NAS-SYS3 + BASIC + POLYDOS2   J: + POLYDOS3\r" .
+    "K  NAS-SYS3 + BASIC + NASDOS\r" .
+    "L: NAS-SYS3 + PASCAL\r" .
+    "M: NASCOM CP/M\r" .
+    "N: MAP80 VFC CP/M\r" .
+    "O: NAS-SYS3 + LOLLIPOP\r" .
+    "P: NAS-SYS3 + INVADERS\r" .
+    "Q: NAS-SYS3 + NASPEN\r" .
+    "R: NAS-SYS3 + MEMORY TEST\r" ;
 
 
 my $pad = $menu_blocks * 512 - length($menu);
@@ -144,22 +143,24 @@ $menu = $menu . (chr(0) x $pad);
 
 my @profiles;
 
-add_profile('A', "L:BBUG",                                      "P19=01", "G0=11");
-add_profile('B', "L:NASBUGT2",                                  "P19=01", "G0=11");
-add_profile('C', "L:NASBUGT4", "L:ZEAP", "L:BASIC",             "P19=61", "G0=11");
-add_profile('D', "L:NASSYS1", "L:ZEAP",  "L:BASIC",             "P19=61", "G0=11");
-add_profile('E',              "L:DISDEB", "L:ZEAP",  "L:BASIC", "P19=70", "G0=19");
-add_profile('F',              "L:POLYDOS2", "L:BASIC",          "P19=60", "GD000=19");
-add_profile('G',              "L:POLYDOS3", "L:BASIC",          "P19=60", "GD000=19");
-add_profile('H',              "L:NASDOS",   "L:BASIC",          "P19=60", "GD000=19");
-add_profile('I',                            "L:PASCAL",         "P19=60", "GD000=19");
-add_profile('J', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
-add_profile('K',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
-add_profile('L',               "L:LOLLIPOP",                              "G1000=19");
-add_profile('M',               "L:INVADERS",                              "G1000=9");
-add_profile('N', "L:NASSYS3",                                   "P19=01", "G0=11"); # NAS-SYS3 in RAM
-add_profile('O', "L:NASSYS1",                                   "P19=01", "G0=11"); # NAS-SYS3 in ROM
-add_profile('P', "L:NASPEN",                                    "P19=08", "G0=19");
+add_profile('A', "L:NASBUGT2",                                  "P19=01", "G0=11");
+add_profile('B', "L:BBUG",                                      "P19=01", "G0=11");
+add_profile('C', "L:NASBUGT4",                                  "P19=01", "G0=11");
+add_profile('D', "L:NASSYS1",                                   "P19=01", "G0=11"); # NAS-SYS1 in RAM
+add_profile('E', "L:NASSYS3",                                   "P19=01", "G0=11"); # NAS-SYS3 in RAM
+add_profile('F', "L:NASBUGT4", "L:ZEAP", "L:BASIC",             "P19=61", "G0=11");
+add_profile('G', "L:NASSYS1", "L:ZEAP",  "L:BASIC",             "P19=61", "G0=11");
+add_profile('H',              "L:DISDEB", "L:ZEAP",  "L:BASIC", "P19=70", "G0=19");
+add_profile('I',              "L:POLYDOS2", "L:BASIC",          "P19=60", "GD000=19");
+add_profile('J',              "L:POLYDOS3", "L:BASIC",          "P19=60", "GD000=19");
+add_profile('K',              "L:NASDOS",   "L:BASIC",          "P19=60", "GD000=19");
+add_profile('L',                            "L:PASCAL",         "P19=60", "GD000=19");
+add_profile('M', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
+add_profile('N',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
+add_profile('O',               "L:LOLLIPOP",                              "G1000=19");
+add_profile('P',               "L:INVADERS",                              "G1000=9");
+add_profile('Q', "L:NASPEN",                                    "P19=08", "G0=19");
+add_profile('R',               "L:MEMTEST",                               "G0=9"); # Load then start NAS-SYS
 
 ################################################################################
 # Generate the image
