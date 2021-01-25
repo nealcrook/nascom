@@ -72,7 +72,7 @@ add_image("NASCPM",   0xF000, "../../nascom_other/cpm_polydos/bootrom/cpmboot.go
 add_image("LOLLIPOP", 0x1000, "/home/crook/Arduino/VGANoFrameBufferNAS/data/lollipop.bin");
 add_image("DISDEB",   0xC000, "../../nascom_other/Odebdis.nas");
 add_image("INVADERS", 0x1000, "../../nascom_other/Spaceii.nas");
-add_image("MEMTEST",  0x0c80, "../../nascom_other/m80memtp/m80memtp.bin");
+add_image("MEMTEST",  0x0c80, "../../nascom_other/map80memorytest/m80memtp.bin");
 
 # calculate the start block for each image, given the overhead
 set_block_offsets($menu_blocks + $profile_blocks);
@@ -158,9 +158,9 @@ add_profile('L',                            "L:PASCAL",         "P19=60", "GD000
 add_profile('M', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
 add_profile('N',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
 add_profile('O',               "L:LOLLIPOP",                              "G1000=19");
-add_profile('P',               "L:INVADERS",                              "G1000=9");
+add_profile('P',               "L:INVADERS",                              "G1000=19");
 add_profile('Q', "L:NASPEN",                                    "P19=08", "G0=19");
-add_profile('R',               "L:MEMTEST",                               "G0=9"); # Load then start NAS-SYS
+add_profile('R',               "L:MEMTEST",                               "G0=19"); # Load then start NAS-SYS
 
 ################################################################################
 # Generate the image
@@ -287,11 +287,13 @@ sub add_profile {
 
     print "INFO profile $profile as $data\n";
 
+    # Parsing code expects each profile to end with a space so space-fill
+    # the command strings
     my $pad = 512 - length($data);
     if ($pad < 0) {
         die "ERROR profile $profile is too long!";
     }
-    $data = $data . (chr(0) x $pad);
+    $data = $data . (' ' x $pad);
     $profiles[$profile_num] = $data;
 }
 
@@ -301,7 +303,7 @@ sub build_image {
 
     print OUT $menu;
 
-    my $empty = chr(0) x 512;
+    my $empty = ' ' x 512;
     foreach my $i (0..$profile_blocks - 1) {
         if (exists $profiles[$i]) {
             printf "INFO add profile %s\n", chr($i + ord 'A');
