@@ -1,4 +1,4 @@
-#Sources
+# Sources
 
 The monitor source code:
 
@@ -24,7 +24,7 @@ Obvious typos in the original have been corrected, along with all of the OCR err
 that I have spotted. I have messed with the font size in a few places in an attempt
 to maintain the pagination of the original as much as possible.
 
-#Rebuild From Source
+# Rebuild From Source
 
 To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but effective)
 invoked using this script, named "build":
