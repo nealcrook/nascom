@@ -58,18 +58,21 @@ $ split -b 2048 NASSYS3.bin && rm xab && mv xaa NASSYS3.bin_trim
 
 Now:
 
+$ diff NASSYS3.bin_golden NASSYS3.bin_trim
+(no output => files match)
 $ diff NASSYS3.bin_golden NASSYS3.bin
 Binary files NASSYS3.bin_golden and NASSYS3.bin differ
-$ diff NASSYS3.bin_golden NASSYS3.bin_trim
 
 This shows that the original binary can be faithfully reproduced.
 
 You can use nascon (https://github.com/nealcrook/nascom/blob/master/converters/nascon)
 to convert to .NAS format
 
-$ ../../converters/nascon NASSYS3.bin_golden NASSYS3.NAS_golden -in bin -out nas -org 0 -csum
-$ ../../converters/nascon NASSYS3.bin        NASSYS3.NAS_rebuilt        -out nas -org 0 -csum
-$ diff NASSYS3.NAS_golden NASSYS3.NAS_rebuilt
+$ ../../converters/nascon NASSYS3.bin_golden NASSYS3.NAS_golden       -in bin -out nas -org 0 -csum
+$ ../../converters/nascon NASSYS3.bin_trim   NASSYS3.NAS_trim_rebuilt -in bin -out nas -org 0 -csum
+$ ../../converters/nascon NASSYS3.bin        NASSYS3.NAS_rebuilt              -out nas -org 0 -csum
+$ diff NASSYS3.NAS_golden NASSYS3.NAS_trim_rebuilt
+(no output => files match)
 $ diff NASSYS3.NAS_golden NASSYS3.NAS_rebuilt
 256a257,272
 > 0800 00 00 00 00 00 00 00 00 08
