@@ -4,7 +4,13 @@ The monitor source code:
 
     NASBUGT4.asm
 
-DOES NOT YET EXIST
+Has been recreated by disassembly of the binary (see below).  It seems that the
+source code was never published even though source was published for earlier
+(T2) and later (NAS-SYS) monitors. Much of the first 1Kbytes is very similar to
+T2 and so label names and comments have been pasted from that code. T4 was the
+first sight of the R/W/G commands and some label names and comments for these
+have been pasted the NAS-SYS1 source.  Some stuff here still needs tidying up,
+but this does assemble to produce a match to the golden binary.
 
 The binary file:
 
@@ -22,8 +28,6 @@ documentation, which is written as a supplement to the T2 document. Unlike the o
 monitors, no source code seems to have been published for this code.
 
 # Rebuild From Source
-
-NOT YET POSSIBLE. IGNORE TEXT BELOW
 
 To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but effective)
 invoked using this script, named "build":
@@ -46,12 +50,12 @@ creates:
     NASBUGT4.bin
     NASBUGT4.lst
 
-The .bin is 1104 in size because of the way that the assembler handles the workspace
+The .bin is 2128 in size because of the way that the assembler handles the workspace
 declarations.
 
 Split the workspace off the end:
 
-    $ split -b 1024 NASBUGT4.bin && rm xab && mv xaa NASBUGT4.bin_trim
+    $ split -b 2048 NASBUGT4.bin && rm xab && mv xaa NASBUGT4.bin_trim
 
 Now:
 
@@ -71,14 +75,14 @@ to convert to .NAS format
     $ diff NASBUGT4.NAS_golden NASBUGT4.NAS_trim_rebuilt
     (no output => files match)
     $ diff NASBUGT4.NAS_golden NASBUGT4.NAS_rebuilt
-    128a129,138
-    > 0400 00 00 00 00 00 00 00 00 04
-    > 0408 00 00 00 00 00 00 00 00 0C
-    > 0410 00 00 00 00 00 00 00 00 14
-    > 0418 00 00 00 00 00 00 00 00 1C
-    > 0420 00 00 00 00 00 00 00 00 24
-    > 0428 00 00 00 00 00 00 00 00 2C
-    > 0430 00 00 00 00 00 00 00 00 34
-    > 0438 00 00 00 00 00 00 00 00 3C
-    > 0440 00 00 00 00 00 00 00 00 44
-    > 0448 00 00 00 00 00 00 00 00 4C
+    256a257,266
+    > 0800 00 00 00 00 00 00 00 00 08
+    > 0808 00 00 00 00 00 00 00 00 10
+    > 0810 00 00 00 00 00 00 00 00 18
+    > 0818 00 00 00 00 00 00 00 00 20
+    > 0820 00 00 00 00 00 00 00 00 28
+    > 0828 00 00 00 00 00 00 00 00 30
+    > 0830 00 00 00 00 00 00 00 00 38
+    > 0838 00 00 00 00 00 00 00 00 40
+    > 0840 00 00 00 00 00 00 00 00 48
+    > 0848 00 00 00 00 00 00 00 00 50
