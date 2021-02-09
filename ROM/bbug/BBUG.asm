@@ -11,6 +11,7 @@
 ; then using the source listing in the
 ; BBUG documentation to get label names
 ; and comments for the remaining code.
+; foofoobedoo@gmail.com Feb 2020/Feb 2021
 
 	org	0
 crtram: equ	0800h	; start of video ram
@@ -24,7 +25,7 @@ curlin: equ	0b8ah
 ; initialise stack pointer and RAM
 start:	ld	sp,stack
 	ld	hl,ramz
-	ld	b, $15        ;;  rame-ramz 
+	ld	b,rame-ramz
 l1:     ld	(hl),0
 	inc	hl
 	djnz	l1
@@ -36,7 +37,7 @@ l1:     ld	(hl),0
 	ldir
 
 ; initialise CRT
-	ld	a,$1e
+	ld	a,ff
 	call	crt
 	jp	strt0
 
@@ -48,7 +49,7 @@ rst20:	ex	(sp),hl
 	nop
 	nop
 
-; RST = print following string, terminated by 00
+; RST 5 = print following string, terminated by 00
 prs:	ex	(sp),hl
 prs1:	ld	a,(hl)
 	inc	hl
@@ -85,7 +86,7 @@ flpflp:	push	af
 	jr	flip
 
 ; start or stop motor
-motflp:	ld	a,$10	; bit 4
+motflp:	ld	a,10h	; bit 4
 
 ; flip a bit in port 0
 flip:	push	hl
@@ -166,7 +167,7 @@ l4:	rl	d
 	or	a
 	jr	z,ksc1a
 	ld	a,(kmap)
-	and	$10	; bit 4
+	and	10h	; bit 4
 	or	b
 	add	a
 	add	a
@@ -180,7 +181,7 @@ l4:	rl	d
 	jr	z,l5
 	ld	hl,(_ktab)
 	ld	bc,(_ktabl)
-	and	$7f
+	and	7fh
 	cpir
 l5:	jr	nz,ksc8
 	ld	bc,(_ktab)
@@ -235,27 +236,27 @@ crt:	or	a
 	push	bc
 	push	de
 	push	hl
-	cp	$1e
+	cp	ff
 	jr	nz,l_0174
 	ld	hl,crtram+9
-	ld	(hl),$ff
+	ld	(hl),-1
 	inc	hl
-	ld	b,$30
-l_014d:	ld	(hl),$20
+	ld	b,48
+l7:	ld	(hl),' '
 	inc	hl
-	djnz	l_014d
-	ld	b,$10
+	djnz	l7
+	ld	b,16
 l8:	ld	(hl),0
 	inc	hl
 	djnz	l8
 	ex	de,hl
 	ld	hl,crtram+10
-	ld	bc,$03b0
+	ld	bc,15*64-16
 	ldir
-	ld	a,$ff
+	ld	a,-1
 	ld	(crtram+14*64+58),a
-l_0167:	ld	hl,$0b8a
-l_016a:	ld	(hl),$5f
+l_0167:	ld	hl,curlin
+l_016a:	ld	(hl),cur
 	ld	(cursor),hl
 	pop	hl
 	pop	de
@@ -266,29 +267,29 @@ l_016a:	ld	(hl),$5f
 
 ; remove cursor
 l_0174:	ld	hl,(cursor)
-	ld	(hl),$20
-	cp	$1d
+	ld	(hl),' '
+	cp	bs
 	jr	nz,l_0188
 
 ; backspace (thru margins if necessary)
-l_017d:	dec	hl
+l10:	dec	hl
 	ld	a,(hl)
 	or	a
-	jr	z,l_017d
+	jr	z,l10
 	inc	a
 	jr	nz,l_016a
 	inc	hl
 	jr	l_016a
 
-l_0188:	cp	$1f
+l_0188:	cp	cr
 	jr	z,l_0195
 
 ; put on screen, scroll if necessary
 	ld	(hl),a
-l_018d:	inc	hl
+l11:	inc	hl
 	ld	a,(hl)
 	or	a
-	jr	z,l_018d
+	jr	z,l11
 	inc	a
 	jr	nz,l_016a
 
@@ -297,12 +298,12 @@ l_0195:	ld	de,crtram+10
 	ld	hl,crtram+10+64
 	ld	bc,14*64-16
 	ldir
-	ld	hl,$0010
+	ld	hl,16
 	add	hl,de
-	ld	b,$30
-l_01a6:	ld	(hl),' '
+	ld	b,48
+l12:	ld	(hl),' '
 	inc	hl
-	djnz	l_01a6
+	djnz	l12
 	jr	l_0167
 
 ; memory modify, arg1=address
@@ -311,7 +312,7 @@ mod1:	call	tbcd3
 	ld	a,(hl)
 	call	b2hex
 	call	inline
-	ld	de,$0b52
+	ld	de,line+8
 	ld	b,0
 
 ; note that line starts at line+8
@@ -339,14 +340,14 @@ mod3:	pop	hl
 l13:	jr	mod1
 
 ; print system prompt and read a line
-inline:	rst	$28
-	defb	'>',$00
+inline:	rst	28h
+	defb	'>',0
 inl0:	call	chin
-	cp	$1d
+	cp	bs
 	jr	z,l_01ee
 
 ; return on cr
-	cp	$1f
+	cp	cr
 	jr	z,crlf
 
 ; put out char and continue
@@ -359,9 +360,8 @@ l_01ee:	ld	de,(cursor)
 	ld	a,(de)
 	cp	'>'
 	jr	z,inl0
-	ld	a,$1d
+	ld	a,bs
 	jr	l_01e9
-
 
 ; tabulate code, arg1=start addr, arg2=end
 ;	routine is used by dump command
@@ -372,8 +372,8 @@ tbcd1:	ld	de,(arg2)
 	sbc	hl,de
 	pop	hl
 	jr	c,l14
-	rst	$28
-	defb	'.',$1f,00
+	rst	28h
+	defb	'.',cr,00
 	ret
 l14:	ld	c,0
 	call	tbcd3
@@ -386,8 +386,8 @@ tbcd1a:	ld	a,(hl)
 ; put put checksum and backspace over it so it doesnt show
 	ld	a,c
 	call	b2hex
-	rst	$28
-	defb	$1d,$1d,$1f,$00
+	rst	28h
+	defb	1dh,1dh,1fh,0
 	jr	tbcd1
 tbcd2:	push	af
 	add	a,c
@@ -401,28 +401,25 @@ tbcd3:	ld	a,h
 	nop
 	nop
 
-space:	ld	a,$20
-	jr	l_0257
+space:	ld	a,' '
+	jr	jcrt
+crlf:	ld	a,1fh
+	jr	jcrt
 
-
-crlf:	ld	a,$1f
-	jr	l_0257
-
-
-b2hex:
-	push	af
+; print A in hex
+b2hex:	push	af
 	rra
 	rra
 	rra
 	rra
-	call	l_024d
+	call	b2hex1
 	pop	af
-l_024d:	and	$0f
-	add	a,$30
-	cp	$3a
-	jr	c,l_0257
-	add	a,$07
-l_0257:	jp	_crt
+b2hex1:	and	0fh
+	add	30h
+	cp	'9'+1
+	jr	c,jcrt
+	add	7
+jcrt:	jp	_crt
 
 ; read in a hex number, DE being used as pointer to line
 ;	NUM+1, NUM+2 contain the number
@@ -433,43 +430,43 @@ nexnum:	ld	a,(de)
 	jr	z,nexnum
 	dec	de
 	xor	a
-	ld	hl,$0c12
+	ld	hl,num
 	ld	(hl),a
 	inc	hl
 	ld	(hl),a
 	inc	hl
 	ld	(hl),a
-l_026a:	ld	a,(de)
+nn1:	ld	a,(de)
 	dec	hl
 	dec	hl
-	sub	$30
+	sub	'0'
 	ret	m
-	cp	$0a
-	jr	c,l_027c
-	sub	$07
-	cp	$0a
+	cp	10
+	jr	c,nn2
+	sub	7
+	cp	10
 	ret	m
-	cp	$10
+	cp	10h
 	ret	p
-l_027c:	inc	de
+nn2:	inc	de
 	inc	(hl)
 	inc	hl
 	rld
 	inc	hl
 	rld
-	jr	l_026a
+	jr	nn1
 
 ; main monitor loop; read a line and obey it
 parse:	call	inline
-	ld	de,$0b4b
-	ld	bc,$0c0a
+	ld	de,line+1
+	ld	bc,args
 	ld	a,(de)
 	cp	' '
-	jr	nz,l_0299
+	jr	nz,l16
 	ld	a,(bc)
 	cp	'S'
 	jr	nz,parse
-l_0299:	ld	(bc),a
+l16:	ld	(bc),a
 	inc	bc
 	inc	de
 	xor	a
@@ -487,56 +484,54 @@ ploop:	inc	bc
 	inc	bc
 	ld	a,(hl)
 	ld	(bc),a
-	ld	hl,$0c0b
+	ld	hl,args+1
 	inc	(hl)
 	jr	ploop
-l_02b3:	ld bc,($0c0a)
-	ld hl,ctab
-l_02ba:	ld a,(hl)
-	or a
-	jp z,eparse
-	inc hl
-	cp c
-	jr z,l_02c7
-	inc hl
-	inc hl
-	jr l_02ba
-l_02c7:	ld e,(hl)
-	inc hl
-	ld d,(hl)
-l_02ca:	ld hl,parse
-	push hl
-	ex de,hl
-	jp (hl)
+l_02b3:	ld      bc,($0c0a)
+	ld      hl,ctab
+l_02ba:	ld      a,(hl)
+	or      a
+	jp      z,eparse
+	inc     hl
+	cp      c
+	jr      z,l_02c7
+	inc     hl
+	inc     hl
+	jr      l_02ba
+l_02c7:	ld      e,(hl)
+	inc     hl
+	ld      d,(hl)
+l_02ca:	ld      hl,parse
+	push    hl
+	ex      de,hl
+	jp      (hl)
 
 
-exec:	ld a,$ff
-	ld (conflg),a
+exec:	ld      a,$ff
+	ld      (conflg),a
 ; common to E and S, config tells which
 ;	set NMI for end of instr
-exec1:	ld hl,trap
-	ld ($0c48),hl
-	pop hl
-	ld a,($0c0b)
-	or a
-	jr z,l_02e8
-	ld hl,(arg1)
-	ld ($0c3b),hl
-
-l_02e8:
-	pop bc
-	pop de
-	pop af
-	pop af
-	ld hl,(initr)
-	ld sp,hl
-	ld hl,($0c3b)
-	push hl
-	ld ($0c37),hl
-	push af
-	ld a,$08
-	out ($00),a
-	pop af
+exec1:	ld      hl,trap
+	ld      ($0c48),hl
+	pop     hl
+	ld      a,($0c0b)
+	or      a
+	jr      z,l_02e8
+	ld      hl,(arg1)
+	ld      (_pc),hl
+l_02e8:	pop     bc
+	pop     de
+	pop     af
+	pop     af
+	ld      hl,(_sp)
+	ld      sp,hl
+	ld      hl,(_pc)
+	push    hl
+	ld      (_hl),hl
+	push    af
+	ld      a,$08
+	out     ($00),a
+	pop     af
 	retn
 
 ; step, if arg supplied then is address
@@ -553,8 +548,8 @@ trap:	push af
 	jr z,l_0325
 	ld hl,(brkadr)
 	ld a,(hl)
-	ld ($0c17),a
-	ld (hl),$e7
+	ld (brkval),a
+	ld (hl),$e7              ; rst4
 	xor a
 	ld (conflg),a
 	nop
@@ -575,7 +570,7 @@ l_0325:	push de
 	ld d,(hl)
 	inc hl
 	nop
-	ld ($0c3b),de
+	ld (_pc),de
 	ld (initr),hl
 
 ; print out regs SP PC AF HL DE BC
@@ -593,7 +588,7 @@ l_0347:	dec hl
 
 
 strt0:	ld hl,(brkadr)
-	ld a,($0c17)
+	ld a,(brkval)
 	ld (hl),a
 	jp parse
 
@@ -619,17 +614,17 @@ ctab:	defb	'M'
 
 ; load command
 load:	call	motflp
-lod1:	ld	hl,$0b8a
+lod1:	ld	hl,curlin
 	ld	(cursor),hl
-l_0385:	call	chin
-	cp	$1d
-	jr	z,l_0385
-	cp	$1f
-	jr	z,l_0395
+lod1b:	call	chin
+	cp	bs
+	jr	z,lod1b
+	cp	cr
+	jr	z,lod1a
 	call	_crt
-	jr	nz,l_0385
-l_0395:	ld	de,$0b8a
-	ld	b,$08
+	jr	nz,lod1b
+lod1a:	ld	de,curlin
+	ld	b,8
 	ld	a,(de)
 	cp	'.'
 	jp	z,motflp
@@ -669,13 +664,13 @@ dump:	call	motflp
 	ld	b,0
 l21:	call	kdel
 	djnz	l21
-	ld	hl,($0c4b)
+	ld	hl,(_crt+1)
 	push	hl
 	ld	hl,slrout
-	ld	($0c4b),hl
-	call	 tabcde
-	pop	 hl
-	ld	($0c4b),hl
+	ld	(_crt+1),hl
+	call	tabcde
+	pop	hl
+	ld	(_crt+1),hl
 	jp	motflp
 
 ; copy, arguments: from, to, length
@@ -1033,7 +1028,7 @@ er1:	ld a,i
 	push iy
 	pop hl
 	call tbcd3
-	ld hl,$0c39
+	ld hl,_af
 	ld a,(hl)
 	ld de,$0703
 	ld b,$08
@@ -1207,77 +1202,32 @@ ecm:	ld a,(hl)
 	org     $0c00
 ramz:   equ     $
 port0:  defs    1
-
-_kmap:	defb $00,$00,$00,$00,$00,$00,$00,$00
-kmap:	defb $00
-
-	; start of unknown area $0c0a to $0c0b
-	defb $00,$00
-	; end of unknown area $0c0a to $0c0b
-
-arg1:	defw start
-arg2:	defw start
-arg3:	defw start
-
-	; start of unknown area $0c12 to $0c14
-	defb $00,$00,$00
-	; end of unknown area $0c12 to $0c14
-
-
-brkadr:	defw start
-
-	; start of unknown area $0c17 to $0c17
-	defb $00
-	; end of unknown area $0c17 to $0c17
-
-
-cursor:
-	defb $00
-
-	; start of unknown area $0c19 to $0c19
-	defb $00
-	; end of unknown area $0c19 to $0c19
-
-
-conflg:
-	defb $00
-
-	; start of unknown area $0c1b to $0c32
-	defb $00,$00,$00,$00,$00
-	defb $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-	defb $00,$00,$00
-	; end of unknown area $0c1b to $0c32
-
-
-stack:
-	defb $00
-
-	; start of unknown area $0c34 to $0c3c
-	defb $00,$00,$00,$00,$00,$00,$00,$00,$00
-	; end of unknown area $0c34 to $0c3c
-
-
+_kmap:	defs    8
+kmap:	defs    1
+args:   defs    2
+arg1:	defs    2
+arg2:	defs    2
+arg3:	defs    2
+num:    defs    3
+rame:   equ     $
+brkadr:	defs    2
+brkval: defs    1
+cursor: defs    2
+conflg: defs    1
+	defs    $18
+stack:	defs    2
+	defs    2
+_hl:    defs    2
+_af:    defs    2
+_pc:    defs    2
 initr:
-	defb $00
-
-	; start of unknown area $0c3e to $0c3e
-	defb $00
-	; end of unknown area $0c3e to $0c3e
-
-
-_ktabl:
-	defw start
-
-_ktab0:
-	defw start
-
-_ktab:
-	defw start
-
-	; start of unknown area $0c45 to $0c46
-	defb $00,$00
-	; end of unknown area $0c45 to $0c46
-
+_sp:	defs    2
+; reflections
+_ktabl: defs    2
+_ktab0:	defs    2
+_ktab:	defs    2
+_ctab:  defs    2
+;
 _nmi:	defs	3
 _crt:	defs	3
 _kbd:	defs	3
