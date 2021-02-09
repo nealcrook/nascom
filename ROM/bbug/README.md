@@ -4,7 +4,7 @@ The monitor source code:
 
     BBUG.asm
 
-Has was recreated by disassembly of the binary (see below). BBUG was a 2Kbyte
+was recreated by disassembly of the binary (see below). BBUG was a 2Kbyte
 monitor in which the first 1Kbyte was a patched near-copy of NASBUG T2.  This
 source code has been re-created by disassembling a BBUG ROM dump, making the
 labels/comments in the first 1Kbyte match NASBUG T2 (and highlighting the parts
@@ -39,7 +39,8 @@ and nascon reports multiple checksum errors:
     ERROR bad checksum at line 128 -- calculated 0x69 but read 0x7D
 
 The errors were inspected; in all cases the problem seemed to be with the
-checksum byte itself; the code seems to match the listing
+checksum byte itself; the code seems to match the listing. Here is a diff
+of the original against a version with repaired checksums:
 
     $ diff BBUG.NAS BBUG_fixcsum.NAS
     5c5
