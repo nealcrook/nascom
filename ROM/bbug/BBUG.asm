@@ -26,7 +26,7 @@ curlin: equ	0b8ah
 start:	ld	sp,stack
 	ld	hl,ramz
 	ld	b,rame-ramz
-l1:     ld	(hl),0
+l1:	ld	(hl),0
 	inc	hl
 	djnz	l1
 
@@ -121,7 +121,7 @@ kbd:	push	bc
 	push	hl
 	ld	a,2	; bit 1
 	call	flpflp
-	ld	hl,_kmap
+	ld	hl,kmap
 	in	a,(0)
 	cpl
 	ld	(hl),a
@@ -137,9 +137,7 @@ ksc1:	ld	a,1	; bit 0
 ksc1a:	djnz	ksc1
 ksc8:	or	a
 ksc9:	jp	ekey
-
 	nop
-
 ksc2:	call	kdel
 	in	a,(0)
 	cpl
@@ -166,7 +164,7 @@ l4:	rl	d
 	ld	a,e
 	or	a
 	jr	z,ksc1a
-	ld	a,(kmap)
+	ld	a,(kmap+8) ; BBUG "list of modifications" shows (kmap) but opcodes address kmap+8
 	and	10h	; bit 4
 	or	b
 	add	a
@@ -209,15 +207,15 @@ break:	ld	hl,(arg1)
 ; If the shift key is down and no code is found
 ;	then the table is searched again if
 ;	the shift key were uo.
-ktab:	defb	$08,$88,$09
-	defb	$14,$9c,$9b,$a3,$92,$c2,$ba,$b2
-	defb	$aa,$a2,$98,$a0,$29,$0a,$21,$19
-	defb	$1a,$1c,$1b,$23,$12,$42,$3a,$32
-	defb	$2a,$22,$18,$20,$a9,$8a,$a1,$99
-	defb	$0d,$2c,$41,$13,$3b,$33,$43,$10
-	defb	$40,$2d,$38,$30,$28,$31,$39,$25
-	defb	$1d,$24,$15,$34,$45,$35,$11,$2b
-	defb	$44,$3d,$3c
+ktab:	defb	08h,88h,09h
+	defb	14h,9ch,9bh,0a3h,92h,0c2h,0bah,0b2h
+	defb	0aah,0a2h,98h,0a0h,29h,0ah,21h,19h
+	defb	1ah,1ch,1bh,23h,12h,42h,3ah,32h
+	defb	2ah,22h,18h,20h,0a9h,8ah,0a1h,99h
+	defb	0dh,2ch,41h,13h,3bh,33h,43h,10h
+	defb	40h,2dh,38h,30h,28h,31h,39h,25h
+	defb	1dh,24h,15h,34h,45h,35h,11h,2bh
+	defb	44h,3dh,3ch
 
 ; reflection initialisation table
 initt:	defw	1000h
@@ -237,7 +235,7 @@ crt:	or	a
 	push	de
 	push	hl
 	cp	ff
-	jr	nz,l_0174
+	jr	nz,l6
 	ld	hl,crtram+9
 	ld	(hl),-1
 	inc	hl
@@ -255,8 +253,8 @@ l8:	ld	(hl),0
 	ldir
 	ld	a,-1
 	ld	(crtram+14*64+58),a
-l_0167:	ld	hl,curlin
-l_016a:	ld	(hl),cur
+crt0:	ld	hl,curlin
+crt1:	ld	(hl),cur
 	ld	(cursor),hl
 	pop	hl
 	pop	de
@@ -266,10 +264,10 @@ l_016a:	ld	(hl),cur
 
 
 ; remove cursor
-l_0174:	ld	hl,(cursor)
+l6:	ld	hl,(cursor)
 	ld	(hl),' '
 	cp	bs
-	jr	nz,l_0188
+	jr	nz,l9
 
 ; backspace (thru margins if necessary)
 l10:	dec	hl
@@ -277,12 +275,12 @@ l10:	dec	hl
 	or	a
 	jr	z,l10
 	inc	a
-	jr	nz,l_016a
+	jr	nz,crt1
 	inc	hl
-	jr	l_016a
+	jr	crt1
 
-l_0188:	cp	cr
-	jr	z,l_0195
+l9:	cp	cr
+	jr	z,crt3
 
 ; put on screen, scroll if necessary
 	ld	(hl),a
@@ -291,10 +289,10 @@ l11:	inc	hl
 	or	a
 	jr	z,l11
 	inc	a
-	jr	nz,l_016a
+	jr	nz,crt1
 
 ; scroll
-l_0195:	ld	de,crtram+10
+crt3:	ld	de,crtram+10
 	ld	hl,crtram+10+64
 	ld	bc,14*64-16
 	ldir
@@ -304,7 +302,7 @@ l_0195:	ld	de,crtram+10
 l12:	ld	(hl),' '
 	inc	hl
 	djnz	l12
-	jr	l_0167
+	jr	crt0
 
 ; memory modify, arg1=address
 modify:	ld	hl,(arg1)
@@ -344,24 +342,24 @@ inline:	rst	28h
 	defb	'>',0
 inl0:	call	chin
 	cp	bs
-	jr	z,l_01ee
+	jr	z,inl2
 
 ; return on cr
 	cp	cr
 	jr	z,crlf
 
 ; put out char and continue
-l_01e9:	call	_crt
+inl1:	call	_crt
 	jr	inl0
 
 ; handle backspace; dont allow backspace over prompt
-l_01ee:	ld	de,(cursor)
+inl2:	ld	de,(cursor)
 	dec	de
 	ld	a,(de)
 	cp	'>'
 	jr	z,inl0
 	ld	a,bs
-	jr	l_01e9
+	jr	inl1
 
 ; tabulate code, arg1=start addr, arg2=end
 ;	routine is used by dump command
@@ -476,7 +474,7 @@ ploop:	inc	bc
 	call	nexnum
 	ld	a,(hl)
 	or	a
-	jr	z,l_02b3
+	jr	z,pend
 	inc	hl
 	ld	a,(hl)
 	ld	(bc),a
@@ -487,110 +485,107 @@ ploop:	inc	bc
 	ld	hl,args+1
 	inc	(hl)
 	jr	ploop
-l_02b3:	ld      bc,($0c0a)
-	ld      hl,ctab
-l_02ba:	ld      a,(hl)
-	or      a
-	jp      z,eparse
-	inc     hl
-	cp      c
-	jr      z,l_02c7
-	inc     hl
-	inc     hl
-	jr      l_02ba
-l_02c7:	ld      e,(hl)
-	inc     hl
-	ld      d,(hl)
-l_02ca:	ld      hl,parse
-	push    hl
-	ex      de,hl
-	jp      (hl)
+pend:	ld	bc,(args)
+	ld	hl,ctab
+pend1:	ld	a,(hl)
+	or	a
+	jp	z,eparse
+	inc	hl
+	cp	c
+	jr	z,l17
+	inc	hl
+	inc	hl
+	jr	pend1
+l17:	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+l_02ca:	ld	hl,parse
+	push	hl
+	ex	de,hl
+	jp	(hl)
 
-
-exec:	ld      a,$ff
-	ld      (conflg),a
+exec:	ld	a,0ffh
+	ld	(conflg),a
 ; common to E and S, config tells which
 ;	set NMI for end of instr
-exec1:	ld      hl,trap
-	ld      ($0c48),hl
-	pop     hl
-	ld      a,($0c0b)
-	or      a
-	jr      z,l_02e8
-	ld      hl,(arg1)
-	ld      (_pc),hl
-l_02e8:	pop     bc
-	pop     de
-	pop     af
-	pop     af
-	ld      hl,(_sp)
-	ld      sp,hl
-	ld      hl,(_pc)
-	push    hl
-	ld      (_hl),hl
-	push    af
-	ld      a,$08
-	out     ($00),a
-	pop     af
+exec1:	ld	hl,trap
+	ld	(_nmi+1),hl
+	pop	hl
+	ld	a,(args+1)
+	or	a
+	jr	z,l18
+	ld	hl,(arg1)
+	ld	(_pc),hl
+l18:	pop	bc
+	pop	de
+	pop	af
+	pop	af
+	ld	hl,(_sp)
+	ld	sp,hl
+	ld	hl,(_pc)
+	push	hl
+	ld	(_hl),hl
+	push	af
+	ld	a,8
+	out	(0),a
+	pop	af
 	retn
 
 ; step, if arg supplied then is address
-step:	xor a
-	ld (conflg),a
-	jr exec1
+step:	xor	a
+	ld	(conflg),a
+	jr	exec1
 
-trap:	push af
-	push hl
-	ld a,(port0)
-	out ($00),a
-	ld a,(conflg)
-	or a
-	jr z,l_0325
-	ld hl,(brkadr)
-	ld a,(hl)
-	ld (brkval),a
-	ld (hl),$e7              ; rst4
-	xor a
-	ld (conflg),a
+trap:	push	af
+	push	hl
+	ld	a,(port0)
+	out	(0),a
+	ld	a,(conflg)
+	or	a
+	jr	z,l19
+	ld	hl,(brkadr)
+	ld	a,(hl)
+	ld	(brkval),a
+	ld	(hl),0e7h	; rst4
+	xor	a
+	ld	(conflg),a
 	nop
 	nop
-	pop hl
-	pop af
+	pop	hl
+	pop	af
 	retn
-l_0325:	push de
-	push bc
-	ld hl,start
-	add hl,sp
-	ld de,stack
-	ld sp,stack
-	ld bc,l1
+l19:	push	de
+	push	bc
+	ld	hl,0
+	add	hl,sp
+	ld	de,stack
+	ld	sp,stack
+	ld	bc,8
 	ldir
-	ld e,(hl)
-	inc hl
-	ld d,(hl)
-	inc hl
+	ld	e,(hl)
+	inc	hl
+	ld	d,(hl)
+	inc	hl
 	nop
-	ld (_pc),de
-	ld (initr),hl
+	ld	(_pc),de
+	ld	(_sp),hl
 
 ; print out regs SP PC AF HL DE BC
-	ld hl,_ktabl
-	ld b,$06
-l_0347:	dec hl
-	ld a,(hl)
-	call b2hex
-	dec hl
-	ld a,(hl)
-	call b2hex
-	call space
-	djnz l_0347
-	jp ereg
-
-
-strt0:	ld hl,(brkadr)
-	ld a,(brkval)
-	ld (hl),a
-	jp parse
+	ld	hl,_sp+2
+	ld	b,6
+regs1:	dec	hl
+	ld	a,(hl)
+	call	b2hex
+	dec	hl
+	ld	a,(hl)
+	call	b2hex
+	call	space
+	djnz	regs1
+	jp	ereg
+strt0:	ld	hl,(brkadr)
+	ld	a,(brkval)
+	ld	(hl),a	; restore breakpoint
+	jp	parse
 
 ; command table
 ;	format: character, address of subroutine
@@ -629,7 +624,7 @@ lod1a:	ld	de,curlin
 	cp	'.'
 	jp	z,motflp
 	call	nexnum
-	ld	($0c13),hl
+	ld	(num+1),hl
 	ld	a,l
 	add	a,h
 	ld	c,a
@@ -677,7 +672,7 @@ l21:	call	kdel
 copy:	ld	hl,(arg1)
 	ld	de,(arg2)
 	ld	bc,(arg3)
-l_03fa:	ldir                    ;come here from icopy
+l_03fa:	ldir			;come here from icopy
 	ret
 	nop
 	halt
@@ -801,7 +796,7 @@ sub:
 
 ekey:
 	jr nc,ke
-	ld hl,kmap
+	ld hl,kmap+8
 	cp $40
 	jr nz,k3
 	or a
@@ -1199,35 +1194,33 @@ ecm:	ld a,(hl)
 	bit 0,a
 	ret
 
-	org     $0c00
-ramz:   equ     $
-port0:  defs    1
-_kmap:	defs    8
-kmap:	defs    1
-args:   defs    2
-arg1:	defs    2
-arg2:	defs    2
-arg3:	defs    2
-num:    defs    3
-rame:   equ     $
-brkadr:	defs    2
-brkval: defs    1
-cursor: defs    2
-conflg: defs    1
-	defs    $18
-stack:	defs    2
-	defs    2
-_hl:    defs    2
-_af:    defs    2
-_pc:    defs    2
+	org	0c00h
+ramz:	equ	$
+port0:	defs	1
+kmap:	defs	9
+args:	defs	2
+arg1:	defs	2
+arg2:	defs	2
+arg3:	defs	2
+num:	defs	3
+rame:	equ	$
+brkadr:	defs	2
+brkval: defs	1
+cursor: defs	2
+conflg: defs	1
+	defs	18h
+stack:	defs	2
+	defs	2
+_hl:	defs	2
+_af:	defs	2
+_pc:	defs	2
 initr:
-_sp:	defs    2
+_sp:	defs	2
 ; reflections
-_ktabl: defs    2
-_ktab0:	defs    2
-_ktab:	defs    2
-_ctab:  defs    2
-;
+_ktabl: defs	2
+_ktab0:	defs	2
+_ktab:	defs	2
+_ctab:	defs	2
 _nmi:	defs	3
 _crt:	defs	3
 _kbd:	defs	3

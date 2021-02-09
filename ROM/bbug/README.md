@@ -189,3 +189,8 @@ to convert to .NAS format
     > 0838 00 00 00 00 00 00 00 00 40
     > 0840 00 00 00 00 00 00 00 00 48
     > 0848 00 00 00 00 00 00 00 00 50
+
+# Futures
+
+Annotate comments from hand-written source code in the manual. Currently, the
+comments are restricted to stuff patched in from t2 source code.

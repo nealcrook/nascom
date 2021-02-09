@@ -20,7 +20,7 @@ curlin: equ	0b8ah
 start:	ld	sp,stack
 	ld	hl,ramz
 	ld	b,rame-ramz
-l1:     ld	(hl),0
+l1:	ld	(hl),0
 	inc	hl
 	djnz	l1
 
@@ -206,7 +206,7 @@ break:	ld	hl,(arg1)
 ktab:	defb	08h,88h,09h
 	defb	14h,9ch,9bh,0a3h,92h,0c2h,0bah,0b2h
 	defb	0aah,0a2h,98h,0a0h,29h,0ah,21h,19h
-	defb	1ah,1ch,1bh,23h,12h,42h,3Ah,32h
+	defb	1ah,1ch,1bh,23h,12h,42h,3ah,32h
 	defb	2ah,22h,18h,20h,0b1h,8ah,0b9h,99h
 	defb	0dh,2ch,41h,13h,3bh,33h,43h,10h
 	defb	40h,2dh,38h,30h,28h,31h,39h,25h
@@ -450,7 +450,7 @@ nn2:	inc	de
 	jr	nn1
 
 ; main monitor loop; read a line and obey it
-parse:	call 	inline
+parse:	call	inline
 	ld	de,line+1
 	ld	bc,args
 	ld	a,(de)
@@ -585,7 +585,7 @@ strt0:	ld	hl,(brkadr)
 	ld	(hl),a	; restore breakpoint
 	jp	parse
 
-; commant table
+; command table
 ;	format: character, address of subroutine
 ctab:	defb	'M'
 	defw	modify
@@ -651,7 +651,6 @@ lod2:	push	hl
 	jr	lod1
 l20:	call	crlf
 	jr	lod1
-
 
 ; dump, uses same code as tabulate
 dump:	call	motflp
