@@ -4,7 +4,7 @@ The monitor source code:
 
     NASSYS3.asm
 
-came from thenascomhomepage but has been fixed up to match the assembler
+came from nascomhomepage.com but has been fixed up to match the assembler
 syntax and to move the workspace declaration to the end of the file.
 
 The binary file:

@@ -4,21 +4,21 @@ The monitor source code:
 
     NASBUGT2.asm
 
-came from thenascomhomepage but has been fixed up to match the assembler
+came from nascomhomepage.com but has been fixed up to match the assembler
 syntax and to move the workspace declaration to the end of the file.
 
 The binary file:
 
     NASBUGT2.bin_golden
 
-is 1024 bytes in size and converted from the file Nasbugt2.nas on thenascomhomepage
+is 1024 bytes in size and converted from the file Nasbugt2.nas on nascomhomepage.com
 (converted using nascon).
 
 The documentation:
 
     NASBUGT2_manual.pdf
 
-came from thenascomhomepage "Nascom 1 Nasbug manual.pdf" and is a scan of the
+came from nascomhomepage.com "Nascom 1 Nasbug manual.pdf" and is a scan of the
 "NASCOM Microcomputer NASCOM 1 Software Notes" document, which includes documentation
 on NASBUGT2 (including a source listing) and other programming notes. Casual inspection
 of the source listing shows that the NASBUGT2.asm contains the same content and comments
