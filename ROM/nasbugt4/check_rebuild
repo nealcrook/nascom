@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# rebuild from source and check that the binary matches the golden version
+./build NASBUGT4
+split -b 2048 NASBUGT4.bin && rm xab && mv xaa NASBUGT4.bin_trim
+
+../../converters/nascon NASBUGT4.bin_golden NASBUGT4.NAS_golden       -in bin -out nas -org 0 -csum
+../../converters/nascon NASBUGT4.bin_trim   NASBUGT4.NAS_trim_rebuilt -in bin -out nas -org 0 -csum
+diff NASBUGT4.NAS_golden NASBUGT4.NAS_trim_rebuilt

@@ -1,0 +1,8 @@
+*.bin
+*.lst
+*_dis.asm
+*_dis.txt
+*.bin_trim
+*.NAS_golden
+*.NAS_trim_rebuilt
+*.NAS_rebuilt

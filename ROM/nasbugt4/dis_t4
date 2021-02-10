@@ -1,0 +1,325 @@
+#!/usr/bin/perl
+#
+# script to use the z80 disassembler to reverse the NASBUGT4 1 ROM file
+
+use CPU::Z80::Disassembler;
+
+my $file_name = "NASBUGT4.bin_golden";
+my $addr = 0x0000;
+my $file = "NASBUGT4_dis.txt";
+my $asm_file = "NASBUGT4_dis.asm";
+
+
+$dis = CPU::Z80::Disassembler->new;
+$dis->memory->load_file($file_name, $addr);
+$dis->write_dump($file);
+
+# mock up stuff for NASBUGT4 RST codes
+
+###########################################
+# RST 0 - START
+
+###########################################
+# RST 8 - RIN
+
+###########################################
+# RST 10 - RCAL
+## TODO put the actual code thread in here so that it can be followed.
+$dis->set_call(0x10, \&handle_rcal);
+
+# advance return PC past in-line subroutine code
+sub handle_rcal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 18 - SCAL
+$dis->set_call(0x18, \&handle_scal);
+
+# advance return PC past in-line subroutine code
+sub handle_scal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 20 - BRKPT
+
+###########################################
+# RST 28 - PRS
+$dis->set_call(0x28, \&handle_prs);
+
+# advance return PC past in-line null-terminated string
+sub handle_prs {
+    my $ref = $_[0];
+    my $addr = $_[1];
+    my $start = $addr;
+    while ($ref->memory->peek($addr) != 0) {
+        ##TODO work out length and use ->defm
+        ##TODO ..not that simple: need to detect CR and other non-printers
+        $dis->defb($addr);
+#        printf("Peek of 0x%04x for prs\n", $addr);
+        $addr = $addr + 1;
+    }
+    # the message and its terminating NULL
+    printf("RST PRS message at 0x%04x, length %d\n",$start, $addr - $start +1);
+#    $dis->defm($start, $addr - $start);
+    $dis->defb($addr);
+
+    # next PC is after NULL
+    return $addr+1;
+}
+
+###########################################
+# RST 30 - ROUT
+##$dis->code(0x30);
+
+###########################################
+# RST 38 - RDEL
+##$dis->code(0x38);
+
+# 3 bytes. 1st is command letter, 2nd/3rd is execution address
+sub handle_cmd {
+    my $addr = $_[0];
+    $dis->defb($addr);
+    $dis->defw($addr+1);
+}
+
+###########################################
+# NASBUG T4 initialisation routine
+
+
+###########################################
+# NASBUG T4 entry point
+# Never actually come back from here, but
+# model it as "ret"
+
+
+###########################################
+# Stuff specific to the code being disassembled
+
+# workspace
+for ($i=0xc00; $i<0xc50; $i=$i+1) {
+    $dis->memory->poke($i, 0);
+}
+
+$dis->defb(0xc00, 1, "port0");
+$dis->defb(0xc01, 9, "kmap");
+$dis->defb(0xc0a, 2, "args");
+$dis->defb(0xc0c, 2, "arg1");
+$dis->defb(0xc0e, 2, "arg2");
+$dis->defb(0xc10, 2, "arg3");
+$dis->defb(0xc12, 3, "num");
+$dis->defb(0xc15, 2, "brkadr");
+$dis->defb(0xc17, 1, "brkval");
+$dis->defb(0xc18, 2, "cursor");
+$dis->defb(0xc1a, 1, "conflg");
+$dis->defb(0xc33, 2, "stack");
+$dis->defb(0xc37, 2, "_hl");
+$dis->defb(0xc39, 2, "_af");
+$dis->defb(0xc3b, 2, "_pc");
+$dis->defb(0xc3d, 2, "_sp");
+#reflections
+$dis->defb(0xc3f, 2, "_ktabl");
+$dis->defb(0xc41, 2, "_ktab0");
+$dis->defb(0xc43, 2, "_ktab");
+$dis->defb(0xc45, 2, "_ctab");
+$dis->code(0xc47, "_nmi");
+$dis->code(0xc4a, "_crt");
+$dis->code(0xc4d, "_kbd");
+
+
+
+##$dis->set_call(0x45, \&handle_xx);
+
+sub handle_xx {
+    my $ref = $_[0];
+    my $addr = $_[1];
+    printf "Unknown entry being called at 0x%04x\n", $addr;
+    return $addr;
+}
+
+$dis->code(0x0000,"start");
+$dis->code(0x0006);
+$dis->code(0x000e);
+$dis->code(0x0018,"XL18");
+$dis->code(0x0020,"XL20");
+$dis->code(0x0030,"rout");
+$dis->code(0x0028,"prs");
+$dis->code(0x0029,"prs1");
+$dis->code(0x0026);
+$dis->code(0x0066,"XL66");
+$dis->code(0x0305,"bpt1");
+$dis->code(0x0033);
+$dis->code(0x0035,"kdel");
+$dis->code(0x0036,"kdel1");
+$dis->code(0x003e,"chin");
+$dis->code(0x0041);
+$dis->code(0x0045);
+$dis->code(0x0047);
+$dis->code(0x004a,"flpflp");
+$dis->code(0x0053,"flip");
+$dis->code(0x0051,"motflp");
+$dis->code(0x005e,"slrout");
+$dis->code(0x0060,"l3");
+
+$dis->code(0x005e,"slrout");
+$dis->code(0x069,"kbd");
+$dis->code(0x07a,"ksc1");
+$dis->code(0x087,"ksc1a");
+$dis->code(0x089,"ksc8");
+$dis->code(0x08a,"ksc9");
+
+$dis->code(0x08d);
+$dis->code(0x08e,"ksc2");
+$dis->code(0x09c,"l4");
+$dis->code(0x0d1,"l5");
+
+$dis->code(0x124,"LX124");
+$dis->code(0x128,"LX128");
+$dis->code(0x135,"LX135");
+$dis->code(0x138,"LX138");
+
+$dis->code(0x13b,"crt");
+$dis->code(0x174,"l6");
+$dis->code(0x14d,"l7");
+$dis->code(0x154,"l8");
+$dis->code(0x167,"crt0");
+$dis->code(0x16a,"crt1");
+$dis->code(0x16f,"crt2");
+
+$dis->code(0x188,"l9");
+$dis->code(0x17d,"l10");
+##$dis->code(0x18c,"LX18c"); # ??does not make entry point??
+
+$dis->code(0x199,"crt3");
+$dis->code(0x1a6,"l12");
+
+$dis->code(0x1ad,"modify");
+$dis->code(0x1b0,"mod1");
+$dis->code(0x1bf,"mod2");
+$dis->code(0x1b3);
+$dis->code(0x232,"tbcd3");
+$dis->code(0x244,"b2hex");
+$dis->code(0x581,"inline");
+$dis->code(0x1ba);
+$dis->code(0x25a,"nexnum");
+$dis->code(0x1cf,"mod3");
+
+$dis->code(0x1d9);
+$dis->code(0x1db,"prompt");
+$dis->code(0x1de,"in10");
+##$dis->code(0x240,"in12");
+$dis->code(0x240,"crlf");
+
+$dis->code(0x1fc,"tabcde");
+$dis->code(0x20a,"l14");
+$dis->code(0x22b,"tbcd2");
+$dis->code(0x23c,"space");
+$dis->code(0x21d);
+$dis->code(0x215,"tbcd1a");
+$dis->code(0x1ff,"tbcd1");
+$dis->code(0x22a);
+
+$dis->code(0x257,"jcrt");
+$dis->code(0x24d,"b2hex1");
+
+$dis->code(0x26a,"nn1");
+$dis->code(0x27c,"nn2");
+$dis->code(0x286,"parse");
+$dis->code(0x299,"l16");
+$dis->code(0x29e,"ploop");
+
+$dis->code(0x2d0,"exec");
+$dis->code(0x2e8,"l18");
+$dis->code(0x2ff,"step");
+$dis->code(0x2d5,"exec1");
+
+$dis->code(0x325,"l19");
+$dis->code(0x347,"regs1");
+$dis->code(0x6d9,"XXcrlf");
+$dis->code(0x35c,"strt0");
+$dis->code(0x375,"LX375");
+$dis->code(0x37b,"LX37b");
+
+
+$dis->code(0x37f,"lod1");
+$dis->code(0x3b0,"lod2");
+$dis->code(0x39a,"lod1a");
+$dis->code(0x3cc,"l20");
+$dis->code(0x3e9);
+
+$dis->code(0x41d,"w5");
+$dis->code(0x42a,"w6");
+$dis->code(0x44a,"w9");
+$dis->code(0x40b,"w4");
+$dis->code(0x45b,"tx1");
+$dis->code(0x7c6,"tx2");
+$dis->code(0x461,"Xtbcd3");
+$dis->code(0x6cc,"sout");
+$dis->code(0x6ce,"so1");
+
+$dis->code(0x455,"LX455");
+$dis->code(0x497,"LX497");
+$dis->code(0x4a9,"LX4a9");
+$dis->code(0x4fe,"LX4fe");
+$dis->code(0x509,"LX509");
+$dis->code(0x511,"LX511");
+$dis->code(0x542,"ang");
+$dis->code(0x556);
+
+$dis->code(0x700);
+$dis->code(0x718,"r2");
+$dis->code(0x735,"r3");
+
+
+
+$dis->defb(0x755,1,"ctab");
+$dis->code(0x527,"arith");
+$dis->code(0x63b,"bcmd");
+$dis->code(0x3ef,"ccmd");
+$dis->code(0x3d1,"dcmd");
+$dis->code(0x514,"icmd");
+$dis->code(0x37c,"lcmd");
+$dis->code(0x7c0,"ncmd");
+$dis->code(0x677,"o");
+$dis->code(0x682,"q");
+
+
+foreach my $i (0..19) {
+    handle_cmd(0x755 + $i*3);
+}
+$dis->defb(0x791);
+$dis->code(0x792,"xx");
+$dis->code(0x79a,"LX79a");
+$dis->code(0x7a8,"LX7a8");
+$dis->code(0x7b4,"LX7b4");
+$dis->code(0x7cf,"LX7cf");
+$dis->code(0x7ec);
+
+
+
+# from t4 manual
+$dis->code(0x400,"write");
+$dis->code(0x6a3,"g");
+$dis->code(0x70c,"read");
+$dis->code(0x5d,"srlout");
+$dis->code(0x4f6,"srlin");
+$dis->code(0x4f2,"tin");
+$dis->code(0x634,"kcmd");
+$dis->code(0x47a,"xcmd");
+
+
+# unused
+####$dis->defb(0xd6fd, 0xd7d7 - 0xd6fd + 1);
+
+# msg
+###$dis->defm(0xd7d8, 0xd7ff - 0xd7d8 + 1, MSG);
+
+# This can optimise code and so it may prevent 100% match
+# on re-assembly.
+##$dis->analyse;
+$dis->write_asm($asm_file);
