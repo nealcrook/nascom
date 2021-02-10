@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# $1 is the program base-name
+#
+# expect to find z80asm (from https://www.nongnu.org/z80asm/index.html) on $PATH
+z80asm ${1}.asm -l${1}.lst -o${1}.bin

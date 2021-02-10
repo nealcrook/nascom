@@ -1,0 +1,130 @@
+#!/usr/bin/perl
+#
+# script to use the z80 disassembler to reverse the NAS-SYS 1 ROM file
+
+use CPU::Z80::Disassembler;
+
+my $file_name = "NASSYS1.bin_golden";
+my $addr = 0x0000;
+my $file = "NASSYS1_dis.txt";
+my $asm_file = "NASSYS1_dis.asm";
+
+
+$dis = CPU::Z80::Disassembler->new;
+$dis->memory->load_file($file_name, $addr);
+$dis->write_dump($file);
+
+# mock up stuff for NAS-SYS RST codes
+
+###########################################
+# RST 0 - START
+
+###########################################
+# RST 8 - RIN
+
+###########################################
+# RST 10 - RCAL
+## TODO put the actual code thread in here so that it can be followed.
+$dis->set_call(0x10, \&handle_rcal);
+
+# advance return PC past in-line subroutine code
+sub handle_rcal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 18 - SCAL
+$dis->set_call(0x18, \&handle_scal);
+
+# advance return PC past in-line subroutine code
+sub handle_scal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 20 - BRKPT
+
+###########################################
+# RST 28 - PRS
+$dis->set_call(0x28, \&handle_prs);
+
+# advance return PC past in-line null-terminated string
+sub handle_prs {
+    my $ref = $_[0];
+    my $addr = $_[1];
+    my $start = $addr;
+    while ($ref->memory->peek($addr) != 0) {
+        ##TODO work out length and use ->defm
+        ##TODO ..not that simple: need to detect CR and other non-printers
+        $dis->defb($addr);
+#        printf("Peek of 0x%04x for prs\n", $addr);
+        $addr = $addr + 1;
+    }
+    # the message and its terminating NULL
+    printf("RST PRS message at 0x%04x, length %d\n",$start, $addr - $start +1);
+#    $dis->defm($start, $addr - $start);
+    $dis->defb($addr);
+
+    # next PC is after NULL
+    return $addr+1;
+}
+
+###########################################
+# RST 30 - ROUT
+##$dis->code(0x30);
+
+###########################################
+# RST 38 - RDEL
+##$dis->code(0x38);
+
+###########################################
+# NAS-SYS initialisation routine
+
+
+###########################################
+# NAS-SYS entry point
+# Never actually come back from here, but
+# model it as "ret"
+
+
+###########################################
+# Stuff specific to the code being disassembled
+
+# workspace
+for ($i=0xc000; $i<0xc00f; $i=$i+1) {
+    $dis->memory->poke($i, 0);
+}
+#$dis->defw(0xc000, 1, "WORKSP");
+$dis->defb(0xc000, 1, "MDRV");
+$dis->defb(0xc001, 1, "DDRV");
+$dis->defb(0xc002, 1, "DRVCOD");
+$dis->defb(0xc003, 1, "FIRST");
+$dis->defb(0xc004, 1, "ERRFLG");
+$dis->defb(0xc005, 1, "ERRCOD");
+
+
+##$dis->set_call(0x45, \&handle_xx);
+
+sub handle_xx {
+    my $ref = $_[0];
+    my $addr = $_[1];
+    printf "Unknown entry being called at 0x%04x\n", $addr;
+    return $addr;
+}
+
+$dis->code(0x0000,"Entry");
+
+# unused
+####$dis->defb(0xd6fd, 0xd7d7 - 0xd6fd + 1);
+
+# msg
+###$dis->defm(0xd7d8, 0xd7ff - 0xd7d8 + 1, MSG);
+
+# This can optimise code and so it may prevent 100% match
+# on re-assembly.
+##$dis->analyse;
+$dis->write_asm($asm_file);
