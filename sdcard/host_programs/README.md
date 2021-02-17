@@ -74,7 +74,8 @@ NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
 
 ## Other utilities
 
-* serboot.asm - boot loader for NASCOM digital tape recorder. A utility program that is loaded through the serial interface and which provides a simple command-line environment for communicating with the NASCOM digital tape recorder. The NASCOM digital tape recorder uses an ATMEL controller and an SDcard to provide solid-state storage for a NASCOM through an unmodified serial/cassette interface.
+* serboot.asm - boot loader for NASCOM digital tape recorder. A utility program that is loaded through the serial interface and which provides a simple command-line environment for communicating with the NASCOM digital tape recorder. The NASCOM digital tape recorder uses an ATMEL controller and an SDcard to provide solid-state storage for a NASCOM through an unmodified serial/cassette interface. This version is 111 bytes long and loads at $0c80; it requires NAS-SYS 1 or NAS-SYS 3.
+* serbootT4.asm - boot loader for NASCOM digital tape recorder. A utility program that is loaded through the serial interface and which provides a simple command-line environment for communicating with the NASCOM digital tape recorder. The NASCOM digital tape recorder uses an ATMEL controller and an SDcard to provide solid-state storage for a NASCOM through an unmodified serial/cassette interface. This version is 141 bytes long and loads at $0c50; it requires NASBUG T4.
 * dskboot.asm - boot loader for virtual disk. Refer to the comments in the code.
 * SDBOOT0.asm - sample bootstrap program, invoked by sdboot. Refer to the comments in dskboot.asm.
 * NASconsole - a PERL program to run on a PC that is attached to nascom_sdcard hardware. Allows file exchange between PC and the SDcard without the need to remove the SDcard or interrupt the NASCOM session.

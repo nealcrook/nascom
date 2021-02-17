@@ -1,4 +1,4 @@
-;;; NASCOM-resident code for the NAScas serial interface using NAS-SYS 1 or 3
+;;; NASCOM-resident code for the NAScas serial interface using NASBUG T4
 ;;;
 ;;; https://github.com/nealcrook/nascom
 ;;;
@@ -9,8 +9,8 @@
 ;;; It provides a prompt and command loop and acts as a console, relaying
 ;;; commands to the NAScas hardware and reporting responses.
 ;;;
-;;; By default it is assembled to load at location 0c80 because that is the
-;;; start of free RAM when running the NAS-SYS monitors.
+;;; By default it is assembled to load at location 0c50 because that is the
+;;; start of free RAM when running the NASBUG T4 monitor.
 ;;;
 ;;; The command loop provides a mechanism whereby this code can relocate
 ;;; itself and continues to run, from the new location. It will relocate to
@@ -53,7 +53,7 @@
 ;;; A blank line results in a new prompt with no communication with the NAScas
 ;;; hardware
 
-START:        EQU     $0c80
+START:        EQU     $0c50
 
 ;;; length of the prompt "NAScas> "
 PRLEN:  EQU     8
@@ -63,21 +63,20 @@ RSDONE: EQU     0
 RSMOVE: EQU     $55
 RSMSG:  EQU     $ff
 
+;;; Equates for NASBUG T4 characters
+T4CR:   EQU     $1f
 
-SCAL:   MACRO FOO
-        RST 18H
-        DB FOO
-        ENDM
+;;; Restarts into NASBUG T4
+T4RET:  EQU     $8              ;Return to monitor
+PRS:    EQU     $28             ;Print string until NULL
+ROUT:   EQU     $30             ;Output character in A
 
+;;; Addresses for calls into NASBUG T4
+SLROUT: EQU     $005e           ;Output to UART only
+TIN:    EQU     $04f2           ;Input from keyboard or UART
 
-;;; Equates for communicating with NAS-SYS
-PRS:    EQU     $28             ;Restart
-RIN:    EQU     $08             ;Restart
-ROUT:   EQU     $30             ;Restart
-ZMRET:  EQU     $5b             ;SCAL
-ZINLIN: EQU     $63             ;SCAL
-ZERRM:  EQU     $6b             ;SCAL
-ZSRLX:  EQU     $6f             ;SCAL
+;;; Addresses of NASBUG T4 workspace
+CURSOR: EQU     $0c18
 
         ORG     START
 
@@ -85,7 +84,18 @@ ZSRLX:  EQU     $6f             ;SCAL
 newcmd: rst     PRS
         defm    "NAScas> ", 0
 
-        SCAL    ZINLIN          ;DE=start of this line
+        ;; imitate the NAS-SYS ZINLIN call: get an input line and finish with DE
+        ;; addressing the start of the line
+inlin:  call    TIN             ;get character
+        rst     ROUT            ;echo to display
+        cp      T4CR            ;end of line?
+        jr      nz,inlin        ;no; continue
+        ;; Got a line, and cursor is at the start of the next line
+        ld      hl, (CURSOR)
+        ld      de, -64         ;video RAM stride is 64 so this moves us up a line to the command
+        add     hl,de
+        ex      de,hl           ;DE=start of command in video RAM
+
         ld      hl, PRLEN
         add     hl,de
         ex      de,hl           ;DE=1st char of command
@@ -121,16 +131,16 @@ nodot:  push    af              ;save Z. Later, exit if Z
 ;;; ready to send line out. B characters from HL onwards
 
 send:   ld      a,(hl)
-        SCAL    ZSRLX           ;send to serial port ONLY
+        call    SLROUT          ;send to serial port ONLY
         inc     hl
         djnz    send
 
 ;;; nul-terminate
         xor     a
-        SCAL    ZSRLX
+        call    SLROUT
 
 ;;; get response
-eol:    RST     RIN
+eol:    call    TIN             ;get character
         cp      RSDONE
         jr      z, done         ;ready for next command, if any
         cp      RSMSG
@@ -138,8 +148,32 @@ eol:    RST     RIN
         cp      RSMOVE
         jr      z, move
 ;;; fatal error: print message and exit
-        SCAL    ZERRM
-        SCAL    ZMRET           ;TEMINATE PROGRAM
+        rst     PRS
+        defm    "Error"
+        defb    T4CR,0
+        rst     T4RET           ;TERMINATE PROGRAM
+
+
+xprmsg: RST     ROUT            ;echo and drop through for more
+
+;;; RSMSG: print pageable null-terminated string from NAScas hardware
+prmsg:  call    TIN             ;get character (from serial interface)
+        or      a               ;is it NUL?
+        jr      z, done         ;yes; ready for next command, if any
+        cp      1               ;is it PAUSE
+        jr      nz, xprmsg      ;anything else is echoed
+
+;;; pause/pager within RSMSG
+        call    TIN             ;get character (from NASCOM keyboard)
+        call    SLROUT          ;and send to serial port
+        jr      prmsg           ;continue with print message
+
+;;; RSDONE: recover Z and either exit or get the next command
+done:   pop     af
+        jr      nz, newcmd
+
+;;; finished
+exit:   RST     T4RET           ;TERMINATE PROGRAM
 
 
 ;;; RSMOVE: get new address
@@ -150,9 +184,9 @@ move2:  ld      de,move2 - START;offset from start
         or      a
         sbc     hl,de           ;HL=current start
 
-        RST     RIN
+        call    TIN
         ld      e, a            ;low byte
-        RST     RIN
+        call    TIN
         ld      d, a            ;DE=destination
 
         pop     af              ;recover Z flag
@@ -165,27 +199,6 @@ move2:  ld      de,move2 - START;offset from start
 
         jr      z, exit         ;quit using code at current location
         ret                     ;jump to start of code at new location
-
-xprmsg: RST     ROUT            ;echo and drop through for more
-
-;;; RSMSG: print pageable null-terminated string from NAScas hardware
-prmsg:  RST     RIN             ;get character (from serial interface)
-        or      a               ;is it NUL?
-        jr      z, done         ;yes; ready for next command, if any
-        cp      1               ;is it PAUSE
-        jr      nz, xprmsg      ;anything else is echoed
-
-;;; pause/pager within RSMSG
-        RST     RIN             ;get character (from NASCOM keyboard)
-        SCAL    ZSRLX           ;and send to serial port
-        jr      prmsg           ;continue with print message
-
-;;; RSDONE: recover Z and either exit or get the next command
-done:   pop     af
-        jr      nz, newcmd
-
-;;; finished
-exit:   SCAL    ZMRET           ;TERMINATE PROGRAM
 
 END:
 ;;; end
