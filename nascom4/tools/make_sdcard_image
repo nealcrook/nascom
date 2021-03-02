@@ -39,12 +39,14 @@
 use warnings;
 use strict;
 
+# point to NASCOM repository (relative path is OK)
+my $nascom = "../..";
 # use nascon to convert images to binary format if necessary.
-my $nascon_exe = "../converters/nascon";
+my $nascon_exe = "$nascom/converters/nascon";
 # name to use for temporary file
 my $tempfname = "temp";
 # name to use for the output image file
-my $imgfname = "nascom_sdcard.img";
+my $imgfname = "nascom4_sdcard.img";
 # number of blocks for menu
 my $menu_blocks = 8;
 # number of profiles, one block per profile
@@ -56,23 +58,23 @@ my $profile_blocks = 26;
 
 my @roms;
 
-add_image("NASBUGT2", 0x0000, "nasbugt2/NASBUGT2.NAS");
-add_image("NASBUGT4", 0x0000, "nasbugt4/NASBUGT4.NAS");
-add_image("BBUG",     0x0000, "bbug/BBUG_fixcsum.NAS");
-add_image("NASSYS1",  0x0000, "nassys1/NAS-SYS_1.NAS");
-add_image("NASSYS3",  0x0000, "nassys3/NAS-SYS_3.NAS");
-add_image("BASIC",    0xE000, "basic/basic.nas");
-add_image("ZEAP",     0xD000, "zeap/zeap.nas");
-add_image("NASPEN",   0xB800, "naspen/naspen_b800.bin");
-add_image("POLYDOS2", 0xD000, "../PolyDos/rom/PolyDos_2_Boot_ROM.bin");
-add_image("POLYDOS3", 0xD000, "../PolyDos/rom/PolyDos_3_Boot_ROM.bin");
-add_image("PASCAL",   0xD000, "pascal/bls_pascal2_d000.bin");
-add_image("NASDOS",   0xD000, "../../nascom_other/nascom_nasdos/nasdos_disassembled/nasdos.rom");
-add_image("NASCPM",   0xF000, "../../nascom_other/cpm_polydos/bootrom/cpmboot.go");
+add_image("NASBUGT2", 0x0000, "$nascom/ROM/nasbugt2/NASBUGT2.bin_golden");
+add_image("NASBUGT4", 0x0000, "$nascom/ROM/nasbugt4/NASBUGT4.bin_golden");
+add_image("BBUG",     0x0000, "$nascom/ROM/bbug/BBUG.bin_golden");
+add_image("NASSYS1",  0x0000, "$nascom/ROM/nassys1/NASSYS1.bin_golden");
+add_image("NASSYS3",  0x0000, "$nascom/ROM/nassys3/NASSYS3.bin_golden");
+add_image("BASIC",    0xE000, "$nascom/ROM/basic/basic.nas");
+add_image("ZEAP",     0xD000, "$nascom/ROM/zeap/zeap.nas");
+add_image("NASPEN",   0xB800, "$nascom/ROM/naspen/naspen_b800.bin");
+add_image("POLYDOS2", 0xD000, "$nascom/PolyDos/rom/PolyDos_2_Boot_ROM.bin");
+add_image("POLYDOS3", 0xD000, "$nascom/PolyDos/rom/PolyDos_3_Boot_ROM.bin");
+add_image("PASCAL",   0xD000, "$nascom/ROM/pascal/bls_pascal2_d000.bin");
+add_image("NASDOS",   0xD000, "../../../nascom_other/nascom_nasdos/nasdos_disassembled/nasdos.rom");
+add_image("NASCPM",   0xF000, "../../../nascom_other/cpm_polydos/bootrom/cpmboot.go");
 add_image("LOLLIPOP", 0x1000, "/home/crook/Arduino/VGANoFrameBufferNAS/data/lollipop.bin");
-add_image("DISDEB",   0xC000, "../../nascom_other/Odebdis.nas");
-add_image("INVADERS", 0x1000, "../../nascom_other/Spaceii.nas");
-add_image("MEMTEST",  0x0c80, "../../nascom_other/map80memorytest/m80memtp.bin");
+add_image("DISDEB",   0xC000, "../../../nascom_other/Odebdis.nas");
+add_image("INVADERS", 0x1000, "../../../nascom_other/Spaceii.nas");
+add_image("MEMTEST",  0x0c80, "../../../nascom_other/map80memorytest/m80memtp.bin");
 
 # calculate the start block for each image, given the overhead
 set_block_offsets($menu_blocks + $profile_blocks);
@@ -192,7 +194,11 @@ sub add_image {
     my $org = $_[1];
     my $file = $_[2];
 
-    if (($file =~ /\.[Bb][Ii][Nn]$/) or ($file =~ /\.[Rr][Oo][Mm]$/) or ($file =~ /\.[Gg][Oo]$/)) {
+    if (($file =~ /\.[Bb][Ii][Nn]$/) or
+        ($file =~ /\.[Rr][Oo][Mm]$/) or
+        ($file =~ /\.[Gg][Oo]$/) or
+        ($file =~ /\.bin_golden$/)
+        ) {
         # binary file; open as-is
     }
     elsif ($file =~ /\.[Nn][Aa][Ss]$/) {
