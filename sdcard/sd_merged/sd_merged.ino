@@ -81,9 +81,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 // PROTOCOL FOR SERIAL INTERFACE
 //
-// When running serboot (serboot.asm)
-// E 0C80
-// NAScas>
+// When running serboot (serboot.asm)            serbootT4 (serbootT4.asm)
+// E 0C80                                        E 0C50
+// NAScas>                                       NAScas>
 //
 // NAS-SYS always polls the serial interface as well as the keyboard, so the
 // serial interface can deliver input at any time. By sending R<return>
@@ -250,6 +250,11 @@
 // - baud rate reduced from 1200 to 600
 // - serial comms is non-inverted.
 //#define NASCOM1
+
+// Define to use with NASBUG T4, comment out for use with NAS-SYS
+// - uses a different version of the serboot code
+// - uses different line-endings (T4 uses 0x1f for CR)
+//#define NASBUGT4
 
 // Define which ROMS to include in the Flash filesystem; you may need
 // to omit some to make the code fit (especially if you enable CONSOLE)
