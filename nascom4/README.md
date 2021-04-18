@@ -1,10 +1,14 @@
 # NASCOM 4
 
+![n4_assembled.jpg](n4_assembled.jpg?raw=true "NASCOM 4 assembled")
+
 * doc - user guide, schematics and layout drawings
 * tools - for creating SDcard image
+* photos - the assembled board
 
 The FPGA VHDL code and KiCad design database is here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4
 
+The pre-build files for programming the FPGA are here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4/output_files
 
 Here are some videos of its evolution:
 
