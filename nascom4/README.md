@@ -1,6 +1,6 @@
 # NASCOM 4
 
-![n4_assembled.jpg](n4_assembled.jpg?raw=true "NASCOM 4 assembled")
+![n4_assembled.jpg](photos/n4_assembled.jpg?raw=true "NASCOM 4 assembled")
 
 * doc - user guide, schematics and layout drawings
 * tools - for creating SDcard image
