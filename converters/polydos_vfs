@@ -384,6 +384,7 @@ sub cmd_name {
     return unless defined($drive);
 
     $dsk[$drive]->{dname} = $name;
+    wr_dir($drive);
 }
 
 
