@@ -13,6 +13,12 @@ the need for PIO or FDC.
 All of the customisation of PolyDos takes place within its boot ROM. Boot ROMs
 are loaded using the NASCOM 4 menu system.
 
+TODO:
+
+* New utilities
+* Fix bug in CASDSK where it ignores a load-offset argument to R
+
+
 ## Getting Started
 
 
@@ -94,7 +100,7 @@ If the images are stored contiguously, the ROM needs to know the start block of
 the first image, and need workspace in which to store the start block of
 each of the currently-selected images.
 
-If the images are aligned, so that they start at block 0x800, 0x1000, 0x1800
+If the images are aligned, so that they start at block 0x0800, 0x1000, 0x1800
 etc. only need 4 bits for each image; 2 bytes in total.. or store a
 start block (16 bits) and 4x4 bits (32 bits)
 
@@ -110,4 +116,35 @@ used to check that a disk is present after selecting a drive; we don't need
 it so can happily use this space without conflict. There are a further 64 bytes
 of unused workspace.
 
+translation from drive to start address:
 
+disk images start at $400, each disk image is $800 in size
+
+
+$0400 + $0000 drive 0
+$0400 + $0800       1
+$0400 + $1000 2
+$0400 + $1800 3
+$0400 + $2000 4
+$0400 + $2800 5
+$0400 + $3000 6
+$0400 + $3800 7
+$0400 + $4000 8
+$0400 + $4800 9
+$0400 + $5000 a
+$0400 + $5800 b
+$0400 + $6000 c
+$0400 + $6800 d
+$0400 + $7000 e
+$0400 + $7800 f
+
+so, just store the high byte in first 4 bytes of DSKWSP, then can have a utility to report it and change it (which will need to go from offset to slot)
+
+or, more portable to store values 0-f in DSKWSP and convert to block number:
+
+* left-shift by 3
+* add the base
+
+sla a
+sla a
+sla a

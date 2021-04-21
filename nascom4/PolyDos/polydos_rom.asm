@@ -1086,6 +1086,19 @@ PDSCTB:	DW	RKBD		;7DH
 
 INIT:   xor     a
         out     (SDLBA2),a      ;high block address is ALWAYS 0
+
+        ;; support 16 disks, numbered 0-15 (0x0-0xf)
+        ;; 4 bytes at (DSKWSP) are used to store to disk numbers
+        ;; of the disks associated with drives 0,1,2,3.
+        ;; initially, disks 0-3 are selected; there will be a
+        ;; utility to change the assignments.
+        ld      HL, DSKWSP
+        ld      B, 4
+INIT1:  ld      (HL), a
+        inc     a
+        inc     hl
+        djnz    INIT1
+
 	CALL	CNVCOD		;Convert drive code
 	JP	TSTDSK		;Test for disk
 
@@ -1112,26 +1125,35 @@ RWSCTS:	PUSH	AF		;Save R/W flag
         ld      a,MAXDRV        ;Too big?
         cp      c
 	LD	A,28H		;(Error 28 if so)
-        jr      c,RWS2		;Yes => return
+        jp      c,RWS2		;Yes => return
 
         ld      a,c
         ld      (DRVCOD),a      ;Probably never used..
 
-
-;;; TODO convert from drive in C to block start address. For now, just
-;;; support 1 drive, starting at block 0x800
-
-;;; Convert DE from sector offset to absolute sector address
+        ;; convert from drive (0-3) in C to disk (in DSKWSP)
+        ;; and then to block offset and finally to block address
         push    hl
-        ld      hl,$400         ;base for PolyDos images
+        push    bc
+        ld      b,0             ;now BC is 0..3 based on drive
+        ld      hl, DSKWSP
         xor     a               ;clear carry
-        adc     hl, de          ;start block address
-        ld      d,h
-        ld      e,l
-        pop     hl              ;restore address
+        add     hl,bc           ;compute address
+        ld      a,(hl)          ;get disk number
+        sla     a
+        sla     a
+        sla     a               ;high byte of offset
+        ld      h,a
+        ld      l,0             ;offset from start of disks to start of required disk
+        xor     a               ;clear carry
+        adc     hl,de           ;offset from start of disks to start of required sector
+        ld      de,$400         ;disks start at this offset
+        adc     hl,de           ;carry still clear. Absolute address of required sector
+
+        ex      de,hl           ;absolute address in DE
+        pop     bc
+        pop     hl
 
         pop     af              ;Restore R/W flag
-        push    af              ;TODO may not need this any more.. discarded later using POP HL
         or      a               ;0=>read
         jr      z,rs
 
@@ -1179,7 +1201,7 @@ wdpad:  in      a,(SDCTRL)      ;status
         djnz    ws              ;write data loop for B sectors
 
         xor     a               ;success
-        jr      RWS2            ;tidy stack and return
+        jr      RWS2            ;set status and return
 
 ;;; read. Block DE, Data to HL, B sectors of 256 bytes each
 
@@ -1224,14 +1246,13 @@ rdpad:  in      a,(SDCTRL)
         djnz    rs              ;read data loop for B sectors
 
         xor     a               ;success
-        jr      RWS2            ;tidy stack and return
+        jr      RWS2            ;set status and return
 
 ;;; TODO currently no way to get "Error 29" - I need to find out how the SDcontroller responds
 ;;; when no SDcard is present - probably need a timeout right at the start.
 
 RWS2A:  LD	A,29H		;Error 29
-RWS2:	POP	HL		;Adjust
-	OR	A		;Status to Z flag
+RWS2:	OR	A		;Status to Z flag
 	RET
 
 ; Convert drive number in C to a drive code
