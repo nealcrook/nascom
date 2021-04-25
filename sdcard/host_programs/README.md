@@ -70,6 +70,7 @@ NASxxx.BIN (where xxx are digits in the range 0..9) is chosen.
 * sddir.asm - intended to be run from PolyDos SDcard version. Reports directory listing of the SDcard.
 * casdsk.asm - intended to be run from PolyDos disk or SDcard version. Replaces NAS-SYS R, W commands so that some other program can be tricked into saving/loading to disk instead of to tape.
 * scrape5.asm - intended to be run from PolyDos disk or SDcard version. Copies CP/M physical disk images to SDcard file images; assumes 35 track DSDD disks with 10 sectors per side, each of 512 bytes (so 35*10*2*512=350KBytes per disk).
+* scrape2.asm - intended to be run from PolyDos disk or SDcard version. Copies PolyDos physical disk images to SDcard file images; assumes 35 track DSDD disks with 18 sectors per side, each of 256 bytes (so 35*18*2*256=315KBytes per disk).
 * sdoff.asm -  intended to be run from PolyDos SDcard version. Puts SDcard interface into a quiescent state so that the PIO can be used for something else.
 
 ## Other utilities
