@@ -304,9 +304,9 @@ ewrt:   DB "Write failed",0
 ; CHOPPED PD2 SOURCE FOR READING
 ; 35-TRACK, 256-BYTE/SECTOR DSDD DISKS
 ; TRACKS ARE 0 TO 34
-; SECTORS ARE 0 TO 9, EACH OF 512 BYTES:
-; AFTER 10 SECTORS ON SIDE 0 GET THE 10 ON
-; SIDE 1 BEFORE STEPPING: IE 10K PER TRACK
+; SECTORS ARE 0 TO 17, EACH OF 256 BYTES:
+; AFTER 18 SECTORS ON SIDE 0 GET THE 18 ON
+; SIDE 1 BEFORE STEPPING: IE 9K PER TRACK
 ;
 ;----------------------------------------------
 
@@ -402,7 +402,6 @@ RWS1:	POP	AF;Restore R/W flag
 	DEC	B;Decrement count
 	JR	Z,RWS3;Done => skip
 	INC	H;Calculate next addr
-	INC	H
 	INC	E;Increment sector nbr
 	LD	C,18*2          ;(Double density size)
 RWS2:	LD	A,E;Get sector nbr
