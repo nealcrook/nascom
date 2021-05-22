@@ -98,3 +98,23 @@ throw away your floppy disks (and floppy disk controller) and still run PolyDos.
 * 80-Bus News, Volume 3 issue 5, "PolyDos File Name Listing" is a program to build a unified file index by examining the directories on a set of disks.
 
 * 80-Bus News, Volume 3 issue 6, "Lawrence and the PolyDos User Group"
+
+
+## PolyDos Gotchas
+
+Maybe not bugs, but irritating behaviours..
+
+You are in BASIC and developing a program, so you are saving
+regularly, using the same name. Eventually, you hit the 50 files limit, and an error is reported:
+directory is full. What to do?
+
+First attempt:
+
+Type MONITOR to get back to the $ prompt, then PURGE 0, then Z to warm-start BASIC.
+
+This is broken in two ways:
+
+# Although PURGE is a built-in that runs in the overlay area, it seems to use memory at 1000; at least, it corrupts the BASIC program so that Z does not warm-start BASIC
+# When saving using the same name, the existing file is erased before the error message about directory entries is generated. Therefore, the PURGE deleted all copies of the program, and the inability to warm-start BASIC means that all copies are lost
+
+Result: misery. The correct thing to do is simply to save to a different disk, and purge the first disk later.

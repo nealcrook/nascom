@@ -157,7 +157,7 @@ PD304 "M/C Games" -- Miscellaneous machine-code games (from Neal's collection)
    01df 0043 1000 1000          ELIZA.GO
 
 
-PD304 "More M/C Games" -- Miscellaneous machine-code games
+PD305 "More M/C Games" -- Miscellaneous machine-code games
 ======================
 
    Sect Nsct Load Exec SysFlg   Name
