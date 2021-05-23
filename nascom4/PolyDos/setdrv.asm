@@ -50,6 +50,7 @@ ZMRET:  EQU     $5b
 ZTBCD3: EQU     $66
 ZCRLF:  EQU     $6a
 ZERRM:  EQU     $6b
+ZNUM:   EQU     $64
 ;;; Equates for PolyDos workspace
 CLINP:  EQU     $c019
 CLIN:   EQU     $c01b
@@ -62,6 +63,7 @@ ARG1:   EQU     $0c0c
 ARG2:   EQU     $0c0e
 ARG3:   EQU     $0c10
 ARG4:   EQU     $0c12
+NUMV:   EQU     $0c21
 ;;; Equates for PolyDOS SCALs
 ZDSIZE: equ     $80
 ZDRD:   equ     $81
@@ -76,88 +78,68 @@ CR:     EQU     $0d
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
         ;; parse the command line.
-setdrv: ld      hl, (CLINP)
-        ld      a,(hl)
+setdrv: ld      de, (CLINP)
+        ld      a,(de)
         or      a
         jp      z, info         ;no arguments, report mounted drives.
 
-        ;; should be drive number 0-4
-        cp      '0'
-        jp      c, baddrv
-        cp      '5'
-        jr      nc, baddrv
+        ;; should be drive number 0-3
+        SCAL    ZNUM
+        jr      c, badchar
+        ld      hl, (NUMV)
+        ld      a,h
+        jr      nz, baddrv      ;too big
+        ld      a,l
+        cp      4
+        jr      nc, baddrv      ;too big
 
-        ;; convert drive number from ASCII to binary and save in d
-        sub     a, '0'
-        ld      d,a
+        ;; save drive in b
+        ld      b,l
 
-        ;; expect 1 digit for drive number, then at least 1 blank
-        inc     hl
-        ld      a,(hl)
-        cp      ' '
-        jr      nz,baddrv       ;spoke too soon.
+        ;; should be a disk number 0-f
+        SCAL    ZNUM
+        jr      c, badchar
+        ld      hl, (NUMV)
+        ld      a,h
+        jr      nz, baddsk      ;too big
+        ld      a,l
+        cp      $10
+        jr      nc, baddsk      ;too big
 
-        ;; skip blanks, if any
-skip1:  inc     hl
-        ld      a, (hl)
-        cp      ' '
-        jr      z, skip1
-        or      a
-        jr      z,badfile       ;line ended too soon
-
-        ;; should be a disk number '0'-'F', convert to binary
-        sub     a, '0'          ;0-9 and $11-$16
-        cp      0
-        jr      c, badfile
-        cp      $a
-        jr      c, diskok       ;0-9, already converted
-        cp      $11
-        jr      c, badfile      ;too small to be A
-        cp      $17
-        jr      nc, badfile     ;too big to be F
-        sub     a, $7           ;$11-$16 become $A-$F
-
-        ;; expect 1 digit for disk number, then at least 1 blank
-        inc     hl
-        ld      a,(hl)
-        cp      ' '
-        jr      nz,baddrv       ;spoke too soon.
-
-
-        ;; Don't care if there are extra characters on the line. We have what
-        ;; we need:
-        ;; drive number in D
-        ;; disk number in ???
-diskok: 
-
-
-
-;;; TODO stuff below needs update..
-
+        ld      c,l
+        ;; Don't care if there are extra characters on the line; we have what we need:
+        ;; drive number in b
+        ;; disk  number in c
 
         ld      a,(DDRV)        ;is the directory buffer associated
-        cp      d               ;with the drive to be replaced?
+        cp      b               ;with the drive to be replaced?
         jr      nz, cont        ;no
         ld      a,$ff           ;yes, so
         ld      (DDRV), a       ;invalidate directory buffer
 
-cont:
-        ;;; z => error (unlike PolyDos)
-        jp      nz, ok          ;exit successfully
+cont:   inc     b               ;change from 0-3 to 1-4
+        ld      hl,DSKWSP-1     ;always going to increment hl at least 1 time
 
+getloc: inc     hl              ;do this 1 time for drive 0, 2 times for drive 1, etc.
+        djnz    getloc          ;to get DSKWSP for drive 0, DSKWSP+1 for drive 1, etc
 
-        jp      exit
+        ld      (hl),c          ;associate disk with drive
+        SCAL    ZMRET           ;successful exit
 
+;;; too many/too few parameters. Report error and exit
+badchar:ld      a, $02
+        jp      errexit
 
+;;; bad disk address (kinda mis-using this, but seems appropriate). Report error and exit
+baddsk:ld      a, $26
+        jp      errexit
 
-
-;;; missing file name (disk number). Report error and exit
-badfile:ld      a, $13
-        jp      exit
-
-;;; bad drive number. Report error and exit
+;;; missing/bad drive number. Report error and exit
 baddrv: ld      a, $12
-        jp      exit
+
+;;; come here with error code in A
+errexit:SCAL    ZCKER
+        SCAL    ZMRET
 
 ;;; no args => report current mounted files and exit
 info:   rst     PRS
@@ -194,15 +176,7 @@ ascok:  rst     ROUT
         ld      a, '4'          ;non-existent drive
         cp      b
         jr      nz, info1       ;continue until drives 0-3 all done.
-
-ok:     xor     a               ;A=0 => no error
-
-;;; come here with A=0 for good exit, else error code in A
-exit:   SCAL    ZCKER
-        SCAL    ZMRET
-
-
-
+        SCAL    ZMRET           ;successful exit
 
 ;;; pad to 512bytes to be tidy
 size:   equ $ - START

@@ -1,0 +1,7 @@
+*.lst
+# don't want to wildcard ignore .bin files because I might commit the ROM binaries here. Therefore, manually list all the others..
+setdrv.bin
+polydos_rom_d000.bin
+# these are disk images extracted from sdcard; don't want to commit them
+pd*_from.dsk
+nascom4_sdcard_bp_from.img

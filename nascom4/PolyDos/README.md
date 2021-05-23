@@ -13,50 +13,52 @@ the need for PIO or FDC.
 All of the customisation of PolyDos takes place within its boot ROM. Boot ROMs
 are loaded using the NASCOM 4 menu system.
 
-TODO:
-
-* New utilities
-
 
 ## Getting Started
 
+From the NASCOM 4 boot menu, select the letter associated with "POLYDOS-LSD" (LSD = Local SDcard). In response to the prompt, choose to boot from drive 0. You should get the PolyDos banner and a "$" prompt.
 
 ## How this version differs from one using floppy disks
 
+There are 4 drives (0-3) and 16 (virtual) disks, 0-9,a-f. At boot time, drives 0-3 are associated with disks 0-3. You can change disks using the SETDRV utility (described below).
 
-## Adding disk images to the SDcard
-
-Create a 2048-sector disk image using polydos_vfs:
-
-$ ../../converters/polydos_vfs
-polydos_vfs: new pd0.dsk s=2048
-polydos_vfs: mount 0 pd0.dsk
-polydos_vfs: name 0 PD0 System for N4
-polydos_vfs: mount 1 ../../PolyDos/lib/PD000.BIN
-polydos_vfs: copy *.*:1 0
-polydos_vfs: exit
-
-Pad each sector to 512 bytes:
-
-$ ../../converters/pad256to512 pd0.dsk pd0.dsk_padded
-
-Later might want to convert back:
-
-$ ../../converters/unpad512to256 pad0.dsk_padded pd0.dsk_back
-
-Pad the menu part of the SDcard image to 0x800 blocks and add this new image on the end:
-
-$ cp ../tools/nascom4_sdcard.img xx.img
-$ dd if=pd0.dsk_padded of=xx.img bs=512K seek=1
-
-now xx.img is 1572864bytes (3072 sectors = 0xc00 sectors; 0x400 sectors for the
-menu system and 0x800 sectors for the disk image).
 
 ## Utilities
 
-SETDRV utility to map drives to drive slots (new version)
-CASDSK to intercept tape read/write commands (same version as for nascom_sdcard)
-SCRAPE (new version that stores to internal SDcard)
+* SETDRV utility to map drives to drive slots (new version)
+* CASDSK to intercept tape read/write commands (same version as for nascom_sdcard)
+* SCRAPE (new version that stores to internal SDcard NOT YET WRITTEN)
+
+There are 4 virtual drives and 16 virtual disks. Type:
+
+````
+$ SETDRV n m
+````
+to associate drive n with disk m
+
+Type:
+````
+$ SETDRV
+````
+to see the current drive mappings.
+
+CASDSK is designed to be used with programs like ADVENTURE that were designed to store game progress on tape by making calls to the NAS-SYS R and W commands. Start ADVENTURE like this:
+
+````
+$ CASDSK ADV.SV
+Installed
+$ ADVENTUR
+````
+
+This intercepts the SCAL table entries for R and W. Now, when you type SAVE the data is written to a file (ADV.SV in this example). If you save multiple times, each save will delete the old file and save the progress to a new file. When you leave the program restore the normal tape operation like this:
+````
+$ CASDSK
+Uninstalled
+````
+
+(Also, you can use PolyDos RENAME/UNDELETE command to recover older versions of ADV.SV if required).
+
+When you want, later, to restore your progress, run CASDSK and then ADVENTUR as before, and type RESTORE.
 
 
 ## Working with PolyDos disk images
@@ -100,6 +102,44 @@ Each disk image is 2048 blocks (1024Kbytes) before unpacking, 1024 (512Kbytes) a
 
 ## Other PolyDos resources
 
+See the nascom/PolyDos tree in this repository.
+
+
+## Appendix: Adding disk images to the SDcard
+
+This is gory details that you should not care about now; there are scripts described above to take care of it.
+
+Create a 2048-sector disk image using polydos_vfs:
+
+````
+$ ../../converters/polydos_vfs
+polydos_vfs: new pd0.dsk s=2048
+polydos_vfs: mount 0 pd0.dsk
+polydos_vfs: name 0 PD0 System for N4
+polydos_vfs: mount 1 ../../PolyDos/lib/PD000.BIN
+polydos_vfs: copy *.*:1 0
+polydos_vfs: exit
+````
+
+Pad each sector to 512 bytes:
+````
+$ ../../converters/pad256to512 pd0.dsk pd0.dsk_padded
+````
+
+Later might want to convert back:
+````
+$ ../../converters/unpad512to256 pad0.dsk_padded pd0.dsk_back
+````
+
+Pad the menu part of the SDcard image to 0x800 blocks and add this new image on the end:
+````
+$ cp ../tools/nascom4_sdcard.img xx.img
+$ dd if=pd0.dsk_padded of=xx.img bs=512K seek=1
+````
+
+now xx.img is 1572864bytes (3072 sectors = 0xc00 sectors; 0x400 sectors for the
+menu system and 0x800 sectors for the disk image).
+
 
 ## Appendix: Design Decisions
 
@@ -114,7 +154,7 @@ Each PolyDos sector is 256 bytes so the maximum disk size is 2^16 * 256 =
 16Mbytes but the directory size limits the number of files on a disk so there is
 no point making the disk over-large.
 
-I'm going to set the disk size to 512Kbytes ie 2048 sectors.
+Set the disk size to 512Kbytes ie 2048 sectors.
 
 To avoid having to pack 256-byte PolyDos sectors into 512byte SDcard sectors
 (read/modify/write cycles) each Polydos sector uses the first half of an SDcard
@@ -127,7 +167,7 @@ The SDcard uses 24-bit addressing but PolyDos sets the top 8 bits to 0 and so
 restricts itself to accessing the first 2^16 * 512 = 32MBytes: all of the disk
 images have to fit within the first 32MBytes of the SDcard image.
 
-Say I allow 16 images and allow 4 to be assigned to drives 0-3. Start
+Allow 16 disk images and allow 4 to be assigned to drives 0-3. Start
 with the first 4 assigned and allow that to be changed using the SETDRV
 utility.
 
@@ -151,11 +191,11 @@ used to check that a disk is present after selecting a drive; we don't need
 it so can happily use this space without conflict. There are a further 64 bytes
 of unused workspace.
 
-translation from drive to start address:
+Translation from drive to start address:
 
 disk images start at $400, each disk image is $800 in size
 
-
+````
 $0400 + $0000 drive 0
 $0400 + $0800       1
 $0400 + $1000 2
@@ -172,14 +212,15 @@ $0400 + $6000 c
 $0400 + $6800 d
 $0400 + $7000 e
 $0400 + $7800 f
-
-so, just store the high byte in first 4 bytes of DSKWSP, then can have a utility to report it and change it (which will need to go from offset to slot)
+````
+So, just store the high byte in first 4 bytes of DSKWSP, then can have a utility to report it and change it (which will need to go from offset to slot)
 
 or, more portable to store values 0-f in DSKWSP and convert to block number:
 
 * left-shift by 3
 * add the base
-
+````
 sla a
 sla a
 sla a
+````
