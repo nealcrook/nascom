@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# ./dsks_from_image
+#
+# Process the file nascom4_sdcard_bp_from.img to extract the 16 PolyDos disk images
+# and unpack them. The final images are named pd0_from.dsk.. pdf_from.dsk
+# The original image file (nascom4_sdcard_bp_from.img) is unmodified.
+
+dd if=nascom4_sdcard_bp_from.img of=pd0_from.dsk_p bs=512 skip=1024 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd1_from.dsk_p bs=512 skip=3072 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd2_from.dsk_p bs=512 skip=5120 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd3_from.dsk_p bs=512 skip=7168 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd4_from.dsk_p bs=512 skip=9216 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd5_from.dsk_p bs=512 skip=11264 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd6_from.dsk_p bs=512 skip=13312 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd7_from.dsk_p bs=512 skip=15360 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd8_from.dsk_p bs=512 skip=17408 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pd9_from.dsk_p bs=512 skip=19456 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pda_from.dsk_p bs=512 skip=21504 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pdb_from.dsk_p bs=512 skip=23552 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pdc_from.dsk_p bs=512 skip=25600 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pdd_from.dsk_p bs=512 skip=27648 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pde_from.dsk_p bs=512 skip=29696 count=2048
+dd if=nascom4_sdcard_bp_from.img of=pdf_from.dsk_p bs=512 skip=31744 count=2048
+
+../../converters/unpad512to256 pd0_from.dsk_p pd0_from.dsk
+../../converters/unpad512to256 pd1_from.dsk_p pd1_from.dsk
+../../converters/unpad512to256 pd2_from.dsk_p pd2_from.dsk
+../../converters/unpad512to256 pd3_from.dsk_p pd3_from.dsk
+../../converters/unpad512to256 pd4_from.dsk_p pd4_from.dsk
+../../converters/unpad512to256 pd5_from.dsk_p pd5_from.dsk
+../../converters/unpad512to256 pd6_from.dsk_p pd6_from.dsk
+../../converters/unpad512to256 pd7_from.dsk_p pd7_from.dsk
+../../converters/unpad512to256 pd8_from.dsk_p pd8_from.dsk
+../../converters/unpad512to256 pd9_from.dsk_p pd9_from.dsk
+../../converters/unpad512to256 pda_from.dsk_p pda_from.dsk
+../../converters/unpad512to256 pdb_from.dsk_p pdb_from.dsk
+../../converters/unpad512to256 pdc_from.dsk_p pdc_from.dsk
+../../converters/unpad512to256 pdd_from.dsk_p pdd_from.dsk
+../../converters/unpad512to256 pde_from.dsk_p pde_from.dsk
+../../converters/unpad512to256 pdf_from.dsk_p pdf_from.dsk
+
+rm -f pd*_from.dsk_p

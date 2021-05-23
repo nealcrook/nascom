@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# PolyDos for NASCOM 4 - script to create the SDcard image.
+#
+# - build PolyDos ROM from source
+# - rebuild the boot menu/ROMs in the ../tools area
+# - pad the 16 PolyDos disk images
+# - bundle the menu/ROM blob with the disk images to make a single image for
+#   transferring to the SDcard
+
+./build polydos_rom
+mv polydos_rom.bin polydos_rom_d000.bin
+
+pushd ../tools/
+./make_sdcard_image
+popd
+
+cp ../tools/nascom4_sdcard.img nascom4_sdcard_bp.img
+
+../../converters/pad256to512 pd0.dsk pd0.dsk_p
+../../converters/pad256to512 pd1.dsk pd1.dsk_p
+../../converters/pad256to512 pd2.dsk pd2.dsk_p
+../../converters/pad256to512 pd3.dsk pd3.dsk_p
+../../converters/pad256to512 pd4.dsk pd4.dsk_p
+../../converters/pad256to512 pd5.dsk pd5.dsk_p
+../../converters/pad256to512 pd6.dsk pd6.dsk_p
+../../converters/pad256to512 pd7.dsk pd7.dsk_p
+../../converters/pad256to512 pd8.dsk pd8.dsk_p
+../../converters/pad256to512 pd9.dsk pd9.dsk_p
+../../converters/pad256to512 pda.dsk pda.dsk_p
+../../converters/pad256to512 pdb.dsk pdb.dsk_p
+../../converters/pad256to512 pdc.dsk pdc.dsk_p
+../../converters/pad256to512 pdd.dsk pdd.dsk_p
+../../converters/pad256to512 pde.dsk pde.dsk_p
+../../converters/pad256to512 pdf.dsk pdf.dsk_p
+
+cat pd0.dsk_p pd1.dsk_p pd2.dsk_p pd3.dsk_p pd4.dsk_p pd5.dsk_p pd6.dsk_p pd7.dsk_p pd8.dsk_p pd9.dsk_p pda.dsk_p pdb.dsk_p pdc.dsk_p pdd.dsk_p pde.dsk_p pdf.dsk_p > all.dsk_p
+
+# The "bs/seek" reserves the first 512Kbytes for the menu system and ROM images: starts the PolyDos disk
+# images 512Kbytes from the start of the image.
+dd if=all.dsk_p  of=nascom4_sdcard_bp.img bs=512K seek=1
+
+rm *.dsk_p

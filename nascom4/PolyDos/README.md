@@ -16,7 +16,6 @@ are loaded using the NASCOM 4 menu system.
 TODO:
 
 * New utilities
-* Fix bug in CASDSK where it ignores a load-offset argument to R
 
 
 ## Getting Started
@@ -62,11 +61,47 @@ SCRAPE (new version that stores to internal SDcard)
 
 ## Working with PolyDos disk images
 
+Overview:
+
+* Use ../../converters/polydos_vfs to create/manipulate 16 disk images, pd0.dsk..pdf.dsk
+* Use make_full_sdcard_image to create a disk image for the NASCOM4 sdcard
+* Later, use image_from_sdcard to pull a modified image off the card, and dsks_from_image to extract pd0_from.dsk..pdf_from.dsk from the image
+* Copy some/all of pdX_from.dsk to pdX.dsk and re-run make_full_sdcard_image to create a revised disk image for the NASCOM4 sdcard
+
+### Script: mkdsk.scr
+
+Script for polydos_vfs to create a set of empty disk images. Probably never need to run this again.
+
+### Script: make_full_sdcard_image
+
+Creates an image, nascom4_sdcard_bp.img, containing the nascom4 boot menu (built in ../tools by
+running make_sdcard_image to create nascom4_sdcard.img and including the PolyDos
+ROM which is built here, first) and a set of 16 disk images which start out as
+the files pd0.dsk..pdf.dsk here.
+
+(_bp stands for: boot, polydos)
+
+The image is suitable to be dd'd onto an SDcard.
+
+### Script: image_from_sdcard
+
+Reads a sdcard to extract the file nascom4_sdcard_bp_from.img which should be
+exactly the same size as nascom4_sdcard_bp.img and contain all the same stuff
+but will have been changed by any PolyDos write/delete operations to the disk
+images.
+
+### Script: dsks_from_img
+
+Given an image file, typically nascom4_sdcard_bp.img, extract 16 files representing the PolyDos disk images and unpack them
+as pd0_from.dsk.. pdf_from.dsk
+
+Each disk image is 2048 blocks (1024Kbytes) before unpacking, 1024 (512Kbytes) after.
+
 
 ## Other PolyDos resources
 
 
-## Design Decisions
+## Appendix: Design Decisions
 
 16 disk slots, each 512Kbytes
 
