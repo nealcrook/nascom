@@ -34,6 +34,7 @@ my %args;
 $args{infile} = undef;
 $args{outfile} = undef;
 $args{-baud300} = 0;
+$args{-baud2400} = 0;
 $args{-debug} = 0;
 
 ################################################################################
@@ -84,6 +85,11 @@ if ($args{-baud300}) {
     $count0 = $count0 * 1200/300; # 8 symbols  = 4 cycles
     $count1 = $count1 * 1200/300; # 16 symbols = 8 cycles
 }
+if ($args{-baud2400}) {
+    # 2400 baud uses the same frequencies but for shorter!
+    $count0 = 1; # 1 symbol  = 1/2 cycle
+    $count1 = 2; # 2 symbols = 1   cycle
+}
 
 # Size of data buffer. Making this bigger requires more (virtual) memory
 # but makes things run more efficiently. It must be a multiple of 4 so that
@@ -96,7 +102,8 @@ my $want = 1024*64*4;
 
 # Track decode
 my $prev_sign = 0;
-my $count = 0;
+my $count = 1; # number of samples between zero-crossings.
+my $symbol;
 my $prev_symbol = 0;
 my $symbol_count = 0;
 my $bit;
@@ -120,13 +127,12 @@ my $actual = 0;
 # The .wav file is sampled data, and this code is set up for 44100 samples/second.
 # The main "while" loop steps through each SAMPLE in turn. It looks for a
 # zero-crossing which it detects by seeing a sign change in the samples. It counts
-# the number of samples from the previous sign change. That count represents the
-# duration of a half-cycle and I call this a SYMBOL. Since we know the sample rate
-# we *could* use the count to infer the frequency. However, the program is not that
-# sophisticated; it simply uses a hard-wired threshold to decide if the count
-# represents a half-cycle of a low frequency or a high frequency.
-# So, a SYMBOL is a 0 if it represents a half-cycle of a low frequency and a 1 if it
-# represents a half-cycle of a high freuqncy.
+# the number of samples from the previous sign change. COUNT represents the
+# duration of a half-cycle. Since we know the sample rate, we *could* use COUNT
+# to infer the frequency. However, the program is not that; it simply uses a
+# hard-wired threshold convert COUNT to a SYMBOL: A SYMBOL is a 0 if it represents
+# a half-cycle of a low frequency and a 1 if it represents a half-cycle of a high
+# frequency.
 #
 # SYMBOLs are accumulated to form BITs.
 #
@@ -176,20 +182,26 @@ while (1) {
     my $sign = (0x80 & ord(substr($data, $index + 1, 1)) )>> 7;
     $index = $index + 4; # next sample
 
-    print "$sign " if ($args{-debug} > 3);
-
-    # If the sign is the same as the last sample, count it and we're done.
     if ($sign == $prev_sign) {
+        # Same sign as the last sample: count it, maybe report it, and continue
         $count++;
+        print $sign ? '+ ' : '- ' if ($args{-debug} > 4);
         next SAMPLE;
     }
+    else {
+        # The sign has changed, so the previous sample completed a new symbol.
+        # Maybe report the symbol
+        print "$count " if ($args{-debug} > 2);
 
-    # Got here with a new symbol.
-    print "$count " if ($args{-debug} > 2);
-    my $symbol = $count > $threshold ? 0 : 1;
+        $symbol = $count > $threshold ? 0 : 1;
+        print $symbol ? 'L ' : 'H ' if ($args{-debug} > 2);
+        print "\n" if ($args{-debug} > 3);
 
-    $prev_sign = $sign;
-    $count = 0;
+        # Restart the count for the new sample, and maybe report it.
+        $count = 1;
+        $prev_sign = $sign;
+        print $sign ? '+ ' : '- ' if ($args{-debug} > 4);
+    }
 
     if ($symbol == $prev_symbol) {
         $symbol_count++;
@@ -370,6 +382,8 @@ start bits.
 The following options are supported:
 
 -baud300  - default is to expect a 1200baud file. This argument selects 300baud
+            operation
+-baud2400 - default is to expect a 1200baud file. This argument selects 2400baud
             operation
 -debug    - diagnostic output (use -debug -debug etc. to get more and more output)
 
