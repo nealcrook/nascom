@@ -249,20 +249,23 @@
 // If defined:
 // - baud rate reduced from 1200 to 600
 // - serial comms is non-inverted.
-//#define NASCOM1
+#define NASCOM1
 
 // Define to use with NASBUG T4, comment out for use with NAS-SYS
 // - uses a different version of the serboot code
 // - uses different line-endings (T4 uses 0x1f for CR)
+// - uses different back-space   (T4 uses 0x1d for BS)
 #define NASBUGT4
 
 // Define which ROMS to include in the Flash filesystem; you may need
 // to omit some to make the code fit (especially if you enable CONSOLE)
 //#define ROM_INVADERS
-//#define ROM_PIRANHA
 #define ROM_LOLLIPOP
-#define ROM_ZEAP2
+//#define ROM_PIRANHA
+//#define ROM_ZEAP2
+#define ROM_ZEAPT4
 //#define ROM_NASDIS
+#define ROM_M5AT4
 
 // Enable support for a console interface from a PC across the USB link
 // - for details, search for "void cmd_console" below
@@ -854,18 +857,23 @@ char screen_page_quit()  {
     lines = (lines + 1) % 14; // GLOBAL
 
     if (lines == 0) {
-        // print message, cursor home (to start of line) then pause
-        NASSERIAL.print(F("Press [SPACE] to continue\x17\x01"));
+        // print message then pause
+        NASSERIAL.print(F("Press [SPACE] to continue\x01"));
         // wait for keypress from NASCOM
         while (!NASSERIAL.available()) {
         }
         key = NASSERIAL.read();
 
-        // clear the line then send cursor home
-        for (int i = 0; i< 45; i++) {
-            NASSERIAL.write(' ');
+        // backspace over the line, which leaves the cursor "home"
+        // 25 is the number of printed characters in the "Press..continue" message
+        for (int i = 0; i< 25; i++) {
+#ifdef NASBUGT4
+            NASSERIAL.write((byte)0x1d); // T4 backspace
+#else
+            NASSERIAL.write((byte)0x08); // normal backspace
+#endif
         }
-        NASSERIAL.write((byte)0x17);
+
 
         // what key was pressed?
         if (key != ' ') {

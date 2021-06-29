@@ -73,7 +73,7 @@ ROUT:   EQU     $30             ;Output character in A
 
 ;;; Addresses for calls into NASBUG T4
 SLROUT: EQU     $005e           ;Output to UART only
-TIN:    EQU     $04f2           ;Input from keyboard or UART
+TIN:    EQU     $04f2           ;Input from keyboard or UART: C set if char
 
 ;;; Addresses of NASBUG T4 workspace
 CURSOR: EQU     $0c18
@@ -86,7 +86,7 @@ newcmd: rst     PRS
 
         ;; imitate the NAS-SYS ZINLIN call: get an input line and finish with DE
         ;; addressing the start of the line
-inlin:  call    TIN             ;get character
+inlin:  call    in              ;get character
         rst     ROUT            ;echo to display
         cp      T4CR            ;end of line?
         jr      nz,inlin        ;no; continue
@@ -140,7 +140,7 @@ send:   ld      a,(hl)
         call    SLROUT
 
 ;;; get response
-eol:    call    TIN             ;get character
+eol:    call    in              ;get character
         cp      RSDONE
         jr      z, done         ;ready for next command, if any
         cp      RSMSG
@@ -157,14 +157,14 @@ eol:    call    TIN             ;get character
 xprmsg: RST     ROUT            ;echo and drop through for more
 
 ;;; RSMSG: print pageable null-terminated string from NAScas hardware
-prmsg:  call    TIN             ;get character (from serial interface)
+prmsg:  call    in              ;get character (from serial interface)
         or      a               ;is it NUL?
         jr      z, done         ;yes; ready for next command, if any
         cp      1               ;is it PAUSE
         jr      nz, xprmsg      ;anything else is echoed
 
 ;;; pause/pager within RSMSG
-        call    TIN             ;get character (from NASCOM keyboard)
+        call    in              ;get character (from NASCOM keyboard)
         call    SLROUT          ;and send to serial port
         jr      prmsg           ;continue with print message
 
@@ -184,9 +184,9 @@ move2:  ld      de,move2 - START;offset from start
         or      a
         sbc     hl,de           ;HL=current start
 
-        call    TIN
+        call    in
         ld      e, a            ;low byte
-        call    TIN
+        call    in
         ld      d, a            ;DE=destination
 
         pop     af              ;recover Z flag
@@ -199,6 +199,11 @@ move2:  ld      de,move2 - START;offset from start
 
         jr      z, exit         ;quit using code at current location
         ret                     ;jump to start of code at new location
+
+;;; wait for input character from KBD or Serial
+in:     call    TIN
+        ret     c
+        jr      in
 
 END:
 ;;; end
