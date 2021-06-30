@@ -260,7 +260,7 @@
 // Define which ROMS to include in the Flash filesystem; you may need
 // to omit some to make the code fit (especially if you enable CONSOLE)
 //#define ROM_INVADERS
-#define ROM_LOLLIPOP
+//#define ROM_LOLLIPOP
 //#define ROM_PIRANHA
 //#define ROM_ZEAP2
 #define ROM_ZEAPT4
@@ -993,7 +993,7 @@ int find_dirent(UDIRENT *d, char *name) {
 //         >=0 the iterator aborted. The return value is the iteration number
 //         which is the directory index of the entry that aborted.
 int foreach_flash_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
-    for (unsigned int i=0; i<sizeof(romdir)/sizeof(struct DIRENT); i++) {
+    for (unsigned int i=0; i<sizeof(romdir)/sizeof(struct FDIRENT); i++) {
         // read the 18-byte FDIRENT into a 20-byte DIRENT by padding
         // in the middle so that all the fields we care about line up.
         UDIRENT dirent;

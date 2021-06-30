@@ -1299,7 +1299,7 @@ const FDIRENT romdir[] PROGMEM = {
                                   , { "ZEAP2   GO", zeap2,    sizeof(zeap2),    0x1000, 0x1000}
 #endif
 #ifdef ROM_ZEAPT4
-                                  , { "ZEAP1_1 GO", zeapt4,   sizeof(zeapt4),   0x0f00, 0x0f00}
+                                  , { "ZEAP11  GO", zeapt4,   sizeof(zeapt4),   0x0f00, 0x0f00}
 #endif
 #ifdef ROM_NASDIS
                                   , { "NASDIS  GO", nasdis,   sizeof(nasdis),   0xc000, 0xc000}
