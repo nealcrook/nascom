@@ -326,13 +326,29 @@ $dis->code(0x7,"KBDIN");
 $dis->code(0xc,"VIDEO");
 #
 
-# video in
+# version string "AW1.1"
+$dis->defb(0x67d, 5, "VER");
 
 
 $dis->block_comment(0x682,';;; ========================================================
 ;;; NOT RELOCATABLE. Load track 0 sector 0 from drive A into memory at 0C00H
-;;; using the 2797 FDC. This ROM is at 0000H-07FFH and the video RAM is at TODO');
+;;; using the 2797 FDC. This ROM is at 0000H-07FFH and the video RAM is at 800H');
 $dis->code(0x682,"BOOT1");
+
+$dis->block_comment(0x690,'
+;;; Enable VFC video RAM (at $0800)');
+
+$dis->block_comment(0x694,'
+;;; $0800 is top-left corner of VDU and KBDIN should
+;;; be the literal 7 -- the length of all of the message strings. LDIR copies the string');
+
+$dis->block_comment(0x6a0,'
+;;; The screen is 25*80=2000 locations subtract 7 for the
+;;; message string is 1993 = 0x7c9, so this is clearing the screen - filling it with spaces');
+
+$dis->block_comment(0x6a8,'
+;;; keep ROM enabled at 0, disable the video RAM, so that system RAM appears');
+
 
 
 $dis->block_comment(0x23,';;; ========================================================
@@ -360,6 +376,10 @@ $dis->code(0x23,"VINIT1");
 $dis->code(0x6b,"KBDST1");
 
 $dis->code(0x6d8,"FDCCMD");
+
+# destination of computed jump from routine X_0183??
+$dis->code(0x564,"X_0564");
+$dis->block_comment(0x56c,"\n;;; write 14 to port EA to select cursor high, then store H then go round\n;;; again and store L. Defautlt entry at 569 sets the cursor off-screen. Entry at 56C sets\n;;; cursor location to ??current output position");
 
 
 # Other stuff

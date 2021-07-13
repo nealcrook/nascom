@@ -338,7 +338,7 @@ X_0183:
         ld hl, X_0157
         add hl, de
         push hl
-        ld hl, $0564
+        ld hl, X_0564
         add hl, de
         push hl
         exx
@@ -1188,13 +1188,16 @@ L_0554:
         jr L_056C
 
 
-        ; Start of unknown area $0564 to $0568
-        defb $DD, $CB, $0D, $56, $C0
-        ; End of unknown area $0564 to $0568
-
+X_0564:
+        bit 2, (ix+$0D)
+        ret nz
 
 L_0569:
         ld hl, $07FF
+
+;;; write 14 to port EA to select cursor high, then store H then go round
+;;; again and store L. Defautlt entry at 569 sets the cursor off-screen. Entry at 56C sets
+;;; cursor location to ??current output position
 
 L_056C:
         ld b, $02
@@ -1437,14 +1440,11 @@ X_066C:
         ret
 
 
-        ; Start of unknown area $067D to $0681
-        defb $41, $57, $31
-        defb $2E, $31
-        ; End of unknown area $067D to $0681
-
+VER:
+        defb $41, $57, $31, $2E, $31
 ;;; ========================================================
 ;;; NOT RELOCATABLE. Load track 0 sector 0 from drive A into memory at 0C00H
-;;; using the 2797 FDC. This ROM is at 0000H-07FFH and the video RAM is at TODO
+;;; using the 2797 FDC. This ROM is at 0000H-07FFH and the video RAM is at 800H
 
 BOOT1:
         ld sp, $1000
@@ -1453,14 +1453,22 @@ BOOT1:
         call VINIT1
         ld hl, MSGBOOT
 
+;;; Enable VFC video RAM (at $0800)
+
 L_0690:
         ld a, $01
         out ($EC), a
+
+;;; $0800 is top-left corner of VDU and KBDIN should
+;;; be the literal 7 -- the length of all of the message strings. LDIR copies the string
         ld de, $0800
         ld bc, KBDIN
         ldir
         ex de, hl
         ld bc, $07C9
+
+;;; The screen is 25*80=2000 locations subtract 7 for the
+;;; message string is 1993 = 0x7c9, so this is clearing the screen - filling it with spaces
 
 L_06A0:
         ld (hl), $20
@@ -1469,6 +1477,8 @@ L_06A0:
         ld a, b
         or c
         jr nz, L_06A0
+
+;;; keep ROM enabled at 0, disable the video RAM, so that system RAM appears
         xor a
         out ($EC), a
         ld a, $D0
@@ -1745,10 +1755,10 @@ JMPTAB4:
 ; $0460 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 ; $04B0 CCCCCCCCCCCCCC---CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 ; $0500 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC---
-; $0550 ----CCCCCCCCCCCCCCCC-----CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+; $0550 ----CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 ; $05A0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 ; $05F0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
-; $0640 CCCCCCCCCCCCCCCCC--------CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC-----CCCCCCCCCCCCCC
+; $0640 CCCCCCCCCCCCCCCCC--------CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBCCCCCCCCCCCCCC
 ; $0690 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 ; $06E0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBBBBB
 ; $0730 BBBBBBBBBBBBBBBBBBBBWWBWWBWWBWWBWWBWWBWWBWWBWWBWWBWWBWWBWWBWWBWWBBWWBWWBWWBWWBWW
@@ -1883,70 +1893,72 @@ JMPTAB4:
 ; $0541 => K_0541         L_04FD  => $04FD
 ; $0547 => K_0547         L_052C  => $052C
 ; $0554 => L_0554         L_0554  => $0554
-; $0569 => L_0569         L_0569  => $0569
-; $056C => L_056C         L_056C  => $056C
-; $0572 => L_0572         L_0572  => $0572
-; $057C => K_057C         L_0586  => $0586
-; $0581 => K_0581         L_058F  => $058F
-; $0586 => L_0586         L_0596  => $0596
-; $058F => L_058F         L_059F  => $059F
-; $0596 => L_0596         L_05A5  => $05A5
-; $059F => L_059F         L_05AE  => $05AE
-; $05A5 => L_05A5         L_05B1  => $05B1
-; $05AE => L_05AE         L_05BA  => $05BA
-; $05B1 => L_05B1         L_05BE  => $05BE
-; $05BA => L_05BA         L_05C4  => $05C4
-; $05BE => L_05BE         L_05CA  => $05CA
-; $05C4 => L_05C4         L_05D2  => $05D2
-; $05CA => L_05CA         L_05E2  => $05E2
-; $05D2 => L_05D2         L_05FB  => $05FB
-; $05E2 => L_05E2         L_0607  => $0607
-; $05FB => L_05FB         L_060B  => $060B
-; $0607 => L_0607         L_060C  => $060C
-; $060B => L_060B         L_0610  => $0610
-; $060C => L_060C         L_0618  => $0618
-; $0610 => L_0610         L_0623  => $0623
-; $0614 => J_CHR07        L_062C  => $062C
-; $0618 => L_0618         L_0639  => $0639
-; $061E => K_061E         L_063D  => $063D
-; $0623 => L_0623         L_0648  => $0648
-; $0627 => K_0627         L_064B  => $064B
-; $062C => L_062C         L_0664  => $0664
-; $0633 => K_0633         L_0690  => $0690
-; $0637 => K_0637         L_06A0  => $06A0
-; $0639 => L_0639         L_06B4  => $06B4
-; $063D => L_063D         L_06B7  => $06B7
-; $0648 => L_0648         L_06C7  => $06C7
-; $064B => L_064B         L_06D6  => $06D6
-; $0659 => J_CHR0D        L_06DC  => $06DC
-; $0664 => L_0664         L_06DF  => $06DF
-; $066C => X_066C         L_06E6  => $06E6
-; $0682 => BOOT1          L_06EA  => $06EA
-; $0690 => L_0690         L_06F9  => $06F9
-; $06A0 => L_06A0         L_06FC  => $06FC
-; $06B4 => L_06B4         L_0708  => $0708
-; $06B7 => L_06B7         L_0716  => $0716
-; $06C7 => L_06C7         L_0C02  => $0C02
-; $06D6 => L_06D6         MSGBOOT => $0727
-; $06D8 => FDCCMD         MSGDSK  => $072E
-; $06DC => L_06DC         MSGERR  => $073C
-; $06DF => L_06DF         MSGSYS  => $0735
-; $06E6 => L_06E6         VIDEO   => $000C
-; $06EA => L_06EA         VINIT   => $0003
-; $06F9 => L_06F9         VINIT1  => $0023
-; $06FC => L_06FC         X_001D  => $001D
-; $0708 => L_0708         X_0133  => $0133
-; $0716 => L_0716         X_0157  => $0157
-; $0727 => MSGBOOT        X_0176  => $0176
-; $072E => MSGDSK         X_0183  => $0183
-; $0735 => MSGSYS         X_019A  => $019A
-; $073C => MSGERR         X_0257  => $0257
-; $0743 => JMPTAB         X_029F  => $029F
-; $0771 => JMPTAB2        X_02C3  => $02C3
-; $07D2 => JMPTAB3        X_0326  => $0326
-; $07EE => JMPTAB4        X_0339  => $0339
-; $0948 => K_0948         X_0374  => $0374
-; $0B1D => K_0B1D         X_0385  => $0385
-; $0C02 => L_0C02         X_03A3  => $03A3
-; $0F00 => K_0F00         X_03DB  => $03DB
+; $0564 => X_0564         L_0569  => $0569
+; $0569 => L_0569         L_056C  => $056C
+; $056C => L_056C         L_0572  => $0572
+; $0572 => L_0572         L_0586  => $0586
+; $057C => K_057C         L_058F  => $058F
+; $0581 => K_0581         L_0596  => $0596
+; $0586 => L_0586         L_059F  => $059F
+; $058F => L_058F         L_05A5  => $05A5
+; $0596 => L_0596         L_05AE  => $05AE
+; $059F => L_059F         L_05B1  => $05B1
+; $05A5 => L_05A5         L_05BA  => $05BA
+; $05AE => L_05AE         L_05BE  => $05BE
+; $05B1 => L_05B1         L_05C4  => $05C4
+; $05BA => L_05BA         L_05CA  => $05CA
+; $05BE => L_05BE         L_05D2  => $05D2
+; $05C4 => L_05C4         L_05E2  => $05E2
+; $05CA => L_05CA         L_05FB  => $05FB
+; $05D2 => L_05D2         L_0607  => $0607
+; $05E2 => L_05E2         L_060B  => $060B
+; $05FB => L_05FB         L_060C  => $060C
+; $0607 => L_0607         L_0610  => $0610
+; $060B => L_060B         L_0618  => $0618
+; $060C => L_060C         L_0623  => $0623
+; $0610 => L_0610         L_062C  => $062C
+; $0614 => J_CHR07        L_0639  => $0639
+; $0618 => L_0618         L_063D  => $063D
+; $061E => K_061E         L_0648  => $0648
+; $0623 => L_0623         L_064B  => $064B
+; $0627 => K_0627         L_0664  => $0664
+; $062C => L_062C         L_0690  => $0690
+; $0633 => K_0633         L_06A0  => $06A0
+; $0637 => K_0637         L_06B4  => $06B4
+; $0639 => L_0639         L_06B7  => $06B7
+; $063D => L_063D         L_06C7  => $06C7
+; $0648 => L_0648         L_06D6  => $06D6
+; $064B => L_064B         L_06DC  => $06DC
+; $0659 => J_CHR0D        L_06DF  => $06DF
+; $0664 => L_0664         L_06E6  => $06E6
+; $066C => X_066C         L_06EA  => $06EA
+; $067D => VER            L_06F9  => $06F9
+; $0682 => BOOT1          L_06FC  => $06FC
+; $0690 => L_0690         L_0708  => $0708
+; $06A0 => L_06A0         L_0716  => $0716
+; $06B4 => L_06B4         L_0C02  => $0C02
+; $06B7 => L_06B7         MSGBOOT => $0727
+; $06C7 => L_06C7         MSGDSK  => $072E
+; $06D6 => L_06D6         MSGERR  => $073C
+; $06D8 => FDCCMD         MSGSYS  => $0735
+; $06DC => L_06DC         VER     => $067D
+; $06DF => L_06DF         VIDEO   => $000C
+; $06E6 => L_06E6         VINIT   => $0003
+; $06EA => L_06EA         VINIT1  => $0023
+; $06F9 => L_06F9         X_001D  => $001D
+; $06FC => L_06FC         X_0133  => $0133
+; $0708 => L_0708         X_0157  => $0157
+; $0716 => L_0716         X_0176  => $0176
+; $0727 => MSGBOOT        X_0183  => $0183
+; $072E => MSGDSK         X_019A  => $019A
+; $0735 => MSGSYS         X_0257  => $0257
+; $073C => MSGERR         X_029F  => $029F
+; $0743 => JMPTAB         X_02C3  => $02C3
+; $0771 => JMPTAB2        X_0326  => $0326
+; $07D2 => JMPTAB3        X_0339  => $0339
+; $07EE => JMPTAB4        X_0374  => $0374
+; $0948 => K_0948         X_0385  => $0385
+; $0B1D => K_0B1D         X_03A3  => $03A3
+; $0C02 => L_0C02         X_03DB  => $03DB
+; $0F00 => K_0F00         X_0564  => $0564
 ; $5A50 => K_5A50         X_066C  => $066C

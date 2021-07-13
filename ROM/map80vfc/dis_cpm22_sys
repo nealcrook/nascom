@@ -297,9 +297,58 @@ sub dis_tab1 {
 ###########################################
 # Stuff specific to the code being disassembled
 
-$dis->code(0xe800,"ENTRY");
-# Cold boot - executed only on first entry
-$dis->code(0xf388,"BOOT");
+## looking in the BIOS source code, it includes the boot sector followed by padding to the end
+## of the sector. It's followed by a bios jump table which is not in the disassembled source
+## as I see it.. it occurs later on, starting at e800 ("BOOT")
+## ?? how is the disk image created then, with the bootsector and the other components bolted
+## together?
+
+
+
+$dis->code(0xe800,"BIOS"); # jump table so need to specify each entry
+$dis->code(0xe803);
+$dis->code(0xe806);
+$dis->code(0xe809);
+$dis->code(0xe80c);
+$dis->code(0xe80f);
+$dis->code(0xe812);
+$dis->code(0xe815);
+$dis->code(0xe818);
+$dis->code(0xe81b);
+$dis->code(0xe81e);
+$dis->code(0xe821);
+$dis->code(0xe824);
+$dis->code(0xe827);
+$dis->code(0xe82a);
+$dis->code(0xe82d);
+$dis->code(0xe830);
+# Entries in the jump table
+$dis->code(0xf388,"BOOT"); #Cold boot - executed only on first entry
+$dis->code(0xe8dd,"WBOOT");
+$dis->code(0xe9a9,"CONST");
+$dis->code(0xe9b6,"CONIN");
+$dis->code(0xe9c3,"CONOUT");
+$dis->code(0xe9fd,"LIST");
+$dis->code(0xe9dd,"PUNCH");
+$dis->code(0xe9d0,"READER");
+$dis->code(0xee8c,"HOME");
+$dis->code(0xee9d,"SELDSK");
+$dis->code(0xee98,"SETTRK");
+$dis->code(0xeec2,"SETSEC");
+$dis->code(0xeec7,"SETDMA");
+$dis->code(0xeed7,"READ");
+$dis->code(0xeee9,"WRITE");
+$dis->code(0xe9ea,"LISTST");
+$dis->code(0xeecc,"SCTRAN");
+
+## I think this is a data area - consult BIOS source
+$dis->code(0xe833,"x_E833");
+
+
+
+
+# ETC. Read from BIOS source code
+
 $dis->code(0xf439,"X_F439");
 $dis->code(0xd200,"CCP");
 $dis->code(0xd55c,"CCP1");

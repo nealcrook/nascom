@@ -1,5 +1,5 @@
 ;;; First sector of disk for MAP80 VFC CP/M 2.2. The VFC ROM loads this to RAM at $0C00, checks the first 2 bytes
-;;; are as expected then jumps to $0C02. Expects double-sided, 10-sector/track, 512 bytes/sector disk.
+;;; are as expected then jumps to $0C02. Expects disk of 35 tracks * 10 sectors * 2 sides * 512 bytes = 350Kb
 L_0000 equ $0000
 
         org $0C00
@@ -15,7 +15,7 @@ ENTRY:  ld hl, $D200            ;where in memory to load the image (set by movcp
         out ($FF), a            ;Gemini memory map port?
 
 RDSECT: ld a, $01
-        out ($E4), a            ;drive select: drive 1
+        out ($E4), a            ;drive select: drive 0 (drives are 0..3)
         ld a, b
         out ($E2), a            ;select sector
         ld a, d
