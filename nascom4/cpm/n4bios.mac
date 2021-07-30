@@ -1,0 +1,3067 @@
+;1/24/11/83
+;COPYRIGHT (C) MAP 80 SYSTEMS LTD. and DIGITAL RESEARCH INC.
+
+	INCLUDE P:EQU.MAC
+
+;	DPH MACRO
+;1 Translate table, 0000 if no translation required
+;2 DPB for drive type
+;3 Drive number for DPH address label (%)
+;4 Checksum activation True or False
+
+DPH	MACRO	?TRANS,?DPB,?NUM,?CKSUM
+	.LALL
+	.XALL
+	DEFW	?TRANS		;Translate table address
+	DEFW	0,0,0		;BDOS Scratch area
+	DEFW	DIRBUF		;Directory buffer
+	DEFW	?DPB		;Disk parameter block
+	IF ?CKSUM
+	DEFW	CHK&?NUM		;Checksum vector
+	ELSE
+	DEFW	0		;No checksum vector
+	ENDIF
+	DEFW	ALL&?NUM		;Allocation vector
+	ENDM
+
+;	DPB MACRO
+;1 Physical Sector size
+;2 Physical Sectors per track
+;3 Tracks per disk
+;4 CP/M allocation size
+;5 Number of directory entries
+;6 Number of system tracks
+;7 Checksum activation True or False
+;8 Label for allocation vector size
+
+DPB	MACRO	?PSIZE,?PSPT,?TRKS,?BLS,?DIRAL,?OFF,?CKS,?LBL
+
+	LOCAL	?SPT,?BSH,?BLM,?EXM,?DSM,?DRM,?AL0,?AL1,?NCKS,?PSH,?PSM
+	LOCAL	?N
+
+?NDIRS	DEFL (?BLS/32)*?DIRAL
+?SPT	DEFL ?PSPT*(?PSIZE/128)
+?BSH	DEFL 3
+?N	DEFL ?BLS/1024
+
+	REPT	8
+?N	DEFL ?N/2
+	IF	?N EQ 0
+	EXITM	
+	ENDIF	
+?BSH	DEFL ?BSH + 1
+	ENDM	
+
+?BLM	DEFL ?BLS/128-1
+?SIZE	DEFL (?TRKS-?OFF)*?PSPT
+
+?DSM	DEFL ?SIZE/(?BLS/?PSIZE)-1
+?EXM	DEFL ?BLS/1024
+
+	IF	?DSM GT 255
+	IF	?BLS EQ 1024
+	.PRINTX "Error,:can't have this size disk with 1k block size"
+	EXITM	
+	ENDIF	
+?EXM	DEFL ?EXM/2
+	ENDIF	
+
+?EXM	DEFL ?EXM-1
+?ALL	DEFL 0
+?N	DEFL ?DIRAL
+
+	REPT	?N
+?ALL	DEFL (?ALL SHR 1) OR 8000H
+	ENDM	
+
+?AL0	DEFL HIGH ?ALL
+?AL1	DEFL LOW ?ALL
+?DRM	DEFL ?NDIRS-1
+
+	IF ?CKS
+?NCKS	DEFL ?NDIRS/4
+CSIZ&?LBL EQU ?NCKS		;;Pass back checksum vector size
+	ELSE	
+?NCKS	DEFL 0
+CSIZ&?LBL EQU 0			;;Pass back checksum vector size
+	ENDIF	
+ASIZ&?LBL EQU ?DSM/8+1		;;Pass back allocation vector size
+
+	DEFW	?SPT		;128 byte records per track
+	DEFB	?BSH,?BLM	;Block shift and mask
+	DEFB	?EXM		;Extent mask
+	DEFW	?DSM		;Maximum block number
+	DEFW	?DRM		;Maximum directory entry number
+	DEFB	?AL0,?AL1	;Alloc vector for directory
+	DEFW	?NCKS		;Checksum size
+	DEFW	?OFF		;Offset for system tracks
+	ENDM	
+
+;	SKEW MACRO
+;1 Physical sectors per track
+;2 Skew factor
+;3 First sector number
+
+SKEW	MACRO	?SECS,?SKF,?FSC
+;;	generate the translate table
+?NXTSEC	DEFL 0			;;next sector to fill
+?NXTBAS	DEFL 0			;;moves by one on overflow
+
+	GCD	%?SECS,?SKF
+;;	?gcdn EQ gcd(?secs,skew)
+?NELTST	DEFL ?SECS/?GCDN
+;;	neltst is number of elements to generate
+;;	before we overlap previous elements
+?NELTS	DEFL ?NELTST		;;counter
+
+	REPT	?SECS		;;once for each sector
+	DEFB	?NXTSEC+?FSC
+?NXTSEC	DEFL ?NXTSEC+?SKF
+
+	IF	?NXTSEC GE ?SECS
+?NXTSEC	DEFL ?NXTSEC-?SECS
+	ENDIF	
+
+?NELTS	DEFL ?NELTS-1
+	IF	?NELTS EQ 0
+?NXTBAS	DEFL ?NXTBAS+1
+?NXTSEC	DEFL ?NXTBAS
+?NELTS	DEFL ?NELTST
+	ENDIF	
+	ENDM	
+
+	ENDM	
+
+GCD	MACRO	?M,?N
+;;	greatest common divisor of m,n
+;;	produces value gcdn as result
+;;	(used in sector translate table generation)
+?GCDM	DEFL ?M			;;variable for m
+?GCDN	DEFL ?N			;;variable for n
+?GCDR	DEFL 0			;;variable for r
+
+	REPT	65535
+?GCDX	DEFL ?GCDM/?GCDN
+?GCDR	DEFL ?GCDM - ?GCDX*?GCDN
+	IF	?GCDR EQ 0
+	EXITM	
+	ENDIF	
+?GCDM	DEFL ?GCDN
+?GCDN	DEFL ?GCDR
+	ENDM	
+
+	ENDM	
+
+;	BUFF MACRO
+;1 Drive number (%)
+;2 Allocation vector size
+;3 Checksum vector size
+
+BUFF	MACRO ?NUM,?ASIZE,?CSIZE
+	.LALL			;;Show location
+ALL&?NUM	EQU CARRY
+CHK&?NUM	EQU CARRY+?ASIZE
+	.XALL
+CARRY	DEFL CARRY+?ASIZE+?CSIZE
+	ENDM
+
+;*****************************************************
+;*	Sector Deblocking Algorithms for CP/M 2.2    *
+;*****************************************************
+;Utility macro to compute sector mask
+SMASK	MACRO	HBLK
+;;Compute log2(hblk), return @x as result
+;;(2 ** @x = hblk on return)
+@Y	DEFL	HBLK
+@X	DEFL	0
+;;Count right shifts of @y until = 1
+	REPT	8
+	IF	@Y EQ 1
+	EXITM
+	ENDIF
+;;@y is not 1, shift right one position
+@Y	DEFL	@Y SHR 1
+@X	DEFL	@X + 1
+	ENDM
+	ENDM
+
+PRSIZE	MACRO TOPX,TOPY,POSX		;;Signal size of bios
+	.PRINTX "Initialised size &TOPX  Uninitialised size TOPY  USER POSX"
+	ENDM
+
+SECMSK	EQU	CPMRPS-1	;sector mask
+	SMASK	CPMRPS		;compute sector mask
+SECSHF	EQU	@X		;log2(hstblk)
+
+	SUBTTL Size Information
+	PAGE
+END1	EQU IEND-BIOS			;Initialised size
+END2	EQU UEND-BIOS			;Uninitialised size
+POS1	EQU NDRVW			;Spare
+
+	IF2
+	.RADIX 16			;Print in hex
+	PRSIZE %END1,%END2,%POS1
+	.RADIX 10
+	ENDIF
+
+	DSEG
+;Data passed to MOVCPM maker
+	DEFW (UEND-BIOS+0FFH) AND 0FF00H	;Total BIOS size rounded up
+	DEFW (IEND-BIOS+0FFH) AND 0FF00H	;Initialised size rounded up
+
+	DEFW 0
+
+	DEFW IEND-BIOS
+
+	PAGE
+	SUBTTL Track 0 Sector 0 Boot Routines
+STEPIN	EQU	5BH		;Step in
+
+	IF IVC			;Non VFC boot systems
+	.PHASE 0
+	ELSE
+	.PHASE 0C00H		;VFC and BOOT813 systems
+	ENDIF
+
+BSTART:	IF VFC
+	DEFB "80"		;Expected by VFC
+	ELSE
+
+	IF NAS
+	DEFB "GN"		;Expected by SIMON
+	ELSE
+	DEFB "GG"		;Expected by RP/M
+	ENDIF
+
+	ENDIF
+
+START:	LD HL,0			;CP/M address, the only one
+				;modified by MOVCPM
+	LD DE,RDSEC*256		;Read sector + number of secs
+				;Position of this is important
+				;as SIZE is modified by MOVMAKR
+	LD BC,0100H+STAPRT	;Sector + Status port
+
+	IF G811 OR G813
+	LD A,0CH		;Turn off BOOT EPROM on G811/G813
+	OUT (MCR),A
+	ENDIF
+
+;Select VFC mode
+	IF VFC
+	IF G813
+	LD A,0			;Non auto boot linked
+	ELSE
+	LD A,02			;Auto boot linked
+	ENDIF
+	OUT (CNTRL),A		;Switch off VFC
+	ENDIF
+
+	LD A,11H
+	OUT (0FFH),A		;Select Gemini RAM deselect EPROM and G813
+
+GETSEC:	LD A,01H
+	OUT (DRVPRT),A		;Drive
+	LD A,B
+	OUT (FDCSEC),A		;Sector
+	LD A,D
+	OUT (FDCCOM),A		;Command
+	JR LOAD
+SAVE:	LD (HL),A
+	INC HL
+LOAD:	IN A,(C)
+	JR Z,LOAD
+	IN A,(FDCDAT)
+	JP M,SAVE
+	IN A,(FDCSTA)
+	AND 0FCH
+	JR Z,GOOD
+
+;The load is all screwed up, return to system
+	IF (G811 OR NAS) AND VFC
+	LD A,0
+	OUT (CNTRL),A		;Enable VFC
+	JP 0			;Jump to it
+	ENDIF
+
+	IF G813 OR IVC
+	LD A,0
+	OUT (MCR),A		;Page in RPM/BOOT813
+	JP 0F000H
+	ENDIF
+
+;Sector has been read
+GOOD:	INC B
+	LD A,B
+	SUB SECSPS
+	JR NZ,NEXTS
+	LD B,A			;Zero sector
+
+	IF TPI96
+	LD A,STEPIN		;Step out
+	OUT (FDCCOM),A
+WBUSY:	IN A,(FDCSTA)		;Wait until busy
+	BIT 0,A
+	JR Z,WBUSY
+WNBUSY:	IN A,(FDCSTA)		;Wait until not busy
+	BIT 0,A
+	JR NZ,WNBUSY
+	ELSE
+	SET 1,D			;Other side
+	ENDIF
+
+NEXTS:	DEC E			;Sector counter
+	JR NZ,GETSEC
+
+;All loaded, so go to it
+	LD HL,(START+1)		;CP/M address
+	LD DE,1600H		;Add in to BIOS
+	ADD HL,DE
+	JP (HL)
+BTOP:	DEFS 200H-(BTOP-BSTART),0
+	.DEPHASE
+	SUBTTL Jump Table
+	PAGE
+	CSEG
+BIOS:
+;BIOS jump table
+	JP BOOT		;Cold boot
+	JP WBOOT	;Warm boot
+	JP CONST	;Console status
+	JP CONIN	;Console input
+	JP CONOUT	;Console output
+	JP LIST		;List device
+	JP PUNCH	;Punch device
+	JP READER	;Reader device
+	JP HOME		;Home disk head
+	JP SELDSK	;Select disk unit
+	JP SETTRK	;Set track
+	JP SETSEC	;Set sector
+	JP SETDMA	;Set DMA address
+	JP READ		;Read disk
+	JP WRITE	;Write disk
+	JP LISTST	;List device status
+	JP SCTRAN	;Sector translation
+
+	SUBTTL BIOS Workspace
+	PAGE
+;****************************
+;*	BIOS WORKSPACE      *
+;****************************
+
+IOVAL:	DEFB IOINIT		;Stored IOBYTE
+MS:	DEFB MSCNT		;Delay count for 1ms
+CHED:	DEFB KCHED		;Screen edit character
+UARTH:	DEFB SETU		;8250 parameters
+UARTM:	DEFB MODEU		;RS232/Cassette
+UARTB:	DEFW BAUDU		;Baud rate
+PPORT:	DEFB PIO		;PIO base address
+RESERV:	DEFB VRTRK		;Reserved 4k tracks in vdisk
+INITM:
+	IF ABOOT
+	DEFB 06			;Auto boot selected, inverse video
+	ELSE
+	DEFB 04			;Non auto boot, inverse video
+	ENDIF
+LEAVE:
+	IF F800
+	DEFB 0F1H		;Leave VRAM at F800
+	ELSE
+	DEFB 0			;Page out VRAM completely
+	ENDIF
+PRGTAB:	
+	IF MYBIT
+	DEFB ":","*",0FFH	;User programmable key table
+	DEFB "*",":",0FFH
+	ENDIF
+	DEFB 0
+PRGEND:	DEFS 100-(PRGEND-PRGTAB),0	;Leave 100 byte table
+KLONG:	DEFW XLONG		;Initial repeat delay
+KSHRT:	DEFW XSHORT		;Repeat speed
+KBLNK:	DEFW XBLINK		;Blink speed
+KOPT:	DEFB XKOPT		;K option
+LSKIP:	DEFB XLSKIP		;Perforation lines skipped
+PLPAG:	DEFB XPLPAG		;Printed lines per page
+PARITY:	DEFB SRLOP		;Parity
+CRRET:	DEFB CRDEL		;Printer CR delay
+	IF VFC
+;VFC workspace
+VFCW:
+VFCST:	DEFB 0			;Initial status of VFC
+LASVR:	DEFW 0			;Last screen address
+CURSR:	DEFW 0			;Cursor address
+MLOCK:	DEFW 0			;Top of screen
+KPOS:	DEFW 0			;Current send position
+PRGKEY:	DEFW 0			;Address of programable key table
+CURTYP:	DEFW 0			;Normal cursor
+STATE1:	DEFB 0			;Option bits
+KCHR:	DEFB 0			;Key character store
+SEND:	DEFB 0			;Number of characters during send
+KCOUNT:	DEFW 0			;Key repeat counter
+ESCST:	DEFB 0			;ESC status
+ESCTYP:	DEFB 0			;ESC type
+EDCHR:	DEFB 0			;Character to initiate editing
+ROW:	DEFB 0			;Row store
+PIXEL:	DEFB 0			;Pixel store
+VWEND:
+	ENDIF
+;@@@@@@@@@@@@@@@@@@ End of user changeable workspace @@@@@@@@@@@@@@
+;Get to 8H boundary
+WPOS:	DEFS (((WPOS-BIOS) AND 0FFF8H)+8)-(WPOS-BIOS),0
+
+;Interrupt vectors
+IVEC1:	DEFW 0
+	DEFW 0
+	DEFW 0
+	DEFW 0
+IVEC2:	DEFW 0
+	DEFW 0
+	DEFW 0
+	DEFW 0
+LCNT:	DEFB XPLPAG		;Line count
+LSTCL:	DEFW 0			;Return address for `CKFF'
+DDNO:	DEFB 0
+BDOSC:	DEFB 0			;BDOS character store
+
+	SUBTTL Warm Boot
+	PAGE
+;***********************
+;*	WARM BOOT      *
+;***********************
+WBOOT:	LD SP,80H
+	LD A,0FFH
+	LD (BIGLOG),A		;Clear local stack
+
+	IF VFC
+	IN A,(VSWICH)		;Back to VFC video
+	ENDIF
+
+	LD HL,TRKA
+	LD B,NDRV5+1
+INITRK:	LD (HL),0FFH		;Initialise track map and drive log
+	INC HL
+	DJNZ INITRK
+	LD A,(DEFDRI)		;Save default drive
+	LD (DDNO),A
+	LD A,1			;Say read system tracks
+	CALL DBOOT		;Read CP/M from system track
+	JR NZ,WBOOT		;Error
+	LD HL,(BDOS16+1)	;Check for correct system
+	LD DE,BDOS16+11
+	OR A
+	SBC HL,DE
+	JR Z,GOCPM		;Correct system
+	LD HL,WRGSYS
+	CALL PMSG
+	CALL CONIN
+	JR WBOOT
+GOCPM:	CALL WBOOT1		;Initialise page 0 and I/O
+	JP CCP16+3		;Jump into CCP (skip auto run)
+
+;Wrong system message
+WRGSYS:	DEFB CR,LF,7,"Wrong System/Size - Press any Key",0
+	
+;Cold boot enters here
+BOOTB:	IF WINI
+;Write CCP+BDOS to Winchester
+	XOR A			;Say write system tracks
+	CALL DBOOT
+	JR NZ,BOOTB		;Error try again
+	ELSE
+	CALL CLEAN		;Tidy up 2797
+	ENDIF
+	CALL WBOOT1
+	JP CCP16		;Jump into CCP
+
+;Initialise page 0 and I/O
+WBOOT1:	LD A,0C3H		;Jump to warm boot
+	LD (JWBOOT),A
+	LD HL,BIOS+3
+	LD (AWBOOT),HL		;Jump to BDOS
+	LD (JBDOS),A
+	LD HL,BDOS16
+	LD (ABDOS),HL
+	LD A,(IOVAL)		;Set IOBYTE
+	LD (IOBYTE),A
+	XOR A			;Clear deblock count
+	LD H,A
+	LD L,A
+	LD (UNACNT),HL
+	LD (HSTACT),A		;Clear host buffer flag
+	LD HL,DMA		;Set default DMA
+	LD (DMAADR),HL
+;Patch BDOS for internal character store
+	LD HL,BDOSC
+	LD (BIOS-0D04H),HL
+	LD (BIOS-0CDCH),HL
+	LD (BIOS-0CBDH),HL
+
+	IF VFC
+	LD HL,PRGTAB
+	LD (PRGKEY),HL		;Internal programable key table
+	LD HL,STATE1
+	SET 4,(HL)		;Enable it
+	IF MYBIT
+	LD A,"E"+40H		;Change edit character
+	LD (EDCHR),A
+	ENDIF
+	ENDIF
+
+;Restore current default drive
+WBOOT7:	LD A,(DDNO)
+	LD C,A			;Store drive and user
+	AND 0FH			;Remove user number
+	CP NDRVS		;Check drive in range
+	LD A,C
+	JR C,GDEF		;Valid
+;Permit vdrive if it exists
+	LD A,(VDSM)
+	OR A
+	JR Z,GDEF		;Set to drive A, no drive P
+	LD A,C			;Recover drive
+	CP VDRIVE		;Allow drive vdrive
+	JR Z,GDEF		;Return if OK
+	XOR A			;All else failing default to A
+GDEF:	LD (DEFDRI),A
+	LD C,A			;Take drive to CCP
+	RET
+
+	SUBTTL IO Dispatcher
+	PAGE
+;***************************
+;*	IO DISPATCHER      *
+;***************************
+CONST:	LD B,1			;Shift number
+	CALL DISPAT
+	DEFW SINST		;Serial input status
+	DEFW KYBDST		;Main keyboard input
+	DEFW SINST		;Serial input status
+	DEFW SINST		;Serial input status
+
+CONIN:	LD B,1			;Shift number
+	CALL DISPAT
+	DEFW SERIN		;Serial input, parity stripped
+	DEFW KEYBD		;Main keyboard input
+	DEFW SIN		;Serial input
+	DEFW SIN		;Serial input, 8 bit
+
+CONOUT:	LD B,1			;Shift number
+	CALL DISPAT
+	DEFW SROUT		;Serial output, User parity
+	DEFW VIDEO		;Main video output
+	DEFW SOUTH		;Serial output, No parity, With handshake
+	DEFW SOUT		;Serial output
+
+READER:	LD B,7			;Shift number
+	CALL DISPAT
+	DEFW SERIN		;Serial input, parity stripped
+	DEFW SIN		;Serial input, 8 bit
+	DEFW SERIN		;Serial input, parity stripped
+	DEFW SERIN		;Serial input, parity stripped
+
+PUNCH:	LD B,5			;Shift number
+	CALL DISPAT
+	DEFW PUNE		;Serial output, Parity even
+	DEFW SOUT		;Serial output, 8 bit
+	DEFW PUNO		;Serial output, Parity odd
+	DEFW SROUT		;Serial output, User parity
+
+LISTST:	LD B,3			;Shift number
+	CALL DISPAT
+	DEFW SOUTST		;Serial output status, No handshake
+	DEFW READY		;Main video always ready
+	DEFW LPTST		;Serial output status, With handshake
+	DEFW PARST		;Parallel output status
+
+LIST:	CALL CKCS		;Handle FF if required
+	LD B,3			;Shift number
+	CALL LSTOUT
+	JP CRDLY		;CR delay if required
+
+LSTOUT:	CALL DISPAT
+	DEFW SROUT		;Serial output, No handshake, User parity
+	DEFW VIDEO		;Main video output
+	DEFW SROUTH		;Serial output, With handshake, User parity
+	DEFW PARALL		;Parallel output
+
+;Go to assigned routine
+DISPAT:	LD A,(IOBYTE)		;Get IOBYTE
+SHIFTI:	RLCA
+	DJNZ SHIFTI		;Assignment to bits 1 and 2
+	AND 00000110B		;Mask required bits
+	LD E,A
+	LD D,0
+	POP HL			;Point to assignment table
+	ADD HL,DE		;Add into table
+	LD A,(HL)
+	INC HL
+	LD H,(HL)		;Address to HL
+	LD L,A
+	JP (HL)			;Go to routine
+
+	SUBTTL IO Assignment Table
+	PAGE
+;*********************************
+;*	IO assignment table      *
+;*********************************
+
+
+
+
+
+
+	SUBTTL High Level IO
+	PAGE
+;****************************
+;*	CONSOLE STATUS      *
+;****************************
+KYBDST:	IF NKBD OR IKBD
+	LD A,(EDIND)		;Edit buffer empty?
+	OR A
+	JP NZ,READY		;Show ready
+	ENDIF
+
+	JP SCAN
+
+;**********************************
+;*	CONSOLE INPUT DEVICE      *
+;**********************************
+SERIN:	CALL SIN
+	AND 7FH			;Strip parity
+	RET			;Normal, so return char
+
+KEYBD:	IF VKBD
+
+	JP BLINK
+
+	ELSE
+	LD A,(EDIND)		;Edit buffer empty?
+	OR A
+	JR Z,BUFMT
+	LD HL,EDBUF-1		;Get char from buffer
+	LD E,A
+	LD D,0
+	ADD HL,DE
+	LD A,(HL)		;Get character
+	CP CR
+	JR NZ,CONIN2
+	XOR A			;End of buffer
+	LD (EDIND),A
+	LD A,CR
+	RET
+
+CONIN2:	LD HL,EDIND		;Next edit position
+	INC (HL)
+	RET	
+
+BUFMT:	LD A,(FED)		;Fixed edit mode ?
+	OR A
+	JR NZ,FIXED
+	CALL BLINK		;Get input character
+;Character has been obtained from console input
+	LD HL,CHED		;Edit mode ?
+	CP (HL)
+	RET NZ			;Normal character
+
+;Obtain edit buffer
+NORMED:	CALL BLINKE		;Normal edit cursor
+	JR TSTCHR
+FIXED:	CALL BLINKF		;Fixed edit cursor
+TSTCHR:	CP CC			;Return if ^C
+	RET Z
+CIED4:	CP CONS			;Return if ^S
+	RET Z
+CIED5:	LD HL,CHED		;Fixed edit ?
+	CP (HL)
+	JR NZ,NOCHNG
+	LD A,(FED)		;Test if already fixed
+	OR A
+	JR Z,SETFIX
+	XOR A
+	LD (FED),A		;Clear fixed edit mode
+	LD A,CR			;Return with CR
+	RET
+SETFIX:	LD A,0FFH		;Set fixed edit mode
+	LD (FED),A
+	JR FIXED		;Loop until CR
+;Put character on video
+NOCHNG:	CALL CRTA		;Output
+	CP CR			;Loop until CR
+	JR Z,EDOVER		;CR terminates
+	LD A,(FED)		;Edit mode ?
+	OR A
+	JR NZ,FIXED		;Fixed
+	JR NORMED		;Normal
+;Editing finished
+EDOVER:	LD B,VIDWID+1		;Clear buffer
+	LD HL,EDBUF
+FILBUF:	LD (HL),CR
+	INC HL
+	DJNZ FILBUF
+
+;Get the cursor line
+	CALL VDUIL
+	LD DE,EDBUF
+
+	IF VFC
+GETLIN:	LD HL,KBDST
+	CALL VFCENT		;See if there is a character to be returned
+	JR Z,STRIP
+	LD HL,KBDIN
+	CALL VFCENT		;Get the character to be returned
+	ENDIF
+
+	IF IVC
+GETLIN:	CALL VDUIC
+	ENDIF
+
+	LD (DE),A
+	INC DE
+	CP CR
+	JR NZ,GETLIN
+
+;Strip unwanted characters, VFC does this
+STRIP:	LD A,1			;Remove prompts
+	LD (EDIND),A		;Start position
+
+	IF IVC
+;Look for CP/M prompts
+	LD A,(EDBUF+1)		;Test for CP/M prompt position 2
+	CP ">"
+	LD A,3
+	JR Z,PROMPT
+	LD A,(EDBUF+2)		;Test for CP/M prompt position 3
+	CP ">"
+	LD A,4
+	JR Z,PROMPT
+	LD A,(EDBUF+3)		;Test for CP/M prompt position 4
+	CP ">"
+	LD A,5
+	JR Z,PROMPT
+;Look for utility prompts
+	LD A,(EDBUF)
+	LD B,A
+	LD HL,PRMTAB
+NXTPRM:	LD A,(HL)
+	INC HL
+	OR A
+	JR Z,ENDPRM		;End of prompt table
+	CP B
+	JR NZ,NXTPRM		;Search all of table
+UTLPRM:	LD A,2
+PROMPT:	LD (EDIND),A		;New start position
+	JR ENDPRM
+
+PRMTAB:	DEFB "*-.#:",0		;Position 1 prompts
+	ENDIF
+
+ENDPRM:	LD A,0FFH		;Suppress output
+	LD (EDSUP),A
+	LD A,CX			;Delete CP/M input buff
+	RET
+
+;Edit workspace
+EDIND:	DEFB 0			;Edit buffer position, 0 = Empty
+EDSUP:	DEFB 0			;Suppress output, FF = Suppress
+FED:	DEFB 0			;Fixed edit ind, FF = Fixed
+
+;Edit buffer
+EDBUF:	DEFS VIDWID+1,0
+
+	ENDIF
+
+;***********************************
+;*	CONSOLE OUTPUT DEVICE      *
+;***********************************
+VIDEO:	IF NKBD OR IKBD
+;Test if console output is permitted
+	LD A,(EDIND)
+	OR A
+	RET NZ			;Ignore output if edit
+	LD A,(EDSUP)		;Test for suppression
+	OR A
+	JR Z,CONO
+	LD A,C			;Clear suppression at
+	CP CR			; first CR after edit
+	RET NZ			; buffer is empty
+	XOR A
+	LD (EDSUP),A
+	ENDIF
+
+CONO:	JP CRTC			;Send character in C to video
+
+;**************************
+;*	PUNCH DEVICE      *
+;**************************
+;Serial output, Parity even
+PUNE:	CALL PARITE
+	JP SOUT
+
+;Serial output, Parity odd
+PUNO:	CALL PARITO
+	JP SOUT
+
+;*************************
+;*	LIST STATUS      *
+;*************************
+;Serial with handshake
+LPTST:	CALL SHKOUT
+	RET NC			;Not ready
+	JP SOUTST
+
+;*************************
+;*	LIST DEVICE      *
+;*************************
+;Serial output, User parity, No handshake
+SROUT:	CALL PARIT		;Set parity
+	JP SOUT
+
+;Serial output, User parity, With handshake
+SROUTH:	CALL PARIT		;Set parity
+	JP SOUTH
+
+	SUBTTL Low Level IO
+	PAGE
+;***********************
+;*	SERIAL IO      *
+;***********************
+;Serial input
+SIN:	CALL SINST
+	JR Z,SIN		;Wait for character
+	IN A,(UARTD)
+	RET
+
+;Serial input status, return C if char available
+SINST:	IN A,(UARTS)
+	IF NAS
+	RLA			;Test bit 7
+	ELSE
+	RRA			;Test bit 0
+	ENDIF
+	JR C,READY		;Available
+	JR NREADY
+
+;Serial output handshaking
+SOUTH:	CALL SHKOUT		;Wait for handshake
+	JR Z,SOUTH
+;Serial output no handshaking
+SOUT:	CALL SOUTST
+	JR Z,SOUT		;Wait until free
+	LD A,C
+	OUT (UARTD),A
+	RET
+
+;Check serial handshake output
+SHKOUT:	IN A,(PHAND)		;Check handshake
+	IF NAS
+	RLA			;Test bit 7
+	JR NC,NREADY	
+	ELSE
+	BIT 4,A			;Test CTS
+	JR Z,NREADY
+	ENDIF
+	JR READY
+
+;Serial output status, return 0 busy 0FFH free
+SOUTST:	IN A,(UARTS)		;Check serial port
+	IF NAS
+	BIT 6,A
+	ELSE
+	BIT 5,A
+	ENDIF
+	JR Z,NREADY
+READY:	XOR A			;Free, return 0FFH NZ C
+	DEC A
+	SCF
+	RET
+NREADY:	XOR A			;Busy, return 00 Z NC
+	RET
+
+;Set parity if required
+PARIT:	LD A,(PARITY)
+	SRL A
+	RET NC			;No parity
+	JR NZ,PARITE		;Parity even
+;Set 'C' with parity odd
+PARITO:	LD A,C
+	OR A
+	RET PO
+	JR SETPAR
+;Set `C' with PARITY EVEN
+PARITE:	LD A,C
+	OR A
+	RET PE
+SETPAR:	XOR 80H
+	LD C,A
+	RET
+
+;Character sent delay if CR
+CRDLY:	LD A,C
+	AND 7FH			;Strip parity
+	CP CR			;CR ?
+	RET NZ			;No
+	LD A,(CRRET)		;Check for carriage return delay
+	OR A
+	RET Z			;No delay
+	LD B,A
+DELS:	LD A,10			;10ms
+	CALL DELAY		;Do it
+	DJNZ DELS
+	RET
+
+;*****************************
+;*	PARALLEL OUTPUT      *
+;*****************************
+PARALL:	CALL PARST
+	JR Z,PARALL
+	LD A,C
+	OUT (PDATB),A		;Output character
+STROBE:	LD A,0FDH		;Strobe
+	OUT (PDATA),A		;Strobe low
+	NOP
+	NOP
+	LD A,-1
+	OUT (PDATA),A		;Strobe high
+	RET
+
+;Parrallel status
+PARST:	IN A,(PDATA)		;Read Status
+	RRCA
+	JR C,NREADY
+	JR READY
+
+;************************
+;*	BLINK VKBD      *
+;************************
+	IF VKBD
+;Input keyboard character
+BLINK:	PUSH HL
+	LD HL,KBDIN
+	JP VFCCOM
+	ENDIF
+
+;************************
+;*	BLINK IKBD      *
+;************************
+	IF IKBD
+BLINKE:	LD DE,CURE
+	JR DOCUR
+BLINKF:	LD DE,CURF
+	JR DOCUR
+BLINK:	LD DE,CURN
+DOCUR:	CALL CURON
+	LD A,ESC		;Get character
+	CALL CRTA
+	LD A,"K"
+	CALL CRTA
+	CALL VDUIC		;Get the returned character
+	PUSH AF
+	CALL CUROFF
+	POP AF
+	RET
+	ENDIF
+
+	IF NKBD
+;****************************
+;*	BLINK NKBD/VFC      *
+;****************************
+	IF VFC
+BLINKE:	LD DE,CURE
+	JR DOCUR
+BLINKF:	LD DE,CURF
+	JR DOCUR
+BLINK:	LD DE,CURN
+DOCUR:	CALL CURON
+WAITC:	CALL SCAN
+	JR NC,WAITC
+	CALL CUROFF
+	XOR A
+	LD (LCIND),A
+	LD A,(LCHAR)
+	RET
+	ENDIF
+
+;****************************
+;*	BLINK NKBD/IVC      *
+;****************************
+	IF IVC
+BLINKE:	LD DE,CURE
+	JR DOCUR
+BLINKF:	LD DE,CURF
+	JR DOCUR
+BLINK:	LD DE,CURN
+DOCUR:	CALL CURON
+WAITC:	CALL SCAN
+	JR NC,WAITC
+	CALL CUROFF
+	XOR A
+	LD (LCIND),A
+	LD A,(LCHAR)
+	RET
+	ENDIF
+
+	ENDIF
+
+	IF IVC OR (VFC AND NKBD)
+;Turn cursor off
+CUROFF:	LD DE,CURX
+;Turn cursor on
+CURON:	PUSH AF
+	LD A,ESC		;Define cursor
+	CALL CRTA
+	LD A,"Y"
+	CALL CRTA
+	LD A,D
+	CALL CRTA
+	LD A,E
+	CALL CRTA
+	POP AF
+	RET
+
+;Prepare to get line
+VDUIL:	LD A,ESC
+	CALL CRTA
+	LD A,"Z"
+	CALL CRTA
+	RET
+
+	ENDIF
+
+	IF IVC
+;Input a character
+VDUIC:	IN A,(PVDUS)		;Check status
+	RLA
+	JR C,VDUIC
+	IN A,(PVDUD)		;Input character
+	RET
+
+	ENDIF
+
+	IF VKBD
+;**************************
+;*	VFC KEYBOARD      *
+;**************************
+;Get VFC keyboard status
+SCAN:	PUSH HL
+	LD HL,KBDST
+	JP VFCCOM
+	ENDIF
+
+	IF IKBD
+;**************************
+;*	IVC KEYBOARD      *
+;**************************
+SCAN:	LD A,ESC		;Test for character
+	CALL CRTA
+	LD A,"k"
+	CALL CRTA
+	CALL VDUIC
+	OR A
+	JP Z,NREADY
+	JP READY
+	ENDIF
+
+	IF NKBD
+;*****************************
+;*	NASCOM KEYBOARD      *
+;*****************************
+;Repeat keyboard routine
+SCAN:	LD A,(LCIND)		;Already got char?
+	OR A
+	JP NZ,READY
+	CALL KBD
+	JR NC,RK2
+;Key pressed
+	LD HL,(KLONG)
+	LD (KCNT),HL
+	JR CFOUND
+;Key not pressed
+RK2:	LD HL,(KCNT)
+	DEC HL
+	LD (KCNT),HL		;Decrement key count
+	LD A,H
+	OR L
+	JP NZ,NREADY		;Not 0
+;Test and clear table
+	LD HL,KMAP+1
+	LD BC,0800H
+;Set up mask in D
+RK3:	LD D,0FFH
+	LD A,L
+	CP LOW KMAP+5
+	JR NZ,RK5
+	LD D,0BFH
+RK5:	CP LOW KMAP+8
+	JR NZ,RK6
+	LD D,0C7H
+;Test for key down
+RK6:	LD A,(HL)
+	AND D
+	JR Z,RK7
+	LD C,1
+;Clear keys down
+	LD A,D
+	CPL
+	AND (HL)
+	LD (HL),A
+;Next row
+RK7:	INC HL
+	DJNZ RK3
+	LD A,C
+	OR A
+	JP Z,NREADY
+;Repeat speed
+	LD HL,(KSHRT)
+	LD (KCNT),HL
+	CALL KBD		;Pick up key
+
+CFOUND:	LD (LCHAR),A		;Store character
+	LD A,0FFH
+	LD (LCIND),A		;Flag available
+	JP READY
+
+;Keyboard routine
+;Reset KBD counter
+KBD:	LD A,(PORT0)
+	XOR 2
+	OUT (KBDP),A
+	LD A,(PORT0)
+	NOP		;Delay
+	NOP
+	OUT (KBDP),A
+	NOP		;Delay
+	NOP
+;Store row 0 in map
+	LD HL,KMAP
+	IN A,(KBDP)
+	CPL
+	LD (HL),A
+
+;Scan 8 rows
+	LD B,8
+;Increment KBD counter
+KSC1:	LD A,(PORT0)
+	XOR 1
+	OUT (KBDP),A
+	LD A,(PORT0)
+	OUT (KBDP),A
+	NOP
+	NOP
+	INC HL
+;Get row status
+	IN A,(KBDP)
+	CPL
+	AND 7FH
+	LD D,A
+;If map diffrent find out why
+	XOR (HL)
+	JR NZ,KSC2
+;Scan next row
+KSC1A:	DJNZ KSC1
+;No key pressed
+KSC8:	OR A
+	RET
+
+;Wait to debounce
+KSC2:	XOR A
+KSC3:	DEC A
+	PUSH AF
+	POP AF
+	PUSH AF
+	POP AF
+	JR NZ,KSC3
+;Get row again
+	IN A,(KBDP)
+	CPL
+	AND 7FH
+	LD E,A
+;E = New state
+	LD A,D
+;A = Old state
+	XOR (HL)
+;A = Changes
+; Find changed bit
+	LD C,-1
+	LD D,0
+	SCF
+KSC4:	RL D
+	INC C
+	RRA
+	JR NC,KSC4
+;C = Column changed
+;D = Mask with 1 at change
+	LD A,D
+	AND E
+	LD E,A
+;E = New state, masked by change
+; If map state and new state equal, ignore
+	LD A,(HL)
+	AND D
+	CP E
+	JR Z,KSC1A
+;Update map
+	LD A,(HL)
+	XOR D
+	LD (HL),A
+;If new state is 0, then key released,
+; so ignore it
+	LD A,E
+	OR A
+	JR Z,KSC1A
+
+;VALUE = SRRRRCCC
+; S    = 1 If shift
+; RRRR = 9 - Row number
+; CCC  = Column number
+	LD A,(KMAP)
+	AND 10H
+	OR B
+	ADD A,A
+	ADD A,A
+	ADD A,A
+	OR C
+
+;Search table
+	CALL KSE
+	JR Z,KSC5
+;Check for unshifted
+	AND 7FH
+	CALL KSE
+	JR NZ,KSC8
+;Set A to ASCII value
+KSC5:	LD A,C
+
+;Support lower case
+	LD HL,KMAP
+	CP "A"
+	JR C,K20
+	CP "Z"+1
+	JR NC,K20
+;It is a letter
+	BIT 4,(HL)
+;1 = Shift down
+	JR Z,K7
+	CCF
+;Test option
+K7:	LD A,(KOPT)
+	BIT 0,A
+	LD A,C
+	JR Z,K8
+	CCF
+K8:	JR C,K20
+	ADD A,20H
+K20:
+
+;@ key
+;If @ and shift down, then normal
+	CP "@"
+	JR NZ,K30
+	BIT 4,(HL)
+	JR NZ,K35
+
+	IF N1KEY
+;If N1 and @ entered, ignore
+K30:	CP "@"
+	JR Z,K37
+;If N1 and @ down, flip case or make control
+	BIT 5,(HL)
+	JR Z,K35	;@ not down, normal
+	CP CR
+	JR Z,K36	;Flip upper/lower case
+	JR K38		;Make control
+	
+	ELSE
+;If not N1 and @ entered, make into TAB
+K30:	CP "@"
+	JR NZ,K35
+	LD A,TAB
+	ENDIF
+
+;Control key
+K35:	BIT 3,(HL)
+	JR Z,K40
+	CP CR
+	JR NZ,K38
+;Flip upper/lower case
+K36:	LD A,(KOPT)
+	XOR 01H
+	LD (KOPT),A
+K37:	OR A	;Ignore input
+	RET
+;Make control character
+K38:	CP 60H
+	JR C,K39
+	SUB 20H
+K39:	XOR 40H
+
+;Graphic key
+K40:	LD HL,KMAP+5
+	BIT 6,(HL)
+	JR Z,K60
+	XOR 80H
+
+K60:	SCF
+	RET
+
+;Search keyboard table
+KSE:	LD HL,KTABE-1
+	LD BC,KTABE-KTAB
+	CPDR
+	RET
+
+
+;Keyboard table
+KTAB:	DEFB 0FFH,0FFH,0FFH,0FFH	;00
+	DEFB 0FFH,0FFH,0FFH,0FFH	;04
+	DEFB 008H,0FFH,08EH,0C6H	;08 BS,LF,SU
+	DEFB 088H,009H,0B6H,0FFH	;0C CS,CR,SD
+	DEFB 0FFH,0FFH,0FFH,0FFH	;10
+	DEFB 0FFH,0FFH,0BEH,0AEH	;14 SL,SR
+	DEFB 0FFH,00EH,0FFH,089H	;18 CH,ESC
+	DEFB 03EH,02EH,046H,036H	;1C LRUD
+	DEFB 014H,09CH,09BH,0A3H	;20   "#
+	DEFB 092H,0C2H,0BAH,0B2H	;24 $%&'
+	DEFB 0AAH,0A2H,098H,0A0H	;28 ()*+
+	DEFB 029H,00AH,021H,019H	;2C ,-./
+	DEFB 01AH,01CH,01BH,023H	;30 0123
+	DEFB 012H,042H,03AH,032H	;34 4567
+	DEFB 02AH,022H,018H,020H	;38 89:;
+	DEFB 0A9H,08AH,0A1H,099H	;3C <=>?
+	DEFB 00DH,02CH,041H,013H	;40 @ABC
+	DEFB 03BH,033H,043H,010H	;44 DEFG
+	DEFB 040H,02DH,038H,030H	;48 HIJK
+	DEFB 028H,031H,039H,025H	;4C LMNO
+	DEFB 01DH,024H,015H,034H	;50 PQRS
+	DEFB 045H,035H,011H,02BH	;54 TUVW
+	DEFB 044H,03DH,03CH,01EH	;58 XYZ[
+	DEFB 09EH,016H,09AH,096H	;5C \]^_
+KTABE:
+;Nascom keyboard workspace
+PORT0:	DEFB 0			;Copy of PORT 0
+KMAP:	DEFS 9,0		;Keyboard status map (NKBD)
+LCHAR:	DEFB 0			;Last character scanned
+LCIND:	DEFB 0			;Zero if no char scanned
+KCNT:	DEFW 0			;Repeat counter
+	ENDIF
+
+	IF VFC
+;***************************
+;*	OUTPUT TO VFC      *
+;***************************
+;Send character in A to CRT
+CRTA:	PUSH AF
+	LD C,A
+	CALL CRTC
+	POP AF
+	RET
+
+;Send character in C to CRT
+CRTC:	PUSH HL
+	LD HL,VIDOUT
+	JP VFCCOM
+	ENDIF
+
+	IF IVC
+;***************************
+;*	OUTPUT TO IVC      *
+;***************************
+CRTC:	LD A,C
+;Output a character
+CRTA:	PUSH AF
+VDU1:	IN A,(PVDUS)	;Check status
+	RRA
+	JR C,VDU1
+	POP AF
+	OUT (PVDUD),A	;Output character
+	RET
+	ENDIF
+
+	SUBTTL IO Utilities
+	PAGE
+;**************************
+;*	IO UTILITIES      *
+;**************************
+
+	IF VFC
+;*********************************
+;*	VFC COMMON ROUTINES      *
+;*********************************
+VFCENT:	PUSH HL
+;Common VFC entry routine
+VFCCOM:	PUSH DE
+	PUSH BC			;Save registers
+	PUSH IX
+	CALL GOVFC
+	POP IX
+	POP BC
+	POP DE
+	POP HL
+	SCF
+	RET
+
+GOVFC:	CALL BIGSTK		;Make sure of stack position
+	LD IX,VFCW		;Initialise IX
+	LD DE,VFCRET		;Return address after EPROM
+	PUSH DE			;Set up for return
+
+	IF G813
+	PUSH BC
+	LD BC,VFCLOC+0FEH	;B=VFC location C=G813 mapper port
+	LD A,10H		;Any non 0 page will do
+	OUT (C),A		;Take out G813 RAM
+	POP BC
+	ENDIF
+
+	LD A,HIGH VFCLOC	;Location for paging in VFC
+	OR (IX+VFCST-VFCW)	;Current VFC status
+	XOR EVMASK		;Set VRAM and EPROM enable bits
+	OUT (CNTRL),A		;Bring in VFC
+	AND 0F0H		;Mask 4k SLOT
+	LD D,A
+	LD E,0			;DE = address offset
+	ADD HL,DE
+	JP (HL)
+;Goto EPROM routine
+;DE holds address offset, C holds output char if video
+
+;VFC EPROM returns here
+VFCRET:	PUSH AF			;Save returned character and flags
+
+	IF G813
+	LD BC,VFCLOC+0FEH	;B=VFC location C=G813 mapper port
+	LD A,HIGH VFCLOC/256	;Original slot page 0
+	OUT (C),A		;Bring back G813 RAM
+	ENDIF
+
+	LD A,(LEAVE)		;Where to leave VRAM
+	OR (IX+VFCST-VFCW)	;VFC status with EPROM and VRAM off
+	LD B,A
+	POP AF
+	LD C,CNTRL		;VFC control port
+	OUT (C),B		;VFC out
+	RET			;Via RETSP
+
+	ENDIF
+
+;Output a string til 0
+PMSG:	LD C,(HL)
+	LD A,C
+	OR A
+	RET Z
+	PUSH HL
+	CALL CONOUT
+	POP HL
+	INC HL
+	JR PMSG
+
+;Routine to support automatic form feed
+; and perforation skip
+CKCS:	LD A,(PLPAG)		;Test if FF handling required
+	OR A
+	RET Z			;None required
+	LD A,C
+	CP LF
+	JR Z,LF1		;Handle line feed
+	CP CS
+	RET NZ			;Ignore if not FF or LF
+;Handle FF
+	POP HL			;Get return address
+	LD (LSTCL),HL		;Save return address
+	CALL CR1		;Do a CR first
+CS1:	LD A,(LCNT)		;Get line count
+	OR A
+	JR Z,SKIPS		;Perforation skip
+	DEC A			;Next line
+	LD (LCNT),A
+	CALL FEED1		;Do LFs
+	JR CS1			;Loop until end of page
+;Handle line feed
+LF1:	POP HL			;Get return address
+	LD (LSTCL),HL		;Save return address
+	CALL FEED1		;Do LF
+	LD HL,LCNT		;Decrement
+	DEC (HL)		;.. line counter
+	RET NZ			;Not at end of page
+;Perforation skip
+SKIPS:	LD A,(LSKIP)		;Lines to skip
+	OR A			;Could be none
+	JR Z,CKCSX
+	LD B,A
+SKIPS1:	PUSH BC
+	CALL FEED1
+	POP BC
+	DJNZ SKIPS1
+CKCSX:	LD A,(PLPAG)		;Reset line counter
+	LD (LCNT),A
+	RET
+;Send LF through the calling routine
+FEED1:	LD C,LF
+	LD HL,(LSTCL)		;Caller address
+	JP (HL)
+;Send CR through the calling routine
+CR1:	LD C,CR
+	LD HL,(LSTCL)		;Caller address
+	JP (HL)
+
+	SUBTTL Virtual Disk Routines
+	PAGE
+;***********************************
+;*	VIRTUAL DISK ROUTINES      *
+;***********************************
+;Read virtual disk
+VR:	CALL DSKBUF		;Transfer VDISK to VBUFF
+	CALL DMABUF		;Transfer VBUFF to DMA
+	JR VOUT
+
+;Write virtual disk
+VW:	CALL DMABUF		;Transfer DMA to VBUFF
+	CALL DSKBUF		;Transfer VBUFF to VDISK 
+VOUT:	XOR A			;No errors
+	RET
+
+;Move data between VDISK and VBUFF
+	IF MAP32
+DSKBUF:	LD A,(CPMTRK)		;Get track
+	LD C,A
+	AND 0F8H		;Mask bits 3-7
+	RRCA			;Convert to 32K page
+	RRCA
+	RRCA
+	ADD A,0C2H
+	OUT (PPAG),A		;Select page
+;VDISK page is selected
+	LD A,(CPMREC)		;Get sector
+	LD L,A			;Convert to address
+	LD H,0
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	LD A,C			;Track bits 0-2 specify
+	AND 07H			; the 4K block
+	RLCA
+	RLCA
+	RLCA
+	RLCA
+	ADD A,H			;Assemble the address
+	LD H,A
+;HL points to VDISK record
+	LD DE,VBUFF
+	CALL MOVEIT		;Do transfer
+;Reselect DMA page
+	XOR A
+	OUT (PPAG),A		;Normal page
+	RET
+	ENDIF
+
+	IF MAP4
+DSKBUF:
+;Move VFC out
+	IF VFC
+	LD A,(VFCST)
+	OUT (CNTRL),A		;Must get shot of VFC
+	ENDIF
+
+	LD A,(CPMTRK)		;Get track (4K)
+	ADD A,10H		;Convert to page
+	LD BC,PPAG
+	OUT (C),A		;Select page
+;VDISK track is selected
+	LD A,(CPMREC)		;Get sector
+	LD L,A			;Convert to address
+	LD H,0
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+	ADD HL,HL
+;HL points to VDISK record
+	LD DE,VBUFF
+	CALL MOVEIT		;Do transfer
+;Reselect DMA page
+	LD BC,PPAG
+	XOR A
+	OUT (C),A		;Normal page
+
+	IF VFC
+	LD A,(LEAVE)		;Where to leave VRAM
+	LD B,A
+	LD A,(VFCST)		;VFC status with EPROM and VRAM off
+	OR B			;Put on address and VRAM state
+	OUT (CNTRL),A		;VFC restored
+	ENDIF
+
+	RET
+	ENDIF
+
+;Move data between DMA and VBUFF
+DMABUF:	LD HL,VBUFF
+	LD DE,(DMAADR)		;DMA transfer location
+MOVEIT:	LD BC,RECSIZ
+	LD A,(READOP)		;Read/write ?
+	OR A
+	JR NZ,VMOVE
+	EX DE,HL		;Swop for write
+VMOVE:	LDIR
+	RET
+
+	SUBTTL Sector Deblocking
+	PAGE
+;*****************************************************
+;*        BDOS constants on entry to write           *
+;*****************************************************
+WRALL	EQU	0		;write to allocated
+WRDIR	EQU	1		;write to directory
+WRUAL	EQU	2		;write to unallocated
+
+;Home the selected disk
+HOME:	LD A,(HSTWRT)		;check for pending write
+	OR A
+	JR NZ,HOMED
+	LD (HSTACT),A		;clear host active flag
+HOMED:	LD BC,0			;Drop thru' to set track
+
+;Set track given by registers BC
+SETTRK:	LD (CPMTRK),BC		;track to use
+	RET
+
+;Select disk
+SELDSK:	LD HL,0			;Default error
+	LD A,(VDSM)
+	OR A			;Test for vdisk
+	LD A,C
+	JR Z,NOTVDR		;No vdisk
+	CP VDRIVE		;Virtual drive?
+	JR NZ,NOTVDR		;No see if it's standard
+	LD HL,DPHV		;Return virtual DPH
+	JR SELRET
+
+NOTVDR:	CP NDRVS		;Valid disk No. ?
+	RET NC			;Return error if not
+	LD B,A
+	INC B			;Make drive non-zero
+	LD DE,16		;DPH length
+	LD HL,DPBASE-16		;Point at table
+GODPH:	ADD HL,DE		;Compute DPH address
+	DJNZ GODPH
+SELRET:	LD (CPMDSK),A		;CP/M disk
+	RET
+
+;Set sector given by register C
+SETSEC:	LD A,C
+	LD (CPMREC),A		;sector to seek
+	RET
+
+;Set dma address given by BC
+SETDMA:	LD(DMAADR),BC		;Data transfer address
+	RET
+
+;Translate sector number BC
+SCTRAN:	LD H,B			;Use BC as default
+	LD L,C
+	LD A,D
+	OR E			;Translate?
+	RET Z			;No
+	EX DE,HL
+	ADD HL,BC		;Add into trans table
+	LD L,(HL)		;Sector to HL
+	LD H,0
+	RET
+
+;************************************************
+;*		READ one CP/M record		*
+;************************************************
+;read the selected CP/M sector
+READ:	CALL BIGSTK
+	LD A,1			;Read operation
+	CALL SETBUF		;Set DMA address
+	JP Z,VR			;Vdrive read
+	LD A,WRUAL
+	LD (WRTYPE),A		;treat as unalloc
+	JR ALLOC		;to perform the read
+
+;************************************************
+;*		WRITE one CP/M record		*
+;************************************************
+;Write the selected CP/M sector
+WRITE:	CALL BIGSTK
+	XOR A			;Write operation
+	CALL SETBUF		;Set DMA address
+	JP Z,VW			;Vdrive write
+	LD A,C			;write type in c
+	LD (WRTYPE),A
+	CP WRUAL		;write unallocated?
+	JR NZ,CHKUNA		;check for unalloc
+
+;Write to unallocated, set parameters
+	LD A,BLKSIZ/RECSIZ	;next unalloc recs
+	LD (UNACNT),A
+
+;Shift CP/M request to unallocated request
+	LD DE,UNADSK		;Shift CP/M to UNA
+	CALL SHIFT
+	DEC DE
+	LDI			;Make UNAREC CPMREC
+
+;Check for write to unallocated sector
+CHKUNA:	LD A,(UNACNT)		;any unalloc remain?
+	OR A
+	JR Z,ALLOC		;skip if not
+
+;More unallocated records remain
+	DEC A			;unacnt = unacnt-1
+	LD (UNACNT),A
+
+;Compare CP/M request against unallocated
+	LD DE,UNADSK		;Compare CP/M disk and track to UNA
+	CALL COMP3		;4 bytes
+	JR NZ,ALLOC		;Different
+	INC HL			;On to CP/M record
+	CALL COMP1		;Compare records
+	JR NZ,ALLOC
+
+;Move to next sector for future ref
+	LD HL,UNAREC
+	INC (HL)		;unarec = unarec+1
+
+	IF WINI
+	LD A,(HSTDSK)		;Check drive type
+	CP NDRVW
+	LD A,RPTW-1		;In case Winchester
+	JR C,GOTREC
+	ENDIF
+
+	LD A,RPTF-1		;Must be floppy
+GOTREC:	CP (HL)			;end of track?
+	JR NC,NOOVF		;skip if no overflow
+
+;Overflow to next track
+	LD (HL),0		;unarec = 0
+	LD HL,(UNATRK)
+	INC HL
+	LD (UNATRK),HL		;unatrk = unatrk+1
+
+;Match found, mark as unnecessary read
+NOOVF:	XOR A			;0 to accumulator
+	LD (RSFLAG),A		;rsflag = 0
+	JR RWOPER		;to perform the write
+
+;Not an unallocated record, requires pre-read
+ALLOC:	XOR A			;0 to accum
+	LD (UNACNT),A		;unacnt = 0
+	INC A			;1 to accum
+	LD (RSFLAG),A		;rsflag = 1
+
+;*****************************************************
+;*	Common code for READ and WRITE follows       *
+;*****************************************************
+;Enter here to perform the read/write
+RWOPER:	XOR A			;zero to accum
+	LD (ERFLAG),A		;no errors (yet)
+	LD A,(CPMREC)		;compute host sector
+	REPT SECSHF
+	SRL A
+	ENDM
+	LD (CPMSEC),A		;host sector to seek
+
+;Active host sector?
+	LD HL,HSTACT		;host active flag
+	LD A,(HL)
+	LD (HL),1		;always becomes 1
+	OR A			;was it already?
+	JR Z,FILHST		;fill host if not
+
+;Compare CP/M request against host buffer
+	LD DE,HSTDSK		;Compare CP/M disk and track to HST
+	CALL COMP3		;4 bytes
+	JR NZ,NOMTCH		;Different
+	CALL COMP1		;Compare sectors
+	JR Z,MATCH		;skip if match
+
+;Buffer different
+NOMTCH:	LD A,(HSTWRT)		;host written?
+	OR A
+	LD A,0			;Say write
+	CALL NZ,RWHST		;Write host buffer
+
+;May have to fill the host buffer
+FILHST:	LD DE,HSTDSK		;Shift CPM to HST
+	CALL SHIFT
+	LD A,(RSFLAG)		;need to read?
+	OR A
+	CALL NZ,RWHST		;yes, if 1, Read
+	XOR A			;0 to accum
+	LD (HSTWRT),A		;no pending write
+
+;Copy data to or from buffer
+MATCH:	LD A,(CPMREC)		;mask buffer number
+	AND SECMSK		;least signif bits
+	LD L,A			;ready to shift
+	LD H,0			;double count
+	REPT 7			;shift left 7
+	ADD HL,HL
+	ENDM
+;HL has relative host buffer address
+	LD DE,HSTBUF
+	ADD HL,DE		;hl = host address
+	LD DE,(DMAADR)		;get/put CP/M data
+	LD BC,RECSIZ		;length of move
+	LD A,(READOP)		;which way?
+	OR A
+	JR NZ,RWMOVE		;skip if read
+
+;Write operation, mark and switch direction
+	LD A,1
+	LD (HSTWRT),A		;hstwrt = 1
+	EX DE,HL		;source/dest swap
+
+;BC initially 128, HL is source, DE is dest
+RWMOVE:	LDIR			
+
+;Data has been moved to/from host buffer
+	LD A,(WRTYPE)		;write type
+	CP WRDIR		;to directory?
+	LD A,(ERFLAG)		;in case of errors
+	RET NZ			;no further processing
+
+;Clear host buffer for directory write
+	OR A			;errors?
+	RET NZ			;skip if so
+	XOR A			;0 to accum
+	LD (HSTWRT),A		;buffer written
+	CALL RWHST		;Write buffer
+	LD A,(ERFLAG)
+	RET
+
+;Set DMA buffer, and test for drive not requiring deblocking
+SETBUF:	LD (READOP),A		;Store read/write operation
+	LD HL,HSTBUF		;BIOS buffer
+	LD (HSTDMA),HL
+	LD A,(CPMDSK)
+	CP VDRIVE		;VDISK ?
+	RET
+
+;Shift CPM disk track and sector to (DE)
+SHIFT:	LD HL,CPMDSK
+	LD BC,4
+	LDIR
+	RET
+
+;Compare one more byte (HL) (DE)
+COMP1:	INC B			;Assumes B=0 on entry
+	JR COMP
+;Compare 3 bytes (DE) against (CPMDSK)
+COMP3:	LD B,3
+	LD HL,CPMDSK
+COMP:	LD A,(DE)
+	CP (HL)
+	INC HL
+	INC DE
+	RET NZ			;Return early if no compare
+	DJNZ COMP
+	RET
+
+	SUBTTL Disk Parameters
+	PAGE
+;************************************
+;*	DISK PARAMETER HEADERS      *
+;************************************
+;	DPH MACRO
+;1 Translate table, 0000 if no translation required
+;2 DPB for drive type
+;3 Drive number for DPH address label (%)
+;4 Checksum activation True or False
+
+DRVNUM	DEFL 0			;Initialise drive number
+
+DPBASE:
+	IF WINI
+	REPT NDRVW
+	DPH 0,DPBW,%DRVNUM,F	;Check vector true
+DRVNUM	DEFL DRVNUM+1
+	ENDM
+	ENDIF
+
+	REPT NDRV5
+	IF TPI96
+	DPH 0,DPB96,%DRVNUM,T	;;Check vector true
+	ELSE
+	DPH 0,DPB48,%DRVNUM,T	;;Check vector true
+	ENDIF
+DRVNUM	DEFL DRVNUM+1
+	ENDM
+
+DRVNUM	DEFL VDRIVE		;Drive P
+DPHV:	DPH 0,DPBV,%DRVNUM,F	;Check vector false
+
+;***********************************
+;*	DISK PARAMETER BLOCKS      *
+;***********************************
+;	DPB MACRO
+;1 Physical Sector size
+;2 Physical Sectors per track
+;3 Tracks per disk
+;4 CP/M allocation size
+;5 Number of directory entries
+;6 Number of system tracks
+;7 Checksum activation True or False
+;8 Label for allocation vector size
+
+	IF WINI
+DPBW:	DPB	HSTSIZ,MXSCW,MXTKW,BLKSIZ,DALLW,OFFW,F,W
+	ENDIF
+
+	IF TPI96
+DPB96:	DPB	SEC96,MXSC96,SIDES*MXTK96,BLK96,DALL96,OFF96,T,96
+	ELSE
+DPB48:	DPB	SEC48,MXSC48,MXTK48,BLK48,DALL48,OFF48,T,48
+	ENDIF
+
+DPBV:	DPB	SECV,MXSECV,MXTRKV,BLKV,DALLV,OFFV,F,V
+VDSM	EQU DPBV+5
+OFF	EQU DPBV+13
+
+	SUBTTL Read/Write CCP+BDOS
+	PAGE
+;Read/Write CCP and BDOS
+DBOOT:	LD C,A			;Save read/write
+	PUSH BC
+	CALL CLEAN		;Clean up 2797 and Xebec
+	LD HL,CCP16		;CCP load address
+	LD DE,0001H		;Start at track 0 sector 1
+	POP BC
+
+	IF WINI
+	LD A,CPMLEN/HSTSIZ	;Sectors to load
+	LD (SCOUNT),A		;Tell DCB how many sectors
+	XOR A			;Drive A
+	CALL RWSEC
+	LD A,1
+	LD (SCOUNT),A		;Reset DCB sector count
+	RET
+
+	ELSE
+
+	LD B,CPMLEN/HSTSIZ	;Sectors to load
+LDCPM:	PUSH DE
+	PUSH HL
+	PUSH BC
+	XOR A			;Logical drive A
+	CALL RWSEC		;Read sector
+	POP BC
+	POP HL
+	LD DE,HSTSIZ
+	ADD HL,DE		;Next DMA address
+	POP DE
+	RET NZ			;I/O error
+	INC E			;Next sector
+;Test for next track
+	LD A,E
+	CP SPTF			;Sectors per track
+	JR NZ,SECOK
+	LD DE,0100H		;Track 1 sector 0
+SECOK:	DJNZ LDCPM
+	XOR A			;OK
+	RET
+	ENDIF
+
+	SUBTTL WD2797 Diskette Routines
+	PAGE
+;Driver request
+HSTDSK:	DEFB 0			;Host disk number
+HSTTRK:	DEFW 0			;Host track number
+HSTSEC:	DEFB 0			;Host sector number
+
+RWFLAG:	DEFB 0			;0 if write
+HSTDMA:	DEFW 0			;Load address
+
+;Floppy track record
+TRKA:	REPT NDRV5
+	DEFB	0FFH
+	ENDM
+DRVLOG:	DEFB 0FFH
+
+;Read/Write a sector from :-
+;Logical drive (A)
+;Sector (E)
+;Track (D)
+;Into (HL)
+;C=1 read, C=0 write
+RWSEC:	LD (HSTDSK),A		;Set up logical drive
+	LD (HSTDMA),HL		;Set up DMA
+	LD HL,HSTSEC		;Set up sector
+	LD (HL),E
+	LD HL,HSTTRK		;Set up track
+	LD (HL),D
+	INC HL
+	LD (HL),0
+	LD A,C			;Get read/write flag
+
+;Read/Write to sector in HSTSEC
+;At track in HSTTRK
+;On drive in HSTDSK
+;To/From address in HSTDMA
+;A=1 Read A=0 Write
+RWHST:	LD (RWFLAG),A		;Flag read/write
+;Full retry
+FRETRY:
+;Check for Winchester
+	IF WINI
+	LD A,(HSTDSK)
+	CP NDRVW
+	JP C,RWWINI		;Go to Winchester read/write
+	ENDIF
+
+;Floppy read/write
+	LD B,8			;Up to 8 retries
+NEXTRY:	PUSH BC
+	CALL SETFLP		;Set up for floppy read/write
+	LD A,(HL)
+	INC A			;Valid track ?
+	JR NZ,ONTRAK		;Yes
+	PUSH HL			;Save track log
+	CALL WAITON		;Wait til ready
+	JR C,DERR1		;Time out
+	LD A,READID		;Read address header
+	OUT (FDCCOM),A
+RDHEAD:	IN A,(STAPRT)
+	AND 00000011B		;Wait for IRQ or READY off
+	JR Z,RDHEAD
+	IN A,(FDCDAT)		;Clear DRQ and BUSY
+	IN A,(FDCSTA)
+	AND 11111011B		;We know we've lost data
+	POP HL
+	JR Z,HDROK
+	AND 10000000B		;Ready?
+	JR NZ,DERR2		;No
+	CALL TRACK0		;Drive is at least turning
+	JR ONTRAK
+HDROK:	IN A,(FDCSEC)		;Get track
+	OUT (FDCTRK),A
+	LD (HL),A
+;Track reg is up to date, heads are loaded, motors are running
+ONTRAK:	LD B,2			;Initialise side (default 2)
+	CALL SEEK		;Get to required track
+	PUSH HL			;Save position in track map
+;Head is at the right place
+	CALL WAITON		;Wait until drives ready
+	JR C,DERR1		;Drives not ready
+	CALL RWFLOP		;All ready so do read/write
+	POP HL
+	POP BC
+	IN A,(FDCSTA)
+	OR A
+	RET Z			;All OK
+	JP M,DERR		;Motor off so don't retry
+	PUSH AF			;Save error code
+	LD A,B
+	CP 4
+	CALL Z,TRACK0		;Restore head
+	POP AF
+	DJNZ NEXTRY
+	JR DERR			;Tries exhausted
+
+;Print floppy error type and prompt for retry
+DERR1:	POP HL			;Clear stack
+DERR2:	POP BC
+DERR:	PUSH AF
+	CALL CLEAR		;Clear the 2797
+	POP AF
+	LD HL,DNR		;Find approp. message
+	RLCA
+	JR C,GOTMSG
+	LD HL,DWP
+	RLCA
+	JR C,GOTMSG
+	LD HL,WF
+	RLCA
+	JR C,GOTMSG
+	LD HL,RNF
+	RLCA
+	JR C,GOTMSG
+	LD HL,CRC
+	RLCA
+	JR C,GOTMSG
+	RLCA
+	JP C,FRETRY		;Auto retry lost data
+	LD HL,NDWF		;Shouldn't happen
+;Print Error, Drive, Track and Sector
+;Prompt for retry
+GOTMSG:	PUSH HL			;Save error type
+	LD HL,ERMSG
+	CALL PMSG		;Error header
+	POP HL
+	CALL PMSG		;Print message
+	LD HL,ONMSG
+	CALL PMSG
+	LD A,(HSTDSK)		;Get drive
+	ADD A,"A"
+	LD C,A
+DRVINC:	CALL CONOUT		;Drive code
+	LD HL,TRKMSG
+	CALL PMSG		;Track header
+	LD HL,(HSTTRK)
+	CALL PDEC		;Track number
+	LD HL,SECMSG
+	CALL PMSG		;Sector header
+	LD HL,(HSTSEC)
+	LD H,0
+	CALL PDEC		;Sector number
+	LD HL,RETRY		;Prompt reply
+	CALL PMSG
+WRONG:	CALL CONIN		;Get reply
+	CP CC			;Boot if ^C
+	JR NZ,NOTCC
+	XOR A			;Reset default drive
+	LD (DEFDRI),A
+	JP WBOOT		;Warm boot
+NOTCC:	PUSH AF
+	LD C,A
+	CALL CONOUT
+	LD HL,ERMSG+1
+	CALL PMSG
+	POP AF
+	AND 5FH			;Ensure u/c
+	CP "Y"
+	JP Z,FRETRY		;Full retry
+	CP "N"
+	JR NZ,WRONG		;Invalid reply
+	LD A,1
+	OR A			;Return NZ
+	LD (ERFLAG),A		;Inform BDOS of error
+	RET
+
+;Print binary number 0-65535 from <HL>
+PDEC:	XOR A
+	LD (LDG0),A
+	LD BC,TBL10
+	LD DE,-10000
+NEXT:	LD A,"0"-1
+PDECL:	PUSH HL
+	INC A
+	ADD HL,DE
+	JR NC,STOPL
+	INC SP
+	INC SP
+	JR PDECL
+STOPL:	PUSH DE
+	PUSH BC
+	LD C,A
+	CP "0"
+	JR NZ,NOLDG
+	LD A,(LDG0)
+	OR A
+	JR Z,ISLDG
+NOLDG:	LD (LDG0),A
+	CALL CONOUT
+ISLDG:	POP BC
+	POP DE
+NEXDIG:	POP HL
+	LD A,(BC)
+	LD E,A
+	INC BC
+	LD A,(BC)
+	LD D,A
+	INC BC
+	LD A,E
+	OR D
+	JR NZ,NEXT
+	LD A,(LDG0)
+	OR A
+	RET NZ
+	LD C,"0"
+	JP CONOUT
+
+TBL10:	DEFW -1000,-100,-10,-1,0
+LDG0:	DEFB 0
+
+;Set up for floppy read/write
+;Convert logical drive number to physical
+SETFLP:	LD A,(HSTDSK)		;Logical drive
+	SUB NDRVW		;Take off Winchesters
+	LD B,A
+	INC B			;Make B non-zero
+	LD A,80H
+MAKDRV:	RLCA
+	DJNZ MAKDRV		;Make drive code
+	OUT (DRVPRT),A		;Kick motor
+	LD HL,DRVLOG		;Previously logged in drive
+	CP (HL)			;New drive ?
+	LD (HL),A		;Save physical code
+	PUSH AF			;Save flag
+	LD HL,TRKA-1		;Point to track map
+GOTRAK:	INC HL
+	RRCA			;Drive select bit to C
+	JR NC,GOTRAK		;Get on the right track (baby)
+	LD A,(HL)
+	OUT (FDCTRK),A		;Update track reg
+	OUT (FDCDAT),A
+	LD A,SEKTRK		;Seek to current track
+	CALL SENCOM		;Load the head
+	POP AF			;Recover drive log flag
+	RET Z
+	LD A,HLDEL		;Head load delay on changing drives
+	CALL DELAY
+	RET
+
+;Step to required track
+SEEK:	PUSH HL			;Save position in track map
+	LD HL,HSTTRK		;Point to required track
+	IF TPI96
+	LD A,MAXTRK
+	NEG
+	ADD A,(HL)		;Check for side 2
+	JR C,SID2
+	LD B,0			;Side 1
+	ENDIF
+	LD A,(HL)
+SID2:	POP HL			;Recover position in track map
+	LD C,A			;Save required track
+	IN A,(FDCTRK)
+	CP C
+	LD A,C
+	RET Z			;Already at track
+	CALL SEEKIT
+	RET
+
+;Wait 1.5 secs for drive to be ready
+;Return NC if ready
+WAITON:	LD DE,1500		;Motor start up allowance (1.5secs)
+	IN A,(FDCSTA)
+	RLCA			;Look at ready bit
+	RET NC			;Ready
+	LD A,1			;1 ms delay
+	CALL DELAY
+	DEC DE			;Decrement time out
+	LD A,D
+	OR E
+	JR NZ,WAITON		;Keep waiting
+	LD A,80H		;Not ready error
+	SCF			;Signal error
+	RET
+
+;Read/write floppy
+RWFLOP:	LD A,(DRVLOG)		;Physical drive code
+	OUT (DRVPRT),A		;Keep them motors running
+	LD HL,HSTSEC		;Point to sector
+	IF NOT TPI96
+	LD A,(HL)
+	SUB SECSPS
+	JR NC,SIDE2
+	LD B,0
+	ENDIF
+	LD A,(HL)
+SIDE2:	OUT (FDCSEC),A		;Select sector
+	LD C,STAPRT
+	LD HL,(HSTDMA)		;Sector load address
+	LD A,(RWFLAG)
+	OR A			;Read or write ?
+	JR Z,WRTOP
+	LD A,RDSEC
+	OR B			;Put on side bit
+	OUT (FDCCOM),A		;Send command
+	JR RDTEST
+
+DATOUT:	IN A,(FDCDAT)		;Read byte
+	LD (HL),A		;Store buffer byte
+	INC HL
+RDTEST:	IN B,(C)		;Get flags
+	JR Z,RDTEST		;Nothings happening
+	JP M,DATOUT		;DRQ
+	RET			;Finished, either IRQ or motor off
+
+WRTOP:	LD A,WRSEC
+	OR B			;Put on side bit
+	OUT (FDCCOM),A		;Send command
+DATIN:	LD A,(HL)		;Get buffer byte
+	INC HL
+WRTEST:	IN B,(C)		;Get flags
+	JR Z,WRTEST		;Nothings happening
+	OUT (FDCDAT),A		;Send byte
+	JP M,DATIN		;DRQ
+	LD A,2
+	CALL DELAY		;Delay 2 ms after write
+	RET
+
+;Restore the head and initialise track map
+TRACK0:	XOR A
+SEEKIT:	LD (HL),A		;Update track map
+	OUT (FDCDAT),A		;Set up for seek
+
+	IF RATE EQ 3
+	LD C,A			;Store track
+	LD A,(DRVLOG)
+	PUSH AF
+	OR 20H			;Double clock speed
+	OUT (DRVPRT),A
+	LD A,C
+	ENDIF
+
+	OR A			;Test for track 0
+	LD A,SEKTRK+RATEB
+	JR NZ,DOSEEK
+	LD A,RESTOR+RATEB	;Use restore of it's track 0
+DOSEEK:	CALL SENCOM		;Load the head
+	LD A,SETTIM
+	CALL DELAY		;Settling time
+
+	IF RATE EQ 3
+	POP AF
+	OUT (DRVPRT),A		;Back to 1Mhz
+	ENDIF
+
+	RET
+
+;Clear the 2797
+CLEAR:	LD A,CLRFDC		;Load the command
+
+;Send command to 2797 and wait til it's done
+SENCOM:	OUT (FDCCOM),A		;Send command
+	LD A,10
+WAIT:	DEC A
+	JR NZ,WAIT
+WAITNB:	IN A,(FDCSTA)
+	RRCA			;Wait til finished
+	JR C,WAITNB
+	RET
+
+;Error message components
+ERMSG:	DEFB 7,CR,LF,0
+ONMSG:	DEFB " on ",0
+TRKMSG:	DEFB ": Track- ",0
+SECMSG:	DEFB " Sector- ",0
+
+DNR:	DEFB "Drive Not Ready",0
+DWP:	DEFB "Write Protect",0
+WF:	DEFB "Write Fault",0
+RNF:	DEFB "Record Not Found",0
+CRC:	DEFB "CRC Fault",0
+NDWF:	DEFB "????",0
+RETRY:	DEFB " - RETRY (Y/N/^C)? ",0
+
+	SUBTTL SASI Interface Routines
+	PAGE
+	IF WINI
+;Xebec error message
+XERROR:	DEFB	"Xebec Type "
+XTYPE:	DEFB	"0 Code "
+XCODE:	DEFB	"0 Error",0
+
+;Read/Write a Winchester sector
+RWWINI:
+	LD HL,(HSTTRK)		;Initialise HL
+	LD A,(HSTDSK)
+	OR A
+	JR Z,ONCYL
+	LD B,A
+	LD DE,MXTKW		;Tracks per drive
+GOCYL:	ADD HL,DE
+	DJNZ GOCYL
+;Multiply by Sectors per head pair track (34)
+ONCYL:	PUSH HL
+	REPT 4
+	ADD HL,HL
+	ENDM
+	POP DE
+	ADD HL,DE
+	ADD HL,HL
+;Add in to correct sector
+	LD A,(HSTSEC)
+	LD E,A
+	LD D,0
+	ADD HL,DE
+;Store logical address in DCB
+	LD E,H			;Address stored MSB first
+	LD H,L
+	LD L,E
+	LD (LGADDR),HL		;Store logical address
+	LD A,(RWFLAG)		;Get read/write command
+	OR A
+	LD A,8			;Read
+	JR NZ,DOW
+	LD A,0AH		;Write
+DOW:	CALL DOTASK		;Send the command
+	JR NZ,SXERR		;Error in selecting Xebec
+	LD HL,(HSTDMA)		;Read/write address
+	CALL RWDATA		;Perform read/write
+	CALL GETSTA
+	RET Z			;No errors
+
+;Xebec error reporting
+WERR:	LD A,3			;Sense status
+	CALL DOTASK		;Request error sense
+	JR NZ,SXERR		;Error in selecting Xebec
+	LD HL,SBYTES		;Get the reply
+	CALL RWDATA
+	CALL GETSTA		;Clear status bytes
+	LD A,(SBYTES)		;Get error code
+	PUSH AF
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	AND 7			;Error type
+	ADD A,"0"
+	LD (XTYPE),A		;Put in message
+	POP AF
+	AND 0FH			;Error code
+	ADD A,90H
+	DAA
+	ADC A,40H
+	DAA
+	LD (XCODE),A		;Put in message
+	CALL CLEAN		;Reset Xebec
+	LD HL,XERROR
+	JP GOTMSG		;Print message, Drive etc.
+
+;Failure to select Xebec
+SXERR:	CALL CLEAN		;Try resetting
+	JP FRETRY		;If we get back, try again
+
+RWDATA:	IN A,(SASIC)		;Read status lines
+	RRCA			;Test REQ
+	JR C,RWDATA		;Wait for request
+	RRCA			;Test I/O
+	JR C,WRTXEB		;Write
+	RRCA			;Test C/D
+	RET NC			;Only status bytes left
+
+RDXEB:	IN A,(SASID)		;Read a byte
+	CPL
+	LD (HL),A
+	INC HL
+	JR RWDATA
+
+WRTXEB:	LD A,(HL)		;Send a byte
+	CPL
+	OUT (SASID),A
+	INC HL
+	JR RWDATA
+
+;Send a command string
+DOTASK:	PUSH HL
+	PUSH BC
+	LD HL,TASK
+	LD (HL),A		;Insert command
+;Select the controller
+	IN A,(SASIC)		;Ensure Xebec clear
+	CPL
+	AND 1FH			;Strip ID bits
+	JR NZ,SELERR		;Reset
+	LD A,0FEH		;Select drive 0
+	OUT (SASID),A
+	LD A,0FDH		;Strobe SEL
+	OUT (SASIC),A
+	LD B,6
+	CALL WRITEB		;Send 6 command bytes
+	XOR A			;No errors
+SELERR:	POP BC
+	POP HL
+	RET
+
+;Write B bytes
+WRITEB:	IN A,(SASIC)
+	RRCA			;Test REQ
+	JR C,WRITEB
+	LD A,(HL)
+	CPL
+	OUT (SASID),A		;Send byte
+	INC HL
+	DJNZ WRITEB
+	RET
+
+;Get status bytes
+GETSTA:	IN A,(SASIC)
+	RRCA			;Test REQ
+	JR C,GETSTA
+	IN A,(SASID)		;Read status byte
+	CPL
+	PUSH AF
+GET2:	IN A,(SASIC)
+	RRCA			;Test REQ
+	JR C,GET2
+	IN A,(SASID)		;Clear the null
+	POP AF
+	OR A			;Test status
+	RET
+
+;Read/Write command string
+TASK:	DEFB	0		;Command
+	DEFB	0		;Logical adddress MSB
+LGADDR:	DEFB	0		;   "       "
+	DEFB	0		;   "       "     LSB
+SCOUNT:	DEFB	1		;Sector count
+	DEFB	4		;Buffered seek
+
+;Sense Bytes
+SBYTES:	DEFS 6,0
+
+XEBBYT:	DEFB 0			;Stops re-entry to Xebec initialisation routine
+	ENDIF
+
+CLEAN:	CALL CLEAR		;Clean up 2797
+	IF WINI
+;Xebec initialisation
+INITX:	LD A,(XEBBYT)		;Re-entry byte
+	OR A
+	JR NZ,HALTX		;Re-entry so fatal error
+	DEC A
+	LD (XEBBYT),A		;Tag to stop re-entry
+	LD HL,20000		;20 seconds
+RESETX:	LD A,0FBH		;Reset the Xebec
+	OUT (SASIC),A
+WREADY:	IN A,(SASIC)
+	AND 10H
+	JR Z,NOTRDY		;Wait until ready
+	XOR A
+	CALL DOTASK		;Request if drive ready
+	JR NZ,HALTX		;Can't reset the Xebec
+	CALL GETSTA		;Read status
+	JR Z,ISRDY		;Drive is ready
+NOTRDY:	LD A,1
+	CALL DELAY		;Delay 1 ms
+	DEC HL
+	LD A,H
+	OR L
+	JR NZ,WREADY
+	JR HALTX		;Time out
+ISRDY:	LD A,0CH		;Initialise command
+	CALL DOTASK
+	JR NZ,HALTX		;Can't select the Xebec
+	LD HL,INITD		;Initialise data
+	LD B,8			;8 bytes to send
+	CALL WRITEB
+	CALL GETSTA		;Clear status
+	LD (XEBBYT),A		;Flag re-entry clear
+	ENDIF
+
+	RET
+
+	IF WINI
+;INITX re-entered so stop everything
+HALTX:	LD HL,TOTALX
+	CALL PMSG
+RING:	LD C,7
+	CALL CONOUT
+	JR RING
+
+TOTALX:	DEFB CR,LF,7,"Unable to reset Xebec",0
+
+;Make Xebec initialisation table
+INITAB	MACRO WNUM
+INITD:	DEFB HIGH WCYL&WNUM
+	DEFB LOW WCYL&WNUM
+	DEFB HEAD&WNUM
+	DEFB HIGH RWC&WNUM
+	DEFB LOW RWC&WNUM
+	DEFB HIGH WPC&WNUM
+	DEFB LOW WPC&WNUM
+	DEFB 11
+	ENDM
+
+;Initialisation table
+	INITAB %WINTYP
+
+
+	ENDIF
+
+	SUBTTL General Purpose Utilities
+	PAGE
+;Delay for (A) ms
+DELAY:	OR A			;Return on 0 delay
+	RET Z
+	PUSH BC
+	LD B,A			;Ms count to B
+DLY1:	LD A,(MS)
+WTLP:	DEC A			;Main count
+	JR NZ,WTLP
+	DJNZ DLY1		;Ms count
+	POP BC
+	RET
+
+;Take on local BIOS stack
+BIGSTK:	PUSH HL
+	LD HL,BIGLOG
+	INC (HL)
+	LD (HL),0		;Big log active
+	POP HL
+	JR Z,NEWBIG		;New entry
+	RET			;Already in
+NEWBIG:	LD (@BIGSP-6),HL	;HL on new stack
+	POP HL			;Calling address
+	LD (@BIGSP-4),HL	;Put it on new stack
+	LD HL,OLDSP		;Exit via here
+	LD (@BIGSP-2),HL
+	LD (SPSTOR),SP		;Save SP
+	LD SP,@BIGSP-6		;Set up to new stack
+	POP HL			;Recover HL
+	RET
+
+OLDSP:	PUSH AF
+	LD A,0FFH
+	LD (BIGLOG),A		;Reset stack log
+	POP AF
+	LD SP,(SPSTOR)		;Recover old stack
+	RET
+
+SPSTOR:	DEFW 0			;Saved SP
+BIGLOG:	DEFB 0FFH
+
+	DEFS 50,0		;Stack space
+@BIGSP:				;Internal BIOS stack
+
+	SUBTTL Uninitialised Workspace
+	PAGE
+;*************************************
+;*	UNINITIALISED WORKSPACE      *
+;*************************************
+;Cold boot area, this area will be overwritten by workspace
+COLD:
+;Buffers
+DRVNUM	DEFL 0			;Initialise drive
+CARRY	DEFL COLD		;Initialise carry
+
+;	BUFF MACRO
+;1 Drive number (%)
+;2 Allocation vector size
+;3 Checksum vector size
+
+;Allocation and checksum workspace
+	REPT NDRVW
+	IF WINI
+	BUFF %DRVNUM,ASIZW,CSIZW
+DRVNUM	DEFL DRVNUM+1
+	ENDIF
+	ENDM
+
+	REPT NDRV5
+	IF TPI96
+	BUFF %DRVNUM,ASIZ96,CSIZ96
+	ELSE
+	BUFF %DRVNUM,ASIZ48,CSIZ48
+	ENDIF
+DRVNUM	DEFL DRVNUM+1
+	ENDM
+
+DRVNUM	DEFL VDRIVE		;Drive P
+	BUFF %DRVNUM,ASIZV,CSIZV
+
+HSTBUF	EQU CARRY
+DIRBUF	EQU HSTBUF+HSTSIZ	;Directory buffer
+VBUFF	EQU DIRBUF+RECSIZ	;VDISK transfer buffer
+
+;Deblocking Workspace
+;CP/M request
+CPMDSK	EQU VBUFF+RECSIZ	;CPM disk requested
+CPMTRK	EQU CPMDSK+1		;CPM track requested
+CPMSEC	EQU CPMTRK+2		;CPM physical sector requested
+CPMREC	EQU CPMSEC+1		;CPM 128 byte record number
+;Last unallocated
+UNADSK	EQU CPMREC+1		;Last unalloc disk
+UNATRK	EQU UNADSK+1		;Last unalloc track
+UNAREC	EQU UNATRK+2		;Last unalloc 128 byte record
+
+UNACNT	EQU UNAREC+1		;Unalloc rec cnt
+HSTACT	EQU UNACNT+1		;Host active flag
+HSTWRT	EQU HSTACT+1		;Host written flag
+ERFLAG	EQU HSTWRT+1		;Error reporting
+RSFLAG	EQU ERFLAG+1		;Read sector flag
+READOP	EQU RSFLAG+1		;0 if write
+WRTYPE	EQU READOP+1		;Write operation type
+DMAADR	EQU WRTYPE+1		;Last dma address
+
+UEND	EQU DMAADR+2		;Uninitialised BIOS end
+
+	SUBTTL Cold Boot
+	PAGE
+;***********************
+;*	COLD BOOT      *
+;***********************
+;Cold boot - executed only on first entry
+BOOT:	LD SP,@BIGSP		;Stack in upper RAM
+
+;**********************************
+;*	VDISK INITIALISATION      *
+;**********************************
+	IF MAP32
+;Initialise vdisk parameters if it exists
+	LD C,0FEH		;C=paging port
+	LD E,0C2H		;First vdisk page
+	LD HL,0			;Address tested
+	XOR A			;Clear track counter
+	EX AF,AF'
+	LD A,(HL)		;Get page 0 byte
+	OUT (C),E		;See if page 1 is there
+	CP (HL)
+	JR NZ,MAPRAM		;Main RAM not Gemini
+	CPL			;See if MAP RAM with same byte
+	LD (HL),A
+	OUT (C),H		;Back to page 0
+	CP (HL)			;Should be different now
+	JP Z,NOVIR		;Main RAM is not MAP
+;Main RAM is MAP
+	OUT (C),E
+	CPL
+	LD (HL),A		;Restore original byte in page 1
+MAPRAM:	LD B,7			;Maximum 7 pages (512k)
+NXT64:	OUT (C),E		;Select next page
+	CALL TSTRAM		;Look for RAM
+	JR NZ,MAPTOP		;No RAM there
+	INC E			;Next page
+	INC E
+	DJNZ NXT64		;Look for up to 7 pages
+	ENDIF
+
+	IF MAP4
+;DEFINITIONS
+;PAGE is a 64k page of RAM
+;BLOCK is a 4k block within a 64k page
+;SLOT is a 4k block within the working 64k
+;Initialise virtual disk
+	XOR A			;Clear tracks counter
+	EX AF,AF'
+	LD BC,00FEH		;B = slot 0, c=mapping port
+	LD E,10H		;Page 1 block 0
+	LD HL,0000H		;Address to be tested
+NXT64:	OUT (C),E		;Select 4k into 1000
+	CALL TSTRAM		;See if RAM is there
+	JR NZ,MAPTOP		;End of RAM reached
+	LD A,10H		;Next page
+	ADD A,E
+	LD E,A
+	CP 80H			;Is this over the top
+	JR Z,MAPTOP
+	JR NXT64		;Check next page
+	ENDIF
+
+;End of RAM found alternate A holds number of 4K tracks
+MAPTOP:	LD A,(RESERV)		;Get reserved tracks
+	LD D,A
+	LD (OFF),A		;Tell dpblk system tracks
+	EX AF,AF'		;Get tracks
+	SUB D			;Take off reserved
+	JR C,NOVIR		;No drive P
+	JR Z,NOVIR		;No drive P
+;A holds tracks for drive P
+	SLA A			;Convert to allocation blocks
+	DEC A			;Convert to vdsm
+	LD (VDSM),A		;Put in dpblk
+
+;Now initialise Vdisk if required
+	LD A,(OFF)		;Reserved tracks
+	LD HL,0			;Base address
+
+	IF MAP32
+	LD B,3			;Divide by 8
+TRLOOP:	SRL A
+	RR H			;Carry into H
+	DJNZ TRLOOP
+	SRL H			;Complete making address
+	ADD A,0C2H		;Add in base page
+;HL points to track after paging, A holds page
+	OUT (0FEH),A		;Get vdisk
+	ENDIF
+
+	IF MAP4
+	ADD A,10H		;Add in first page
+	OUT (C),A		;Select directory sector
+	ENDIF
+
+	LD (HL),15		;Undelete Map.Ram
+	INC HL			;Point to 1st FCB
+	PUSH HL			;Save position in case setrun
+	LD DE,RUNMES		;Point to sample FCB
+	LD BC,11		;Length of file name
+CHKRUN:	LD A,(DE)		;Get sample
+	CPI			;Compare it with vdisk
+	INC DE
+	JR NZ,SETRUN		;Map.Ram not there
+	JP PE,CHKRUN		;Not finished yet
+	LD BC,20		;Rest of FCB
+	XOR A
+CHKFCB:	CPI			;Check rest of fcb
+	JR NZ,SETRUN		;fcb is corrupt
+	JP PE,CHKFCB
+	POP DE			;Clear stack
+	JR ENDVIR
+SETRUN:	LD HL,RUNMES
+	POP DE			;Pick up start + 1
+	LD BC,11		;Shift in sample name
+	LDIR
+	XOR A			;Clear fcb
+	LD B,20
+CLRFCB:	LD (DE),A
+	INC DE
+	DJNZ CLRFCB
+	LD HL,32		;FCB length
+	EX DE,HL
+	LD A,0E5H		;Deleted file indicator
+	LD B,63			;Files in 2k-1
+DELETE:	LD (HL),A		;Delete all files
+	ADD HL,DE
+	DJNZ DELETE
+	JR ENDVIR
+
+;No RAM, no space, system too small...So no virtual disk
+NOVIR:	XOR A
+	LD (VDSM),A		;No virtual disk
+	LD (SIGN1),A		;Kill message
+
+;End of vdisk set restore memory
+ENDVIR:	XOR	A
+
+	IF MAP32
+	OUT (0FEH),A		;Page 0
+	ENDIF
+
+	IF MAP4
+	LD BC,00FEH		;Slot 0 + ppag
+	OUT (C),A		;Restore to normal
+	LD B,10H
+	INC A
+	OUT (C),A
+	ENDIF
+;End of virtual disk initialisation
+
+;*******************************
+;*	IO INITIALISATION      *
+;*******************************
+	LD A,(IOVAL)	;Set IOBYTE
+	LD (IOBYTE),A	;Do this before CONOUT
+
+	IF VFC
+;Initialise VFC
+	LD IX,VFCW
+	LD A,(INITM)		;Initial VFC status
+	OR HIGH VFCLOC		;Now position + initial status
+	XOR EVMASK		;Switch EPROM/VRAM enable bits
+	OUT (CNTRL),A		;Bring in the VFC
+	CALL VFCLOC+VFCCLR
+	LD A,(LEAVE)		;Where to leave VRAM
+	OR (IX+VFCST-VFCW)	;VFC status with EPROM and VRAM off
+	OUT (CNTRL),A		;Switch card out
+	IN A,(VSWICH)		;Switch to alternate video
+	ENDIF
+
+	LD SP,80H
+;Initialise PIO for printer ops if required
+	LD A,(PPORT)		;Initialise PIO ?
+	OR A
+	JR Z,SETURT		;No
+	LD A,-1
+	OUT (PDATA),A		;A lines 0FFH
+	OUT (PDATB),A		;B lines 0FFH
+	OUT (PCTRLB),A		;B port mode 3
+	XOR A
+	OUT (PCTRLB),A		;Outputs
+	DEC A
+	OUT (PCTRLA),A		;A port mode 3
+	LD A,0FDH		;Inputs except STROBE
+	OUT (PCTRLA),A
+	CALL STROBE		;Send a strobe
+
+SETURT:	IF NOT NAS
+;Intialise 8250 for serial ops
+	LD A,(UARTM)
+	OUT (MCR),A		;Set mode
+	LD A,83H		;Divisors
+	OUT (LCR),A
+	LD HL,(UARTB)
+	LD A,H
+	OUT (BAUDL),A		;Baud rate high byte
+	LD A,L
+	OUT (UARTD),A		;Baud rate low byte
+	LD A,(UARTH)
+	OUT (LCR),A		;Set line control
+	ENDIF
+
+;Print welcoming message
+	LD HL,SIGNON		;Message
+	CALL PMSG
+	JP BOOTB		;Initialise page 0 and I/O
+
+TSTRAM:	LD D,(HL)		;See if RAM present at HL
+	LD A,D
+	CPL
+	LD (HL),A
+	CP (HL)
+	LD (HL),D
+	RET NZ			;No RAM
+	EX AF,AF'		;Increment track counter
+	ADD A,16		;Tracks per page
+	EX AF,AF'
+	RET
+
+;Sample FCB of Map.Ram
+RUNMES:	DEFB "Map     "
+	DEFB "R"+80H
+	DEFB "am"
+
+;*****************************
+;*	SIGN ON MESSAGE      *
+;*****************************
+SIGNON:
+;Sign-on messages
+	DEFB CONZ
+
+	IF NKBD OR IKBD
+	DEFB ESC,"E"
+	ENDIF
+
+RRR	DEFL 20H+5
+
+CCC	DEFL 20H+(VIDWID-(W2-W1))/2
+	DEFB ESC,"=",RRR,CCC
+W1:	DEFB "************************************"
+W2:
+
+RRR	DEFL RRR+1
+	DEFB ESC,"=",RRR,CCC
+	DEFB "**"
+CCCC	DEFL CCC+W2-W1-2
+	DEFB ESC,"=",RRR,CCCC
+	DEFB "**"
+
+RRR	DEFL RRR+1
+	DEFB ESC,"=",RRR,CCC
+	DEFB "**     MAP 80 SYSTEMS LIMITED     **"
+RRR	DEFL RRR+1
+	DEFB ESC,"=",RRR,CCC
+	DEFB "**   BIOS Version 2.1  01/10/83   **"
+RRR	DEFL RRR+1
+	DEFB ESC,"=",RRR,CCC
+	DEFB "**       00k CP/M vers 2.2        **",CR,LF
+RRR	DEFL RRR+1
+	DEFB ESC,"=",RRR,CCC
+	DEFB "**    "
+
+	IF G811
+	DEFB "G811  "
+	ENDIF
+
+	IF G813
+	DEFB "G813  "
+	ENDIF
+
+	IF NAS
+	DEFB "NASCOM"
+	ENDIF
+
+	DEFB " CPU  SUPPORTING:-    **"
+
+RRR	DEFL RRR+1
+	DEFB ESC,"=",RRR,CCC
+	DEFB "**"
+	DEFB ESC,"=",RRR,CCCC
+	DEFB "**"
+
+RRR	DEFL RRR+1
+	DEFB ESC,"=",RRR,CCC
+	DEFB "************************************"
+
+DRIVEN	DEFL "A"
+
+;Winchester message
+	IF WINI
+RRR	DEFL RRR+2
+CCC	DEFL 20H+(VIDWID-(WWW-WW))/2
+	DEFB ESC,"=",RRR,CCC
+
+WW:	"Winchester Hard Disk on "
+	REPT NDRVW
+	DEFB DRIVEN
+DRIVEN	DEFL DRIVEN+1
+	ENDM
+WWW:
+RRR	DEFL RRR+1
+	ELSE
+RRR	DEFL RRR+2
+	ENDIF
+
+;Floppies message
+CCC	DEFL 20H+(VIDWID-(W4-W3))/2
+	DEFB ESC,"=",RRR,CCC
+
+W3:	IF (SIDES EQ 1) AND TPI96
+	DEFB "Single sided "
+	ELSE
+	DEFB "Double sided "
+	ENDIF
+
+	IF TPI96
+	DEFB "96"
+	ELSE
+	DEFB "48"
+	ENDIF
+
+	DEFB " tpi drives on "
+	REPT NDRV5
+	DEFB DRIVEN
+DRIVEN	DEFL DRIVEN+1
+	ENDM
+W4:
+RRR	DEFL RRR+1
+
+;Video message
+CCC	DEFL 20H+(VIDWID-(W6-W5))/2
+	DEFB ESC,"=",RRR,CCC
+W5:
+	IF IVC
+	DEFB "IVC"
+	ENDIF
+
+	IF VFC
+	DEFB "MAP VFC"
+	ENDIF
+
+	DEFB " video display"
+W6:
+RRR	DEFL RRR+1
+
+;Keyboard message
+CCC	DEFL 20H+(VIDWID-(W8-W7))/2
+	DEFB ESC,"=",RRR,CCC
+	IF NKBD
+W7:	DEFB "Nascom keyboard on CPU card"
+	ELSE
+W7:	DEFB "Keyboard on video card"
+	ENDIF
+W8:	DEFB CR,LF		;In case no vdisk
+
+;Virtual disk sign on message
+SIGN1:	DEFB 7			;Signal operator
+
+;Position now for vdisk message
+RRR	DEFL RRR+1
+CCC	DEFL 20H+(VIDWID-(W21-W20))/2
+	DEFB ESC,"=",RRR,CCC
+	IF MAP32
+W20:	DEFB "MAP-32"
+	ENDIF
+	IF MAP4
+W20:	DEFB "MAP-4"
+	ENDIF
+	DEFB " virtual disk on ","A"+VDRIVE
+W21:	DEFB CR,LF
+	DEFB 0
+
+IEND:				;Initialised BIOS end
+
+	SUBTTL Size Test
+	PAGE
+
+	DEFW 0			;Cos of hex
+
+;Check BIOS will fit on a system track
+	IF IEND-BIOS GT 19*200H-CPMLEN
+	.PRINTX "ERROR??? BIOS TOO BIG ???ERROR"
+	ENDIF
+
+	END
+

@@ -1,0 +1,407 @@
+;1/24/11/83
+	TITLE MAP 80 BIOS VERSION 2.2
+	SUBTTL Options
+;Version  1.0
+;Revision 2.0 31/7/83
+;Revision 2.1 06/09/83
+;Revision 2.2 24/11/83
+
+	.XLIST
+	.SFCOND
+	.Z80
+
+T	EQU -1			;T(rue)
+F	EQU NOT T		;F(alse)
+
+;G811,G813 or NASCOM CPU board. Set only one true
+G811	EQU F			;G811 with VFC or IVC
+G813	EQU F			;G813 with VFC or IVC
+NAS	EQU T			;Nascom with VFC,IVC
+
+MYBIT	EQU F			;Personal additives
+
+;Video and keyboard options
+VFC	EQU T 			;VFC video
+IVC	EQU F 			;IVC
+NKBD	EQU T AND NAS		;Select Nascom keyboard
+
+;Winchester select
+WINI	EQU F
+
+;Select the drive type
+TPI96	EQU F			;Select 96 tpi system
+SIDES	EQU 2			;Set 1 or 2 for single/double sided (96tpi)
+;Select 96 tpi drive type
+TEAC	EQU F
+MICROP	EQU T
+
+;Number of drives
+NDRV5	EQU 4			;5"
+
+;VFC options
+ALT	EQU F OR WINI		;Select alternate VFC location
+F800	EQU T			;Leave VFC RAM at F800 during idle time
+
+;8250 set up
+RS232	EQU 0FH			;Selects 8250 RS232
+B9600	EQU 13
+B4800	EQU 26
+B1200	EQU 104			;1200 baud
+B300	EQU 417
+
+SETU	EQU 3			;Bits/stops/no parity
+MODEU	EQU RS232		;RS232/cassette
+BAUDU	EQU B1200		;Baud rate
+
+;Serial options
+PTYE	EQU 3			;Parity even
+PTYO	EQU 1			;Parity odd
+NPTY	EQU 0			;No parity
+
+	IF NAS
+SRLOP	EQU PTYE		;Set list option
+	ELSE
+SRLOP	EQU 0			;Parity handled by 8250
+	ENDIF
+
+;CR delay for slow printers
+CRDEL	EQU 0			;Set 0 for no delay else delay in 10s of ms
+
+;Output devices
+XPLPAG	EQU 0			;Printed lines/page for CS support
+XLSKIP	EQU 0			;Perf. lines skipped
+
+;Virtual disk reserved space
+VRTRK	EQU 0			;User reserved vdisk in 4k chunks
+
+;Winchester types
+R201	EQU 0			;Rodime 201
+MS3	EQU 1			;Mini Scribe 3
+SQ306	EQU 2			;Syquest 306
+
+;Select Winchester type, This equate must come after types
+WINTYP	EQU R201
+
+;Winchester data
+;Rodime 201
+WCYL0	EQU 320			;Cylinders
+RWC0	EQU 132			;Reduced write cylinder
+HEAD0	EQU 2			;Heads
+WPC0	EQU 0			;Write pre-comp cylinder
+
+;Mini Scribe 3
+WCYL1	EQU 612			;Cylinders
+RWC1	EQU 612			;Reduced write cylinder
+HEAD1	EQU 2			;Heads
+WPC1	EQU 0			;Write pre-comp cylinder
+
+;Syquest 306
+WCYL2	EQU 306			;Cylinders
+RWC2	EQU 306			;Reduced write cylinder
+HEAD2	EQU 2			;Heads
+WPC2	EQU 306			;Write pre-comp cylinder
+
+	SUBTTL Standard Parameters
+	PAGE
+;Drive parameters
+	IF TPI96		;Set for TEAC
+	IF TEAC
+RATE	EQU	3		;Teac Step rate
+HLDEL	EQU	0		;Head load timing
+SETTIM	EQU	15		;Track settling time after seek
+	ENDIF
+	IF MICROP
+RATE	EQU	10		;Micropolis Step rate
+HLDEL	EQU	0		;Head load timing
+SETTIM	EQU	15		;Track settling time after seek
+	ENDIF
+
+	ELSE			;Set for PERTEC
+RATE	EQU	25		;Step rate
+HLDEL	EQU	35		;Head load timing
+SETTIM	EQU	10		;Track settling time
+	ENDIF
+
+	IF G813
+VFCLOC	EQU 0000H		;Use 0 for 813 as this will be page 0
+	ELSE
+VFCLOC	EQU 1000H		;Avoids possible confliction with...
+	ENDIF			;...NAS-SYS VRAM
+
+F2797	EQU 0E0H		;FDC always here
+
+	IF ALT
+VPORT	EQU 0C0H		;Alternate VFC location
+	ELSE
+VPORT	EQU F2797		;Standard location
+	ENDIF
+CNTRL	EQU VPORT+0CH
+VSWICH	EQU VPORT+0EH		;VFC video 1
+
+VKBD	EQU VFC AND NOT NKBD		;VFC keyboard
+IKBD	EQU IVC AND NOT NKBD		;IVC keyboard
+MAP32	EQU NOT G813		;MAP 32K page system (Nascom 2/G811)
+MAP4	EQU G813		;MAP 4K page system (G813)
+VDRIVE	EQU 15			;Drive to use/swop (12=M, 15=P)
+ABOOT	EQU NOT G813		;Set true if VFC is in auto boot mode
+KCHED	EQU NULL		;Screen edit character
+N1KEY	EQU F			;Set true for Nascom 1
+XKOPT	EQU 1			;Nascom keyboard default (1=lower)
+MSCNT	EQU 0F9H		;0F9H=4MHz, =4MHz+Wait, =2MHz
+
+CURN	EQU 4808H		;Normal cursor (R10,11)
+CURE	EQU 0009H		;Editing cursor (blink/block)
+CURF	EQU 4009H		;Fixed edit cursor (block)
+CURX	EQU 0808H		;No cursor (no blink)
+				;(2808h for no cursor)
+
+VIDWID	EQU 80
+VIDHT	EQU 25
+
+	IF IKBD
+XLONG	EQU 0500H		;Initial repeat delay
+XSHORT	EQU 0070H		;Repeat speed
+XBLINK	EQU 0160H		;Blink speed
+	ELSE
+XLONG	EQU 0800H		;Initial repeat delay
+XSHORT	EQU 00C0H		;Repeat speed
+XBLINK	EQU 0280H		;Blink speed (Nascom)
+	ENDIF
+
+;********************************************
+;*		PORT ASSIGNMENT             *
+;********************************************
+
+	IF NAS
+KBDP	EQU 00H			;Nascom keyboard port
+UARTD	EQU 01H			;Serial data port
+UARTS	EQU UARTD+1		;Serial status port
+PHAND	EQU 00H			;Printer handshake port
+PIO	EQU 4			;Base PIO port (0 no PIO setup)
+	ELSE
+KBDP	EQU 0B0H		;Gemini keyboard port
+UARTD	EQU 0B8H		;Serial data port
+UARTS	EQU UARTD+5		;Serial status port
+PHAND	EQU UARTD+6		;Printer handshake port
+PIO	EQU 0B4H		;Base PIO port (0 no PIO setup)
+	ENDIF
+
+;Winchester ports
+SASIC	EQU	0E5H		; SASI control port
+SASID	EQU	SASIC+1		; SASI data port
+
+;Port controlled video
+PVDUD	EQU 0B1H		;Data port (R/W)
+PVDUS	EQU 0B2H		;Status port (R/O):
+				; Bit 0=1= Video busy
+				; Bit 7=0= Data ready
+PVDUR	EQU 0B3H		;Reset port (any I/O)
+
+KBDM	EQU VPORT+6		;MAPKBD port
+
+;PIO ports
+PDATA	EQU PIO
+PDATB	EQU PIO+1
+PCTRLA	EQU PIO+2
+PCTRLB	EQU PIO+3
+
+;96 TPI DRIVES
+SEC96	EQU	512		;Physical sector size
+BLK96	EQU	4096		;CP/M block allocation size
+DALL96	EQU	1		;Directory allocation blocks
+MXSC96	EQU	10		;Physical sectors/track
+MXTK96	EQU	80		;Tracks/disc
+OFF96	EQU	2		;System tracks
+
+;48 TPI DRIVES
+SEC48	EQU 512			;Physical sector size
+BLK48	EQU 2048		;CP/M block allocation size
+DALL48	EQU 2			;Directory allocation blocks
+MXSC48	EQU 20			;Physical sectors/track
+MXTK48	EQU 35			;Tracks/disc
+OFF48	EQU 1			;System tracks
+
+;WINCHESTER DRIVES
+MXSCW	EQU 34			;host sectors/track (per head pair)
+OFFW	EQU 1			;system tracks
+;Define Winchester system
+MAKTRK	MACRO NUM
+HDPAIR	EQU HEAD&NUM/2		;;Number of head pairs
+TOTTRK	EQU WCYL&NUM*HDPAIR	;;Total Wini tracks
+	ENDM
+
+;Calculate tracks
+	MAKTRK %WINTYP
+MAXTKS	EQU 8000/17		;CP/M 2 size limitation
+NUMWIN	EQU (TOTTRK/MAXTKS)+1	;Number of drives
+MXTKW	EQU TOTTRK/NUMWIN	;Tracks per drive
+NDRVW	EQU NUMWIN AND WINI	;Number of Winchesters
+
+;VIRTUAL DISK
+SECV	EQU	128		;Sector size
+BLKV	EQU	2048		;Allocation size
+DALLV	EQU	1		;Directory allocation
+MXSECV	EQU	4096/SECV	;Sectors per 4K track
+MXTRKV	EQU	7*16		;7 pages of 16 tracks (512K)
+OFFV	EQU	0		;Reserved 4K tracks
+
+NDRVS	EQU NDRVW+NDRV5		;Total number of drives
+
+;Winchester sector and block size set by floppy parameters
+	IF TPI96
+BLKSIZ	EQU	BLK96		;CP/M block allocation size
+HSTSIZ	EQU	SEC96		;Physical sector size
+SPTF	EQU	MXSC96		;Physical sectors/track
+MAXTRK	EQU	MXTK96		;Tracks/side
+	ELSE
+BLKSIZ	EQU	BLK48		;CP/M block allocation size
+HSTSIZ	EQU	SEC48		;Physical sector size
+SPTF	EQU	MXSC48		;Physical sectors/track
+	ENDIF
+SECSPS	EQU	10		;Sectors per side
+
+	IF WINI
+SPTW	EQU	MXSCW		;Physical sectors/track Winchester
+RPTW	EQU	CPMRPS*SPTW	;CP/M records/host track winchester
+DALLW	EQU 16384/BLKSIZ	;Directory allocation blocks (16k)
+	ENDIF
+CPMRPS	EQU	HSTSIZ/128	;CP/M records/host sector
+RPTF	EQU	CPMRPS*SPTF	;CP/M records/host track floppy
+
+;8250 UART
+BAUDL	EQU UARTD+1
+LCR	EQU UARTD+3
+MCR	EQU UARTD+4
+
+;********************************
+;*	EXTERNAL ADDRESSES      *
+;********************************
+;Locations within notional 16K CP/M
+CPMLEN	EQU 1600H		;Size of CP/M (CCP+BDOS)
+CCP16	EQU BIOS-CPMLEN		;Start of CCP V2.2
+BDOS16	EQU CCP16+806H		;Start of BDOS V2.2
+RECSIZ	EQU 128			;Length of a CP/M record
+
+;Other CP/M addresses
+JWBOOT	EQU 0000H		;Jump to warm boot
+AWBOOT	EQU 0001H		;Warm boot address
+IOBYTE	EQU 0003H		;IOBYTE
+DEFDRI	EQU 0004H		;Default drive
+JBDOS	EQU 0005H		;Jump to BDOS
+ABDOS	EQU 0006H
+DMA	EQU 0080H		;Disk buffer
+TPA	EQU 0100H		;Start of TPA
+
+PPAG	EQU 00FEH		;Paging port
+
+;********************************
+;*	CONTROL CHARACTERS      *
+;********************************
+
+NULL	EQU 00H	;^@ (NUL)
+CB	EQU 02H	;^B (STX) Screen dump
+CC	EQU 03H	;^C (ETX) Warm boot
+CD	EQU 04H	;^D (EOT)
+BS	EQU 08H	;^H (BS)  Backspace
+TAB	EQU 09H	;^I (TAB) Horizontal tab
+LF	EQU 0AH	;^J (LF)  Line feed
+CSU	EQU 0BH	;^K (VT)  Delete line
+CS	EQU 0CH	;^L (FF)  Form feed
+CR	EQU 0DH	;^M (CR)  Carriage return
+CSD	EQU 0EH	;^N (SO)  Insert line
+CONR	EQU 12H	;^R (DC2)
+CONS	EQU 13H	;^S (DC3)
+CSL	EQU 16H	;^V (SYN) Delete & shift left
+CSR	EQU 17H	;^W (ETB) Delete & shift right
+CX	EQU 18H	;^X (CAN) Delete input buffer
+CH	EQU 19H	;^Y (EM)  Cursor home
+CONZ	EQU 1AH	;^Z (SUB) Clear screen
+ESC	EQU 1BH	;   (ESC) Escape, erase line
+CUL	EQU 1CH	;   (FS)  Cursor move left
+CUR	EQU 1DH	;   (GS)  Cursor move right
+CUU	EQU 1EH	;   (RS)  Cursor move up
+CUD	EQU 1FH	;   (VS)  Cursor move down
+CU	EQU 5FH	;   (_)   Cursor (Nascom disp)
+DEL	EQU 7FH	;   (DEL)
+
+VFCCLR	EQU 3
+KBDST	EQU 5
+KBDIN	EQU 7
+VIDOUT	EQU 12
+
+CNTRL	EQU VPORT+0CH
+
+	IF G811 OR G813 OR NAS
+VSWICH	EQU VPORT+0EH		;VFC video 1
+	ELSE
+VSWICH	EQU VPORT+0FH		;VFC video 2
+	ENDIF
+
+EVMASK	EQU 00000011B		;EPROM and VRAM enable bits
+
+FCBLEN	EQU	32		;File Control Block length
+
+;FDC Ports
+FDCCOM	EQU	F2797		;Command register
+FDCSTA	EQU	F2797		;Status register
+FDCTRK	EQU	F2797+1		;Track register
+FDCSEC	EQU	F2797+2		;Sector register
+FDCDAT	EQU	F2797+3		;Data register
+DRVPRT	EQU	F2797+4		;Drive select port
+STAPRT	EQU	F2797+4		;DRQ/IRQ/READY
+
+;2797 Commands
+RESTOR	EQU	08H		;Restore command
+SEKTRK	EQU	18H		;Seek comand
+RDSEC	EQU	88H		;Read Sector
+WRSEC	EQU	0A8H		;Write sector
+CLRFDC	EQU	0D0H		;Clear command
+READID	EQU	0C0H		;Read ID header
+
+;Head step rate mask
+RATEB	DEFL 3			;30 ms
+	IF RATE LT 21
+RATEB	DEFL 2			;20 ms
+	ENDIF
+	IF RATE LT 13
+RATEB	DEFL 1			;12 ms
+	ENDIF
+	IF RATE LT 7
+RATEB	DEFL 0			;6 ms
+	ENDIF
+
+;Definition of IOBYTE
+;CON:
+TTY	EQU 00H		;Serial input/output, parity stripped/User parity
+CRT	EQU 01H		;Main keyboard input/Main video output
+BAT	EQU 02H		;Serial input/output, No parity/With handshake
+UC1	EQU 03H		;Serial input/output, No parity, No handshake
+
+;RDR:
+;tty	equ 00h		;Serial input, parity stripped
+PTR	EQU 01H		;Serial input, 8 bit
+UR1	EQU 02H		;Serial input, parity stripped
+UR2	EQU 03H		;Serial input, parity stripped
+
+;PUN:
+;tty	equ 00h		;Serial output, Parity even
+PTP	EQU 01H		;Serial output, 8 bit
+UP1	EQU 02H		;Serial output, Parity odd
+UP2	EQU 03H		;Serial output, User parity
+
+;LST:
+;tty	equ 00h		;Serial output, No handshake, User parity
+;crt	equ 01h		;Main video output
+LPT	EQU 02H		;Serial output, With handshake, User parity
+UL1	EQU 03H		;Parallel output
+
+;Set up default I/O byte
+CON	EQU CRT
+RDR	EQU PTR
+PUN	EQU PTP
+LST	EQU UL1
+IOINIT	EQU CON+(RDR*4)+(PUN*16)+(LST*64)
+
+	SUBTTL
+	PAGE
+
