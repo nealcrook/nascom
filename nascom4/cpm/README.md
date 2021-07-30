@@ -293,7 +293,7 @@ N4PT12.SUB (Which does all but MOVECPM and SYSGEN) works successfully.
 2/ DONE test cpmdefs by writing/listing disk contents
 3/ DONE modify BIOS to support 2 real disks and 2 SD disks, set up the geometry in the headers
 4/ DONE build it in the emulator, and test using 2 magnetic and 2 SD image
-5/ create new labels to fix NAC HACK in code
+5/ DONE create new labels to fix NAC HACK in code
 6/ DONE fix signon message where extra LF are present
 7/ DONE extend .sub file to include the sysgen
 8/ debug emulator problem with N4PT123

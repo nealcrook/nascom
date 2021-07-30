@@ -5,8 +5,9 @@
 ;Revision 2.0 31/7/83
 ;Revision 2.1 06/09/83
 ;Revision 2.2 24/11/83
+;Revision 29jul2021 add support for NASCOM 4 SDcard
 
-	.XLIST
+	.XLIST			;LIST (on) or XLIST (off)
 	.SFCOND
 	.Z80
 
@@ -28,15 +29,20 @@ NKBD	EQU T AND NAS		;Select Nascom keyboard
 ;Winchester select
 WINI	EQU F
 
-;Select the drive type
+;Support virtual floppy drives on SDcard
+SDDRV	EQU F
+NUMSD	EQU 2			;virtual SDdisks on SDcard
+NDRVSD	EQU NUMSD AND SDDRV	;Number of SDdisks
+
+;Support magnetic floppy drives
+NDRV5	EQU 4
+
+;Select the drive type (48TPI always 2-sided. 96TPI can be 1 or 2-sided)
 TPI96	EQU F			;Select 96 tpi system
 SIDES	EQU 2			;Set 1 or 2 for single/double sided (96tpi)
 ;Select 96 tpi drive type
 TEAC	EQU F
 MICROP	EQU T
-
-;Number of drives
-NDRV5	EQU 4			;5"
 
 ;VFC options
 ALT	EQU F OR WINI		;Select alternate VFC location
@@ -205,21 +211,29 @@ PDATB	EQU PIO+1
 PCTRLA	EQU PIO+2
 PCTRLB	EQU PIO+3
 
-;96 TPI DRIVES
+;96 TPI DRIVES (single or double-sided)
 SEC96	EQU	512		;Physical sector size
 BLK96	EQU	4096		;CP/M block allocation size
 DALL96	EQU	1		;Directory allocation blocks
 MXSC96	EQU	10		;Physical sectors/track
-MXTK96	EQU	80		;Tracks/disc
+MXTK96	EQU	80		;Tracks/disc (*2 if SIDES=2)
 OFF96	EQU	2		;System tracks
 
-;48 TPI DRIVES
+;48 TPI DRIVES (implicitly double-sided)
 SEC48	EQU 512			;Physical sector size
 BLK48	EQU 2048		;CP/M block allocation size
 DALL48	EQU 2			;Directory allocation blocks
-MXSC48	EQU 20			;Physical sectors/track
+MXSC48	EQU 20			;Physical sectors/track (10 per side)
 MXTK48	EQU 35			;Tracks/disc
-OFF48	EQU 1			;System tracks
+OFF48	EQU 1			;System tracks (1 => 20 sectors)
+
+;SDcard (VIRTUAL) DRIVES - pretend to be double-sided; see README.md
+SECSD	EQU 512			;Physical sector size
+BLKSD	EQU 2048		;CP/M block allocation size
+DALLSD	EQU 2			;Directory allocation blocks
+MXSCSD	EQU 32			;Physical sectors/track
+MXTKSD	EQU 64			;Tracks/disc
+OFFSD	EQU 1			;System tracks (1 => 32 sectors)
 
 ;WINCHESTER DRIVES
 MXSCW	EQU 34			;host sectors/track (per head pair)
@@ -404,4 +418,4 @@ IOINIT	EQU CON+(RDR*4)+(PUN*16)+(LST*64)
 
 	SUBTTL
 	PAGE
-
+

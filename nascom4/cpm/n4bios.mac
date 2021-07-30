@@ -1,7 +1,7 @@
 ;1/24/11/83
 ;COPYRIGHT (C) MAP 80 SYSTEMS LTD. and DIGITAL RESEARCH INC.
 
-	INCLUDE P:EQU.MAC
+	INCLUDE P:N4EQU.MAC
 
 ;	DPH MACRO
 ;1 Translate table, 0000 if no translation required
