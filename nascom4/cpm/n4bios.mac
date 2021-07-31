@@ -438,7 +438,7 @@ WBOOT:	LD SP,80H
 	ENDIF
 
 	LD HL,TRKA
-	LD B,NDRV5+1
+	LD B,NDRV5+NDRVSD+1
 INITRK:	LD (HL),0FFH		;Initialise track map and drive log
 	INC HL
 	DJNZ INITRK
@@ -512,7 +512,7 @@ WBOOT1:	LD A,0C3H		;Jump to warm boot
 WBOOT7:	LD A,(DDNO)
 	LD C,A			;Store drive and user
 	AND 0FH			;Remove user number
-	CP NDRVS		;Check drive in range
+	CP NDRVT		;Check drive in range
 	LD A,C
 	JR C,GDEF		;Valid
 ;Permit vdrive if it exists
@@ -1631,7 +1631,7 @@ HOMED:	LD BC,0			;Drop thru' to set track
 SETTRK:	LD (CPMTRK),BC		;track to use
 	RET
 
-;Select disk
+;Select disk. C contains 0 for drive A, etc.
 SELDSK:	LD HL,0			;Default error
 	LD A,(VDSM)
 	OR A			;Test for vdisk
@@ -1642,7 +1642,7 @@ SELDSK:	LD HL,0			;Default error
 	LD HL,DPHV		;Return virtual DPH
 	JR SELRET
 
-NOTVDR:	CP NDRVS		;Valid disk No. ?
+NOTVDR:	CP NDRVT		;Valid disk No. ?
 	RET NC			;Return error if not
 	LD B,A
 	INC B			;Make drive non-zero
@@ -1720,7 +1720,7 @@ CHKUNA:	LD A,(UNACNT)		;any unalloc remain?
 
 ;Compare CP/M request against unallocated
 	LD DE,UNADSK		;Compare CP/M disk and track to UNA
-	CALL COMP3		;4 bytes
+	CALL COMP3		;3 bytes
 	JR NZ,ALLOC		;Different
 	INC HL			;On to CP/M record
 	CALL COMP1		;Compare records
@@ -1779,7 +1779,7 @@ RWOPER:	XOR A			;zero to accum
 
 ;Compare CP/M request against host buffer
 	LD DE,HSTDSK		;Compare CP/M disk and track to HST
-	CALL COMP3		;4 bytes
+	CALL COMP3		;3 bytes
 	JR NZ,NOMTCH		;Different
 	CALL COMP1		;Compare sectors
 	JR Z,MATCH		;skip if match
@@ -1822,7 +1822,7 @@ MATCH:	LD A,(CPMREC)		;mask buffer number
 	EX DE,HL		;source/dest swap
 
 ;BC initially 128, HL is source, DE is dest
-RWMOVE:	LDIR			
+RWMOVE:	LDIR
 
 ;Data has been moved to/from host buffer
 	LD A,(WRTYPE)		;write type
@@ -1897,6 +1897,13 @@ DRVNUM	DEFL DRVNUM+1
 DRVNUM	DEFL DRVNUM+1
 	ENDM
 
+	IF SDDRV
+	REPT NDRVSD
+	DPH 0,DPBSD,%DRVNUM,T	;Check vector true
+DRVNUM	DEFL DRVNUM+1
+	ENDM
+	ENDIF
+
 DRVNUM	DEFL VDRIVE		;Drive P
 DPHV:	DPH 0,DPBV,%DRVNUM,F	;Check vector false
 
@@ -1921,6 +1928,10 @@ DPBW:	DPB	HSTSIZ,MXSCW,MXTKW,BLKSIZ,DALLW,OFFW,F,W
 DPB96:	DPB	SEC96,MXSC96,SIDES*MXTK96,BLK96,DALL96,OFF96,T,96
 	ELSE
 DPB48:	DPB	SEC48,MXSC48,MXTK48,BLK48,DALL48,OFF48,T,48
+	ENDIF
+
+	IF SDDRV
+DPBSD:	DPB	SECSD,MXSCSD,MXTKSD,BLKSD,DALLSD,OFFSD,T,SD
 	ENDIF
 
 DPBV:	DPB	SECV,MXSECV,MXTRKV,BLKV,DALLV,OFFV,F,V
@@ -1982,7 +1993,7 @@ RWFLAG:	DEFB 0			;0 if write
 HSTDMA:	DEFW 0			;Load address
 
 ;Floppy track record
-TRKA:	REPT NDRV5
+TRKA:	REPT NDRV5+NDRVSD
 	DEFB	0FFH
 	ENDM
 DRVLOG:	DEFB 0FFH
@@ -2649,6 +2660,13 @@ DRVNUM	DEFL DRVNUM+1
 DRVNUM	DEFL DRVNUM+1
 	ENDM
 
+	IF SDDRV
+	REPT NDRVSD
+	BUFF %DRVNUM,ASIZSD,CSIZSD
+DRVNUM	DEFL DRVNUM+1
+	ENDM
+	ENDIF
+
 DRVNUM	DEFL VDRIVE		;Drive P
 	BUFF %DRVNUM,ASIZV,CSIZV
 
@@ -2663,8 +2681,8 @@ CPMTRK	EQU CPMDSK+1		;CPM track requested
 CPMSEC	EQU CPMTRK+2		;CPM physical sector requested
 CPMREC	EQU CPMSEC+1		;CPM 128 byte record number
 ;Last unallocated
-UNADSK	EQU CPMREC+1		;Last unalloc disk
-UNATRK	EQU UNADSK+1		;Last unalloc track
+UNADSK	EQU CPMREC+1		;Last unalloc disk 8-bit
+UNATRK	EQU UNADSK+1		;Last unalloc track 16-bit
 UNAREC	EQU UNATRK+2		;Last unalloc 128 byte record
 
 UNACNT	EQU UNAREC+1		;Unalloc rec cnt
@@ -3007,6 +3025,20 @@ DRIVEN	DEFL DRIVEN+1
 	ENDM
 W4:
 RRR	DEFL RRR+1
+
+;SDcard virtual drives message
+	IF SDDRV
+CCC	DEFL 20H+(VIDWID-(WWW-WW))/2
+	DEFB ESC,"=",RRR,CCC
+
+WW:	"SDcard virtual drives on "
+	REPT NDRVSD
+	DEFB DRIVEN
+DRIVEN	DEFL DRIVEN+1
+	ENDM
+WWW:
+RRR	DEFL RRR+1
+	ENDIF
 
 ;Video message
 CCC	DEFL 20H+(VIDWID-(W6-W5))/2

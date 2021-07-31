@@ -282,9 +282,40 @@ SYSGEN) aborts the simulator with the message:
 
 Halt instructions at address 0375
 
-N4PT12.SUB (Which does all but MOVECPM and SYSGEN) works successfully.
+N4PT12.SUB (Which does all but MOVECPM and SYSGEN) worked successfully for a
+while but another day was intermittent/unreliable. N4PT1.SUB runs successfully
+and doing the other steps one by one at the command-line instead of in the
+script always seems successful
 
 (try this with instruction tracing enabled)
+
+.. intermittent/non-deterministic about whether it crashes/halts at 375
+
+looks like a stack problem:
+
+::DB6A: FE 20        CP  20h          SP=DD3B AF=5201 HL=DD0C DE=0002 BC=0252
+::DB6C: D0           RET  NC          SP=DD3B AF=5222 HL=DD0C DE=0002 BC=0252
+::DBDD: C1           POP  BC          SP=DD3D AF=5222 HL=DD0C DE=0002 BC=0252
+::DBDE: C3 D3 DB     JP  DBD3h        SP=DD3F AF=5222 HL=DD0C DE=0002 BC=02A0
+::DBD3: 0A           LD A,(BC)        SP=DD3F AF=5222 HL=DD0C DE=0002 BC=02A0
+::DBD4: FE 24        CP  24h          SP=DD3F AF=2422 HL=DD0C DE=0002 BC=02A0
+::DBD6: C8           RET  Z           SP=DD3F AF=2462 HL=DD0C DE=0002 BC=02A0
+::E774: 3A DE E7     LD  A,(E7DEh)    SP=DD41 AF=2462 HL=DD0C DE=0002 BC=02A0
+::E777: B7           OR  A            SP=DD41 AF=0062 HL=DD0C DE=0002 BC=02A0
+::E778: CA 91 E7     JP  Z,E791h      SP=DD41 AF=0044 HL=DD0C DE=0002 BC=02A0
+::E791: 2A 0F DD     LD  HL,(DD0Fh)   SP=DD41 AF=0044 HL=DD0C DE=0002 BC=02A0
+::E794: F9           LD  SP,HL        SP=DD41 AF=0044 HL=07FE DE=0002 BC=02A0
+::E795: 2A 45 DD     LD  HL,(DD45h)   SP=07FE AF=0044 HL=07FE DE=0002 BC=02A0
+::E798: 7D           LD  A,L          SP=07FE AF=0044 HL=0000 DE=0002 BC=02A0
+::E799: 44           LD  B,H          SP=07FE AF=0044 HL=0000 DE=0002 BC=02A0
+::E79A: C9           RET              SP=07FE AF=0044 HL=0000 DE=0002 BC=00A0
+::0373: F3           DI               SP=0800 AF=0044 HL=0000 DE=0002 BC=00A0
+::0374: 76           HALT             SP=0800 AF=0044 HL=0000 DE=0002 BC=00A0
+Halt instructions at address 0375
+
+When it fails, it seems to fail in the "movecpm 62 *" step
+
+
 
 
 ## Next

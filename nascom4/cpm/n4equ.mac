@@ -30,12 +30,14 @@ NKBD	EQU T AND NAS		;Select Nascom keyboard
 WINI	EQU F
 
 ;Support virtual floppy drives on SDcard
-SDDRV	EQU F
+SDDRV	EQU T
 NUMSD	EQU 2			;virtual SDdisks on SDcard
 NDRVSD	EQU NUMSD AND SDDRV	;Number of SDdisks
 
 ;Support magnetic floppy drives
-NDRV5	EQU 4
+FLOPDRV	EQU T
+NUMFLOP	EQU 2			;5" magnetic disks
+NDRV5	EQU NUMFLOP AND FLOPDRV	;Number of floppy disks
 
 ;Select the drive type (48TPI always 2-sided. 96TPI can be 1 or 2-sided)
 TPI96	EQU F			;Select 96 tpi system
@@ -259,7 +261,7 @@ MXSECV	EQU	4096/SECV	;Sectors per 4K track
 MXTRKV	EQU	7*16		;7 pages of 16 tracks (512K)
 OFFV	EQU	0		;Reserved 4K tracks
 
-NDRVS	EQU NDRVW+NDRV5		;Total number of drives
+NDRVT	EQU NDRVW+NDRV5+NDRVSD	;Total number of drives
 
 ;Winchester sector and block size set by floppy parameters
 	IF TPI96
