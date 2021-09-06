@@ -4,21 +4,31 @@ The goal: CP/M 2.2 using the MAP80 BIOS modified so that it supports real
 (magnetic) floppies and also virtual floppies stored on the NASCOM 4 on-board
 SDcard.
 
-PolyDos supported 4 virtual drives and 16 virtual disks
+SDcard uses 24-bit linear block addressing, with each block being 512 bytes.
 
-each disk is 512Kbytes but doubled on the SDcard so that each disk occupies
-1MByte on the sdcard (2048 sectors, at offsets 0-0x7ff from some start address)
+PolyDos supports 4 virtual drives and 16 virtual disks. Each virtual disk is
+512Kbytes but each 256-byte PolyDos sector occupies 1 512-byte block (the second
+half of the block is unused) so that each virtual disk occupies 1MByte on the
+SDcard (2048 blocks, at offsets 0-0x7ff from some start address).
 
-SDcard uses 24-bit addressing.
+On the SDcard, blocks $0000-$03ff store the N4 boot menu and ROM images, so that
+first PolyDos disk image starts at $0400 + (0 * $800) = $400 and the last starts
+at $0400 + (15 * $800) = $7c00 and ends at $83ff.
 
-Address $0000 $03ff used to store the N4 boot menu and ROM images, so that the
-PolyDos images are at $0400 + $0000, $0400 + $0800, $0400 + $1000 etc.
+Each CP/M disk could be 350Kbyte (like the Pertec) but I've chosen to make them
+bigger: 1MByte. The CP/M sector size (512bytes) matches the SDcard block size
+and so all of the block is used; so that each virtual disk occupies 1MByte on
+the SDcard (2048 blocks, at offsets 0-0x7ff from some start address).
 
-Each CP/M disk could be 350Kbyte (like the Pertec) but it seems sensible to size
-them at 1MByte (and, unlike the PolyDos disks, to use all of the storage). The
-geometry of the drive can be chosen to make the track/sector -> linear
-conversion straightforward.  For example, 1024 * 1024 / 512 = 2048 sectors: 128
-tracks at 16 tracks/sector.
+The first CP/M disk image starts at $0400 + $8000 + (0 * $800) = $8400 and the
+last starts at $0400 + $8000 + (15 * $800) = $fc00 and ends at $1.03ff.
+
+This shows that (unlike the PolyDos port) the driver will need to support 24-bit
+addressing, in order to address the final virtual disk.
+
+The geometry of the drive is chosen to make the track/sector -> linear
+conversion straightforward. For example, 1024 * 1024 / 512 = 2048 sectors: 128
+tracks at 16 sectors/track.
 
 BUT the existing BIOS code has a SIDES equate that applies to all floppies so,
 at least for the initial work where I'm pretending that the SDcard disk images
@@ -26,32 +36,29 @@ are accessed through the floppy disk controller, the easiest approach is to
 pretend that the SDcard disk images are 2-sided to match the Pertec drives.
 
 This affects the equates:
-
+````
 MXTKSD goes from 128 (single-sided) to 64 (double-sided)
 MXSCSS goes from 16  (single-sided) to 32 (double-sided)
 OFFSD  goes from 2   (single-sided) to  1 (double-sided)
-
-.. and affects the setup in David's emulator for the SD*.config files
+````
 
 .. but does NOT affect the disk images themselves, or the cpmtools setup, where
 the sides are invisible.
 
-If I supported 16 CP/M disks I'd have to move to 24-bit addressing to
-accommodate the final one. Probably best to design it with that in mind, so that
-I can eventually support an unfragmented FAT filesystem.
+In the BIOS, I intend to support 2 real drives (floppy or gotek) and 2 drives
+that map to SDcard storage. The SDcard storage will support 16 disk images. At
+boot, the first two disk images will be associated with the 2 SDcard drives. A
+utility will be provided that maps either SDcard drive with any of the 16 disk
+images. Also, there will be a script to extract disk images from the SDcard, and
+a cpmtools setup that allows thes disk images to be created/listed/edited.
 
-Then CP/M images will be at $0400 + $8000, $0400 + $8800. Last one at $1.7C00
-
-Can store a disk id (4-bit value) and hard-code the base address (that's what I
-did for PolyDos) or can store the base address of each image.
+To map a disk image to an SDcard drive, can either store a disk id (4-bit value)
+and hard-code the base address (that's what I did for PolyDos) or can store a
+24-bit base address for each image.
 
 I think, for the start, I'll just store the id, as for PolyDos - and maybe store
 the base address in memory (rather than hard-coded) This means that the group of
 disks could later sit inside a 16MByte unfragmented FAT32 file.
-
-Start from the original BIOS which supports 2 floppy disks. Retain the boot from
-magnetic floppies and add support for 4 additional drives C, D, E, F that map
-to the SDcard.
 
 Required for initial debug:
 
@@ -67,7 +74,7 @@ After initial debug:
 * Create a utility to change the disk mappings, like the PolyDos one.
 
 * Put the new system image onto the system track of the SDcard disk image and
-switch the disk order so that A, B, C, D are SDcard disks and E, F are the
+switch the disk order so that A, B, are SDcard disks and C, D are the
 magnetic floppies.
 
 The system track on the magnetic floppies is both sides of 1 track: 2*10*512 =
@@ -76,7 +83,8 @@ cpmtools definition it counts as 2 (single-sided, interleaved) tracks.
 
 The proposed Sdcard image geometry is single-sided; both the BIOS and cpmtools
 setup consider the track size to be 16 sectors; in both cases, need to reserve 2
-system tracks (2*16*512 = 16Kbytes).
+system tracks (2*16*512 = 16Kbytes). The Pertec configuration reserved 10Kbytes
+and used nearly all of it, so 8Kbytes would not be enough.
 
 Q: are the blocking/unblocking routines portable (for different geometrys)
 provided that the physical sector size is constant (which it is: 512 bytes)
@@ -89,7 +97,7 @@ file?
 
 ## CPMTOOLS setup
 
-I added these 2 entries to /etc/cpmtools/diskdefs
+I added these 2 entries to /etc/cpmtools/diskdefs:
 
 ````
 # NASCOM CP/M Pertec 35-track DS DD by Neal 18Jul2021
@@ -236,7 +244,7 @@ Can compute the 24-bit start address of the selected SDdisk: calculate and store
 base + image_number*image_size (where image_size = 1024*1024/512 = 2048)
 
 and also store the disk ID of the selected drive, so can easily decide whether
-this needs to be recalculated or not. Do this in routine SHIFT or
+this needs to be recalculated or not. Do this in routine SHIFT?
 
 WRITE checks for RAMdisk and, if so, goes there (no blocking). Can see that this
 code is hard-wired to use a single floppy geometry: BLKSIZ, HSTSIZ, SPTF,
@@ -266,8 +274,8 @@ Summary of changes needed:
 * Option to make SDdisks first/bootable
 * RWHST to test for SDdisk and JP to a new piece of code for read/write based on stored parameters
 * GOTREC to select between floppy and SDdisk and calculate track wrap based on geometry
-* Review SEEK to understand how MAXTRK is used and how side select works. Update notes above and delete this bullet.
 * DON'T want to do anything on SELDSK because there could be buffered data to flush
+* MAY need to do something around CLEAN and TRACK0 (CLEAN might get called when it's not needed; TRACK0 initialises the track map, but TRACK0 is not being called by SDcard code.
 
 
 NOTE: This is the work to co-exist with 48TPI drives. In order to co-exist with
@@ -275,47 +283,92 @@ NOTE: This is the work to co-exist with 48TPI drives. In order to co-exist with
 with 96TPI rather than 48TPI.
 
 
-## Problems
+## Creating the SDcard image
 
-1/ running script N4PT123.SUB which does the entire build (including MOVECPM and
-SYSGEN) aborts the simulator with the message:
+For now, I simply added 2 disk images to the end of the SDcard image prepared for the PolyDos port
 
-Halt instructions at address 0375
+````
+$ cp ../PolyDos/nascom4_sdcard_bp.img .
+$ cat nascom4_sdcard_bp.img SD0.DSK SD1.DSK > xx
+$ mv xx nascom4_sdcard_bp.img
+````
 
-N4PT12.SUB (Which does all but MOVECPM and SYSGEN) worked successfully for a
-while but another day was intermittent/unreliable. N4PT1.SUB runs successfully
-and doing the other steps one by one at the command-line instead of in the
-script always seems successful
+## Problem: Cannot do entire build from XSUB
 
-(try this with instruction tracing enabled)
+Running script N4PT123.SUB which does the entire build (including MOVECPM and
+SYSGEN) aborts the simulator with a "Synchronization error" during the MOVECPM
+step.
 
-.. intermittent/non-deterministic about whether it crashes/halts at 375
+This error is an assertion that the serial number of the running system does not
+match the serial number in the MOVECPM image.
 
-looks like a stack problem:
+When running final step by hand (MOVECPM followed by SYSGEN) no sync error occurs.
 
-::DB6A: FE 20        CP  20h          SP=DD3B AF=5201 HL=DD0C DE=0002 BC=0252
-::DB6C: D0           RET  NC          SP=DD3B AF=5222 HL=DD0C DE=0002 BC=0252
-::DBDD: C1           POP  BC          SP=DD3D AF=5222 HL=DD0C DE=0002 BC=0252
-::DBDE: C3 D3 DB     JP  DBD3h        SP=DD3F AF=5222 HL=DD0C DE=0002 BC=02A0
-::DBD3: 0A           LD A,(BC)        SP=DD3F AF=5222 HL=DD0C DE=0002 BC=02A0
-::DBD4: FE 24        CP  24h          SP=DD3F AF=2422 HL=DD0C DE=0002 BC=02A0
-::DBD6: C8           RET  Z           SP=DD3F AF=2462 HL=DD0C DE=0002 BC=02A0
-::E774: 3A DE E7     LD  A,(E7DEh)    SP=DD41 AF=2462 HL=DD0C DE=0002 BC=02A0
-::E777: B7           OR  A            SP=DD41 AF=0062 HL=DD0C DE=0002 BC=02A0
-::E778: CA 91 E7     JP  Z,E791h      SP=DD41 AF=0044 HL=DD0C DE=0002 BC=02A0
-::E791: 2A 0F DD     LD  HL,(DD0Fh)   SP=DD41 AF=0044 HL=DD0C DE=0002 BC=02A0
-::E794: F9           LD  SP,HL        SP=DD41 AF=0044 HL=07FE DE=0002 BC=02A0
-::E795: 2A 45 DD     LD  HL,(DD45h)   SP=07FE AF=0044 HL=07FE DE=0002 BC=02A0
-::E798: 7D           LD  A,L          SP=07FE AF=0044 HL=0000 DE=0002 BC=02A0
-::E799: 44           LD  B,H          SP=07FE AF=0044 HL=0000 DE=0002 BC=02A0
-::E79A: C9           RET              SP=07FE AF=0044 HL=0000 DE=0002 BC=00A0
-::0373: F3           DI               SP=0800 AF=0044 HL=0000 DE=0002 BC=00A0
-::0374: 76           HALT             SP=0800 AF=0044 HL=0000 DE=0002 BC=00A0
-Halt instructions at address 0375
+With sync error:
 
-When it fails, it seems to fail in the "movecpm 62 *" step
+````
+0000 C3 2F D0 D5 00 C3 06 D0  C/PU.C.P
+0008 76 76 76 76 76 76 76 76  vvvvvvvv
 
+0373 F3 76 00 D0 0D 0A 43 6F  sv.P..Co
+037B 6E 73 74 72 75 63 74 69  nstructi
+````
 
+.. a HALT instruction has been written to 374
+
+without sync error:
+
+````
+0000 C3 03 E8 D5 00 C3 06 DA  C.hU.C.Z
+0008 76 76 76 76 76 76 76 76  vvvvvvvv
+
+0373 20 6F 6E 20 5A 2C 20 74   on Z, t
+037B 68 65 6E 20 74 79 70 65  hen type
+````
+
+The "06 D0/06 DA" is the BDOS entry point. When running without XSUB the BDOS
+entry point is DA06h. When XSUB is run it installs itself by fiddling with the
+vector in low memory, redirecting it to XSUB in high memory below the CCP. CCP
+is 0800h in size so if XSUB were 200h it would explain why the BDOS address
+(when XSUB is running) changes from DA00 to D000.
+
+By HALTing the system while it's running the XSUB script, memory examination
+shows that the BDOS is at D006 -- ie, the apparent BDOS intercept.
+
+So, now the question is: why does MOVECPM fail when running from XSUB. Neither
+MOVECPM nor SYSGEN mess with the O/S image that's currently in use and so they
+should not interfere with the high memory map.
+
+Also.. why was this intermittent with the emulator and does it happen on the
+real system now (it apparently didn't "back in the day"??)
+
+By comparing an instruction trace on passing and failing system and from
+examination of the original XSUB and MOVCPM source codes, the mystery is
+explained..
+
+It's reading the serial number from the start of the BDOS in the created image
+and expecting to find the same serial number in the running image's BDOS, but
+when it thinks it's looking in the running image's BDOS it's actually looking in
+the XSUB BDOS replacement, so there is no serial number there.
+
+..that suggests it could NEVER have worked even on the original system..
+
+(If XSUB had been a bit smarter it could have (also) have included space for the
+serial number and copied it from the BDOS as it installed. OR, if MOVECPM had
+been a bit smarter it could have recognised the XSUB double-jump..)
+
+When the code fails it gets to label BADSER0. The locations at SER1 (0373h) are
+loaded with 76F3h (op-code sequence DI HALT) then location at 0370h is changed
+from C3h (JP) to CDh (CALL) so that:
+
+* normal behaviour: PRINT contains a JP to BDOS and the BDOS return returns to
+  the caller of PRINT
+* modified behaviour: PRINT contains a CALL to BDOS and the BDOS return returns
+  to the code immediately following the PRINT, which has been set up to contain
+  the DI HALT sequence
+
+As the original source code intimates, this is all deliberately obfuscated to
+prevent reverse-engineering even on a development system.
 
 
 ## Next
@@ -327,18 +380,30 @@ When it fails, it seems to fail in the "movecpm 62 *" step
 5/ DONE create new labels to fix NAC HACK in code
 6/ DONE fix signon message where extra LF are present
 7/ DONE extend .sub file to include the sysgen
-8/ debug emulator problem with N4PT123
-9/ change bios to actually read/write SDcard
-10/ create sdcard image with the disk images present
-11/ test on N4 hardware
-12/ swap disk order so it boots from SDcard
-13/ create utility to allow SD disk images to be selected
+8/ DONE debug emulator problem with N4PT123
+9/ DONE change bios to actually read/write SDcard
+10/ DONE create sdcard image with the disk images present
+11/ support multiple disk images
+12/ write SDcard boot sector loader
+13/ swap disk order so it boots from SDcard
+14/ test on N4 hardware
+15/ create utility to allow SD disk images to be selected
+16/ tidy up all the scripts and check them in
+
+## Forming the SDcard block address
+
+This is the conversion from track/sector/side to linear addressing.
+
+````
+2 2 2 2 1 1 1 1 1 1 1 1 1 1
+3 2 1 0.9 8 7 6.5 4 3 2.1 0 9 8.7 6 5 4.3 2 1 0
+                1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 Base address $8400
+                  x x x x                       4-bit disk ID (0-15)
+                          x x x x x x           6-bit track (0-63)
+                                      x x x x x 5-bit sector (0-31)
+
+                ^ ^ ^ ^ ^ ^---------- this is the only place that a wrap can occur.
+                                      the low byte can be formed by ORing.
+````
 
 
-
-24-bit base address
-+  disk id * disk size
-+  track * track size
-+  sector
-
-..all in units of block size

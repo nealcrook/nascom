@@ -213,6 +213,22 @@ PDATB	EQU PIO+1
 PCTRLA	EQU PIO+2
 PCTRLB	EQU PIO+3
 
+;SDcontroller ports
+SDDATA	EQU 010H		;R/W
+SDSTAT	EQU 011H		;RO
+SDCTRL	EQU 011H		;WO
+SDLBA0	EQU 012H		;WO
+SDLBA1	EQU 013H		;WO
+SDLBA2	EQU 014H		;WO
+
+;For 48 TPI drives, 2-sided-ness is handled by doubling the
+;number of sectors on each track so that the two sides are
+;interleaved (implemented by a check against SECPS in RWFLOP).
+;For 96 TPI drives, 2-sided-ness is handled by doubling the
+;number of tracks so that the second side tracks come after
+;all of the first tracks (implemented by a check against MAXTRK
+;in SEEK).
+
 ;96 TPI DRIVES (single or double-sided)
 SEC96	EQU	512		;Physical sector size
 BLK96	EQU	4096		;CP/M block allocation size
@@ -233,7 +249,7 @@ OFF48	EQU 1			;System tracks (1 => 20 sectors)
 SECSD	EQU 512			;Physical sector size
 BLKSD	EQU 2048		;CP/M block allocation size
 DALLSD	EQU 2			;Directory allocation blocks
-MXSCSD	EQU 32			;Physical sectors/track
+MXSCSD	EQU 32			;Physical sectors/track (16 per side)
 MXTKSD	EQU 64			;Tracks/disc
 OFFSD	EQU 1			;System tracks (1 => 32 sectors)
 
@@ -283,6 +299,7 @@ DALLW	EQU 16384/BLKSIZ	;Directory allocation blocks (16k)
 	ENDIF
 CPMRPS	EQU	HSTSIZ/128	;CP/M records/host sector
 RPTF	EQU	CPMRPS*SPTF	;CP/M records/host track floppy
+RPTS	EQU	CPMRPS*MXSCSD	;CP/M records/host track SDdisk
 
 ;8250 UART
 BAUDL	EQU UARTD+1

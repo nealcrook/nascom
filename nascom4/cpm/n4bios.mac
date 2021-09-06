@@ -1737,6 +1737,14 @@ CHKUNA:	LD A,(UNACNT)		;any unalloc remain?
 	JR C,GOTREC
 	ENDIF
 
+;This assumes winchester then floppy drives then SDdrives
+	IF SDDRV
+	LD A,(HSTDSK)		;Check drive type
+	CP NDRVW+NDRV5
+	LD A,RPTS-1		;In case SDdrive
+	JR NC,GOTREC
+	ENDIF
+
 	LD A,RPTF-1		;Must be floppy
 GOTREC:	CP (HL)			;end of track?
 	JR NC,NOOVF		;skip if no overflow
@@ -2004,6 +2012,9 @@ DRVLOG:	DEFB 0FFH
 ;Track (D)
 ;Into (HL)
 ;C=1 read, C=0 write
+;*only* used for warm boot (reload system tracks to RAM) and so
+;only for read, but falls through into RWHST which is used for
+;all reads/writes
 RWSEC:	LD (HSTDSK),A		;Set up logical drive
 	LD (HSTDMA),HL		;Set up DMA
 	LD HL,HSTSEC		;Set up sector
@@ -2027,6 +2038,13 @@ FRETRY:
 	LD A,(HSTDSK)
 	CP NDRVW
 	JP C,RWWINI		;Go to Winchester read/write
+	ENDIF
+
+;This assumes winchester then floppy drives then SDdrives
+	IF SDDRV
+	LD A,(HSTDSK)
+	CP NDRVW+NDRV5
+	JP NC,RWSD		;Go to SDcard read/write
 	ENDIF
 
 ;Floppy read/write
@@ -2221,7 +2239,8 @@ GOTRAK:	INC HL
 	CALL DELAY
 	RET
 
-;Step to required track
+;Step to required track. B=2 and will be ORed in to FDC command
+;to select side 1, unless cleared to 0 here.
 SEEK:	PUSH HL			;Save position in track map
 	LD HL,HSTTRK		;Point to required track
 	IF TPI96
@@ -2579,8 +2598,106 @@ INITD:	DEFB HIGH WCYL&WNUM
 ;Initialisation table
 	INITAB %WINTYP
 
-
 	ENDIF
+
+	SUBTTL SDcard routines
+	PAGE
+
+	IF SDDRV
+
+SDBASE: DEFB 84H                  ;1st block of disk 0 at 8400H
+
+
+
+;[NAC HACK 2021Aug02] TODO storage and code.
+;[NAC HACK 2021Aug02] TODO tabify
+;[NAC HACK 2021Aug03] have a byte reserved for track map at TRKA but don't use it
+;[NAC HACK 2021Aug03] don't need to maintain DRVLOG either
+
+;Read/Write to sector in HSTSEC
+;At track in HSTTRK
+;On drive in HSTDSK
+;To/From address in HSTDMA
+;(RWFLAG) =1 Read, =0 Write
+
+
+;/--- LBA2 ---\  /--- LBA1 ---\  /--- LBA0 ---\
+;2 2 2 2 1 1 1 1 1 1 1 1 1 1
+;3 2 1 0.9 8 7 6.5 4 3 2.1 0 9 8.7 6 5 4.3 2 1 0
+;                1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 Base address $8400
+;                  x x x x                       4-bit disk ID (0-15)
+;                          x x x x x x           6-bit track (0-63)
+;                                      x x x x x 5-bit sector (0-31)
+;
+;                ^ ^ ^ ^ ^ ^---------- this is the only place that a wrap can occur.
+;                                      the low byte can be formed by ORing.
+
+
+
+RWSD:	IN	A,(SDSTAT)
+        CP      80H
+        JR      NZ, RWSD        ;wait until SDcard is ready
+
+        LD      A,(HSTTRK)
+        LD      B,A
+        REPT 5
+        SLA     B
+        ENDM
+        LD      A,(HSTSEC)
+        ADD     A,B
+        OUT     (SDLBA0),A      ;low 8 bits of block address
+
+        LD      A,(HSTTRK)
+        LD      B,A
+        REPT    3
+        SRA     B
+        ENDM
+        LD      A,(SDBASE)
+        ADD     A,B
+        OUT     (SDLBA1),A
+
+        XOR     A
+        OUT     (SDLBA2),A
+
+;[NAC HACK 2021Aug03] this is only set up for 1st disk. Need N bytes
+;that store the disk ID of the 4 drives. Also, need to cope with
+;wrap/carry into SDLBA2.
+
+
+        LD      HL,(HSTDMA)     ;data source/destination
+        LD      A,(RWFLAG)
+        OR      A
+        JR      Z,WSD
+
+;Read. A=1
+        XOR     A
+        OUT     (SDCTRL), A     ;0=>read command
+
+RSDBSY: IN      A,(SDSTAT)
+        CP      080H
+        RET     Z               ;done!
+        CP      0E0H
+        JR      NZ, RSDBSY
+        IN      A,(SDDATA)      ;[NAC HACK 2021Aug03] set up C for data port
+        LD      (HL),A
+        INC     HL
+        JR      RSDBSY
+
+;Write. A=0
+WSD:    INC     A
+        OUT     (SDCTRL), A     ;1=>write command
+
+WSDBSY: IN      A,(SDSTAT)
+        CP      080H
+        RET     Z               ;done!
+        CP      0A0H
+        JR      NZ, WSDBSY
+        LD      A,(HL)
+        OUT     (SDDATA),A
+        INC     HL
+        JR      WSDBSY
+
+        ENDIF
 
 	SUBTTL General Purpose Utilities
 	PAGE
