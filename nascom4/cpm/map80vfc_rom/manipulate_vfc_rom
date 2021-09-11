@@ -1,0 +1,157 @@
+#!/usr/bin/perl
+#
+# manipulate_vfc_rom
+#
+# extract the boot loader binary from the VFC ROM for analysis, and create
+# a new ROM with a modified version inserted, if it exists.
+#
+# There are 2 ROM versions and they both have different boot code starting
+# at slightly different locations.
+#
+# Here's the "flow":
+# start with 2 rom files
+# report boot loader start/end/size
+# extract boot_code_0682.bin
+#         boot_code_0678.bin
+#
+# use dis_rom_682 to create boot_code_0682.asm
+#     dis_rom_678 to create boot_code_0678.asm
+#
+# use one of those as a starting point to create:
+#     boot_code_0682_sd.asm
+#
+# and then clone/mod to create:
+#     boot_code_0678_sd.asm
+#
+# use ./build to create
+#     boot_code_0678_sd.bin
+#     boot_code_0678_sd.bin
+#
+# then re-run manipulate_vfc_rom to insert that binary into the respective
+# rom file to create:
+#     map80vfc_boot_rom_newver_sd.bin";
+#     map80vfc_boot_rom_sd.bin";
+
+
+my @rom;
+$rom[0] = "../../../ROM/map80vfc/map80vfc_boot_rom_newver.bin";
+$rom[1] = "../../../ROM/map80vfc/map80vfc_boot_rom.bin";
+
+foreach my $i (0..1) {
+    process_boot_code($rom[$i]);
+}
+
+#### Subroutines
+
+sub process_boot_code {
+    my $file = $_[0];
+
+    open IN, $file or die "Cannot open $file\n";
+    my $data;
+    {
+        # slurp
+        local $/=undef;
+        $data = <IN>;
+    }
+    close IN;
+
+    my @rom = unpack("C*", $data);
+
+    # find the entry point of the boot code
+    # code starts: jmp dskboot
+    my $start = $rom[1] | ($rom[2] <<8);
+    printf "Start address is 0x%04x for $file\n", $start;
+
+    # boot code ends with the text "ERROR ?"
+    my @target = unpack("C*", "ERROR ?");
+
+    my $tin = 0;
+    my $rin = $start;
+    my $len = @target;
+
+    # Danger! Code does not exit if not found..
+    while (1) {
+        if ($rom[$rin] == $target[$tin]) {
+            $tin = $tin + 1;
+            last if ($tin == $len);
+        }
+        else {
+            # start again
+            $tin = 0;
+        }
+        $rin = $rin + 1;
+    }
+    my $size = $rin - $start + 1;
+    printf "Boot code found. End address is 0x%04x containing 0x%02x\n", $rin, $rom[$rin];
+    printf "Boot code is %d bytes\n", $size;
+
+    # spit out the code
+    my $outfile = sprintf "boot_code_%04x.bin", $start;
+    open OUT, ">$outfile";
+    for (my $i=$start; $i<=$rin; $i++) {
+        print OUT chr($rom[$i]);
+    }
+    close OUT;
+
+
+    # build and insert new/replacement code, if it exists..
+    my $new_basename = sprintf "boot_code_%04x_sd", $start;
+    if ((-f "${new_basename}.asm") and (assemble($new_basename)) and (-f "${new_basename}.bin")) {
+        open IN, "${new_basename}.bin" or die "Cannot open ${new_basename}.bin\n";
+        my $tmp;
+        {
+            # slurp
+            local $/=undef;
+            $tmp = <IN>;
+        }
+        close IN;
+        my @replacement = unpack("C*", $tmp);
+
+        if (scalar @replacement != $size) {
+            printf "ERROR expected $new_bin of %d bytes but it is %d bytes.\n", $size, scalar @replacement;
+            # abort
+            return;
+        }
+
+        # overwrite the boot loaded with the new version
+        foreach my $byte (@replacement) {
+            $rom[$start] = $byte;
+            $start = $start + 1;
+        }
+
+        # write out the modified ROM image
+        $outfile = new_name($file);
+        print "writing modified ROM image to $outfile\n";
+        open OUT, ">$outfile";
+        foreach my $byte (@rom) {
+            print OUT chr($byte);
+        }
+        close OUT;
+    }
+    else {
+        print "No replacement source code found for this ROM\n";
+    }
+    print "\n\n";
+}
+
+
+# given something like "../../ROM/map80vfc/map80vfc_boot_rom_newver.bin"
+# use the basename and extension to create a new name
+# map80vfc_boot_rom_newver_sd.bin
+#
+sub new_name {
+    my $name = $_[0];
+
+    my @bits = split "/", $name;
+    my @base = split /\./, $bits[-1];
+
+    return "$base[0]_sd.$base[1]";
+}
+
+# given a name foo, assemble foo.asm to generate foo.lst and foo.bin
+# expect to find z80asm (from https://www.nongnu.org/z80asm/index.html) on $PATH
+sub assemble {
+    my $asm = $_[0];
+    system "z80asm ${asm}.asm -l${asm}.lst -o${asm}.bin";
+    return 1;
+}
