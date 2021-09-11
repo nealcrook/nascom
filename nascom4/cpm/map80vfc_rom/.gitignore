@@ -1,2 +1,5 @@
-boot_code_0678
-boot_code_0682
+*.txt
+*.lst
+boot_code*.bin
+boot_code_0678.asm
+boot_code_0682.asm

@@ -33,7 +33,7 @@ comments in that script.
 
 The end result is the 2 ROM images here:
 
-* [map80vfc_boot_rom_sd.bin](../../../ROM/map80vfc/map80vfc_boot_rom_sd.bin)
-* [map80vfc_boot_rom_newver_sd.bin](../../../ROM/map80vfc/map80vfc_boot_rom_newver_sd.bin)
+* [map80vfc_boot_rom_sd.bin](map80vfc_boot_rom_sd.bin)
+* [map80vfc_boot_rom_newver_sd.bin](map80vfc_boot_rom_newver_sd.bin)
 
 These can be used in David's map80nascom emulator or in the boot menu of a real NASCOM4.
