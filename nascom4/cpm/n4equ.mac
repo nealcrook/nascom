@@ -30,6 +30,11 @@ NKBD	EQU T AND NAS		;Select Nascom keyboard
 WINI	EQU F
 
 ;Support virtual floppy drives on SDcard
+;When SDBOOT is false, the floppy disks come first and are used
+;to boot: the boot sector code loads from floppy drive. When
+;true, the SDcard virtual drives come first and are used to boot:
+;the boot sector code loads from the first SDcard virtual drive.
+SDBOOT  EQU T
 SDDRV	EQU T
 NUMSD	EQU 2			;virtual SDdisks on SDcard
 NDRVSD	EQU NUMSD AND SDDRV	;Number of SDdisks

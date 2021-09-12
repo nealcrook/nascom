@@ -406,4 +406,113 @@ This is the conversion from track/sector/side to linear addressing.
                                       the low byte can be formed by ORing.
 ````
 
+## Build process
 
+````
+$ ./regen_build_disk
+
+(start up CP/M using that disk)
+
+A>sub n4pt12
+
+A>
+A>movecpm 62 *
+````
+
+.. you need to press <CR> to get the 2nd A> prompt. The system does a warm-start
+between the first and second A> prompt, unloading XSUB. Without the <CR>,
+movecpm will generate a SYNCHRONIZATION ERROR due to XSUB being chained through
+the BDOS entry point (see long description above).
+
+reboot, and continue (using the movecpm.com that had been generated before)
+
+````
+A>movecpm 62 *
+.
+.
+A>sysgen
+
+a
+
+Wrong System/Size - Press any Key
+````
+
+.. but, reboot and the system starts up correctly, with the new BIOS. Run
+MOVECPM and SYSGEN on this system and it all completes without error. I suppose
+that means I need to disassemble/undestand SYSGEN next.. (actually - the DR
+SYSGEN sources are in the cpm2-plm bundle, but SYSGEN is somewhat
+system-specific because it encodes the disk geometry).
+
+..that error message is not part of SYSGEN but is part of the BIOS. Is it
+printed from the running image or from the new image? Would need to patch the
+system to find out.. How does that come to get used/printed? It is an error
+message printed by the warm start code... presumably of the running system.
+
+-> would definitely be useful to add some tracing of BDOS and BIOS entry, and to
+add the capability to break on particular locations.
+
+-> or could just grab a trace and work backwards from the message.
+
+..claims to be a warm start: re-reading CCP and BDOS without BIOS (presumably
+that's only possible if the BIOS is the same size as it used to be?? Or, at
+least the same number of sectors.
+
+
+
+
+After MOVECPM has run, the relocated system is in memory at 900h - the system
+track contents, including the boot sector. That allows a *small* program (eg,
+SYSGEN) to be loaded and to execute without messing up the image. SYSGEN can
+read a system track into memory, which is loaded at 900h.
+
+
+
+
+TODO edit the "original" disk to add pip and the .com files that I created (and document them here??)
+TODO clean up the number of disk files/images that I created and rationalise the names, and clean up the associated scripts and instructions
+
+
+
+
+1. primary boot loader code to replace blob in MAP80VFC ROM, and a script to hack it into
+the existing binary (to save the need to disassemble/reassemble the whole thing)
+
+- my ROM and David's ROMs are different, and have the boot code at different
+places. The boot code itself is different/different sizes. The new boot code
+(from SDcard) is identical for both ROM versions.
+
+-> DONE (and working)
+
+
+2. boot sector code
+
+-> DONE (and working)
+
+
+3. option to put the SDcard drives first
+
+-> DONE (and working)
+
+
+
+## Bootstrap
+
+* start from clean floppy image
+* (boot from floppy)
+* build BIOS with SDcard support and SDCARD set to F (FALSE)
+* SYSGEN the new image onto floppy -- drive A
+* reboot from floppy and ensure SDcard is accessible
+
+then
+
+* edit n4equ.mac to change SDBOOT to T (TRUE)
+* update the existing boot disk with the new n4equ.mac file:
+** cpmrm the existing file
+** cpmcp the new version
+* (boot from floppy)
+* build BIOS -- has SDcard support and SDCARD set to T (TRUE)
+* SYSGEN the new image onto SDcard -- drive C
+* change map80vfc ROM to load bootstrap from SDcard
+* reboot and ensure SDcard is accessible and that drives A, B are SDcard and C, D are floppy
+
+Works!! Now, with map80nascom emulator, 1st floppy (file) is 1st floppy drive: drive C.

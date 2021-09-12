@@ -261,6 +261,40 @@ START:	LD HL,0			;CP/M address, the only one
 	LD A,11H
 	OUT (0FFH),A		;Select Gemini RAM deselect EPROM and G813
 
+	IF SDBOOT
+	;Boot from SDcard. Always load from 2nd block of 1st virtual disk
+	;ie block 00.8401H -- assume no wrap from SDLBA0.
+	;SDcard controller must already be initialised
+	;HL = load address
+	;E = number of blocks
+	;B = current block
+
+	LD A,0			;SDcard block address $00.8400
+	OUT (SDLBA2),A		;coded like this to make it patchable
+	LD A,84H		;[NAC HACK 2021Sep11] use a literal..
+	OUT (SDLBA1),A
+GETSEC:	LD A,B			;start after boot sector
+	OUT (SDLBA0),A
+
+	XOR A
+	OUT (SDCTRL),A		;READ command
+
+LOAD:	IN A,(SDSTAT)
+	CP 80H
+        JR Z, GOOD		;block completed
+	CP 0E0H
+	JR NZ, LOAD		;wait for next byte
+	IN A,(SDDATA)		;[NAC HACK 2021Aug03] set up C for data port??
+	LD (HL),A
+	INC HL
+	JR LOAD
+
+GOOD:	INC B			;Next block
+	DEC E			;Block counter
+        JR NZ,GETSEC
+
+	ELSE
+	; Boot from floppy
 GETSEC:	LD A,01H
 	OUT (DRVPRT),A		;Drive
 	LD A,B
@@ -314,7 +348,8 @@ WNBUSY:	IN A,(FDCSTA)		;Wait until not busy
 NEXTS:	DEC E			;Sector counter
 	JR NZ,GETSEC
 
-;All loaded, so go to it
+	ENDIF
+;All loaded (floppy or SDcard), so go to it
 	LD HL,(START+1)		;CP/M address
 	LD DE,1600H		;Add in to BIOS
 	ADD HL,DE
@@ -1731,21 +1766,33 @@ CHKUNA:	LD A,(UNACNT)		;any unalloc remain?
 	INC (HL)		;unarec = unarec+1
 
 	IF WINI
+	;First group of drives are Winchester..
 	LD A,(HSTDSK)		;Check drive type
 	CP NDRVW
 	LD A,RPTW-1		;In case Winchester
 	JR C,GOTREC
 	ENDIF
 
-;This assumes winchester then floppy drives then SDdrives
 	IF SDDRV
+	IF SDBOOT
+	;SD drives followed by floppy drives
+	LD A,(HSTDSK)		;Check drive type
+	CP NDRVW+NDRVSD
+	LD A,RPTS-1		;In case SDdrive
+	JR C,GOTREC
+
+	ELSE
+	;Floppy drives followed by SD drives
 	LD A,(HSTDSK)		;Check drive type
 	CP NDRVW+NDRV5
 	LD A,RPTS-1		;In case SDdrive
 	JR NC,GOTREC
 	ENDIF
+	ENDIF
 
 	LD A,RPTF-1		;Must be floppy
+
+;A holds RPTW/RPTF/RPTS depending upon the current media type
 GOTREC:	CP (HL)			;end of track?
 	JR NC,NOOVF		;skip if no overflow
 
@@ -1896,6 +1943,14 @@ DRVNUM	DEFL DRVNUM+1
 	ENDM
 	ENDIF
 
+	IF SDDRV AND SDBOOT
+	;SD drives followed by floppy drives
+	REPT NDRVSD
+	DPH 0,DPBSD,%DRVNUM,T	;Check vector true
+DRVNUM	DEFL DRVNUM+1
+	ENDM
+	ENDIF
+
 	REPT NDRV5
 	IF TPI96
 	DPH 0,DPB96,%DRVNUM,T	;;Check vector true
@@ -1905,7 +1960,8 @@ DRVNUM	DEFL DRVNUM+1
 DRVNUM	DEFL DRVNUM+1
 	ENDM
 
-	IF SDDRV
+	IF SDDRV AND NOT SDBOOT
+	;Floppy drives followed by SD drives
 	REPT NDRVSD
 	DPH 0,DPBSD,%DRVNUM,T	;Check vector true
 DRVNUM	DEFL DRVNUM+1
@@ -1932,13 +1988,19 @@ DPHV:	DPH 0,DPBV,%DRVNUM,F	;Check vector false
 DPBW:	DPB	HSTSIZ,MXSCW,MXTKW,BLKSIZ,DALLW,OFFW,F,W
 	ENDIF
 
+	IF SDDRV AND SDBOOT
+	;SD drives followed by floppy drives
+DPBSD:	DPB	SECSD,MXSCSD,MXTKSD,BLKSD,DALLSD,OFFSD,T,SD
+	ENDIF
+
 	IF TPI96
 DPB96:	DPB	SEC96,MXSC96,SIDES*MXTK96,BLK96,DALL96,OFF96,T,96
 	ELSE
 DPB48:	DPB	SEC48,MXSC48,MXTK48,BLK48,DALL48,OFF48,T,48
 	ENDIF
 
-	IF SDDRV
+	IF SDDRV AND NOT SDBOOT
+	;Floppy drives followed by SD drives
 DPBSD:	DPB	SECSD,MXSCSD,MXTKSD,BLKSD,DALLSD,OFFSD,T,SD
 	ENDIF
 
@@ -2033,21 +2095,27 @@ RWSEC:	LD (HSTDSK),A		;Set up logical drive
 RWHST:	LD (RWFLAG),A		;Flag read/write
 ;Full retry
 FRETRY:
-;Check for Winchester
+	LD A,(HSTDSK)		;0=A, 1=B etc.
+
 	IF WINI
-	LD A,(HSTDSK)
 	CP NDRVW
 	JP C,RWWINI		;Go to Winchester read/write
 	ENDIF
 
-;This assumes winchester then floppy drives then SDdrives
 	IF SDDRV
-	LD A,(HSTDSK)
+	IF SDBOOT
+	;SD drives followed by floppy drives
+	CP NDRVW+NDRVSD
+	JP C,RWSD		;Go to SDcard read/write
+
+	ELSE
+	;Floppy drives followed by SD drives
 	CP NDRVW+NDRV5
 	JP NC,RWSD		;Go to SDcard read/write
 	ENDIF
+	ENDIF
 
-;Floppy read/write
+;Fall through to floppy read/write
 	LD B,8			;Up to 8 retries
 NEXTRY:	PUSH BC
 	CALL SETFLP		;Set up for floppy read/write
@@ -2213,7 +2281,15 @@ LDG0:	DEFB 0
 ;Set up for floppy read/write
 ;Convert logical drive number to physical
 SETFLP:	LD A,(HSTDSK)		;Logical drive
-	SUB NDRVW		;Take off Winchesters
+
+        IFDEF SDDRV AND SDBOOT
+	;Winchesters and SD drives before floppies
+        SUB NDRVW + NDRVSD
+        ELSE
+	;Winchesters before floppies
+	SUB NDRVW
+	ENDIF
+
 	LD B,A
 	INC B			;Make B non-zero
 	LD A,80H
@@ -2604,7 +2680,7 @@ INITD:	DEFB HIGH WCYL&WNUM
 	PAGE
 
 	IF SDDRV
-
+;[NAC HACK 2021Sep11] put this in equates and use it also in boot sector code
 SDBASE: DEFB 84H                  ;1st block of disk 0 at 8400H
 
 
@@ -2768,6 +2844,14 @@ DRVNUM	DEFL DRVNUM+1
 	ENDIF
 	ENDM
 
+	IF SDDRV AND SDBOOT
+	;SD drives followed by floppy drives
+	REPT NDRVSD
+	BUFF %DRVNUM,ASIZSD,CSIZSD
+DRVNUM	DEFL DRVNUM+1
+	ENDM
+	ENDIF
+
 	REPT NDRV5
 	IF TPI96
 	BUFF %DRVNUM,ASIZ96,CSIZ96
@@ -2777,7 +2861,8 @@ DRVNUM	DEFL DRVNUM+1
 DRVNUM	DEFL DRVNUM+1
 	ENDM
 
-	IF SDDRV
+	IF SDDRV AND NOT SDBOOT
+	;Floppy drives followed by SD drives
 	REPT NDRVSD
 	BUFF %DRVNUM,ASIZSD,CSIZSD
 DRVNUM	DEFL DRVNUM+1
@@ -3119,6 +3204,20 @@ RRR	DEFL RRR+1
 RRR	DEFL RRR+2
 	ENDIF
 
+;SDcard virtual drives message (when before floppies)
+	IF SDDRV AND SDBOOT
+CCC	DEFL 20H+(VIDWID-(WWS-WS))/2
+	DEFB ESC,"=",RRR,CCC
+
+WS:	"SDcard virtual drives on "
+	REPT NDRVSD
+	DEFB DRIVEN
+DRIVEN	DEFL DRIVEN+1
+	ENDM
+WWS:
+RRR	DEFL RRR+1
+	ENDIF
+
 ;Floppies message
 CCC	DEFL 20H+(VIDWID-(W4-W3))/2
 	DEFB ESC,"=",RRR,CCC
@@ -3143,17 +3242,17 @@ DRIVEN	DEFL DRIVEN+1
 W4:
 RRR	DEFL RRR+1
 
-;SDcard virtual drives message
-	IF SDDRV
-CCC	DEFL 20H+(VIDWID-(WWW-WW))/2
+;SDcard virtual drives message (when after floppies)
+	IF SDDRV AND NOT SDBOOT
+CCC	DEFL 20H+(VIDWID-(WWS-WS))/2
 	DEFB ESC,"=",RRR,CCC
 
-WW:	"SDcard virtual drives on "
+WS:	"SDcard virtual drives on "
 	REPT NDRVSD
 	DEFB DRIVEN
 DRIVEN	DEFL DRIVEN+1
 	ENDM
-WWW:
+WWS:
 RRR	DEFL RRR+1
 	ENDIF
 
