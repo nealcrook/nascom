@@ -47,10 +47,10 @@ DPB	MACRO	?PSIZE,?PSPT,?TRKS,?BLS,?DIRAL,?OFF,?CKS,?LBL
 	REPT	8
 ?N	DEFL ?N/2
 	IF	?N EQ 0
-	EXITM	
-	ENDIF	
+	EXITM
+	ENDIF
 ?BSH	DEFL ?BSH + 1
-	ENDM	
+	ENDM
 
 ?BLM	DEFL ?BLS/128-1
 ?SIZE	DEFL (?TRKS-?OFF)*?PSPT
@@ -61,10 +61,10 @@ DPB	MACRO	?PSIZE,?PSPT,?TRKS,?BLS,?DIRAL,?OFF,?CKS,?LBL
 	IF	?DSM GT 255
 	IF	?BLS EQ 1024
 	.PRINTX "Error,:can't have this size disk with 1k block size"
-	EXITM	
-	ENDIF	
+	EXITM
+	ENDIF
 ?EXM	DEFL ?EXM/2
-	ENDIF	
+	ENDIF
 
 ?EXM	DEFL ?EXM-1
 ?ALL	DEFL 0
@@ -72,7 +72,7 @@ DPB	MACRO	?PSIZE,?PSPT,?TRKS,?BLS,?DIRAL,?OFF,?CKS,?LBL
 
 	REPT	?N
 ?ALL	DEFL (?ALL SHR 1) OR 8000H
-	ENDM	
+	ENDM
 
 ?AL0	DEFL HIGH ?ALL
 ?AL1	DEFL LOW ?ALL
@@ -81,10 +81,10 @@ DPB	MACRO	?PSIZE,?PSPT,?TRKS,?BLS,?DIRAL,?OFF,?CKS,?LBL
 	IF ?CKS
 ?NCKS	DEFL ?NDIRS/4
 CSIZ&?LBL EQU ?NCKS		;;Pass back checksum vector size
-	ELSE	
+	ELSE
 ?NCKS	DEFL 0
 CSIZ&?LBL EQU 0			;;Pass back checksum vector size
-	ENDIF	
+	ENDIF
 ASIZ&?LBL EQU ?DSM/8+1		;;Pass back allocation vector size
 
 	DEFW	?SPT		;128 byte records per track
@@ -95,7 +95,7 @@ ASIZ&?LBL EQU ?DSM/8+1		;;Pass back allocation vector size
 	DEFB	?AL0,?AL1	;Alloc vector for directory
 	DEFW	?NCKS		;Checksum size
 	DEFW	?OFF		;Offset for system tracks
-	ENDM	
+	ENDM
 
 ;	SKEW MACRO
 ;1 Physical sectors per track
@@ -120,17 +120,17 @@ SKEW	MACRO	?SECS,?SKF,?FSC
 
 	IF	?NXTSEC GE ?SECS
 ?NXTSEC	DEFL ?NXTSEC-?SECS
-	ENDIF	
+	ENDIF
 
 ?NELTS	DEFL ?NELTS-1
 	IF	?NELTS EQ 0
 ?NXTBAS	DEFL ?NXTBAS+1
 ?NXTSEC	DEFL ?NXTBAS
 ?NELTS	DEFL ?NELTST
-	ENDIF	
-	ENDM	
+	ENDIF
+	ENDM
 
-	ENDM	
+	ENDM
 
 GCD	MACRO	?M,?N
 ;;	greatest common divisor of m,n
@@ -144,13 +144,13 @@ GCD	MACRO	?M,?N
 ?GCDX	DEFL ?GCDM/?GCDN
 ?GCDR	DEFL ?GCDM - ?GCDX*?GCDN
 	IF	?GCDR EQ 0
-	EXITM	
-	ENDIF	
+	EXITM
+	ENDIF
 ?GCDM	DEFL ?GCDN
 ?GCDN	DEFL ?GCDR
-	ENDM	
+	ENDM
 
-	ENDM	
+	ENDM
 
 ;	BUFF MACRO
 ;1 Drive number (%)
@@ -281,7 +281,7 @@ GETSEC:	LD A,B			;start after boot sector
 
 LOAD:	IN A,(SDSTAT)
 	CP 80H
-        JR Z, GOOD		;block completed
+	JR Z, GOOD		;block completed
 	CP 0E0H
 	JR NZ, LOAD		;wait for next byte
 	IN A,(SDDATA)		;[NAC HACK 2021Aug03] set up C for data port??
@@ -291,7 +291,7 @@ LOAD:	IN A,(SDSTAT)
 
 GOOD:	INC B			;Next block
 	DEC E			;Block counter
-        JR NZ,GETSEC
+	JR NZ,GETSEC
 
 	ELSE
 	; Boot from floppy
@@ -405,7 +405,7 @@ LEAVE:
 	ELSE
 	DEFB 0			;Page out VRAM completely
 	ENDIF
-PRGTAB:	
+PRGTAB:
 	IF MYBIT
 	DEFB ":","*",0FFH	;User programmable key table
 	DEFB "*",":",0FFH
@@ -496,7 +496,7 @@ GOCPM:	CALL WBOOT1		;Initialise page 0 and I/O
 
 ;Wrong system message
 WRGSYS:	DEFB CR,LF,7,"Wrong System/Size - Press any Key",0
-	
+
 ;Cold boot enters here
 BOOTB:	IF WINI
 ;Write CCP+BDOS to Winchester
@@ -688,7 +688,7 @@ KEYBD:	IF VKBD
 
 CONIN2:	LD HL,EDIND		;Next edit position
 	INC (HL)
-	RET	
+	RET
 
 BUFMT:	LD A,(FED)		;Fixed edit mode ?
 	OR A
@@ -891,7 +891,7 @@ SOUT:	CALL SOUTST
 SHKOUT:	IN A,(PHAND)		;Check handshake
 	IF NAS
 	RLA			;Test bit 7
-	JR NC,NREADY	
+	JR NC,NREADY
 	ELSE
 	BIT 4,A			;Test CTS
 	JR Z,NREADY
@@ -1305,7 +1305,7 @@ K30:	CP "@"
 	CP CR
 	JR Z,K36	;Flip upper/lower case
 	JR K38		;Make control
-	
+
 	ELSE
 ;If not N1 and @ entered, make into TAB
 K30:	CP "@"
@@ -1551,7 +1551,7 @@ VR:	CALL DSKBUF		;Transfer VDISK to VBUFF
 
 ;Write virtual disk
 VW:	CALL DMABUF		;Transfer DMA to VBUFF
-	CALL DSKBUF		;Transfer VBUFF to VDISK 
+	CALL DSKBUF		;Transfer VBUFF to VDISK
 VOUT:	XOR A			;No errors
 	RET
 
@@ -2282,10 +2282,10 @@ LDG0:	DEFB 0
 ;Convert logical drive number to physical
 SETFLP:	LD A,(HSTDSK)		;Logical drive
 
-        IFDEF SDDRV AND SDBOOT
+	IFDEF SDDRV AND SDBOOT
 	;Winchesters and SD drives before floppies
-        SUB NDRVW + NDRVSD
-        ELSE
+	SUB NDRVW + NDRVSD
+	ELSE
 	;Winchesters before floppies
 	SUB NDRVW
 	ENDIF
@@ -2711,69 +2711,69 @@ SDBASE: DEFB 84H                  ;1st block of disk 0 at 8400H
 
 
 RWSD:	IN	A,(SDSTAT)
-        CP      80H
-        JR      NZ, RWSD        ;wait until SDcard is ready
+	CP      80H
+	JR      NZ, RWSD        ;wait until SDcard is ready
 
-        LD      A,(HSTTRK)
-        LD      B,A
-        REPT 5
-        SLA     B
-        ENDM
-        LD      A,(HSTSEC)
-        ADD     A,B
-        OUT     (SDLBA0),A      ;low 8 bits of block address
+	LD      A,(HSTTRK)
+	LD      B,A
+	REPT 5
+	SLA     B
+	ENDM
+	LD      A,(HSTSEC)
+	ADD     A,B
+	OUT     (SDLBA0),A      ;low 8 bits of block address
 
-        LD      A,(HSTTRK)
-        LD      B,A
-        REPT    3
-        SRA     B
-        ENDM
-        LD      A,(SDBASE)
-        ADD     A,B
-        OUT     (SDLBA1),A
+	LD      A,(HSTTRK)
+	LD      B,A
+	REPT    3
+	SRA     B
+	ENDM
+	LD      A,(SDBASE)
+	ADD     A,B
+	OUT     (SDLBA1),A
 
-        XOR     A
-        OUT     (SDLBA2),A
+	XOR     A
+	OUT     (SDLBA2),A
 
 ;[NAC HACK 2021Aug03] this is only set up for 1st disk. Need N bytes
 ;that store the disk ID of the 4 drives. Also, need to cope with
 ;wrap/carry into SDLBA2.
 
 
-        LD      HL,(HSTDMA)     ;data source/destination
-        LD      A,(RWFLAG)
-        OR      A
-        JR      Z,WSD
+	LD      HL,(HSTDMA)     ;data source/destination
+	LD      A,(RWFLAG)
+	OR      A
+	JR      Z,WSD
 
 ;Read. A=1
-        XOR     A
-        OUT     (SDCTRL), A     ;0=>read command
+	XOR     A
+	OUT     (SDCTRL), A     ;0=>read command
 
 RSDBSY: IN      A,(SDSTAT)
-        CP      080H
-        RET     Z               ;done!
-        CP      0E0H
-        JR      NZ, RSDBSY
-        IN      A,(SDDATA)      ;[NAC HACK 2021Aug03] set up C for data port
-        LD      (HL),A
-        INC     HL
-        JR      RSDBSY
+	CP      080H
+	RET     Z               ;done!
+	CP      0E0H
+	JR      NZ, RSDBSY
+	IN      A,(SDDATA)      ;[NAC HACK 2021Aug03] set up C for data port
+	LD      (HL),A
+	INC     HL
+	JR      RSDBSY
 
 ;Write. A=0
 WSD:    INC     A
-        OUT     (SDCTRL), A     ;1=>write command
+	OUT     (SDCTRL), A     ;1=>write command
 
 WSDBSY: IN      A,(SDSTAT)
-        CP      080H
-        RET     Z               ;done!
-        CP      0A0H
-        JR      NZ, WSDBSY
-        LD      A,(HL)
-        OUT     (SDDATA),A
-        INC     HL
-        JR      WSDBSY
+	CP      080H
+	RET     Z               ;done!
+	CP      0A0H
+	JR      NZ, WSDBSY
+	LD      A,(HL)
+	OUT     (SDDATA),A
+	INC     HL
+	JR      WSDBSY
 
-        ENDIF
+	ENDIF
 
 	SUBTTL General Purpose Utilities
 	PAGE

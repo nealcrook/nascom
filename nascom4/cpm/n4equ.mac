@@ -151,8 +151,8 @@ VPORT	EQU F2797		;Standard location
 CNTRL	EQU VPORT+0CH
 VSWICH	EQU VPORT+0EH		;VFC video 1
 
-VKBD	EQU VFC AND NOT NKBD		;VFC keyboard
-IKBD	EQU IVC AND NOT NKBD		;IVC keyboard
+VKBD	EQU VFC AND NOT NKBD	;VFC keyboard
+IKBD	EQU IVC AND NOT NKBD	;IVC keyboard
 MAP32	EQU NOT G813		;MAP 32K page system (Nascom 2/G811)
 MAP4	EQU G813		;MAP 4K page system (G813)
 VDRIVE	EQU 15			;Drive to use/swop (12=M, 15=P)
@@ -200,8 +200,8 @@ PIO	EQU 0B4H		;Base PIO port (0 no PIO setup)
 	ENDIF
 
 ;Winchester ports
-SASIC	EQU	0E5H		; SASI control port
-SASID	EQU	SASIC+1		; SASI data port
+SASIC	EQU	0E5H		;SASI control port
+SASID	EQU	SASIC+1		;SASI data port
 
 ;Port controlled video
 PVDUD	EQU 0B1H		;Data port (R/W)
