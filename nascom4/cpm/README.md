@@ -507,8 +507,12 @@ then
 
 * edit n4equ.mac to change SDBOOT to T (TRUE)
 * update the existing boot disk with the new n4equ.mac file:
-** cpmrm the existing file
-** cpmcp the new version
+
+````
+$ cpmrm -f nascom-pertec BIOSDEV2.DSK 0:n4equ.mac
+$ cpmcp -f nascom-pertec BIOSDEV2.DSK n4equ.mac 0:n4equ.mac
+````
+
 * (boot from floppy)
 * build BIOS -- has SDcard support and SDCARD set to T (TRUE)
 * SYSGEN the new image onto SDcard -- drive C
@@ -516,3 +520,24 @@ then
 * reboot and ensure SDcard is accessible and that drives A, B are SDcard and C, D are floppy
 
 Works!! Now, with map80nascom emulator, 1st floppy (file) is 1st floppy drive: drive C.
+
+
+
+next..
+
+how to select disks..
+
+could store a 4-bit code for each disk, the DISK_ID
+
+$84 for drive 0  $a4         $c4       $e4
+$8c              $ac         $cc       $ec
+$94              $b4         $d4       $f4
+$9c              $bc         $dc       $fc for drive f
+
+
+can incorporate the base address and disk ID into a single byte:  nice! but how to find the location from the SDMOUNT utility?
+
+can find BDOS but want to distinguish when XRUN is in progress
+
+.. Added 4 bytes to the BIOS workspace. Can find it at a fixed offset from the start
+of the BIOS.

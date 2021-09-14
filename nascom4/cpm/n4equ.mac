@@ -38,6 +38,9 @@ SDBOOT  EQU T
 SDDRV	EQU T
 NUMSD	EQU 2			;virtual SDdisks on SDcard
 NDRVSD	EQU NUMSD AND SDDRV	;Number of SDdisks
+SD0BLK	EQU 084H		;Disk 0 starts at 00.8400
+SD1BLK	EQU 08CH		;Disk 1 starts at 00.8c00
+
 
 ;Support magnetic floppy drives
 FLOPDRV	EQU T

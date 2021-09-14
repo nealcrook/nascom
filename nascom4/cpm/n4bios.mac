@@ -263,15 +263,15 @@ START:	LD HL,0			;CP/M address, the only one
 
 	IF SDBOOT
 	;Boot from SDcard. Always load from 2nd block of 1st virtual disk
-	;ie block 00.8401H -- assume no wrap from SDLBA0.
-	;SDcard controller must already be initialised
+	;Assume no wrap from SDLBA0 to SDLBA1 during boot.
+	;SDcard controller must already be initialised else we can't be here
 	;HL = load address
 	;E = number of blocks
 	;B = current block
 
 	LD A,0			;SDcard block address $00.8400
 	OUT (SDLBA2),A		;coded like this to make it patchable
-	LD A,84H		;[NAC HACK 2021Sep11] use a literal..
+	LD A,SD0BLK		;1st virtual disk
 	OUT (SDLBA1),A
 GETSEC:	LD A,B			;start after boot sector
 	OUT (SDLBA0),A
@@ -441,6 +441,17 @@ ROW:	DEFB 0			;Row store
 PIXEL:	DEFB 0			;Pixel store
 VWEND:
 	ENDIF
+
+;[NAC HACK 2021Sep13] more portable to repeat for the number of drives and increment from base address
+;[NAC HACK 2021Sep13] ..putting the S and D around the bytes allows the number of bytes reserved here
+;[NAC HACK 2021Sep13] to be checked.
+	IF SDDRV
+	DEFB 'S'		;SD is "Magic number"
+SD0DRV:	DEFB SD0BLK		;1st drive defaults to disk 0
+SD1DRV:	DEFB SD1BLK		;2nd drive defaults to disk 1
+	DEFB 'D'		;Checked by SDMOUNT utility
+	ENDIF
+
 ;@@@@@@@@@@@@@@@@@@ End of user changeable workspace @@@@@@@@@@@@@@
 ;Get to 8H boundary
 WPOS:	DEFS (((WPOS-BIOS) AND 0FFF8H)+8)-(WPOS-BIOS),0
@@ -2282,7 +2293,7 @@ LDG0:	DEFB 0
 ;Convert logical drive number to physical
 SETFLP:	LD A,(HSTDSK)		;Logical drive
 
-	IFDEF SDDRV AND SDBOOT
+	IF SDDRV AND SDBOOT
 	;Winchesters and SD drives before floppies
 	SUB NDRVW + NDRVSD
 	ELSE
@@ -2680,10 +2691,6 @@ INITD:	DEFB HIGH WCYL&WNUM
 	PAGE
 
 	IF SDDRV
-;[NAC HACK 2021Sep11] put this in equates and use it also in boot sector code
-SDBASE: DEFB 84H                  ;1st block of disk 0 at 8400H
-
-
 
 ;[NAC HACK 2021Aug02] TODO storage and code.
 ;[NAC HACK 2021Aug02] TODO tabify
@@ -2707,7 +2714,9 @@ SDBASE: DEFB 84H                  ;1st block of disk 0 at 8400H
 ;
 ;                ^ ^ ^ ^ ^ ^---------- this is the only place that a wrap can occur.
 ;                                      the low byte can be formed by ORing.
-
+;
+;                1 x x x x 1 0 0                 Stored byte, encompasses
+;                                                start address and disk
 
 
 RWSD:	IN	A,(SDSTAT)
@@ -2728,17 +2737,24 @@ RWSD:	IN	A,(SDSTAT)
 	REPT    3
 	SRA     B
 	ENDM
-	LD      A,(SDBASE)
-	ADD     A,B
+
+        LD      A,(HSTDSK)
+        IF NOT SDBOOT
+        SUB     NDRVW+NDRV5
+        ENDIF                   ;Now have 0 for first SDdrive
+
+; This is crude but effective - hard-coded for 2 SDdrives
+        OR      A
+	LD      A,(SD0DRV)      ;Assume drive 0
+        JR      Z, SD0
+        LD      A,(SD1DRV)      ;No, actually want drive 1
+SD0:	ADD     A,B
 	OUT     (SDLBA1),A
 
-	XOR     A
-	OUT     (SDLBA2),A
-
-;[NAC HACK 2021Aug03] this is only set up for 1st disk. Need N bytes
-;that store the disk ID of the 4 drives. Also, need to cope with
-;wrap/carry into SDLBA2.
-
+        LD      A,0             ;Preserve C flag
+        JR      NC,SDWRAP
+        INC     A               ;Wrap Carry into LBA2
+SDWRAP:	OUT     (SDLBA2),A
 
 	LD      HL,(HSTDMA)     ;data source/destination
 	LD      A,(RWFLAG)
