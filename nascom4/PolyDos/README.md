@@ -6,9 +6,9 @@ using the FDC and either real floppy disk drives or GOTEK drives.
 The nascom_sdcard version of PolyDos will run on NASCOM 4, with the
 nascom_sdcard connected to the PIO.
 
-This code is (yet another) version of PolyDos; this time, to use the SDcard on
-the NASCOM 4. Therefore, it will run on a "Stage 2" build of NASCOM 4, without
-the need for PIO or FDC.
+This code is (yet another) version of PolyDos; this time, to use the NASCOM 4
+ SDcard to provide (virtual) disk storage. Therefore, it will run on a "Stage 2"
+ build of NASCOM 4, without the need for PIO or FDC.
 
 All of the customisation of PolyDos takes place within its boot ROM. Boot ROMs
 are loaded using the NASCOM 4 menu system.
@@ -20,14 +20,14 @@ From the NASCOM 4 boot menu, select the letter associated with "POLYDOS-LSD" (LS
 
 ## How this version differs from one using floppy disks
 
-There are 4 drives (0-3) and 16 (virtual) disks, 0-9,a-f. At boot time, drives 0-3 are associated with disks 0-3. You can change disks using the SETDRV utility (described below).
+There are 4 (virtual) drives (0-3) and 16 (virtual) disks (0-9, A-F). At boot time, drives 0-3 are associated with disks 0-3. You can change disks using the SETDRV utility (described below).
 
 
 ## Utilities
 
-* SETDRV utility to map drives to drive slots (new version)
-* CASDSK to intercept tape read/write commands (same version as for nascom_sdcard)
-* SCRAPE (new version that stores to internal SDcard NOT YET WRITTEN)
+* SETDRV - utility to map drives to disk images (new version)
+* CASDSK - utility to intercept tape read/write commands (same version as for nascom_sdcard)
+* SCRAPE - (new version that stores to internal SDcard NOT YET WRITTEN)
 
 There are 4 virtual drives and 16 virtual disks. Type:
 

@@ -1,5 +1,87 @@
 # CP/M for NASCOM 4
 
+CP/M 2.2 using the MAP80 BIOS will run on NASCOM 4 without modification, using
+the FDC and either real floppy disk drives or GOTEK drives.
+
+This code is a modified version of the MAP80 BIOS. The modifications allow the
+NASCOM 4 SDcard to provide (virtual) disk storage. These drives can co-exist
+with real floppy disk drives/GOTEK drives. The default configuration boots from
+an SDcard drive and has 2 SDcard drives (A, B) and 2 real floppy disk drives (C,
+D). One alternative is to swap the ordering, so that the system boots from
+floppy.
+
+All of the customisation of CP/M takes place within the BIOS. I started with the
+source code provided by MAP80 systems.
+
+## Getting Started - preparing the SDcard image
+
+TODO
+
+## Getting Started - booting from floppy
+
+Put the image TODO on floppy or GOTEK. It is a Pertec 35-track 48TPI image.
+
+From the NASCOM 4 boot menu, select the letter associated with "MAP80 VFC
+CP/M". The screen should re-sync and switch to 80-columns. The message "BOOTING"
+should appear top-left, and almost immediately be replaced by the CP/M startup
+screen.
+
+The startup screen should announce that A, B are floppy disk drives and C, D are SD drives.
+
+## Getting Started - booting from SDcard
+
+Prepare the SDcard image as described above.
+
+From the NASCOM 4 boot menu, select the letter associated with "MAP80 VFC
+CP/M-LSD" (LSD = Local SDcard). The screen should re-sync and switch to
+80-columns. The message "SDBOOT" should appear top-left, and almost immediately
+be replaced by the CP/M startup screen.
+
+The startup screen should announce that A, B are SD drives and C, D are floppy disk drives.
+
+## How this version differs from one using floppy disks
+
+There are 2 (virtual) drives (A, B or C, D) and 16 (virtual) disk images (0-9,
+A-F). At boot time, drive A is associated with disk 0 and drive B is associated
+with disk 1.
+
+The utility SDMOUNT is used to associate a disk image with a drive. For example,
+"SDMOUNT B 6" mounts disk image 6 on B.
+
+If the system boots from an SD drive (ie, if drive A is an SD drive) then any
+disk image mounted on A must be a system disk (various CP/M operations trigger a
+re-load of the CCP, BDOS and BIOS from drive A and the system will hang if the
+disk in drive A is not a system disk).
+
+An disk can be made into a system disk by running the CP/M utility SYSGEN. The
+system tracks are not available for any other purpose and so there is no
+disadvantage to making every disk a system disk.
+
+## Utilities
+
+* SDMOUNT - utility to map drives to disk images
+* FAST - writes 0 to I/O port 1AH to switch a NASCOM 4 to full-speed (0-wait) operation. Keyboard scanning will not work!
+* SLOW - writes 20H to I/O port 1AH to switch a NASCOM 4 to nominal 4MHz-equivalent speed operation.
+* HALT - execute 76H (halt). Useful in emulation to get back to the BIOS monitor but probably of no use on a real system
+
+There are 2 virtual drives (A, B or C, D) and 16 virtual disks (0-9, A-F). Type:
+
+````
+$ SDMOUNT n m
+````
+to associate drive n with disk m
+
+Type:
+````
+$ SDMOUNT
+````
+to see a usage hint and a report of the current drive mappings.
+
+
+
+
+# Implementation notes
+
 The goal: CP/M 2.2 using the MAP80 BIOS modified so that it supports real
 (magnetic) floppies and also virtual floppies stored on the NASCOM 4 on-board
 SDcard.
@@ -541,3 +623,14 @@ can find BDOS but want to distinguish when XRUN is in progress
 
 .. Added 4 bytes to the BIOS workspace. Can find it at a fixed offset from the start
 of the BIOS.
+
+
+Next: clean up the scripts, build full set of disks, store a lump here that is CP/M and lump in polydos that is
+polydos, with tools to combine and split them? Add "standard" boot disk, Add the VFC ROM to the boot menu
+
+Problem: how to bootstrap load the new system on N4 hardware? Currently, the VFC
+ROM image is baked into the FPGA and cannot be changed. I could create a
+stand-alone boot loader (defeating the object of my patched ROM) and load it in
+high memory, start it up and have it do all the init -- including calling the
+initialisation routine in the ROM. Put it at f000 where the video memory will
+eventually be located and it should be invisible and leave no footprint.
