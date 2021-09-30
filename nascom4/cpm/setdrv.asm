@@ -1,4 +1,4 @@
-        ;; SDMOUNT.COM
+        ;; SETDRV.COM
         ;;
         ;; Utility for CP/M on NASCOM4
         ;;
@@ -8,10 +8,10 @@
         ;;
         ;; Usage:
         ;;
-        ;; SDMOUNT A 4    -- mount disk 4 on drive A
-        ;; SDMOUNT B A    -- mount disk 10 on drive B
-        ;; SDMOUNT A7     -- this is also legal.. mount disk 7 on drive A
-        ;; SDMOUNT        -- report mounts
+        ;; SETDRV A 4    -- mount disk 4 on drive A
+        ;; SETDRV B A    -- mount disk 10 on drive B
+        ;; SETDRV A7     -- this is also legal.. mount disk 7 on drive A
+        ;; SETDRV        -- report mounts
         ;;
         ;; When referring to drives, A,B,C,D are legal values; A and C
         ;; are synonyms for the 1st SDdrive and B and D are synonyms for
@@ -50,7 +50,7 @@ LF:     EQU     $0a
         ;; and to have a sub to parse a number, then range test the result..
         ;; and a flag to show if the result is valid.)
 
-SDMOUNT:
+SETDRV:
         LD      HL,CLBUF+1      ;skip length byte
 PARSE1: LD      A,(HL)
         INC     HL
@@ -207,7 +207,7 @@ DRV2ASC:
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         ;; MESSAGES
 MSGINFO:
-        DEFM    'Usage:            SDMOUNT n m'
+        DEFM    'Usage:            SETDRV n m'
         DEFB    CR,LF,CR,LF
         DEFM    'Associate drive n (A, B or C, D) with logical disk m (0-9, A-F).'
         DEFB    CR,LF

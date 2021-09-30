@@ -45,8 +45,8 @@ There are 2 (virtual) drives (A, B or C, D) and 16 (virtual) disk images (0-9,
 A-F). At boot time, drive A is associated with disk 0 and drive B is associated
 with disk 1.
 
-The utility SDMOUNT is used to associate a disk image with a drive. For example,
-"SDMOUNT B 6" mounts disk image 6 on B.
+The utility SETDRV is used to associate a disk image with a drive. For example,
+"SETDRV B 6" mounts disk image 6 on B.
 
 If the system boots from an SD drive (ie, if drive A is an SD drive) then any
 disk image mounted on A must be a system disk (various CP/M operations trigger a
@@ -59,7 +59,7 @@ disadvantage to making every disk a system disk.
 
 ## Utilities
 
-* SDMOUNT - utility to map drives to disk images
+* SETDRV - utility to map drives to disk images
 * HALT - execute 76H (halt). Useful in emulation to get back to the BIOS monitor but probably of no use on a real system
 * WARM - execute a jump to 0 (CP/M warm start) - Can be used as a NOP command in a script.
 * FAST - writes 0 to I/O port 1AH followed by jump to 0 to switch a NASCOM 4 to full-speed (0-wait) operation. Keyboard scanning will not work!
@@ -68,13 +68,13 @@ disadvantage to making every disk a system disk.
 There are 2 virtual drives (A, B or C, D) and 16 virtual disks (0-9, A-F). Type:
 
 ````
-$ SDMOUNT n m
+$ SETDRV n m
 ````
 to associate drive n with disk m
 
 Type:
 ````
-$ SDMOUNT
+$ SETDRV
 ````
 to see a usage hint and a report of the current drive mappings.
 
@@ -708,7 +708,7 @@ $94              $b4         $d4       $f4
 $9c              $bc         $dc       $fc for drive f
 
 
-can incorporate the base address and disk ID into a single byte:  nice! but how to find the location from the SDMOUNT utility?
+can incorporate the base address and disk ID into a single byte:  nice! but how to find the location from the SETDRV utility?
 
 can find BDOS but want to distinguish when XRUN is in progress
 
@@ -740,3 +740,9 @@ SD0.DSK .. SDF.DSK
 change disks_from_image to use parameter that names the img file.
 
 -> maybe not; use the other script instead.
+
+-> move more scripts to tools/ and rationalise - use sdcard_editor where possible
+-> create boot ROM
+-> update docs
+-> tidy up this README.md file
+-> rework the bootstrap section and rebuild biosdev2.dsk image now I've renamed setdrv.com
