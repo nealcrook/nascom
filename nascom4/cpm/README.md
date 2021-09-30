@@ -19,7 +19,7 @@ TODO
 
 ## Getting Started - booting from floppy
 
-Put the image TODO on floppy or GOTEK. It is a Pertec 35-track 48TPI image.
+Put the image BIOSDEV2.DSK on floppy or GOTEK. It is a Pertec 35-track 48TPI image.
 
 From the NASCOM 4 boot menu, select the letter associated with "MAP80 VFC
 CP/M". The screen should re-sync and switch to 80-columns. The message "BOOTING"
@@ -60,9 +60,10 @@ disadvantage to making every disk a system disk.
 ## Utilities
 
 * SDMOUNT - utility to map drives to disk images
-* FAST - writes 0 to I/O port 1AH to switch a NASCOM 4 to full-speed (0-wait) operation. Keyboard scanning will not work!
-* SLOW - writes 20H to I/O port 1AH to switch a NASCOM 4 to nominal 4MHz-equivalent speed operation.
 * HALT - execute 76H (halt). Useful in emulation to get back to the BIOS monitor but probably of no use on a real system
+* WARM - execute a jump to 0 (CP/M warm start) - Can be used as a NOP command in a script.
+* FAST - writes 0 to I/O port 1AH followed by jump to 0 to switch a NASCOM 4 to full-speed (0-wait) operation. Keyboard scanning will not work!
+* SLOW - writes 20H to I/O port 1AH followed by jump to 0 to switch a NASCOM 4 to nominal 4MHz-equivalent speed operation.
 
 There are 2 virtual drives (A, B or C, D) and 16 virtual disks (0-9, A-F). Type:
 
@@ -76,6 +77,96 @@ Type:
 $ SDMOUNT
 ````
 to see a usage hint and a report of the current drive mappings.
+
+
+# Disk Images
+
+* BIOSDEV1.DSK - this started out as my "disk 26" which was scraped as NAS051.BIN. Its system track is a circa-1983
+  BIOS build for my NASCOM with 48tpi pertec drives. The NASCOM4 BIOS sources and a few other files have been added
+  (file list below). This image can be used as the starting-point to bootstrap the other two disk images (see
+  bootstrap instructions below).
+* BIOSDEV2.DSK - this started out as BIOSDEV1.DSK and the N4BIOS was rebuilt and sysgen'd onto the system track, so
+  that the system track and the MOVECPM.COM image are the only differences from BIOSDEV2.DSK
+
+
+# Bootstrap
+
+Boot using BIOSDEV1.DSK. The n4equ.mac file has "SDBOOT F" (false). The system announces as "Neal's MAP 80 BIOS Version 2.1a"
+with "Double sided 48 tpi drives on ABCB".
+
+````
+A>sub n4cpm                                       *** type this line
+
+.
+.
+(xsub active)
+A>SAVE 54 MOVECPM.COM
+A>                                                *** press return to cause warm start
+A>MOVECPM 62 *                                    *** type this line
+
+Constructing 62k CP/M vers 2.2
+Ready for "SYSGEN" or
+"SAVE 47 CPM62.COM"
+A>SYSGEN                                          *** type this line
+SYSGEN VER 2.48
+SOURCE Drive name (or RETURN to skip)             *** press return
+DESTINATION Drive name (or RETURN to reboot)A     *** press A
+DESTINATION on A, then type RETURN                *** press return
+FUNCTION COMPLETE
+DESTINATION Drive name (or RETURN to reboot)      *** press return
+
+Wrong System/Size - Press any Key                 *** reset/reboot the system
+````
+
+After reset/reboot the system announces as "MAP 80 BIOS Version 2.1 01/10/83" with
+"Double sided 48 tpi drives on AB" and "SDcard virtual drives on CD".
+
+Edit n4equ.mac to change "SDBOOT T" (true). Replace the file on the disk image:
+
+````
+$ cpmrm -f nascom-pertec BIOSDEV2.DSK 0:n4equ.mac
+$ cpmcp -f nascom-pertec BIOSDEV2.DSK n4equ.mac 0:n4equ.mac
+````
+
+The (modified) disk image is now identical to BIOSDEV2.DSK.
+
+Now, boot using BIOSDEV2.DSK (or the modified BIOSDEV1.DSK), rebuild the BIOS
+and sysgen it onto the SD drive:
+
+````
+A>sub n4cpm                                       *** type this line
+
+.
+.
+(xsub active)
+A>SAVE 54 MOVECPM.COM
+A>                                                *** press return to cause warm start
+A>MOVECPM 62 *                                    *** type this line
+
+Constructing 62k CP/M vers 2.2
+Ready for "SYSGEN" or
+"SAVE 47 CPM62.COM"
+A>SYSGEN                                          *** type this line
+SYSGEN VER 2.48
+SOURCE Drive name (or RETURN to skip)             *** press return
+DESTINATION Drive name (or RETURN to reboot)C     *** press C
+DESTINATION on A, then type RETURN                *** press return
+FUNCTION COMPLETE
+DESTINATION Drive name (or RETURN to reboot)      *** press return
+
+A>DIR C:                                          *** type this line
+C: SD0      TXT
+A>PIP C:=A:*.*                                    *** type this line
+.
+.
+A>
+````
+
+This leaves the new image on drive c: but the boot loader on this system track loads from SD etc. need to
+boot it
+
+
+- add cpmtools setup in this section
 
 
 
@@ -625,8 +716,10 @@ can find BDOS but want to distinguish when XRUN is in progress
 of the BIOS.
 
 
-Next: clean up the scripts, build full set of disks, store a lump here that is CP/M and lump in polydos that is
-polydos, with tools to combine and split them? Add "standard" boot disk, Add the VFC ROM to the boot menu
+Next: clean up the scripts, build full set of disks, store a lump of SDimage
+here that is CP/M and lump of SDimage in polydos that is polydos, with tools to
+combine and split them? Add "standard" boot disk, Add the VFC ROM to the boot
+menu
 
 Problem: how to bootstrap load the new system on N4 hardware? Currently, the VFC
 ROM image is baked into the FPGA and cannot be changed. I could create a
@@ -634,3 +727,16 @@ stand-alone boot loader (defeating the object of my patched ROM) and load it in
 high memory, start it up and have it do all the init -- including calling the
 initialisation routine in the ROM. Put it at f000 where the video memory will
 eventually be located and it should be invisible and leave no footprint.
+
+
+... change make_blank_sd_floppy to make all 16 and to put a unique image on each
+as a "fingerprint" -> make_blank_sd_floppy_set
+
+... want script for inserting/removing SDcard images and Polydos images
+
+SD0.DSK .. SDF.DSK
+
+
+change disks_from_image to use parameter that names the img file.
+
+-> maybe not; use the other script instead.

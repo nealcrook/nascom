@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
-# This script builds an SDcard image for use by the NASCOM-NG
-# Special Boot ROM.
+# This script builds the boot menu/ROM images part of an SDcard image for
+# use by the Special Boot ROM (SBROM) on NASCOM-NG (NASCOM4).
 #
 # Eventually SBR might understand FAT but for now deal with raw SDcard
 # blocks; 512 bytes per block: the image must be put onto the SDcard
@@ -31,7 +31,10 @@
 # This is not an interactive tool; all the work that it does is coded in
 # this source file.
 #
+# https://github.com/nealcrook/nascom
+# Neal Crook, September 2021.
 # foofoobedoo@gmail.com
+#
 ################################################################################
 
 ##[NAC HACK 2020Dec11] - Add profile that uses NAS-SYS3 in RAM

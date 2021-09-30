@@ -1,0 +1,735 @@
+#!/usr/bin/perl
+#
+# This script inserts and removes sections from an SDcard image for use
+# by the NASCOM-NG (NASCOM4).
+#
+# ./sdcard_editor <image_file>
+# ./sdcard_editor -help
+#
+# https://github.com/nealcrook/nascom
+# Neal Crook, September 2021.
+# foofoobedoo@gmail.com
+#
+################################################################################
+
+use strict;
+no strict 'refs'; # CLI makes subroutine from command name.
+use warnings;
+
+my $BYTES_BLK = 512;
+my $BLKS_DSK = 2048; # 1Mbyte (2048 blocks) each
+my $MENU = 1024;           # Blocks for menu/ROMs
+my $PDOS = $BLKS_DSK * 16; # Blocks for 16 PolyDos disks
+my $CPM = $BLKS_DSK * 16;  # Blocks for 16 CP/M disks
+
+# Set by initial examination of image and updated as appropriate by commands
+my $has_menu = 0;
+my $needs_padding = 0;
+my $has_polydos = 0;
+my $has_cpm = 0;
+
+
+my $cmdline;
+my @cmds;
+
+# expect the name of an image file
+if (defined $ARGV[0]) {
+    $cmds[0] = shift @ARGV;
+    if ($cmds[0] eq '-help') {
+        cmd_help();
+        cmd_quit();
+    }
+    elsif (-e $cmds[0]) {
+        open IMG, "+<", $cmds[0] or die "FATAL could not open $cmds[0]";
+    }
+    else {
+        cmd_usage();
+        cmd_quit();
+    }
+}
+else {
+    cmd_usage();
+    cmd_quit();
+}
+
+
+# got an image file. May have additional commands to process
+@cmds = @ARGV;
+my $interactive = defined $cmds[0] ? 0 : 1;
+
+analyse_image();
+
+while (1) {
+    # process commands
+    while (defined $cmds[0]) {
+        my $cmd;
+        my $rest;
+        my $arg;
+        my $fname;
+
+        # general form: command=drive,file
+        ($cmd,$rest) = split "=", $cmds[0];
+        if (defined $rest) {
+            ($arg,$fname) = split ",", $rest;
+        }
+
+        $cmd =~ s/-/_/;
+        my $sub = "cmd_$cmd";
+        if (defined(&{$sub})) {
+            shift @cmds;
+            &{$sub}($arg, $fname);
+        }
+        else {
+            print "ERROR no command \'$cmd\'\n";
+            shift @cmds;
+        }
+    }
+    # get more commands
+    if ($interactive) {
+        print "sdcard_editor: ";
+        my $cmdline = <STDIN>;
+        chomp $cmdline;
+        # remove comments (like this) #or like this
+        $cmdline =~ s/\(.*\)//g;
+        $cmdline =~ s/\#.*$//;
+        next if ($cmdline eq "");
+
+        @cmds = split " ", $cmdline;
+    }
+    else {
+        cmd_quit();
+    }
+}
+
+
+#################################################################
+#################################################################
+## Subroutines
+
+# Look at IMG and infer what pieces are present from its size
+sub analyse_image {
+
+    my @bits = stat IMG;
+    my $size = $bits[7];
+
+    # Default
+    $has_menu = 0;
+    $needs_padding = 0;
+    $has_polydos = 0;
+    $has_cpm = 0;
+
+    if ($size == ($MENU + $PDOS + $CPM) * $BYTES_BLK) {
+        $has_menu = 1;
+        $has_polydos = 1;
+        $has_cpm = 1;
+    }
+    elsif ($size == ($MENU + $PDOS) * $BYTES_BLK) {
+        $has_menu = 1;
+        $has_polydos = 1;
+    }
+    elsif ($size == ($MENU) * $BYTES_BLK) {
+        $has_menu = 1;
+    }
+    else {
+        # Infer whether a non-padded menu exists
+
+        # read 1st block and see whether it looks like a menu
+        # .. if anyone creates a menu for which this heuristic fails, refine the
+        # heuristic.
+
+        seek IMG, 0, 0;
+        my $data;
+        my $got = read IMG, $data, $BYTES_BLK;
+        if ($got == $BYTES_BLK) {
+            if (($data =~ /A:/) and ($data =~ /B:/)) {
+                # found 2 menu entries so conclude that a (non-padded) menu exists
+                $has_menu = 1;
+                $needs_padding = $MENU * $BYTES_BLK - $size; # amount of padding required
+            }
+        }
+    }
+}
+
+
+# Extract disk image from IMG and save as file named $name
+# File $name overwrites any existing file of that name
+# Disk (0-15) is specified by $index
+# $is_poly = 1 -> PolyDos disk image, which must be unpacked before saving (read
+# 1MByte from IMG and save 512Kbytes in $name)
+# $is_poly = 0 -> CP/M disk image (read 1MByte from IMG and save 1MByte in $name)
+# Return 1 if successful, 0 (and print error message) on error.
+sub extract_disk {
+    my $index = $_[0];
+    my $name = $_[1];
+    my $is_poly = $_[2];
+
+    # convert $index: disks 0-15 are PolyDos, 16-31 are CP/M
+    $index = $is_poly ? $index : $index + 16;
+
+    my $seekto = ($MENU + $BLKS_DSK * $index) * $BYTES_BLK;
+    my $size = $BYTES_BLK * $BLKS_DSK;
+    return extract($seekto, $size, $name, $is_poly);
+}
+
+
+# Extract a chunk from IMG.
+# Start at $offset for $size bytes.
+# Extracted chunk is named $name and overwrites any existing file of that name
+# If $is_poly, unpack data by discarding the 2nd 256 bytes in each 512 byte chunk.
+# Return 1 if successful, 0 (and print error message) on error.
+sub extract {
+    my $offset = $_[0];
+    my $size = $_[1];
+    my $name = $_[2];
+    my $is_poly = $_[3];
+
+    if (seek IMG, $offset, 0) {
+        if (open OUT, ">", $name) {
+            my $data;
+            my $got = read IMG, $data, $size;
+            if ($got == $size) {
+                # all good
+                if ($is_poly) {
+                    # unpack: only use the first 256 bytes of each block
+                    my $blocks = $size/$BYTES_BLK;
+                    foreach my $i (0..$blocks-1) {
+                        print OUT substr($data, $i * $BYTES_BLK, 256);
+                    }
+                }
+                else {
+                    print OUT $data;
+                }
+                close OUT;
+                return 1;
+            }
+            else {
+                print "ERROR cannot extract data for $name - data truncated by end of image file\n";
+            }
+        }
+        else {
+            print "ERROR cannot extract data for $name - cannot open $name for output\n";
+        }
+    }
+    else {
+        print "ERROR cannot extract data for $name - image file too small\n";
+    }
+    return 0;
+}
+
+
+# Insert disk image into IMG from $name, overwriting the existing content
+# Disk (0-15) is specified by $index
+# $is_poly = 1 -> PolyDos disk image, which must be packed before insertion (read
+# 512Kbytes from $name and write 1MByte to IMG)
+# $is_poly = 0 -> CP/M disk image (read 1MByte from $name and save 1MByte in IMG)
+# Return 1 if successful, 0 (and print error message) on error.
+sub insert_disk {
+    my $index = $_[0];
+    my $name = $_[1];
+    my $is_poly = $_[2];
+
+    # convert $index: disks 0-15 are PolyDos, 16-31 are CP/M
+    $index = $is_poly ? $index : $index + 16;
+
+    my $seekto = ($MENU + $BLKS_DSK * $index) * $BYTES_BLK;
+    my $size = $BYTES_BLK * $BLKS_DSK;
+    return insert($seekto, $size, $name, $is_poly);
+}
+
+# Insert a chunk into IMG, overwriting the existing content
+# Insert data from file named $name starting at $offset
+# $is_poly = 1 -> PolyDos disk image, which must be packed before insertion (read
+# 512Kbytes from $name and write 1MByte to IMG)
+# $is_poly = 0 -> CP/M disk image (read 1MByte from $name and save 1MByte in IMG)
+# Error/abort with no insertion if $name is larger than $limit
+# Return 1 if successful, 0 (and print error message) on error.
+sub insert {
+    my $offset = $_[0];
+    my $limit = $_[1];
+    my $name = $_[2];
+    my $is_poly = $_[3];
+
+    if (open IN, "<", $name) {
+        my @bits = stat IN;
+        my $size = $bits[7];
+        if ($size <= $limit) {
+            my $data;
+            my $got = read IN, $data, $size;
+            if ($got == $size) {
+                # all good.. carry on
+                close IN;
+                if (seek IMG, $offset, 0) {
+                    # Overwrite
+                    if ($is_poly) {
+                        # pack: put 256 bytes at the start of each block
+                        my $pad = chr(0) x ($BYTES_BLK - 256);
+                        my $blocks = $size/256;
+                        foreach my $i (0..$blocks-1) {
+                            print IMG substr($data, $i * 256, 256);
+                            print IMG $pad;
+                        }
+                    }
+                    else {
+                        print IMG $data;
+                    }
+                    return 1;
+                }
+                else {
+                    print "ERROR cannot insert $name - image file is too small\n";
+                }
+            }
+            else {
+                print "ERROR cannot insert $name - unable to read all of $name\n";
+            }
+        }
+        else {
+            print "ERROR cannot insert $name - $name is too big\n";
+        }
+    }
+    else {
+        print "ERROR cannot insert $name - cannot open $name for input\n";
+    }
+    return 0;
+}
+
+
+#################################################################
+#################################################################
+## Commands
+
+sub cmd_ins_menu {
+    my $name = $_[0];
+
+    if (defined $name) {
+        if (insert(0, $MENU * $BYTES_BLK, $name)) {
+            # may update $needs_padding as a result
+            analyse_image();
+        }
+    }
+    else {
+        print "ERROR no file specified for insertion\n"
+    }
+}
+
+
+sub cmd_ins_poly {
+    my $name = $_[0];
+
+    if (defined $name) {
+        if ($needs_padding != 0) {
+            # pad to end of menu. Image may or may not contain PolyDos disk images
+            print IMG chr(0) x $needs_padding;
+            $needs_padding = 0;
+        }
+
+        if (insert($MENU * $BYTES_BLK, $PDOS * $BYTES_BLK, $name)) {
+            # may update $has_polydos as a result
+            analyse_image();
+        }
+    }
+    else {
+        print "ERROR no file specified for insertion\n"
+    }
+}
+
+
+sub cmd_ins_cpm {
+    my $name = $_[0];
+
+    if (defined $name) {
+        if ($needs_padding != 0) {
+            # pad to end of menu. Image may or may not contain PolyDos disk images
+            print IMG chr(0) x $needs_padding;
+            $needs_padding = 0;
+        }
+
+        if ($has_polydos == 0) {
+            # pad to end of PolyDos disk image. Image may or may not contain CP/M disk images
+            print IMG chr(0) x ($PDOS * $BYTES_BLK);
+            $has_polydos = 1;
+        }
+
+        if (insert(($MENU + $PDOS) * $BYTES_BLK, $CPM * $BYTES_BLK, $name)) {
+            # may update $has_cpm as a result
+            analyse_image();
+        }
+    }
+    else {
+        print "ERROR no file specified for insertion\n"
+    }
+}
+
+
+sub cmd_exs_menu {
+    my $name = $_[0];
+
+    if (defined $name) {
+        my $size = $MENU * $BYTES_BLK - $needs_padding;
+
+        extract(0, $size, $name);
+    }
+    else {
+        print "ERROR no file specified for extract\n"
+    }
+}
+
+
+sub cmd_ind_poly {
+    ind_poly_cpm("PD%X.DSK", 1, @_);
+}
+
+
+sub cmd_ind_cpm {
+    ind_poly_cpm("CPM%X.DSK", 0, @_);
+}
+
+
+# common for cmd_ind_poly and cmd_ind_cpm
+sub ind_poly_cpm {
+    my $name_string = $_[0];
+    my $is_poly = $_[1];
+    my $disk = uc($_[2]);
+    my $name = $_[3];
+
+    if ($disk =~ /^[0-9A-F]$/) {
+        # single file
+        $disk = hex($disk);
+        if (! defined $name) {
+            $name = sprintf($name_string, $disk);
+        }
+        insert_disk($disk, $name, $is_poly);
+    }
+    elsif (($disk eq 'x') or ($disk eq '*')) {
+        # all files
+        if (defined $name) {
+            print "ERROR name is implicit when all disks are inserted\n";
+        }
+        else {
+            foreach my $i (0..15) {
+                $name = sprintf($name_string, $i);
+                insert_disk($i, $name, $is_poly);
+            }
+        }
+    }
+    else {
+        print "ERROR $disk is not a valid disk specifier\n";
+    }
+}
+
+
+sub cmd_exd_poly {
+    exd_poly_cpm("PD%X_from.DSK", 1, @_);
+}
+
+
+sub cmd_exd_cpm {
+    exd_poly_cpm("CPM%X_from.DSK", 0, @_);
+}
+
+
+# common for cmd_exd_poly and cmd_ext_cpm
+sub exd_poly_cpm {
+    my $name_string = $_[0];
+    my $is_poly = $_[1];
+    my $disk = uc($_[2]);
+    my $name = $_[3];
+
+    if ($disk =~ /^[0-9A-F]$/) {
+        # single file
+        $disk = hex($disk);
+        if (! defined $name) {
+            $name = sprintf($name_string, $disk);
+        }
+        extract_disk($disk, $name, $is_poly);
+    }
+    elsif (($disk eq 'X') or ($disk eq '*')) {
+        # all files
+        if (defined $name) {
+            print "ERROR name is implicit when all disks are extracted\n";
+        }
+        else {
+            foreach my $i (0..15) {
+                $name = sprintf($name_string, $i);
+                extract_disk($i, $name, $is_poly);
+            }
+        }
+    }
+    else {
+        print "ERROR $disk is not a valid disk specifier\n";
+    }
+}
+
+
+sub cmd_int {
+    $interactive = 1;
+}
+
+
+sub cmd_usage {
+    print "Usage: sdcard_editor <image file>\n       sdcard_editor -help\n";
+}
+
+
+sub cmd_help {
+    my ($help_for) = @_;
+    if (defined $help_for) {
+        help_for($help_for);
+    }
+    else {
+        help_generic();
+    }
+}
+
+
+sub cmd_exit {
+    close IMG;
+    exit;
+}
+
+
+sub cmd_quit {
+    cmd_exit();
+}
+
+#################################################################
+#################################################################
+## Help
+
+sub help_for {
+    my ($cmd) = @_;
+    if ($cmd eq 'ins-menu') {
+        print <<EOF
+    ins-menu=menu
+
+    Insert contents of the file 'menu' in the image, replacing/overwriting the
+    existing data.
+
+    If the image is currently empty or smaller than 'menu', the image will
+    be extended to the size of 'menu'.
+
+    Error if 'menu' is larger than 512Kbytes.
+EOF
+    }
+    elsif ($cmd eq 'ins-poly') {
+        print <<EOF
+    ins-poly=poly
+
+    Insert contents of the file 'poly' in the image, replacing/overwriting the
+    existing data.
+
+    Error if 'poly' is not 16MBytes in size (each PolyDos disk image occupies
+    1MByte in the image but only the first half of each block is used, so that
+    the usable size of the image is 512Kytes).
+
+    If the image does not currently contain this section, the image will be
+    extended to put this section at the correct offset.
+EOF
+    }
+    elsif ($cmd eq 'ins-cpm') {
+        print <<EOF
+    ins-cpm=cpm
+
+    Insert contents of the file 'cpm' in the image, replacing/overwriting the
+    existing data.
+
+    Error if 'cpm' is not 16MBytes in size.
+
+    If the image does not currently contain this section, the image will be
+    extended to put this section at the correct offset.
+EOF
+    }
+    if ($cmd eq 'exs-menu') {
+        print <<EOF
+    exs-menu=menu
+
+    Extract boot menu/ROM from the image and save it in the file 'menu',
+    overwriting any existing file of that name.
+
+    'menu' will be 512Kbytes or the same size as the image, whichever is the larger.
+EOF
+    }
+    elsif ($cmd eq 'ind-poly') {
+        print <<EOF
+    ind-poly=N[,foo]
+
+    Insert contents of the file 'foo' in the image, replacing/overwriting PolyDos
+    disk image N. N can be 0-9, A-F representing one of 16 disk images.
+
+    Error if 'foo' is not 512Kbytes in size.
+
+    Error if the image does not contain a PolyDos disk image section.
+
+    Each PolyDos disk image occupies 1MByte in the image but only the first half of
+    each block is used, so that the usable size of the image is 512Kytes. This tool
+    packs 'foo' before inserting it into the image.
+
+    The name 'foo' is optional. If absent, default name PDN.DSK is used, for disk N
+    (N is 0..9, A-F).
+
+    N can be * or x as a wild-card meaning "all disks". In this case, the file name
+    must not be present and the default names are used.
+EOF
+    }
+    elsif ($cmd eq 'ind-cpm') {
+        print <<EOF
+    ind-cpm=N[,foo]
+
+    Insert contents of the file 'foo' in the image, replacing/overwriting CP/M
+    disk image N. N can be 0-9, A-F representing one of 16 disk images.
+
+    Error if 'foo' is not 1Mbyte in size.
+
+    Error if the image does not contain a CP/M disk image section.
+
+    Each CP/M disk image occupies 1MByte in the image.
+
+    The name 'foo' is optional. If absent, default name CPMN.DSK is used, for disk N
+    (N is 0..9, A-F).
+
+    N can be * or x as a wild-card meaning "all disks". In this case, the file name
+    must not be present and the default names are used.
+EOF
+    }
+    elsif ($cmd eq 'exd-poly') {
+        print <<EOF
+    exd-poly=N[,foo]
+
+    Extract PolyDos disk image N from the image and save as file 'foo', overwriting any
+    existing file of that name. N can be 0-9, A-F representing one of 16 disk images.
+
+    'foo' will be 512Kbytes in size.
+
+    Error if the image does not contain a PolyDos disk image section.
+
+    Each PolyDos disk image occupies 1MByte in the image but only the first half of
+    each block is used, so that the usable size of the image is 512Kytes. This tool
+    unpacks data from the image before saving it as 'foo'.
+
+    The name 'foo' is optional. If absent, default name PDN_from.DSK is used, for disk N
+    (N is 0..9, A-F).
+
+    N can be * or x as a wild-card meaning "all disks". In this case, the file name
+    must not be present and the default names are used.
+EOF
+    }
+    elsif ($cmd eq 'exd-cpm') {
+        print <<EOF
+    exd-cpm=N[,foo]
+
+    Extract CP/M disk image N from the image and save as file 'foo', overwriting any
+    existing file of that name. N can be 0-9, A-F representing one of 16 disk images.
+
+    'foo' will be 1Mbyte in size.
+
+    Error if the image does not contain a CP/M disk image section.
+
+    Each CP/M disk image occupies 1MByte in the image.
+
+    The name 'foo' is optional. If absent, default name CPMN_from.DSK is used, for disk N
+    (N is 0..9, A-F).
+
+    N can be * or x as a wild-card meaning "all disks". In this case, the file name
+    must not be present and the default names are used.
+EOF
+    }
+    elsif ($cmd eq 'int') {
+        print <<EOF
+    int
+
+    Enter interactive mode.
+
+    Usually, when sdcard_editor is invoked with a sequence of commands on the command-line,
+    it executes those commands and then exits.
+
+    If the commands include the command 'int' then sdcard_editor executes the commands on
+    the command-line and then enters interactive mode.
+EOF
+}
+    elsif ($cmd eq 'usage') {
+        print <<EOF
+    usage
+
+    Prints a brief usage message.
+EOF
+    }
+    elsif ($cmd eq 'help') {
+        print <<EOF
+    help
+    help=CMD
+
+    The first form prints the main help screen.
+
+    The second form prints more detailed help for command CMD
+EOF
+    }
+    elsif ($cmd eq 'exit') {
+        print <<EOF
+    exit
+
+    Close the image file and exit sdcard_editor.
+EOF
+    }
+    elsif ($cmd eq 'quit') {
+        print <<EOF
+    quit
+
+    Close the image file and exit sdcard_editor. Synonym for 'exit'.
+EOF
+    }
+    else {
+        # no more to say about info, help, exit (or any non-existent command)
+        print <<EOF
+    No additional help is available on that topic
+EOF
+    }
+}
+
+
+sub help_generic {
+    print <<EOF
+
+sdcard_editor allows manipulation of a NASCOM4 sdcard image. The image is made
+up of three consecutive sections:
+
+ 1. Boot menu and ROM images - this section is created by make_rom_menu. This
+    tool allows a new version of this section to be inserted in the sdcard image,
+    replacing the existing version.
+
+ 2. 16 PolyDos disk images - if this section is absent, this tool allows it to be
+    added to the sdcard image. If it is present, this tool allows individual PolyDos
+    disk images to be extracted from or inserted into the sdcard image (inserting
+    an image replaces/overwrites an existing image).
+
+ 3. 16 CP/M disk images - if this section is absent, this tool allows it to be
+    added to the sdcard image. If it is present, this tool allows individual CP/M
+    disk images to be extracted from or inserted into the sdcard image (inserting
+    an image replaces/overwrites an existing image).
+
+Usage:
+
+    sdcard_editor <image file>
+    sdcard_editor <image file> cmd1 cmd2.. cmdN
+
+The first form starts an interactive session.
+The second form executes a sequence of commands cmd1 cmd2.. cmdN and then exits (or
+enters an interactive session if the 'int' command is present). Commands are separated
+by whitespace; whitespace is not allowed in a command or its arguments.
+
+Commands are:
+    ins-menu=menu    - insert contents of file 'menu' to replace boot menu/ROM in image
+    ins-poly=poly    - insert contents of file 'poly' to replace PolyDos disk set in image. Pad if necessary
+    ins-cpm=cpm      - insert contents of file 'cpm'  to replace CP/M disk set in image. Pad if necessary
+    exs-menu=menu    - extract boot menu/ROM from image and save in file 'menu'
+    ind-poly=0,[foo] - insert contents of file 'foo' to replace PolyDos disk image 0
+    ind-cpm=0,[foo]  - insert contents of file 'foo' to replace CP/M disk image 0
+    exd-poly=0,[foo] - extract PolyDos disk 0 from image and save in file 'foo'
+    exd-cpm=0,[foo]  - extract CP/M disk 0 from image and save in file 'foo'
+    int              - enter interactive mode after processing command-line arguments
+    usage            - print brief usage message
+    help             - print this message
+    help=cmd         - print help on command cmd (eg: help=ind-poly)
+    exit             - leave sdcard_editor
+    quit             - synonym for exit
+
+EOF
+}

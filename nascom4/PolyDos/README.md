@@ -77,7 +77,7 @@ Script for polydos_vfs to create a set of empty disk images. Probably never need
 ### Script: make_full_sdcard_image
 
 Creates an image, nascom4_sdcard_bp.img, containing the nascom4 boot menu (built in ../tools by
-running make_sdcard_image to create nascom4_sdcard.img and including the PolyDos
+running make_rom_menu to create nascom4_sdcard.img and including the PolyDos
 ROM which is built here, first) and a set of 16 disk images which start out as
 the files pd0.dsk..pdf.dsk here.
 

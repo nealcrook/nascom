@@ -12,7 +12,7 @@
 mv polydos_rom.bin polydos_rom_d000.bin
 
 pushd ../tools/
-./make_sdcard_image
+./make_rom_menu
 popd
 
 cp ../tools/nascom4_sdcard.img nascom4_sdcard_bp.img
