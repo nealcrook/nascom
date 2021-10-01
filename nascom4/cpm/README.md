@@ -92,7 +92,7 @@ to see a usage hint and a report of the current drive mappings.
 # Bootstrap
 
 Boot using BIOSDEV1.DSK. The n4equ.mac file has "SDBOOT F" (false). The system announces as "Neal's MAP 80 BIOS Version 2.1a"
-with "Double sided 48 tpi drives on ABCB".
+with "Double sided 48 tpi drives on ABCD".
 
 ````
 A>sub n4cpm                                       *** type this line
@@ -124,8 +124,8 @@ After reset/reboot the system announces as "MAP 80 BIOS Version 2.1 01/10/83" wi
 Edit n4equ.mac to change "SDBOOT T" (true). Replace the file on the disk image:
 
 ````
-$ cpmrm -f nascom-pertec BIOSDEV2.DSK 0:n4equ.mac
-$ cpmcp -f nascom-pertec BIOSDEV2.DSK n4equ.mac 0:n4equ.mac
+$ cpmrm -f nascom-pertec BIOSDEV1.DSK 0:n4equ.mac
+$ cpmcp -f nascom-pertec BIOSDEV1.DSK n4equ.mac 0:n4equ.mac
 ````
 
 The (modified) disk image is now identical to BIOSDEV2.DSK.
