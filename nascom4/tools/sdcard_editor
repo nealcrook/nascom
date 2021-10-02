@@ -6,6 +6,11 @@
 # ./sdcard_editor <image_file>
 # ./sdcard_editor -help
 #
+# TODO: different import letter to import _from.DSK files
+# TODO: print profile(s)
+# profile=a
+# profile=*
+#
 # https://github.com/nealcrook/nascom
 # Neal Crook, September 2021.
 # foofoobedoo@gmail.com
@@ -460,6 +465,35 @@ sub exd_poly_cpm {
 }
 
 
+sub cmd_menu {
+    # Blocks 0-7 are reserved for the menu, which is 0-terminated, but the menu must
+    # actually be much smaller because it needs to fit on the NASCOM 48x16 screen
+    if (seek IMG, 0, 0) {
+        my $data;
+        my $got = read IMG, $data, 8 * $BYTES_BLK;
+        if ($got == 8 * $BYTES_BLK) {
+            my $i=0;
+            while (substr($data, $i, 1) ne chr(0)) {
+                if (substr($data, $i, 1) eq chr(0x0d)) {
+                    print "\n";
+                }
+                else {
+                    print substr($data, $i, 1);
+                }
+                $i = $i + 1;
+            }
+        }
+        else {
+            print "ERROR cannot extract data for menu - data truncated by end of image file\n";
+        }
+    }
+    else {
+        # probably "impossible";
+        print "ERROR cannot extract data for menu - seek error\n";
+    }
+
+}
+
 sub cmd_int {
     $interactive = 1;
 }
@@ -632,6 +666,13 @@ EOF
     must not be present and the default names are used.
 EOF
     }
+    elsif ($cmd eq 'menu') {
+        print <<EOF
+    int
+
+    Print the (boot) menu from the image
+EOF
+    }
     elsif ($cmd eq 'int') {
         print <<EOF
     int
@@ -644,7 +685,7 @@ EOF
     If the commands include the command 'int' then sdcard_editor executes the commands on
     the command-line and then enters interactive mode.
 EOF
-}
+    }
     elsif ($cmd eq 'usage') {
         print <<EOF
     usage
@@ -724,6 +765,7 @@ Commands are:
     ind-cpm=0,[foo]  - insert contents of file 'foo' to replace CP/M disk image 0
     exd-poly=0,[foo] - extract PolyDos disk 0 from image and save in file 'foo'
     exd-cpm=0,[foo]  - extract CP/M disk 0 from image and save in file 'foo'
+    menu             - print menu from image
     int              - enter interactive mode after processing command-line arguments
     usage            - print brief usage message
     help             - print this message

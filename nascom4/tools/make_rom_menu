@@ -61,6 +61,7 @@ my $profile_blocks = 26;
 
 my @roms;
 
+#          name       load-addr location
 add_image("NASBUGT2", 0x0000, "$nascom/ROM/nasbugt2/NASBUGT2.bin_golden");
 add_image("NASBUGT4", 0x0000, "$nascom/ROM/nasbugt4/NASBUGT4.bin_golden");
 add_image("BBUG",     0x0000, "$nascom/ROM/bbug/BBUG.bin_golden");
@@ -81,6 +82,7 @@ add_image("LOLLIPOP", 0x1000, "/home/crook/Arduino/VGANoFrameBufferNAS/data/loll
 add_image("DISDEB",   0xC000, "../../../nascom_other/Odebdis.nas");
 add_image("INVADERS", 0x1000, "../../../nascom_other/Spaceii.nas");
 add_image("MEMTEST",  0x0c80, "../../../nascom_other/map80memorytest/m80memtp.bin");
+add_image("CPM-LSD",  0xe000, "$nascom/nascom4/cpm/map80vfc_rom/boot_code_standalone_sd.bin");
 
 # calculate the start block for each image, given the overhead
 set_block_offsets($menu_blocks + $profile_blocks);
@@ -100,11 +102,11 @@ my $menu =
     "M  NAS-SYS3 + BASIC + NASDOS    N: NASDOS-SD\r" .
     "O: NAS-SYS3 + PASCAL\r" .
     "P: NASCOM CP/M\r" .
-    "Q: MAP80 VFC CP/M\r" .
-    "R: NAS-SYS3 + LOLLIPOP\r" .
-    "S: NAS-SYS3 + INVADERS\r" .
-    "T: NAS-SYS3 + NASPEN\r" .
-    "U: NAS-SYS3 + MEMORY TEST\r" ;
+    "Q: MAP80 VFC CP/M      R: MAP80 VFC CP/M-LSD\r" .
+    "S: NAS-SYS3 + LOLLIPOP\r" .
+    "T: NAS-SYS3 + INVADERS\r" .
+    "U: NAS-SYS3 + NASPEN\r" .
+    "V: NAS-SYS3 + MEMORY TEST\r" ;
 
 my $pad = $menu_blocks * 512 - length($menu);
 if ($pad < 0) {
