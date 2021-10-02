@@ -742,7 +742,6 @@ change disks_from_image to use parameter that names the img file.
 -> maybe not; use the other script instead.
 
 -> move more scripts to tools/ and rationalise - use sdcard_editor where possible
--> create boot ROM
 -> update docs
 -> tidy up this README.md file
--> rework the bootstrap section and rebuild biosdev2.dsk image now I've renamed setdrv.com
+-> finish the bootstrap section, showing steps to create a blank SD drive and sysgen the image onto it.

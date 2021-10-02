@@ -36,4 +36,13 @@ The end result is the 2 ROM images here:
 * [map80vfc_boot_rom_sd.bin](map80vfc_boot_rom_sd.bin)
 * [map80vfc_boot_rom_newver_sd.bin](map80vfc_boot_rom_newver_sd.bin)
 
-These can be used in David's map80nascom emulator or in the boot menu of a real NASCOM4.
+These can be used in David's map80nascom emulator or in the boot menu of a real
+NASCOM4.
+
+An alternative to modifying the ROM (which is part of the FPGA image) is to use
+a stand-alone boot-loader to start up from SDcard, leaving the MAP80VFC ROM
+unchanged which means the FPGA does not need to be reprogrammed and the NASCOM4
+boot menu can include options to boot either from a floppy (start MAP80VFC ROM)
+or from SDcard (start stand-alone boot-loader). The stand-alone boot-loader is here:
+
+* [boot_code_standalone_sd.bin](oot_code_standalone_sd.bin)
