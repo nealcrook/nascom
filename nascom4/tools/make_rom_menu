@@ -170,10 +170,11 @@ add_profile('N',              "L:NASDOS-SD","L:BASIC",          "P19=60", "GD000
 add_profile('O',                            "L:PASCAL",         "P19=60", "GD000=19");
 add_profile('P', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
 add_profile('Q',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
-add_profile('R',               "L:LOLLIPOP",                              "G1000=19");
-add_profile('S',               "L:INVADERS",                              "G1000=19");
-add_profile('T', "L:NASPEN",                                    "P19=08", "G0=19");
-add_profile('U',               "L:MEMTEST",                               "G0=19"); # Load then start NAS-SYS
+add_profile('R', "L:CPM-LSD",                                   "PEE=00", "GE000=20");# MAP80 CP/M  - switch video, SDcard boot
+add_profile('S',               "L:LOLLIPOP",                              "G1000=19");
+add_profile('T',               "L:INVADERS",                              "G1000=19");
+add_profile('U', "L:NASPEN",                                    "P19=08", "G0=19");
+add_profile('V',               "L:MEMTEST",                               "G0=19"); # Load then start NAS-SYS
 
 ################################################################################
 # Generate the image
