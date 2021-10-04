@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+#
+# - Create 16 blank CP/M floppy images: each is a 1MByte file filled with $E5 bytes
+# - Use cpmcp to create a file in each with a unique name
+# - Bundle them together into a 16MByte lump, named cpm_floppy_set.img
+
+my $final_name = "cpm_floppy_set.img";
+
+my $names = "";
+foreach my $i (0..15) {
+    my $name = make_disk($i);
+    $names = "$names $name";
+}
+
+system "cat $names > $final_name";
+system "rm $names";
+print "Created $final_name\n";
+
+sub make_disk {
+    my $suffix = $_[0];
+
+    my $base = sprintf("SD%X", $suffix);
+    my $fh;
+
+    open $fh, ">", "$base.DSK";
+    print $fh chr(0xE5) x (1024*1024);
+    close $fh;
+
+    open $fg, ">", "$base.TXT";
+    print $fh "This is $base.TXT";
+    print $fh chr(0x1a); # CTRL-Z
+    close $fh;
+    system "cpmcp -f nascom4-sd $base.DSK $base.TXT 0:$base.TXT";
+    unlink "$base.TXT";
+    return "$base.DSK";
+}
+
+
+

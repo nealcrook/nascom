@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+#
+# - Use polydos_vfs to create 16 blank PolyDos floppy images: each is a 512Kbyte file
+#   each image has a disk label to identify it
+# - Pad each 512Kbyte file to 1MBytes by putting each chunk of 256 bytes into its
+#   own 512byte block
+# - Bundle them together into a 16MByte lump, named polydos_floppy_set.img
+
+my $final_name = "polydos_floppy_set.img";
+my $tools = "../../converters";
+
+system "$tools/polydos_vfs < make_polydos_disks.scr";
+
+my $names = "";
+foreach my $i (0..15) {
+    my $name = sprintf("PD%X.DSK", $i);
+    system "$tools/pad256to512 $name ${name}_p";
+    $names = "$names ${name}_p";
+    system "rm $name";
+}
+system "cat $names > $final_name";
+system "rm $names";
+print "Created $final_name\n";
+

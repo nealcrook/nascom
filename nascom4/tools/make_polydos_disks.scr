@@ -1,0 +1,84 @@
+# this is a polydos_vfs script and is invoked by make_polydos_floppy_set
+#
+new PD0.DSK s=2048
+mount 0 PD0.DSK
+name 0 PD0 for N4
+umount 0
+
+new PD1.DSK s=2048
+mount 0 PD1.DSK
+name 0 PD1 for N4
+umount 0
+
+new PD2.DSK s=2048
+mount 0 PD2.DSK
+name 0 PD2 for N4
+umount 0
+
+new PD3.DSK s=2048
+mount 0 PD3.DSK
+name 0 PD3 for N4
+umount 0
+
+new PD4.DSK s=2048
+mount 0 PD4.DSK
+name 0 PD4 for N4
+umount 0
+
+new PD5.DSK s=2048
+mount 0 PD5.DSK
+name 0 PD5 for N4
+umount 0
+
+new PD6.DSK s=2048
+mount 0 PD6.DSK
+name 0 PD6 for N4
+umount 0
+
+new PD7.DSK s=2048
+mount 0 PD7.DSK
+name 0 PD7 for N4
+umount 0
+
+new PD8.DSK s=2048
+mount 0 PD8.DSK
+name 0 PD8 for N4
+umount 0
+
+new PD9.DSK s=2048
+mount 0 PD9.DSK
+name 0 PD9 for N4
+umount 0
+
+new PDA.DSK s=2048
+mount 0 PDA.DSK
+name 0 PDA for N4
+umount 0
+
+new PDB.DSK s=2048
+mount 0 PDB.DSK
+name 0 PDB for N4
+umount 0
+
+new PDC.DSK s=2048
+mount 0 PDC.DSK
+name 0 PDC for N4
+umount 0
+
+new PDD.DSK s=2048
+mount 0 PDD.DSK
+name 0 PDD for N4
+umount 0
+
+new PDE.DSK s=2048
+mount 0 PDE.DSK
+name 0 PDE for N4
+umount 0
+
+new PDF.DSK s=2048
+mount 0 PDF.DSK
+name 0 PDF for N4
+umount 0
+
+exit
+

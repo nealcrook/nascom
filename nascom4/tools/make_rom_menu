@@ -42,14 +42,20 @@
 use warnings;
 use strict;
 
+# default name to use for the output image file
+my $imgfname = "nascom4_sdcard.img";
+
+if (defined $ARGV[0]) {
+    $imgfname = $ARGV[0];
+}
+
+
 # point to NASCOM repository (relative path is OK)
 my $nascom = "../..";
 # use nascon to convert images to binary format if necessary.
 my $nascon_exe = "$nascom/converters/nascon";
 # name to use for temporary file
 my $tempfname = "temp";
-# name to use for the output image file
-my $imgfname = "nascom4_sdcard.img";
 # number of blocks for menu
 my $menu_blocks = 8;
 # number of profiles, one block per profile
@@ -179,7 +185,7 @@ add_profile('V',               "L:MEMTEST",                               "G0=19
 ################################################################################
 # Generate the image
 
-build_image("NASCOM_NG_SD.bin");
+build_image();
 
 ################################################################################
 # Tidy up
