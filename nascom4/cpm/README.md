@@ -15,7 +15,9 @@ source code provided by MAP80 systems.
 
 ## Getting Started - preparing the SDcard image
 
-TODO
+Copy the image tools/nascom4_sdcard.img to an SDcard and plug it in to the
+NASCOM 4. You need to use dd or some form of raw-write toold to transfer the
+image - there is no filesystem on the SDcard.
 
 ## Getting Started - booting from floppy
 
@@ -118,8 +120,9 @@ DESTINATION Drive name (or RETURN to reboot)      *** press return
 Wrong System/Size - Press any Key                 *** reset/reboot the system
 ````
 
-After reset/reboot the system announces as "MAP 80 BIOS Version 2.1 01/10/83" with
-"Double sided 48 tpi drives on AB" and "SDcard virtual drives on CD".
+After reset/reboot the system announces as "MAP 80 SYSTEMS LIMITED" and "BIOS
+Version 2.1 01/10/83" with "Double sided 48 tpi drives on AB" and "SDcard
+virtual drives on CD".
 
 Edit n4equ.mac to change "SDBOOT T" (true). Replace the file on the disk image:
 
@@ -162,12 +165,14 @@ A>PIP C:=A:*.*                                    *** type this line
 A>
 ````
 
-This leaves the new image on drive c: but the boot loader on this system track loads from SD etc. need to
-boot it
+(The result of this is to change MOVECPM.COM on BIOSDEV2.DSK and to change the
+system tracks on CP/M SD drive 0).
 
-
-- add cpmtools setup in this section
-
+Finally, reboot the system and boot from the SDcard as drive A: either use the
+boot_codes_standalone_sd image (via the NASCOM 4 menu) or use the modified
+map80vfc ROM image. The system announces as "MAP 80 SYSTEMS LIMITED" "BIOS
+Version 2.1 01/10/83" with "SDcard virtual drives on AB" and "Double sided 48
+tpi drives on CD".
 
 
 
