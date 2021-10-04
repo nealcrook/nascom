@@ -7,6 +7,7 @@
 * photos - the assembled board
 * [PolyDos](PolyDos/README.md) - a port of PolyDos that uses the NASCOM 4 SDcard for virtual disk storage
 * [cpm](cpm/README.md) - a port of CP/M 2.2 for the MAP80 VFC that uses the NASCOM 4 SDcard for virtual disk storage
+* [tools](tools/README.md) - tools for creating and manipulating SDcard images for the NASCOM 4
 
 The FPGA VHDL code and KiCad design database is here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4
 
