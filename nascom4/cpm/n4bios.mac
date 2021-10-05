@@ -276,6 +276,14 @@ START:	LD HL,0			;CP/M address, the only one
 GETSEC:	LD A,B			;start after boot sector
 	OUT (SDLBA0),A
 
+	;When reading sectors in a tight loop sometimes read an
+	;extra byte. Avoided by waiting here for SDcard ready.
+	;Would need to add observation for external scope to
+	;understand what's going on here..
+SDNRDY:	IN A,(SDCTRL)
+	CP 80H
+	JR NZ, SDNRDY
+
 	XOR A
 	OUT (SDCTRL),A		;READ command
 
@@ -3169,7 +3177,7 @@ RRR	DEFL RRR+1
 	DEFB "**     MAP 80 SYSTEMS LIMITED     **"
 RRR	DEFL RRR+1
 	DEFB ESC,"=",RRR,CCC
-	DEFB "**   BIOS Version 2.1  01/10/83   **"
+	DEFB "**   BIOS Version 2.1  05/10/21   **"
 RRR	DEFL RRR+1
 	DEFB ESC,"=",RRR,CCC
 	DEFB "**       00k CP/M vers 2.2        **",CR,LF

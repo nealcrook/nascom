@@ -1,24 +1,23 @@
 ;;; Stand-alone boot code to initialise the MAP80 VFC and load/execute
 ;;; boot sector code from supposed CP/M image on SDcard.
 ;;;
-;;; With a "normal" floppy disk system, the MAP80 VFC appears in
-;;; the memory map at address 0 and the NASCOM4 SBR menu entry ends
-;;; with a jump to address 0 which executes the boot code in the
-;;; MAP80 VFC ROM.
+;;; With a "normal" floppy disk system, the MAP80 VFC appears in the
+;;; memory map at address 0 and the NASCOM4 SBR menu entry ends with a
+;;; jump to address 0 which executes the boot code in the MAP80 VFC ROM.
 ;;;
 ;;; When booting CP/M from the SDcard, that normal MAP80 VFC ROM boot
 ;;; code is no use. There is a modified MAP80 VFC ROM that contains
-;;; SDcard boot code, but the ROM image is coded into the FPGA *and*
-;;; I want the capability to choose floppy or SDcard boot. Therefore,
+;;; SDcard boot code, but the ROM image is coded into the FPGA *and* I
+;;; want the capability to choose floppy or SDcard boot. Therefore,
 ;;; this program..
 ;;;
-;;; This program is loaded into RAM at E000 by the SBR in the usual
-;;; way, and the MAP80 VFC appears in the memory map at address 0.
-;;; The NASCOM4 SBR menu entry ends with a jump to address E000 which
-;;; executes this boot code, instead of the boot code in the MAP80 VFC ROM.
+;;; This program is loaded into RAM at E000 by the SBR in the usual way;
+;;; the MAP80 VFC appears in the memory map at address 0. The NASCOM4
+;;; SBR menu entry ends with a jump to address E000 which executes
+;;; this boot code, instead of the boot code in the MAP80 VFC ROM.
 ;;;
-;;; This program copies, as much as possible, the boot code from
-;;; the MAP80 VFC ROM.
+;;; This program copies, as much as possible, the boot code from the
+;;; MAP80 VFC ROM.
 ;;;
 ;;; 1/ Use the NASCOM4 SDcard controller to load 1 block (512 bytes)
 ;;; from the 1st sector of the 1st virtual disk (block $8400) to
@@ -27,9 +26,8 @@
 ;;; 2/ Check that the loaded code has a magic fingerprint that identifies
 ;;; it as a system image and, if so, jump to $c02.
 ;;;
-;;; This code also initialises the VFC and its workspace; the code for
-;;; that is unchanged from the original.
-;;;
+;;; This code also calls VFCINIT in the VFC ROM code to initialise the
+;;; VFC and its workspace, in the same way as the original boot code.
 
 VFCINIT: equ $0023               ;outside this image
 ENTRY:   equ $0C02               ;entry point of loaded code
@@ -44,8 +42,7 @@ SDLBA2: EQU 014H		;WO
 
         org $E000
 
-BOOT1:
-        ld sp, $1000
+BOOT1:  ld sp, $1000
         xor a
 
 ;;; Set VFC workspace and call init
@@ -55,8 +52,7 @@ BOOT1:
 
 ;;; Enable VFC video RAM (at $0800)
 
-VIDRAM:
-        ld a, $01
+VIDRAM: ld a, $01
         out ($EC), a
 
 ;;; $0800 is top-left corner of VDU and the literal 7 is the length
@@ -70,8 +66,7 @@ VIDRAM:
 ;;; The screen is 25*80=2000 locations subtract 7 for the
 ;;; message string is 1993 = 0x7c9, so this is clearing the screen - filling it with spaces
 
-CLS:
-        ld (hl), $20
+CLS:    ld (hl), $20
         inc hl
         dec bc
         ld a, b
@@ -84,13 +79,13 @@ CLS:
 
 ;;; initialise SDcard controller
         ld      hl, 0
-initsd: dec     hl
+INITSD: dec     hl
         ld      a,h
         or      l
         jr      z, ERRDSK       ;timeout
         in      a,(SDSTAT)
         cp      $80
-        jr      nz, initsd      ;wait until SDcard is ready
+        jr      nz, INITSD      ;wait until SDcard is ready
 
         ld      a,0             ;SDcard block address $00.8400
         out     (SDLBA2), a     ;coded like this to make it patchable
@@ -104,19 +99,18 @@ initsd: dec     hl
 
         ld      hl, $c00        ;data destination
 
-datloop: in     a,(SDSTAT)
+DATXFER: in     a,(SDSTAT)
         cp      $80
-        jr      z, SYSDSK      ;all bytes loaded
+        jr      z, SYSDSK       ;all bytes loaded
         cp      $e0
-        jr      nz, datloop     ;wait for next byte
+        jr      nz, DATXFER     ;wait for next byte
         in      a,(SDDATA)      ;[NAC HACK 2021Aug03] set up C for data port
         ld      (hl),a
         inc     hl
-        jr      datloop
+        jr      DATXFER
 
 ;;; ensure that the image look good (check "magic signature")
-SYSDSK:
-        ld hl, ($0C00)
+SYSDSK: ld hl, ($0C00)
         ld de, $3038
         or a
         sbc hl, de
@@ -124,14 +118,8 @@ SYSDSK:
         ld hl, MSGSYS
         jr VIDRAM
 
-ERRDSK:
-        ld hl, MSGDSK
+ERRDSK: ld hl, MSGDSK
         jr VIDRAM
-
-;;; assembler doesn't allow forward references in this calculation so only allows
-;;; padding at the end; not what we want. If this number is wrong, the manipulate_vfc_rom
-;;; script will detect/report the problem.
-        DS 54, $00
 
 MSGBOOT:
         defm "LSDBOOT"
@@ -142,12 +130,7 @@ MSGDSK:
 MSGSYS:
         defm "SYSTEM?"
 
-MSGERR:
-        defm "ERROR ?"          ;not used for SDcard code
-
-END:    equ $
-
 ;;; pad to 1 block (512 bytes) for tidyness.
-SIZE:   equ END - BOOT1
+SIZE:   equ $ - BOOT1
 PAD1:   equ 200h - SIZE
         DS PAD1, 0
