@@ -40,7 +40,7 @@ SDLBA0: EQU 012H		;WO
 SDLBA1: EQU 013H		;WO
 SDLBA2: EQU 014H		;WO
 
-        org $E000
+        org $C000
 
 BOOT1:  ld sp, $1000
         xor a
