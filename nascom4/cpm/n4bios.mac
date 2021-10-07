@@ -269,6 +269,19 @@ START:	LD HL,0			;CP/M address, the only one
 	;E = number of blocks
 	;B = current block
 
+
+	;When reading sectors in a tight loop sometimes read an
+	;extra byte. In the SBR, avoided it by waiting here for
+	;SDcard ready, but we already know that's true.
+	;Need to add observation for external scope to see how the
+	;flags are changing at the end of one read and how they
+	;change at the start of the next. For now, insert a set
+	;of short delays.. then work out which is needed.
+	LD A,0FFH
+SDLOP1:	DEC A
+	JR NZ, SDLOP1
+
+
 	LD A,0			;SDcard block address $00.8400
 	OUT (SDLBA2),A		;coded like this to make it patchable
 	LD A,SD0BLK		;1st virtual disk
@@ -276,16 +289,34 @@ START:	LD HL,0			;CP/M address, the only one
 GETSEC:	LD A,B			;start after boot sector
 	OUT (SDLBA0),A
 
+
 	;When reading sectors in a tight loop sometimes read an
-	;extra byte. Avoided by waiting here for SDcard ready.
-	;Would need to add observation for external scope to
-	;understand what's going on here..
-SDNRDY:	IN A,(SDCTRL)
-	CP 80H
-	JR NZ, SDNRDY
+	;extra byte. In the SBR, avoided it by waiting here for
+	;SDcard ready, but we already know that's true.
+	;Need to add observation for external scope to see how the
+	;flags are changing at the end of one read and how they
+	;change at the start of the next. For now, insert a set
+	;of short delays.. then work out which is needed.
+	LD A,0FFH
+SDLOP2:	DEC A
+	JR NZ, SDLOP2
+
 
 	XOR A
 	OUT (SDCTRL),A		;READ command
+
+
+	;When reading sectors in a tight loop sometimes read an
+	;extra byte. In the SBR, avoided it by waiting here for
+	;SDcard ready, but we already know that's true.
+	;Need to add observation for external scope to see how the
+	;flags are changing at the end of one read and how they
+	;change at the start of the next. For now, insert a set
+	;of short delays.. then work out which is needed.
+	LD A,0FFH
+SDLOP3:	DEC A
+	JR NZ, SDLOP3
+
 
 LOAD:	IN A,(SDSTAT)
 	CP 80H
@@ -299,6 +330,7 @@ LOAD:	IN A,(SDSTAT)
 
 GOOD:	INC B			;Next block
 	DEC E			;Block counter
+	DEC HL			;SUPER HACK!!! TO OVERCOME XTRA COPIED BYTE
 	JR NZ,GETSEC
 
 	ELSE
@@ -2700,8 +2732,6 @@ INITD:	DEFB HIGH WCYL&WNUM
 
 	IF SDDRV
 
-;[NAC HACK 2021Aug02] TODO storage and code.
-;[NAC HACK 2021Aug02] TODO tabify
 ;[NAC HACK 2021Aug03] have a byte reserved for track map at TRKA but don't use it
 ;[NAC HACK 2021Aug03] don't need to maintain DRVLOG either
 
@@ -2720,82 +2750,82 @@ INITD:	DEFB HIGH WCYL&WNUM
 ;                          x x x x x x           6-bit track (0-63)
 ;                                      x x x x x 5-bit sector (0-31)
 ;
-;                ^ ^ ^ ^ ^ ^---------- this is the only place that a wrap can occur.
-;                                      the low byte can be formed by ORing.
+;                ^ ^ ^ ^ ^ ^---- this is the only place that a wrap can occur.
+;                                the low byte can be formed by ORing.
 ;
 ;                1 x x x x 1 0 0                 Stored byte, encompasses
 ;                                                start address and disk
 
 
-RWSD:	IN	A,(SDSTAT)
-	CP      80H
-	JR      NZ, RWSD        ;wait until SDcard is ready
+RWSD:	IN A,(SDSTAT)
+	CP 80H
+	JR NZ,RWSD		;wait until SDcard is ready
 
-	LD      A,(HSTTRK)
-	LD      B,A
+	LD A,(HSTTRK)
+	LD B,A
 	REPT 5
-	SLA     B
+	SLA B
 	ENDM
-	LD      A,(HSTSEC)
-	ADD     A,B
-	OUT     (SDLBA0),A      ;low 8 bits of block address
+	LD A,(HSTSEC)
+	ADD A,B
+	OUT (SDLBA0),A		;low 8 bits of block address
 
-	LD      A,(HSTTRK)
-	LD      B,A
-	REPT    3
-	SRA     B
+	LD A,(HSTTRK)
+	LD B,A
+	REPT 3
+	SRA B
 	ENDM
 
-        LD      A,(HSTDSK)
+        LD A,(HSTDSK)
         IF NOT SDBOOT
-        SUB     NDRVW+NDRV5
-        ENDIF                   ;Now have 0 for first SDdrive
+        SUB NDRVW+NDRV5
+        ENDIF			;Now have 0 for first SDdrive
 
 ; This is crude but effective - hard-coded for 2 SDdrives
-        OR      A
-	LD      A,(SD0DRV)      ;Assume drive 0
-        JR      Z, SD0
-        LD      A,(SD1DRV)      ;No, actually want drive 1
-SD0:	ADD     A,B
-	OUT     (SDLBA1),A
+        OR A
+	LD A,(SD0DRV)		;Assume drive 0
+        JR Z,SD0
+        LD A,(SD1DRV)		;No, actually want drive 1
+SD0:	ADD A,B
+	OUT (SDLBA1),A
 
-        LD      A,0             ;Preserve C flag
-        JR      NC,SDWRAP
-        INC     A               ;Wrap Carry into LBA2
-SDWRAP:	OUT     (SDLBA2),A
+        LD A,0			;Preserve C flag
+        JR NC,SDWRAP
+        INC A			;Wrap Carry into LBA2
+SDWRAP:	OUT (SDLBA2),A
 
-	LD      HL,(HSTDMA)     ;data source/destination
-	LD      A,(RWFLAG)
-	OR      A
-	JR      Z,WSD
+	LD HL,(HSTDMA)		;data source/destination
+	LD A,(RWFLAG)
+	OR A
+	JR Z,WSD
 
 ;Read. A=1
-	XOR     A
-	OUT     (SDCTRL), A     ;0=>read command
+	XOR A
+	OUT (SDCTRL),A		;0=>read command
 
-RSDBSY: IN      A,(SDSTAT)
-	CP      080H
-	RET     Z               ;done!
-	CP      0E0H
-	JR      NZ, RSDBSY
-	IN      A,(SDDATA)      ;[NAC HACK 2021Aug03] set up C for data port
-	LD      (HL),A
-	INC     HL
-	JR      RSDBSY
+RSDBSY: IN A,(SDSTAT)
+	CP 080H
+	RET Z			;done!
+	CP 0E0H
+	JR NZ,RSDBSY
+	IN A,(SDDATA)		;[NAC HACK 2021Aug03] set up C for data port??
+	LD (HL),A
+	INC HL
+	JR RSDBSY
 
 ;Write. A=0
-WSD:    INC     A
-	OUT     (SDCTRL), A     ;1=>write command
+WSD:    INC A
+	OUT (SDCTRL),A		;1=>write command
 
-WSDBSY: IN      A,(SDSTAT)
-	CP      080H
-	RET     Z               ;done!
-	CP      0A0H
-	JR      NZ, WSDBSY
-	LD      A,(HL)
-	OUT     (SDDATA),A
-	INC     HL
-	JR      WSDBSY
+WSDBSY: IN A,(SDSTAT)
+	CP 080H
+	RET Z			;done!
+	CP 0A0H
+	JR NZ,WSDBSY
+	LD A,(HL)
+	OUT (SDDATA),A
+	INC HL
+	JR WSDBSY
 
 	ENDIF
 
