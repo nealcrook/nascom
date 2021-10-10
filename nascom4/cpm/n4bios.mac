@@ -330,7 +330,7 @@ LOAD:	IN A,(SDSTAT)
 
 GOOD:	INC B			;Next block
 	DEC E			;Block counter
-	DEC HL			;SUPER HACK!!! TO OVERCOME XTRA COPIED BYTE
+	LD L,0			;SUPER HACK!!! TO OVERCOME XTRA COPIED BYTE
 	JR NZ,GETSEC
 
 	ELSE
@@ -555,8 +555,24 @@ BOOTB:	IF WINI
 	CALL DBOOT
 	JR NZ,BOOTB		;Error try again
 	ELSE
+	IF SDBOOT
+	;May not have 2797 so call CLEAN conditionally..
+	LD A,055H
+	OUT (FDCSEC),A
+	XOR A
+	OUT (FDCTRK),A		;so bus doesn't float at 55
+	IN A,(FDCSEC)
+	CP 055H
+	JR NZ,NOFDC
+	XOR A
+	OUT (FDCSEC), A		;Leave it as we found it
 	CALL CLEAN		;Tidy up 2797
-	ENDIF
+NOFDC:
+	ELSE
+	;Booted from 2797
+	CALL CLEAN		;Tidy up 2797
+	ENDIF			;IF SDBOOT
+	ENDIF			;IF WINI
 	CALL WBOOT1
 	JP CCP16		;Jump into CCP
 
