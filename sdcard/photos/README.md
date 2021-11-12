@@ -2,6 +2,13 @@
 
 Photos of the assembled PCB, using an Arduino NANO and an SDcard adaptor. The two black connectors connect directly to a  NASCOM 2 "serial" and "pio" ports using ribbon cable. Connections to a NASCOM 1 use J2, J4 and J7.
 
+There are 3 versions of the PCB:
+
+* REV-A (blue), pictured below, requires some cuts and wire adds, described in the user guide.
+* REV-B (blue) has an added Shottky diode and wiring corrections.
+* REV-C (green), is electrically identical to REV-B. The 26-way IDC connectors are rotated to allow cleaner connection to a NASCOM 2 (avoids a twist in the ribbon cable). The capacitor footprints are changed. The silk screen and power routing are cleaned up somewhat.
+
+
 ![pcb_top.jpg](pcb_top.jpg?raw=true "Top view of assembled REV-A PCB")
 ![pcb_bottom_eco.jpg](pcb_bottom_eco.jpg?raw=true "Bottom view of assembled REV-A PCB, showing ECO wires")
 
