@@ -2,7 +2,7 @@
 
 ![n4_assembled.jpg](photos/n4_assembled.jpg?raw=true "NASCOM 4 assembled")
 
-* doc - user guide, schematics and layout drawings
+* doc - user handbook, schematics and layout drawings
 * tools - for creating SDcard image
 * photos - the assembled board
 * [PolyDos](PolyDos/README.md) - a port of PolyDos that uses the NASCOM 4 SDcard for virtual disk storage
@@ -11,7 +11,12 @@
 
 The FPGA VHDL code and KiCad design database is here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4
 
-The pre-build files for programming the FPGA are here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4/output_files
+The pre-built files for programming the FPGA are here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4/output_files
+
+Current releases:
+
+Rev1.0 - first release (NASCOM4_rev1p0.pof/NASCOM4_rev1p0.sof)
+Rev1.1 - revisons to video control: (1) both VGA outputs are now active simultaneously. (2) The character generator is now programmable from the Z80 (details in the Handbook) (NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof)
 
 Here are some videos of its evolution:
 
