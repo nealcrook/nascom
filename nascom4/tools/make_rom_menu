@@ -89,6 +89,9 @@ add_image("DISDEB",   0xC000, "../../../nascom_other/Odebdis.nas");
 add_image("INVADERS", 0x1000, "../../../nascom_other/Spaceii.nas");
 add_image("MEMTEST",  0x0c80, "../../../nascom_other/map80memorytest/m80memtp.bin");
 add_image("CPM-LSD",  0xc000, "$nascom/nascom4/cpm/map80vfc_rom/boot_code_standalone_sd.bin");
+add_image("CGEN-NAS", 0xe000, "$nascom/ROM/chargen/nas_an_gra.nas");
+add_image("CGEN-VFC", 0xe000, "$nascom/ROM/map80vfc/map80vfc_chargen_rom.bin");
+add_image("CGEN-SARGON",0xe000, "$nascom/ROM/chargen/sargon.nas");
 
 # calculate the start block for each image, given the overhead
 set_block_offsets($menu_blocks + $profile_blocks);
@@ -109,10 +112,10 @@ my $menu =
     "O: NAS-SYS3 + PASCAL\r" .
     "P: NASCOM CP/M\r" .
     "Q: MAP80 VFC CP/M      R: MAP80 VFC CP/M-LSD\r" .
-    "S: NAS-SYS3 + LOLLIPOP\r" .
-    "T: NAS-SYS3 + INVADERS\r" .
-    "U: NAS-SYS3 + NASPEN\r" .
-    "V: NAS-SYS3 + MEMORY TEST\r" ;
+    "S: NAS-SYS3 + LOLLIPOP        Reload char-gen:\r" .
+    "T: NAS-SYS3 + INVADERS         X: NASCOM\r" .
+    "U: NAS-SYS3 + NASPEN           Y: VFC\r" .
+    "V: NAS-SYS3 + MEMORY TEST      Z: SARGON\r" ;
 
 my $pad = $menu_blocks * 512 - length($menu);
 if ($pad < 0) {
@@ -127,7 +130,6 @@ $menu = $menu . (chr(0) x $pad);
 # "W1234=5678" -- memory write: write to address 1234 with data 5678.
 # "P12=56"     -- I/O write: write to port 12 with data 56.
 # "G1000=40"   -- Go! write 40 to port 3 (memory remap) and jump to 1000
-#                 the implementation is more subtle because it jumps via RAM
 # "L:BBUG"     -- Load image. Converted to "I1234 L4000=8"
 #                 which means Image at block 1234 is loaded to memory
 #                 for 8 blocks.
@@ -144,7 +146,7 @@ $menu = $menu . (chr(0) x $pad);
 # Values to write to port 0x18 as                  Values to write to port 0x19
 # part of a G command:
 # b7 0                                                b7 unused
-# b6 0                                                b6 protect E000-FFFF
+# b6 enable chare gen in VFC space                    b6 protect E000-FFFF
 # b5 MAP VFC autoboot                                 b5 protect D000-DFFF
 # b4 enable WS RAM                                    b4 protect C000-CFFF
 # b3 enable NAS-SYS3 ROM                              b3 protect B000-BFFF
@@ -181,6 +183,11 @@ add_profile('S',               "L:LOLLIPOP",                              "G1000
 add_profile('T',               "L:INVADERS",                              "G1000=19");
 add_profile('U', "L:NASPEN",                                    "P19=08", "G0=19");
 add_profile('V',               "L:MEMTEST",                               "G0=19"); # Load then start NAS-SYS
+# Load chargen then restart SBROM, using 104F (MENU) as entry is nasty, but restarting
+# from 1000 did not work for some reason.
+add_profile('X', "PEC=E1", "P18=5D", "L:CGEN-NAS",   "PEC=E0", "G104F=1D");
+add_profile('Y', "PEC=E1", "P18=5D", "L:CGEN-VFC",   "PEC=E0", "G104F=1D");
+add_profile('Z', "PEC=E1", "P18=5D", "L:CGEN-SARGON","PEC=E0", "G104F=1D");
 
 ################################################################################
 # Generate the image
