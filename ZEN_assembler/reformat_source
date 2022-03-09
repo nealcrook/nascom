@@ -1,0 +1,46 @@
+#!/usr/bin/perl
+#
+# reformat assembler source on stdin and send to stdout in a pretty format.
+
+while (my $line = <STDIN>) {
+    if ($line =~ /^\s*;/) {
+        # line starts with a comment (maybe indented) - leave it alone
+    }
+    elsif ($line =~ /^\s*$/) {
+        # Empty line or just trailing white-space - leave it alone
+        ##print STDERR "BLANK LINE $.\n";
+    }
+    elsif ($line =~ /^\s*([A-Za-z0-9\_]+\:\s*$)/) {
+        # Label on its own - leave it alone
+        ##print STDERR "LONE LABEL $.: $1\n";
+    }
+    elsif ($line =~ /^\s*([A-Za-z0-9\_]+\:)/) {
+        # Label + code
+        ##print STDERR "LABEL $.: $1\n";
+        my $label = $1;
+        my $padded = sprintf("%-8s",$label);
+        $line =~ s/^(\s*[A-Za-z0-9\_]+\:)(\s*)/$padded/;
+    }
+    elsif ($line =~ /^\s*([A-Za-z0-9\_]+)(\s+)([Ee][Qq][Uu]|[Dd][Ee][Ff][SsBbWw])/) {
+        # xx EQU yy or xx DEFS zz or xx DEFB yy or xx DEFW
+        # ZEN requires xx to be a label (and therefore terminated with a ":"). Some other
+        # assemblers don't require a ":"
+        # .. reformat as though it's a label, starting in column 1
+        my $name = $1;
+        my $padded = sprintf("%-7s ",$name); # need 1 space on end because no ":" in this case
+        $line =~ s/^(\s*[A-Za-z0-9\_]+)(\s+)/$padded/;
+    }
+    elsif ($line =~ /^\s*/) {
+        ##print STDERR "LEADING WHITE $. or none\n";
+        # leading whitespace
+        # make it 8 spaces
+        $line =~ s/^\s*/        /;
+    }
+    else {
+        print STDERR "Unclassified: $line";
+    }
+    # whatever happened, strip trailing whitespace
+    $line =~ s/[ \t]*$//;
+
+    print $line;
+}

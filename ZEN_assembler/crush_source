@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+#
+# reformat assembler source on stdin and send to stdout in a crushed format
+#
+
+while (my $line = <STDIN>) {
+    if ($line =~ /^\s*;/) {
+        # line starts with a comment (maybe indented) - discard it
+        next;
+    }
+    elsif ($line =~ /^\s*$/) {
+        # Empty line or just trailing white-space - discard it
+        next;
+    }
+
+    # strip anything after a comment
+    $line =~ s/;.*$//;
+    # and make any multi-spaces into single space
+    $line =~ s/[ \t]+/ /g;
+    # strip trailing whitespace
+    $line =~ s/[ \t]*$//;
+
+    # not quite as small as it could be: could remove spaces after a colon, and any start-of-line space and
+    # ZEN will still be fine. This format should be acceptable to all assemblers.
+
+    # the final crush..
+    $line =~ s/^[ \t]//;
+    $line =~ s/\:[ \t]/\:/;
+
+    print $line;
+}

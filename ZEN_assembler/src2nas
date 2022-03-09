@@ -1,0 +1,35 @@
+#!/usr/bin/perl
+#
+# reformat assembler source:
+# - change \n to \
+# - change to .NAS
+#
+# usage:
+# ./src2nas zen_nassys.asm ZENNSSRC.NAS
+# ./src2nas zen_nassys.asm ZENNSSRC.NAS 2800
+#
+# optional 3rd argument is the origin in hex; defaults to 2400 for original T4 version
+
+my $infile = $ARGV[0];
+my $outfile = $ARGV[1];
+my $org = 2400;
+if (defined $ARGV[2]) {
+    $org = $ARGV[2];
+}
+
+my $temp = "src2nas.tmp";
+
+$nascas = "../../nascom/converters/nascon";
+
+open IN, $infile or die "Could not open $infile for input";
+open OUT, ">$temp" or die "Could not open $temp for output";
+
+while (my $line = <IN>) {
+    $line =~ s/\n/\r/;
+    #print "$.: $line \n"; # doesn't work properly due to \r line endings
+    print OUT $line;
+}
+close IN;
+close OUT;
+
+system "$nascas -in bin $temp -out nas $outfile -org $org -csum && rm $temp";
