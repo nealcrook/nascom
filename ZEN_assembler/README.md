@@ -25,7 +25,8 @@ Shields Software."
 
 The Centre For Computing History, Cambridge, has a number of "Zen" resources,
 including a manual for the "Standard" version, marked "Copyright 1979, Avalon
-Software"
+Software" -- stop press: I found that I had a copy of that document (see links
+below).
 
 ## Copyright
 
@@ -138,8 +139,12 @@ see the "Z>" prompt. Now read the manual (it's quite short: 11 pages).
 
 ### Manual
 
-* ZEN_manual.odt -- LibreOffice source
-* ZEN_manual.pdf -- PDF
+* ZEN_manual.odt -- LibreOffice source of a recreated manual
+* ZEN_manual.pdf -- PDF of the recreated manual
+* ZEN_manual_std.pdf -- I came across this in my loft box of NASCOM goodies; it's a copy of the manual for the "Standard" version, complete with porting information (I don't think I have the associated software though).
+
+
+
 
 
 ### Tools
