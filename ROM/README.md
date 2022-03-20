@@ -66,8 +66,8 @@ There are minor syntax differences between different Z80 assemblers. Most can be
 fixed with a bit of simple editing. Here are the ones that I know about (please
 let me know of any others you spot):
 
-* Most assemblers insist that only a comment or a label can start in column
-  1. ZEN is the exception; it allows labels to start in any column, and it
+* Most assemblers insist that only a comment or a label can start in column 1.
+  ZEN is the exception; it allows labels to start in any column, and it
   allows non-labelled statements to start in column 1.
 
 * Some assemblers require that a label ends with a colon (":"). ZEN, M80 and the
