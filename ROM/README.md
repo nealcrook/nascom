@@ -108,6 +108,12 @@ let me know of any others you spot):
   "SUB C" is legal. Some assemblers (maybe only the GNU assembler?) require this
   to be coded as "SUB A,C".
 
+* Most assemblers allow string literals to be used like this: LD A, "E" but ZEAP
+  does not. In ZEAP, only the opening quote is used: LD A, "E
+
+* Some assemblers require the pseudo-op END at the end of the source; ZEN
+  behaviour is quite confusing if END is omitted.
+
 * Most assemblers allow space and tab as whitespace characters. ZEN only allows
   space.
 
