@@ -2,12 +2,13 @@
 
 Here are PERL programs for converting NASCOM files between different formats.
 
-* nascon - convert between nas/cas/bin/hex/dmp formats.
-* wav2bin - converts NASCOM audio files at 1200 or 300 baud into binary.
+* [nascon](nascon) - convert between nas/cas/bin/hex/dmp formats.
+* [wav2bin](wav2bin) - converts NASCOM audio files at 1200 or 300 baud into binary.
 * nas2cas - (obsolete) convert .nas format to .cas
 * cas2nas - (obsolete) convert .cas format to .nas (also spits out a binary file)
-* sy_extract - Polydos allowed creation of a symbol table in a compiled format that could be read in to the polyzap assembler. This program reads a symbol table in this compiled format and writes it out as a set of equates.
-* polydos_vfs - mount upto 4 PolyDos disk images and inspect/manipulate them. Extensive built-in help
+* [sy_extract](sy_extract) - Polydos allowed creation of a symbol table in a compiled format that could be read in to the polyzap assembler. This program reads a symbol table in this compiled format and writes it out as a set of equates.
+* polydos_vfs - mount upto 4 PolyDos disk images and inspect/manipulate them. Extensive built-in [help](polydos_vfs_help.md)
+* [toZ80](toZ80) - convert assembler source from 8080 mnemonics to Z80 mnemonics. This originated as an AWK script written by Douglas Beattie Jr. cira 2003, but it had some bugs. I used a2p to convert it to PERL then fixed the bugs and added support for some 8080 instructions that had been missing.
 
 All of those programs are written in PERL. If you use Linux or Mac you will have
 PERL installed. If you use Windows I recommend Strawberry PERL which is free.
