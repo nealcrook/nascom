@@ -9,6 +9,8 @@
 ; -> DONE.
 ;- add DEFM as an alias for DEFB
 ; -> DONE.
+;- fix typo in INTAB that made IN A,(C) assemble wrongly
+; -> DONE.
 ;- vectorize all I/O
 ;- move all RAM and stack to separate area and have cold and warm start
 ;- consider moving symbol table to beyond source. Just needs to be quashed on any edit command
@@ -1696,7 +1698,7 @@ INTAB:  DEFB INL
         DEFB IO1-$-INL.S
         DEFB IO2-$-INL.S
         DEFB IOER-$-INL
-        DEFB 0DBH,40,0
+        DEFB 0DBH,40H,0
 OUTAB:  DEFB OL
         DEFB NOI*16.TR
         DEFB RI*16.TR

@@ -2185,7 +2185,7 @@ INTAB:  DEFB INL ; =3
         DEFB IO1-$-INL.S ; IN A,(n)
         DEFB IO2-$-INL.S ; IN rr,(C)
         DEFB IOER-$-INL ; OPND?
-        DEFB 0DBH,40,0 ; op-codes
+        DEFB 0DBH,40H,0 ; op-codes
 ;
 OUTAB:  DEFB OL ; =3
         DEFB NOI*16.TR

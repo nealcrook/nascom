@@ -5,8 +5,8 @@
 # - change to .NAS
 #
 # usage:
-# ./src2nas zen_nassys.asm ZENNSSRC.NAS
-# ./src2nas zen_nassys.asm ZENNSSRC.NAS 2800
+# ./src2nas ZEN_t4.asm     ZENSRC.NAS
+# ./src2nas ZEN_nassys.asm ZENNSSRC.NAS 2800
 #
 # optional 3rd argument is the origin in hex; defaults to 2400 for original T4 version
 
