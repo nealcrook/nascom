@@ -45,11 +45,19 @@ S:      EQU 80H
 ; b1    0 selects EXT (printer) output - uses pager
 ; b0    0 selects VIDEO (tested in OPTION)
 F1:     EQU 0
+; Initialised to 0 at start of assembling each line.
+; b0 ??
+; b1 to 1 if line has a label
+; b3 to 1 if ??something to do with jumps
+; b4 ??
 F2:     EQU 1
+; Initialised to 0 at start of assembling each line.
 F3:     EQU 2
 ; Output line count; used for pager. Hard-coded default is 60 lines/page
 F5:     EQU 3
+; Initialised to 0 at start of assembling each line. Might be byte-length of instruction?
 F6:     EQU 4
+; Initialised to 0 at start of assembling each line.
 F7:     EQU 5
 ; Just used as scratch in SAVE
 F8:     EQU 6
@@ -147,7 +155,7 @@ LC1:    POP HL
         INC HL
         CP CR ; end of line in edit buffer
         CALL Z,UPDATE ; go to next line
-        CALL EOF ; abort if end of edit buffer
+        CALL EOF ; abort if EOF
         LD B,C ; ?save length of string to be searched for
         LD DE,TBUFF+1 ; point to string to be searched for
         PUSH HL
@@ -901,13 +909,13 @@ IMIN:   EQU 38H
 IPOS:   EQU 30H
 ; Parser Exit Tokens
 TR:     EQU 0
-RI:     EQU 4
+RI:     EQU 4 ; (C)
 RP:     EQU 1
 RPI:    EQU 5
 XY:     EQU 2
 XYI:    EQU 6
-NO:     EQU 3
-NOI:    EQU 7
+NO:     EQU 3 ; number
+NOI:    EQU 7 ; (number)
 RE:     EQU 8
 CC:     EQU 9
 XYD:    EQU 10
@@ -943,15 +951,15 @@ PS1:    LD HL,(CUR)   ; process one line
         LD HL,(PC)
         PUSH HL
         LD HL,0
-        LD (FLAGS+F2 ),HL
-        LD (FLAGS+F6),HL
-        CALL CLASS
+        LD (FLAGS+F2 ),HL ; clear F2,F3,F6,F7 at the start of assembling
+        LD (FLAGS+F6),HL ; each line
+        CALL CLASS ;classify line
         CP TLAB
         CALL Z,SYM
         CP TCR
         JR Z,PS2
         CP TALPHA
-        JR NZ,E1 ; non alpha
+        JR NZ,E1 ; non alpha -> HUH? error
         CALL OPTSCH
         JR C,E1
         LD (IX+F6),C
@@ -959,13 +967,13 @@ PS1:    LD HL,(CUR)   ; process one line
         JP NZ,E6
         CALL PARSER
         CP TCR
-        JR NZ,E1
+        JR NZ,E1 ; -> HUH? error
 PS2:    POP HL
-        CALL OPTION ; set flags based on F1
-        CALL C,LIST; video or ext output
-        CALL LINC
+        CALL OPTION ;set flags based on F1
+        CALL C,LIST ;video or ext output
+        CALL LINC ;move to next line
         INC B
-        JR NZ,PS1 ; do next line
+        JR NZ,PS1 ;do line
         RET
 E1:     LD L,M2&255
         JP ER
@@ -992,22 +1000,29 @@ ASK:    LD L,M7&255
         LD (IX+F5),1 ; set pager line count to 1
         LD (IX+F9),1
         RET
-SYM:    SET 1,(IX+F2)
+;
+; C=length of symbol name (excluding the :)
+SYM:    SET 1,(IX+F2) ; set flag to indicate a symbol on this line of source
         INC C
         LD (IX+F7),C
         DEC C
-        JP Z,E0       ; SYM error
+        JP Z,E0       ; C=0 -> SYM error
+; v--- This code imposes the restriction that opcodes and register
+;      names cannot be used as label names. However, this restriction
+;      is not needed! Once removed you can also remove M12 and the
+;      code at E2. Bonus is that the assembler will also run faster!
         CALL OPDSCH
         JR NC,E2 ; RESVD error
         CALL OPTSCH
         JR NC,E2 ; RESVD error
-        CALL SYMSCH
+; ^---
+        CALL SYMSCH ; Does symbol exist?
         LD (LBLP),IY
         BIT 5,(IX+F1)
-        JR Z,SY2 ; Pass 2 ??symbols must be resolved
-        LD L,M13&255 ; Duplicate symbol?
+        JR Z,SY2 ; Pass 2 - expect symbol to exist AND be resolved
+        LD L,M13&255 ; Pass 1 - if found, duplicate symbol error
         JP NC,ER
-        LD HL,(FEP)
+        LD HL,(FEP) ; store in the symbol table
         PUSH HL
         LD B,0
         ADD HL,BC
@@ -1089,9 +1104,10 @@ JP3:    LD A,L
 ;
 ; Every operator in KEYTB and friends, has an associated entry in this table. The
 ; comments show which operators use which entry.
-; Operators marked thus' have MSB set on 1st byte.
-; Offsets 0-38 are subroutines. Offsets 40-56 are additional lookup tables.
-; Some of these entries are code/subroutines, others are data tables. ??How does the lookup know which are which?
+; Operators marked thus' have MSB set on 1st byte - ?allow condititional suffix?
+; Offsets 0-38 are subroutines. Offsets 40-56 are additional lookup tables: Code near JP2 does
+; a "CP 39" to distinguish the two. That code also does a "CP 5" to ?distinguish op-codes that
+; has no arguments?
 JPTAB:  DEFW MOFB    ; 0  NOP, HALT, CCF, CPL, DAA, DI, SCF, EXX, EI, RLCA, RLA, RRCA, RRA,
         DEFW L30     ; 2  NEG, LDI, LDIR, LDD, LDDR, CPI, CPIR, CPD, CPDR, INI, INIR, IND,
                      ;    INDR, OUTI, OTIR, OUTD, OTDR, RLD, RRD, RETI, RETN,
@@ -1111,7 +1127,7 @@ JPTAB:  DEFW MOFB    ; 0  NOP, HALT, CCF, CPL, DAA, DI, SCF, EXX, EI, RLCA, RLA,
         DEFW EQUH    ; 30 EQU
         DEFW ORGH    ; 32 ORG
         DEFW IMH     ; 34 IM
-        DEFW RDH     ; 36 ?? does not seem to be referenced but there is code at RDH..
+        DEFW RDH     ; 36 ?? Unused - but there is code (1 byte) at RDH. Removed in SHARP version
         DEFW LOADH   ; 38 LOAD
 
         ; remaining entries are data, not code.
@@ -1207,6 +1223,16 @@ NM5:    LD A,(HL)
         DEC HL
         RET
 ;
+; Search symbol table.
+; (DE) string to search for
+; (HL) where to search
+; C how many bytes to match (excludes :)
+; If found, return with C set and value in HL
+; During pass 1, each declared symbol is inserted in
+; the symbol table. Something like "JP FOO" where
+; FOO is never declared means that FOO will never be
+; in the symbol table. Symbol not found in Pass 2
+; results in a SYMBOL error.
 SYMSCH: LD HL,AEND+1 ; start of symbol table
         JR SEARCH
 ;
@@ -1319,7 +1345,7 @@ E6:     LD L,M16&255 ; OPND?
 ; Memory/Object output ??what byte
 MOFMIX: LD E,L
 MOFMX2: BIT 3,E
-        JR NZ,E6
+        JR NZ,E6 ; OPND?
         LD A,E
         RLCA
         RLCA
@@ -1327,7 +1353,7 @@ MOFMX2: BIT 3,E
         OR B
         JR MOF
 ;
-; Memory/Object output prefix byte (0EDH)
+; Memory/Object output 0EDH prefix byte
 MOFPRE: LD A,0EDH
         JR MOF
 ;
@@ -1585,9 +1611,9 @@ E7:     LD L,M17&255 ; UNDEF?
         JP ER
 ;
 ; process instruction type
-; ??return with a code address in IY (caller does JP (IY))
-TYPE:   LD HL,(CUR) ;current location
-        CALL EOF         ;check NOT Eof
+; ??return with a code address in IY (caller does JP (IY)) and classification in A
+TYPE:   LD HL,(CUR) ;current location in source line
+        CALL EOF         ;abort if EOF
         INC HL
         LD (CUR),HL      ;set new current location
         DEC HL           ;point to last
@@ -1653,10 +1679,10 @@ TYPTAB: DEFB TL,CR,"'"
         DEFB TIND,0,0,TLAB
         DEFB 0,TCOM,TDEF
 ;
-; Class operation types
+; Classify operation types. Source is at (TEMP). Return with TLAB/TCR/TALPHA etc. in A.
 ;
 CLASS:  CALL TYPE
-        LD BC,2100H
+        LD BC,2100H ; B=21H, C=0
         JP (IY)
 ;
 ; exit when TCR found
@@ -2146,15 +2172,20 @@ SR2:    PUSH AF
         CALL MOF
         POP AF
         JR ML3
+
+; Each table has a count followed by 3 sections
+; - list of legal operand combos
+; - code emit routines for each combo
+; - op-codes (or initial op-code) for combo
 INTAB:  DEFB INL ; =3
-        DEFB TR*16.NOI
-        DEFB TR*16.RI
+        DEFB TR*16.NOI ; legal operand combo 1
+        DEFB TR*16.RI ; legal operand combo 2
         DEFB 0
 ;
-        DEFB IO1-$-INL.S
-        DEFB IO2-$-INL.S
-        DEFB IOER-$-INL
-        DEFB 0DBH,40,0
+        DEFB IO1-$-INL.S ; IN A,(n)
+        DEFB IO2-$-INL.S ; IN rr,(C)
+        DEFB IOER-$-INL ; OPND?
+        DEFB 0DBH,40,0 ; op-codes
 ;
 OUTAB:  DEFB OL ; =3
         DEFB NOI*16.TR
@@ -2170,10 +2201,10 @@ IO1:    BIT 2,E
         JR Z,IOER
         JP ML11
 ;
-IO2:    CALL MOFPRE
+IO2:    CALL MOFPRE ; emit ED byte
         DEC L
         JP Z,MOFMX2
-IOER:   JP E6
+IOER:   JP E6 ; OPND?
 ;
 XTAB:   DEFB XL ; =4
         DEFB RP*16.RP
@@ -2231,8 +2262,10 @@ REGS:   DEFB "H","L".S,IHL,RP
 ; tables and of entries within a table should be chosen to put most-frequently-used first, to speed
 ; up the searches. Each entry ends with MSB set and two trailing bytes:
 ;
-; - first byte is an offset into JMPTAB (sometimes MSB is set; it's stripped off to select the JMPTAB entry)
-; - second byte is used as an argument for that JMPTAB code -- part of the op-code?
+; - first byte is an offset into JPTAB (not JMPTAB..). Sometimes the MSB is set; it's stripped off to
+;   select the JPTAB entry
+; - second byte is used as an argument for that JPTAB code -- part of the op-code?
+; JPTAB is searched by JUMP
 ;
 KEYTB:  DEFB "L".S
         DEFW LOPS-1
