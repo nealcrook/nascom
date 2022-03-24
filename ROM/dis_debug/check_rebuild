@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# rebuild from source and check that the binary matches the golden version
+./build dis_debug
+
+../../converters/nascon dis_debug.bin   dis_debug.NAS_rebuilt -in bin -out nas -org c000 -csum
+diff dis_debug.NAS_golden dis_debug.NAS_rebuilt

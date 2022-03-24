@@ -1,0 +1,3358 @@
+# File dis_debug_dis.asm
+0000			L_0008 equ $0008 
+0000			L_0010 equ $0010 
+0000			L_0018 equ $0018 
+0000			L_0028 equ $0028 
+0000			L_0030 equ $0030 
+0000			L_0038 equ $0038 
+0000			L_0E00 equ $0E00 
+0000			OUT    equ $C8EC 
+0000			XFOUND equ $CAE4 
+0000			 
+0000			        org $000D 
+000d			 
+000d			 
+000d			STMON: 
+000d c9			        ret 
+000e			 
+000e			 
+000e			        org $C000 
+c000			 
+c000			 
+c000			DEBUG: 
+c000 c3 03 c0		        jp START 
+c003			 
+c003			 
+c003			START: 
+c003 31 00 10		        ld sp, $1000 
+c006 cd 0d 00		        call STMON 
+c009 31 00 0f		        ld sp, $0F00 
+c00c 21 5e c3		        ld hl, $C35E 
+c00f e5			        push hl 
+c010 21 43 c1		        ld hl, RETURN 
+c013 e5			        push hl 
+c014 21 00 00		        ld hl, $0000 
+c017 e5			        push hl 
+c018 21 0a 08		        ld hl, $080A 
+c01b e5			        push hl 
+c01c 21 26 c0		        ld hl, DENT 
+c01f 22 78 0c		        ld ($0C78), hl 
+c022 df			        rst $18 
+c023 55			        defb $55 
+c024 df			        rst $18 
+c025 5b			        defb $5B 
+c026			 
+c026			DENT: 
+c026 f5			        push af 
+c027 fe 18		        cp $18 
+c029 20 11		        jr nz, CMND 
+c02b			 
+c02b			SSTEP: 
+c02b 31 f8 0e		        ld sp, $0EF8 
+c02e d7			        rst $10 
+c02f 7a			        defb $7A 
+c030 2a 23 0c		        ld hl, ($0C23) 
+c033 3a 25 0c		        ld a, ($0C25) 
+c036 77			        ld (hl), a 
+c037 cd ec c1		        call SSD 
+c03a 18 4d		        jr DPJ 
+c03c			 
+c03c			 
+c03c			CMND: 
+c03c fe 0d		        cp $0D 
+c03e 20 08		        jr nz, PNORM 
+c040 cd e4 c2		        call STLIN 
+c043 3e 3a		        ld a, $3A 
+c045 be			        cp (hl) 
+c046 28 05		        jr z, DCMND 
+c048			 
+c048			PNORM: 
+c048 f1			        pop af 
+c049 2a fc 0e		        ld hl, ($0EFC) 
+c04c e9			        jp (hl) 
+c04d			 
+c04d			 
+c04d			DCMND: 
+c04d 31 f8 0e		        ld sp, $0EF8 
+c050 36 20		        ld (hl), $20 
+c052 df			        rst $18 
+c053 6a			        defb $6A 
+c054 2a 29 0c		        ld hl, ($0C29) 
+c057 11 c0 ff		        ld de, $FFC0 
+c05a 19			        add hl, de 
+c05b 36 3a		        ld (hl), $3A 
+c05d eb			        ex de, hl 
+c05e 13			        inc de 
+c05f 1a			        ld a, (de) 
+c060 fe 51		        cp $51 
+c062 30 23		        jr nc, DERR 
+c064 2a fe 0e		        ld hl, ($0EFE) 
+c067			 
+c067			PA1: 
+c067 e5			        push hl 
+c068 01 2b 0c		        ld bc, $0C2B 
+c06b 1a			        ld a, (de) 
+c06c fe 20		        cp $20 
+c06e 20 05		        jr nz, PA2 
+c070 0a			        ld a, (bc) 
+c071 fe 53		        cp $53 
+c073 20 5a		        jr nz, DPARSE 
+c075			 
+c075			PA2: 
+c075 fe 41		        cp $41 
+c077 38 0e		        jr c, DERR 
+c079 fe 5b		        cp $5B 
+c07b 30 0a		        jr nc, DERR 
+c07d 02			        ld (bc), a 
+c07e 32 0a 0c		        ld ($0C0A), a 
+c081 f5			        push af 
+c082 13			        inc de 
+c083 df			        rst $18 
+c084 79			        defb $79 
+c085 30 04		        jr nc, DPEND 
+c087			 
+c087			DERR: 
+c087 df			        rst $18 
+c088 6b			        defb $6B 
+c089			 
+c089			DPJ: 
+c089 18 44		        jr DPARSE 
+c08b			 
+c08b			 
+c08b			DPEND: 
+c08b f1			        pop af 
+c08c f5			        push af 
+c08d fe 53		        cp $53 
+c08f 28 02		        jr z, DP2 
+c091 fe 45		        cp $45 
+c093			 
+c093			DP2: 
+c093 cc aa c0		        call z, EXCH 
+c096 f1			        pop af 
+c097 e1			        pop hl 
+c098 cd b6 c3		        call DSCALJ 
+c09b 18 32		        jr DPARSE 
+c09d			 
+c09d			 
+c09d			ALTP: 
+c09d d7			        rst $10 
+c09e 0b			        defb $0B 
+c09f 30 2e		        jr nc, DPARSE 
+c0a1			 
+c0a1			TIN: 
+c0a1 df			        rst $18 
+c0a2 7b			        defb $7B 
+c0a3 fe 0d		        cp $0D 
+c0a5 28 03		        jr z, EXCH 
+c0a7 f7			        rst $30 
+c0a8 18 f7		        jr TIN 
+c0aa			 
+c0aa			 
+c0aa			EXCH: 
+c0aa 2a fa 0e		        ld hl, ($0EFA) 
+c0ad 7c			        ld a, h 
+c0ae b5			        or l 
+c0af c8			        ret z 
+c0b0 37			        scf 
+c0b1 11 00 08		        ld de, $0800 
+c0b4 01 00 04		        ld bc, $0400 
+c0b7			 
+c0b7			EX1: 
+c0b7 1a			        ld a, (de) 
+c0b8 ed a0		        ldi 
+c0ba 2b			        dec hl 
+c0bb 77			        ld (hl), a 
+c0bc 23			        inc hl 
+c0bd ea b7 c0		        jp pe, EX1 
+c0c0 2a f8 0e		        ld hl, ($0EF8) 
+c0c3 ed 5b 29 0c	        ld de, ($0C29) 
+c0c7 ed 53 f8 0e	        ld ($0EF8), de 
+c0cb			 
+c0cb			CUR1: 
+c0cb 22 29 0c		        ld ($0C29), hl 
+c0ce c9			        ret 
+c0cf			 
+c0cf			 
+c0cf			DPARSE: 
+c0cf 31 f8 0e		        ld sp, $0EF8 
+c0d2 d7			        rst $10 
+c0d3 64			        defb $64 
+c0d4 df			        rst $18 
+c0d5 63			        defb $63 
+c0d6 3e a0		        ld a, $A0 
+c0d8 62			        ld h, d 
+c0d9 6b			        ld l, e 
+c0da be			        cp (hl) 
+c0db 28 67		        jr z, EDFIND 
+c0dd 23			        inc hl 
+c0de be			        cp (hl) 
+c0df 28 ee		        jr z, DPARSE 
+c0e1 23			        inc hl 
+c0e2 be			        cp (hl) 
+c0e3 28 09		        jr z, RNAM 
+c0e5 2a 71 0c		        ld hl, ($0C71) 
+c0e8 31 61 0c		        ld sp, $0C61 
+c0eb c3 67 c0		        jp PA1 
+c0ee			 
+c0ee			 
+c0ee			RNAM: 
+c0ee 01 61 0c		        ld bc, $0C61 
+c0f1 21 ca c3		        ld hl, REGTAB 
+c0f4			 
+c0f4			TSTREG: 
+c0f4 1a			        ld a, (de) 
+c0f5 be			        cp (hl) 
+c0f6 23			        inc hl 
+c0f7 28 0a		        jr z, FOUND 
+c0f9 0c			        inc c 
+c0fa 0c			        inc c 
+c0fb 23			        inc hl 
+c0fc 23			        inc hl 
+c0fd 7e			        ld a, (hl) 
+c0fe b7			        or a 
+c0ff 20 f3		        jr nz, TSTREG 
+c101			 
+c101			EDERR: 
+c101 18 84		        jr DERR 
+c103			 
+c103			 
+c103			FOUND: 
+c103 13			        inc de 
+c104 13			        inc de 
+c105 13			        inc de 
+c106 7e			        ld a, (hl) 
+c107 23			        inc hl 
+c108 66			        ld h, (hl) 
+c109 6f			        ld l, a 
+c10a d7			        rst $10 
+c10b 72			        defb $72 
+c10c			 
+c10c			FIN: 
+c10c df			        rst $18 
+c10d 77			        defb $77 
+c10e e5			        push hl 
+c10f d7			        rst $10 
+c110 27			        defb $27 
+c111 11 c0 ff		        ld de, $FFC0 
+c114 06 07		        ld b, $07 
+c116 21 8a 09		        ld hl, $098A 
+c119			 
+c119			SPLINE: 
+c119 3e 53		        ld a, $53 
+c11b be			        cp (hl) 
+c11c 28 08		        jr z, REDO 
+c11e			 
+c11e			UPONE: 
+c11e 19			        add hl, de 
+c11f 10 f8		        djnz SPLINE 
+c121 cd ec c1		        call SSD 
+c124 18 0d		        jr NOMOP 
+c126			 
+c126			 
+c126			REDO: 
+c126 e5			        push hl 
+c127 2a 29 0c		        ld hl, ($0C29) 
+c12a e3			        ex (sp), hl 
+c12b d7			        rst $10 
+c12c 9e			        defb $9E 
+c12d cd ec c1		        call SSD 
+c130 e1			        pop hl 
+c131 d7			        rst $10 
+c132 98			        defb $98 
+c133			 
+c133			NOMOP: 
+c133 e1			        pop hl 
+c134 df			        rst $18 
+c135 71			        defb $71 
+c136			 
+c136			PAJ: 
+c136 18 97		        jr DPARSE 
+c138			 
+c138			 
+c138			BRSTO: 
+c138 af			        xor a 
+c139 32 26 0c		        ld ($0C26), a 
+c13c 2a 23 0c		        ld hl, ($0C23) 
+c13f 7e			        ld a, (hl) 
+c140 32 25 0c		        ld ($0C25), a 
+c143			 
+c143			RETURN: 
+c143 c9			        ret 
+c144			 
+c144			 
+c144			EDFIND: 
+c144 d7			        rst $10 
+c145 85			        defb $85 
+c146 13			        inc de 
+c147 d7			        rst $10 
+c148 6b			        defb $6B 
+c149 c5			        push bc 
+c14a 21 19 00		        ld hl, $0019 
+c14d d7			        rst $10 
+c14e 10			        defb $10 
+c14f e1			        pop hl 
+c150 cd 8d c3		        call PHA 
+c153 18 e1		        jr PAJ 
+c155			 
+c155			 
+c155			VALUES: 
+c155 d7			        rst $10 
+c156 4c			        defb $4C 
+c157 c0			        ret nz 
+c158			 
+c158			GBDEC: 
+c158 0b			        dec bc 
+c159 0b			        dec bc 
+c15a 0b			        dec bc 
+c15b 0b			        dec bc 
+c15c			 
+c15c			GBL: 
+c15c 21 1f 00		        ld hl, $001F 
+c15f			 
+c15f			GBY: 
+c15f 19			        add hl, de 
+c160			 
+c160			GB1: 
+c160 e5			        push hl 
+c161 df			        rst $18 
+c162 64			        defb $64 
+c163 e1			        pop hl 
+c164 9f			        sbc a, a 
+c165 b7			        or a 
+c166 ed 52		        sbc hl, de 
+c168 19			        add hl, de 
+c169 d8			        ret c 
+c16a 17			        rla 
+c16b			 
+c16b			ERJ: 
+c16b 38 94		        jr c, EDERR 
+c16d 3a 21 0c		        ld a, ($0C21) 
+c170 02			        ld (bc), a 
+c171 03			        inc bc 
+c172 18 ec		        jr GB1 
+c174			 
+c174			 
+c174			XYC: 
+c174 d7			        rst $10 
+c175 3e			        defb $3E 
+c176 e1			        pop hl 
+c177 e3			        ex (sp), hl 
+c178 ed 42		        sbc hl, bc 
+c17a e1			        pop hl 
+c17b 28 db		        jr z, GBDEC 
+c17d c5			        push bc 
+c17e			 
+c17e			JUMP: 
+c17e e9			        jp (hl) 
+c17f			 
+c17f			 
+c17f			PCR: 
+c17f d7			        rst $10 
+c180 22			        defb $22 
+c181 c0			        ret nz 
+c182 21 11 00		        ld hl, $0011 
+c185 18 d8		        jr GBY 
+c187			 
+c187			 
+c187			IXY: 
+c187 1b			        dec de 
+c188 1b			        dec de 
+c189 1a			        ld a, (de) 
+c18a 13			        inc de 
+c18b 13			        inc de 
+c18c fe 59		        cp $59 
+c18e 28 07		        jr z, IYR 
+c190 dd e5		        push ix 
+c192 d7			        rst $10 
+c193 e0			        defb $E0 
+c194 dd e1		        pop ix 
+c196 c9			        ret 
+c197			 
+c197			 
+c197			IYR: 
+c197 fd e5		        push iy 
+c199 d7			        rst $10 
+c19a d9			        defb $D9 
+c19b fd e1		        pop iy 
+c19d c9			        ret 
+c19e			 
+c19e			 
+c19e			SPR: 
+c19e d7			        rst $10 
+c19f 03			        defb $03 
+c1a0 28 ba		        jr z, GBL 
+c1a2 c9			        ret 
+c1a3			 
+c1a3			 
+c1a3			IMAGEV: 
+c1a3 c5			        push bc 
+c1a4 d7			        rst $10 
+c1a5 0e			        defb $0E 
+c1a6 e1			        pop hl 
+c1a7 e5			        push hl 
+c1a8 7e			        ld a, (hl) 
+c1a9 23			        inc hl 
+c1aa 66			        ld h, (hl) 
+c1ab 6f			        ld l, a 
+c1ac ed 42		        sbc hl, bc 
+c1ae e1			        pop hl 
+c1af c8			        ret z 
+c1b0 71			        ld (hl), c 
+c1b1 23			        inc hl 
+c1b2 70			        ld (hl), b 
+c1b3 c9			        ret 
+c1b4			 
+c1b4			 
+c1b4			NUMBR: 
+c1b4 df			        rst $18 
+c1b5 64			        defb $64 
+c1b6 38 b3		        jr c, ERJ 
+c1b8 ed 4b 21 0c	        ld bc, ($0C21) 
+c1bc c9			        ret 
+c1bd			 
+c1bd			 
+c1bd			REGN: 
+c1bd df			        rst $18 
+c1be 68			        defb $68 
+c1bf			 
+c1bf			REGDIS: 
+c1bf 3e a0		        ld a, $A0 
+c1c1 f7			        rst $30 
+c1c2 df			        rst $18 
+c1c3 66			        defb $66 
+c1c4 06 0a		        ld b, $0A 
+c1c6 2b			        dec hl 
+c1c7 2b			        dec hl 
+c1c8 2b			        dec hl 
+c1c9 2b			        dec hl 
+c1ca			 
+c1ca			SPDIS: 
+c1ca df			        rst $18 
+c1cb 69			        defb $69 
+c1cc 7c			        ld a, h 
+c1cd fe 08		        cp $08 
+c1cf 38 11		        jr c, RD1 
+c1d1 fe 0c		        cp $0C 
+c1d3 30 0d		        jr nc, RD1 
+c1d5 ed 5b fa 0e	        ld de, ($0EFA) 
+c1d9 7a			        ld a, d 
+c1da b3			        or e 
+c1db 28 05		        jr z, RD1 
+c1dd 19			        add hl, de 
+c1de 11 00 f8		        ld de, $F800 
+c1e1 19			        add hl, de 
+c1e2			 
+c1e2			RD1: 
+c1e2 7e			        ld a, (hl) 
+c1e3 23			        inc hl 
+c1e4 df			        rst $18 
+c1e5 68			        defb $68 
+c1e6 df			        rst $18 
+c1e7 69			        defb $69 
+c1e8 10 f8		        djnz RD1 
+c1ea f7			        rst $30 
+c1eb c9			        ret 
+c1ec			 
+c1ec			 
+c1ec			SSD: 
+c1ec cd e4 c2		        call STLIN 
+c1ef 22 29 0c		        ld ($0C29), hl 
+c1f2 ef			        rst $28 
+c1f3 53			        defb $53 
+c1f4 50			        defb $50 
+c1f5 a0			        defb $A0 
+c1f6 00			        defb $00 
+c1f7 2a 6b 0c		        ld hl, ($0C6B) 
+c1fa df			        rst $18 
+c1fb 66			        defb $66 
+c1fc 06 0c		        ld b, $0C 
+c1fe cd df c2		        call SPCS 
+c201 06 06		        ld b, $06 
+c203 d7			        rst $10 
+c204 c5			        defb $C5 
+c205 ef			        rst $28 
+c206 0d			        defb $0D 
+c207 49			        defb $49 
+c208 58			        defb $58 
+c209 00			        defb $00 
+c20a dd e5		        push ix 
+c20c e1			        pop hl 
+c20d d7			        rst $10 
+c20e b0			        defb $B0 
+c20f ef			        rst $28 
+c210 20			        defb $20 
+c211 49			        defb $49 
+c212 46			        defb $46 
+c213 46			        defb $46 
+c214 32			        defb $32 
+c215 20			        defb $20 
+c216 00			        defb $00 
+c217 ed 57		        ld a, i 
+c219 3e 30		        ld a, $30 
+c21b e2 1f c2		        jp po, IFF 
+c21e 3c			        inc a 
+c21f			 
+c21f			IFF: 
+c21f f7			        rst $30 
+c220 ef			        rst $28 
+c221 0d			        defb $0D 
+c222 49			        defb $49 
+c223 59			        defb $59 
+c224 00			        defb $00 
+c225 fd e5		        push iy 
+c227 e1			        pop hl 
+c228 d7			        rst $10 
+c229 95			        defb $95 
+c22a ef			        rst $28 
+c22b 20			        defb $20 
+c22c 49			        defb $49 
+c22d 20			        defb $20 
+c22e 00			        defb $00 
+c22f ed 57		        ld a, i 
+c231 d9			        exx 
+c232 c5			        push bc 
+c233 d5			        push de 
+c234 e5			        push hl 
+c235 d9			        exx 
+c236 d7			        rst $10 
+c237 73			        defb $73 
+c238 ef			        rst $28 
+c239 48			        defb $48 
+c23a 4c			        defb $4C 
+c23b 00			        defb $00 
+c23c 2a 65 0c		        ld hl, ($0C65) 
+c23f cd bf c1		        call REGDIS 
+c242 ef			        rst $28 
+c243 48			        defb $48 
+c244 4c			        defb $4C 
+c245 00			        defb $00 
+c246 d7			        rst $10 
+c247 5a			        defb $5A 
+c248 3e de		        ld a, $DE 
+c24a 2a 63 0c		        ld hl, ($0C63) 
+c24d cd bd c1		        call REGN 
+c250 3e de		        ld a, $DE 
+c252 d7			        rst $10 
+c253 4c			        defb $4C 
+c254 3e bc		        ld a, $BC 
+c256 2a 61 0c		        ld hl, ($0C61) 
+c259 cd bd c1		        call REGN 
+c25c 3e bc		        ld a, $BC 
+c25e d7			        rst $10 
+c25f 40			        defb $40 
+c260 ef			        rst $28 
+c261 41			        defb $41 
+c262 46			        defb $46 
+c263 a0			        defb $A0 
+c264 00			        defb $00 
+c265 2a 67 0c		        ld hl, ($0C67) 
+c268 df			        rst $18 
+c269 66			        defb $66 
+c26a f7			        rst $30 
+c26b 7d			        ld a, l 
+c26c 21 c1 c3		        ld hl, $C3C1 
+c26f 06 0c		        ld b, $0C 
+c271			 
+c271			PCL: 
+c271 23			        inc hl 
+c272 cb 27		        sla a 
+c274 f5			        push af 
+c275 7e			        ld a, (hl) 
+c276 38 02		        jr c, PRC 
+c278 3e 20		        ld a, $20 
+c27a			 
+c27a			PRC: 
+c27a f7			        rst $30 
+c27b f1			        pop af 
+c27c 10 f3		        djnz PCL 
+c27e ef			        rst $28 
+c27f 5e			        defb $5E 
+c280 00			        defb $00 
+c281 06 12		        ld b, $12 
+c283 d7			        rst $10 
+c284 5a			        defb $5A 
+c285 08			        ex af, af' 
+c286 f5			        push af 
+c287 08			        ex af, af' 
+c288 3e af		        ld a, $AF 
+c28a d7			        rst $10 
+c28b 14			        defb $14 
+c28c 11 bd c2		        ld de, REVOUT 
+c28f d7			        rst $10 
+c290 1f			        defb $1F 
+c291 2a 69 0c		        ld hl, ($0C69) 
+c294			 
+c294			RV1: 
+c294 44			        ld b, h 
+c295 4d			        ld c, l 
+c296 54			        ld d, h 
+c297 5d			        ld e, l 
+c298 dd e5		        push ix 
+c29a cd fa cf		        call L_CFFD 
+c29d dd e1		        pop ix 
+c29f c9			        ret 
+c2a0			 
+c2a0			 
+c2a0			ALTN: 
+c2a0 df			        rst $18 
+c2a1 68			        defb $68 
+c2a2			 
+c2a2			ALT: 
+c2a2 3e 27		        ld a, $27 
+c2a4 f7			        rst $30 
+c2a5 e1			        pop hl 
+c2a6 e3			        ex (sp), hl 
+c2a7 7c			        ld a, h 
+c2a8 df			        rst $18 
+c2a9 68			        defb $68 
+c2aa 7d			        ld a, l 
+c2ab			 
+c2ab			B2HCR: 
+c2ab df			        rst $18 
+c2ac 68			        defb $68 
+c2ad			 
+c2ad			CRRET: 
+c2ad df			        rst $18 
+c2ae 6a			        defb $6A 
+c2af c9			        ret 
+c2b0			 
+c2b0			 
+c2b0			REVAD: 
+c2b0 2a 03 c4		        ld hl, ($C403) 
+c2b3 36 c3		        ld (hl), $C3 
+c2b5 23			        inc hl 
+c2b6 73			        ld (hl), e 
+c2b7 23			        inc hl 
+c2b8 72			        ld (hl), d 
+c2b9 23			        inc hl 
+c2ba 36 01		        ld (hl), $01 
+c2bc c9			        ret 
+c2bd			 
+c2bd			 
+c2bd			REVOUT: 
+c2bd ef			        rst $28 
+c2be 50			        defb $50 
+c2bf 43			        defb $43 
+c2c0 a0			        defb $A0 
+c2c1 00			        defb $00 
+c2c2			 
+c2c2			REVO2: 
+c2c2 06 12		        ld b, $12 
+c2c4			 
+c2c4			REVO: 
+c2c4 7e			        ld a, (hl) 
+c2c5 23			        inc hl 
+c2c6 f7			        rst $30 
+c2c7 10 fb		        djnz REVO 
+c2c9 23			        inc hl 
+c2ca 23			        inc hl 
+c2cb 23			        inc hl 
+c2cc			 
+c2cc			BOUT: 
+c2cc 7e			        ld a, (hl) 
+c2cd f7			        rst $30 
+c2ce 23			        inc hl 
+c2cf fe 0d		        cp $0D 
+c2d1 20 f9		        jr nz, BOUT 
+c2d3 11 d8 c2		        ld de, REVO3 
+c2d6 18 d8		        jr REVAD 
+c2d8			 
+c2d8			 
+c2d8			REVO3: 
+c2d8 ef			        rst $28 
+c2d9 20			        defb $20 
+c2da a0			        defb $A0 
+c2db 20			        defb $20 
+c2dc 00			        defb $00 
+c2dd 18 e3		        jr REVO2 
+c2df			 
+c2df			 
+c2df			SPCS: 
+c2df df			        rst $18 
+c2e0 69			        defb $69 
+c2e1 10 fc		        djnz SPCS 
+c2e3 c9			        ret 
+c2e4			 
+c2e4			 
+c2e4			STLIN: 
+c2e4 2a 29 0c		        ld hl, ($0C29) 
+c2e7 7d			        ld a, l 
+c2e8 e6 c0		        and $C0 
+c2ea f6 0a		        or $0A 
+c2ec 6f			        ld l, a 
+c2ed c9			        ret 
+c2ee			 
+c2ee			 
+c2ee			REVENT: 
+c2ee e5			        push hl 
+c2ef 11 d8 c2		        ld de, REVO3 
+c2f2 d7			        rst $10 
+c2f3 bc			        defb $BC 
+c2f4			 
+c2f4			RM1: 
+c2f4 e1			        pop hl 
+c2f5			 
+c2f5			RM2: 
+c2f5 d7			        rst $10 
+c2f6 9d			        defb $9D 
+c2f7 d5			        push de 
+c2f8			 
+c2f8			INP: 
+c2f8 df			        rst $18 
+c2f9 7b			        defb $7B 
+c2fa fe 0d		        cp $0D 
+c2fc 28 08		        jr z, NL 
+c2fe f7			        rst $30 
+c2ff fe 1b		        cp $1B 
+c301 20 f5		        jr nz, INP 
+c303 f1			        pop af 
+c304 18 a7		        jr CRRET 
+c306			 
+c306			 
+c306			NL: 
+c306 d7			        rst $10 
+c307 dc			        defb $DC 
+c308 eb			        ex de, hl 
+c309 df			        rst $18 
+c30a 64			        defb $64 
+c30b 38 3f		        jr c, FERR 
+c30d 7e			        ld a, (hl) 
+c30e b7			        or a 
+c30f 28 e3		        jr z, RM1 
+c311 df			        rst $18 
+c312 6a			        defb $6A 
+c313 e1			        pop hl 
+c314 2a 21 0c		        ld hl, ($0C21) 
+c317 18 dc		        jr RM2 
+c319			 
+c319			 
+c319			FIND: 
+c319 2b			        dec hl 
+c31a e5			        push hl 
+c31b df			        rst $18 
+c31c 69			        defb $69 
+c31d df			        rst $18 
+c31e 63			        defb $63 
+c31f 21 10 0c		        ld hl, $0C10 
+c322 01 00 00		        ld bc, $0000 
+c325			 
+c325			MORE: 
+c325 e5			        push hl 
+c326 df			        rst $18 
+c327 64			        defb $64 
+c328 7e			        ld a, (hl) 
+c329 b7			        or a 
+c32a 28 0e		        jr z, NOARGS 
+c32c 23			        inc hl 
+c32d 7e			        ld a, (hl) 
+c32e e1			        pop hl 
+c32f			 
+c32f			STORE: 
+c32f 77			        ld (hl), a 
+c330 23			        inc hl 
+c331			 
+c331			L_C331: 
+c331 04			        inc b 
+c332 cb 58		        bit 3, b 
+c334 20 1e		        jr nz, F2 
+c336 cb 01		        rlc c 
+c338 18 eb		        jr MORE 
+c33a			 
+c33a			 
+c33a			NOARGS: 
+c33a e1			        pop hl 
+c33b 1a			        ld a, (de) 
+c33c fe 2c		        cp $2C 
+c33e 20 05		        jr nz, MINUS 
+c340 13			        inc de 
+c341 1a			        ld a, (de) 
+c342 13			        inc de 
+c343 18 ea		        jr STORE 
+c345			 
+c345			 
+c345			MINUS: 
+c345 fe 2d		        cp $2D 
+c347 28 06		        jr z, FLAG 
+c349 b7			        or a 
+c34a 28 08		        jr z, F2 
+c34c			 
+c34c			FERR: 
+c34c c3 87 c0		        jp DERR 
+c34f			 
+c34f			 
+c34f			FLAG: 
+c34f cb c1		        set 0, c 
+c351 13			        inc de 
+c352 18 dd		        jr L_C331 
+c354			 
+c354			 
+c354			F2: 
+c354 79			        ld a, c 
+c355 3c			        inc a 
+c356 28 f4		        jr z, FERR 
+c358 c5			        push bc 
+c359 3e 06		        ld a, $06 
+c35b			 
+c35b			BDUN: 
+c35b b8			        cp b 
+c35c 38 05		        jr c, CDUN 
+c35e cb 01		        rlc c 
+c360 04			        inc b 
+c361 18 f8		        jr BDUN 
+c363			 
+c363			 
+c363			CDUN: 
+c363 f1			        pop af 
+c364 47			        ld b, a 
+c365 e1			        pop hl 
+c366			 
+c366			NEXT: 
+c366 ed 5b 0e 0c	        ld de, ($0C0E) 
+c36a 23			        inc hl 
+c36b b7			        or a 
+c36c ed 52		        sbc hl, de 
+c36e 19			        add hl, de 
+c36f d0			        ret nc 
+c370 c5			        push bc 
+c371 e5			        push hl 
+c372 11 10 0c		        ld de, $0C10 
+c375			 
+c375			FTEST: 
+c375 cb 01		        rlc c 
+c377 30 04		        jr nc, COMP 
+c379 23			        inc hl 
+c37a 05			        dec b 
+c37b 18 f8		        jr FTEST 
+c37d			 
+c37d			 
+c37d			COMP: 
+c37d 1a			        ld a, (de) 
+c37e be			        cp (hl) 
+c37f 23			        inc hl 
+c380 20 07		        jr nz, NEXTJ 
+c382 13			        inc de 
+c383 10 f0		        djnz FTEST 
+c385 e1			        pop hl 
+c386 e5			        push hl 
+c387 d7			        rst $10 
+c388 04			        defb $04 
+c389			 
+c389			NEXTJ: 
+c389 e1			        pop hl 
+c38a c1			        pop bc 
+c38b 18 d9		        jr NEXT 
+c38d			 
+c38d			 
+c38d			PHA: 
+c38d 3e a0		        ld a, $A0 
+c38f f7			        rst $30 
+c390 df			        rst $18 
+c391 66			        defb $66 
+c392 54			        ld d, h 
+c393 5d			        ld e, l 
+c394 06 08		        ld b, $08 
+c396 cd ca c1		        call SPDIS 
+c399 f7			        rst $30 
+c39a 06 08		        ld b, $08 
+c39c			 
+c39c			PRA: 
+c39c 1a			        ld a, (de) 
+c39d 3c			        inc a 
+c39e e6 7f		        and $7F 
+c3a0 fe 21		        cp $21 
+c3a2 1a			        ld a, (de) 
+c3a3 30 02		        jr nc, PRA2 
+c3a5 3e 2e		        ld a, $2E 
+c3a7			 
+c3a7			PRA2: 
+c3a7 f7			        rst $30 
+c3a8 13			        inc de 
+c3a9 10 f1		        djnz PRA 
+c3ab df			        rst $18 
+c3ac 6a			        defb $6A 
+c3ad c9			        ret 
+c3ae			 
+c3ae			 
+c3ae			CHUSR: 
+c3ae 22 fc 0e		        ld ($0EFC), hl 
+c3b1 c9			        ret 
+c3b2			 
+c3b2			 
+c3b2			OPTN: 
+c3b2 22 fa 0e		        ld ($0EFA), hl 
+c3b5 c9			        ret 
+c3b6			 
+c3b6			 
+c3b6			DSCALJ: 
+c3b6 5f			        ld e, a 
+c3b7 16 00		        ld d, $00 
+c3b9 19			        add hl, de 
+c3ba 19			        add hl, de 
+c3bb 5e			        ld e, (hl) 
+c3bc 23			        inc hl 
+c3bd 56			        ld d, (hl) 
+c3be d5			        push de 
+c3bf df			        rst $18 
+c3c0 60			        defb $60 
+c3c1 c9			        ret 
+c3c2			 
+c3c2			 
+c3c2			STR: 
+c3c2 ..			        defm "SZ H PNC" 
+c3ca			 
+c3ca			REGTAB: 
+c3ca ..			        defm "B" 
+c3cb 55 c1		        defw VALUES 
+c3cd ..			        defm "D" 
+c3ce 55 c1		        defw VALUES 
+c3d0 ..			        defm "H" 
+c3d1 55 c1		        defw VALUES 
+c3d3 ..			        defm "A" 
+c3d4 a3 c1		        defw IMAGEV 
+c3d6 ..			        defm "P" 
+c3d7 7f c1		        defw PCR 
+c3d9 ..			        defm "S" 
+c3da 9e c1		        defw SPR 
+c3dc ..			        defm "I" 
+c3dd 87 c1		        defw IXY 
+c3df 00			        defb $00 
+c3e0			 
+c3e0			CTAB: 
+c3e0 9d c0 87 c0 ae c3 ee c2 87 c0 19 c3 87 c0 87 c0 87 c0 87 c0 87 c0 87 c0 87 c0 87 c0 b2 c3 ec c1	        defw ALTP, DERR, CHUSR, REVENT, DERR, FIND, DERR, DERR, DERR, DERR, DERR, DERR, DERR, DERR, OPTN, SSD 
+c400 3e c3		        ld a, $C3 
+c402 32 00 00		        ld (L_0E00), a 
+c405 32 03 0e		        ld ($0E03), a 
+c408 21 28 c4		        ld hl, PRINT 
+c40b 22 01 0e		        ld ($0E01), hl 
+c40e 3a 0b 0c		        ld a, ($0C0B) 
+c411 fe 02		        cp $02 
+c413 da bb ca		        jp c, REVASC 
+c416 df			        rst $18 
+c417 60			        defb $60 
+c418 20 02		        jr nz, SCO 
+c41a 0e 01		        ld c, $01 
+c41c			 
+c41c			SCO: 
+c41c 41			        ld b, c 
+c41d ed 43 10 0c	        ld ($0C10), bc 
+c421 42			        ld b, d 
+c422 4b			        ld c, e 
+c423 21 ff ff		        ld hl, $FFFF 
+c426 18 16		        jr REVAS 
+c428			 
+c428			 
+c428			PRINT: 
+c428 7e			        ld a, (hl) 
+c429 f7			        rst $30 
+c42a 23			        inc hl 
+c42b fe 0d		        cp $0D 
+c42d 20 f9		        jr nz, PRINT 
+c42f 21 10 0c		        ld hl, $0C10 
+c432 35			        dec (hl) 
+c433 c0			        ret nz 
+c434 23			        inc hl 
+c435 7e			        ld a, (hl) 
+c436 2b			        dec hl 
+c437 77			        ld (hl), a 
+c438 cf			        rst $08 
+c439 d6 1b		        sub $1B 
+c43b c0			        ret nz 
+c43c df			        rst $18 
+c43d 5b			        defb $5B 
+c43e			 
+c43e			REVAS: 
+c43e ed 43 04 0e	        ld ($0E04), bc 
+c442 ed 53 06 0e	        ld ($0E06), de 
+c446 22 08 0e		        ld ($0E08), hl 
+c449			 
+c449			NEXTL: 
+c449 2a 08 0e		        ld hl, ($0E08) 
+c44c ed 5b 06 0e	        ld de, ($0E06) 
+c450 af			        xor a 
+c451 ed 52		        sbc hl, de 
+c453 d8			        ret c 
+c454 cd 6e c4		        call INITB 
+c457 cd b8 c4		        call BYTE 
+c45a cd 15 c5		        call DECODE 
+c45d 21 0c 0e		        ld hl, $0E0C 
+c460 7e			        ld a, (hl) 
+c461 23			        inc hl 
+c462 be			        cp (hl) 
+c463 c4 53 c9		        call nz, NOTVAL 
+c466 21 14 0e		        ld hl, $0E14 
+c469 cd 00 00		        call L_0E00 
+c46c 18 db		        jr NEXTL 
+c46e			 
+c46e			 
+c46e			INITB: 
+c46e 11 14 0e		        ld de, $0E14 
+c471 d5			        push de 
+c472 dd e1		        pop ix 
+c474 21 00 00		        ld hl, $0000 
+c477 22 12 0e		        ld ($0E12), hl 
+c47a 22 0c 0e		        ld ($0E0C), hl 
+c47d 2a 04 0e		        ld hl, ($0E04) 
+c480 22 0e 0e		        ld ($0E0E), hl 
+c483 cd 9d c4		        call HEX4 
+c486 eb			        ex de, hl 
+c487 23			        inc hl 
+c488 22 0a 0e		        ld ($0E0A), hl 
+c48b 2b			        dec hl 
+c48c 06 2b		        ld b, $2B 
+c48e			 
+c48e			INITB0: 
+c48e 36 20		        ld (hl), $20 
+c490 23			        inc hl 
+c491 10 fb		        djnz INITB0 
+c493 dd 36 2a 3b	        ld (ix+$2A), $3B 
+c497 36 0d		        ld (hl), $0D 
+c499 11 2d 0e		        ld de, $0E2D 
+c49c c9			        ret 
+c49d			 
+c49d			 
+c49d			HEX4: 
+c49d 7c			        ld a, h 
+c49e cd a2 c4		        call HEX2 
+c4a1 7d			        ld a, l 
+c4a2			 
+c4a2			HEX2: 
+c4a2 f5			        push af 
+c4a3 0f			        rrca 
+c4a4 0f			        rrca 
+c4a5 0f			        rrca 
+c4a6 0f			        rrca 
+c4a7 cd ab c4		        call HEX1 
+c4aa f1			        pop af 
+c4ab			 
+c4ab			HEX1: 
+c4ab f5			        push af 
+c4ac e6 0f		        and $0F 
+c4ae c6 90		        add a, $90 
+c4b0 27			        daa 
+c4b1 ce 40		        adc a, $40 
+c4b3 27			        daa 
+c4b4 12			        ld (de), a 
+c4b5 13			        inc de 
+c4b6 f1			        pop af 
+c4b7 c9			        ret 
+c4b8			 
+c4b8			 
+c4b8			BYTE: 
+c4b8 dd 23		        inc ix 
+c4ba 2a 04 0e		        ld hl, ($0E04) 
+c4bd 23			        inc hl 
+c4be 22 04 0e		        ld ($0E04), hl 
+c4c1 2a 06 0e		        ld hl, ($0E06) 
+c4c4 7e			        ld a, (hl) 
+c4c5 23			        inc hl 
+c4c6 22 06 0e		        ld ($0E06), hl 
+c4c9 2a 0a 0e		        ld hl, ($0E0A) 
+c4cc 23			        inc hl 
+c4cd eb			        ex de, hl 
+c4ce cd a2 c4		        call HEX2 
+c4d1 eb			        ex de, hl 
+c4d2 22 0a 0e		        ld ($0E0A), hl 
+c4d5 f5			        push af 
+c4d6 3c			        inc a 
+c4d7 e6 7f		        and $7F 
+c4d9 fe 21		        cp $21 
+c4db 3d			        dec a 
+c4dc 30 02		        jr nc, BYTE0 
+c4de 3e 2e		        ld a, $2E 
+c4e0			 
+c4e0			BYTE0: 
+c4e0 dd 77 2a		        ld (ix+$2A), a 
+c4e3 f1			        pop af 
+c4e4 c9			        ret 
+c4e5			 
+c4e5			 
+c4e5			WREX: 
+c4e5 eb			        ex de, hl 
+c4e6 36 45		        ld (hl), $45 
+c4e8 23			        inc hl 
+c4e9 36 58		        ld (hl), $58 
+c4eb 18 06		        jr WRLD0 
+c4ed			 
+c4ed			 
+c4ed			WRLD: 
+c4ed eb			        ex de, hl 
+c4ee 36 4c		        ld (hl), $4C 
+c4f0 23			        inc hl 
+c4f1 36 44		        ld (hl), $44 
+c4f3			 
+c4f3			WRLD0: 
+c4f3 11 32 0e		        ld de, $0E32 
+c4f6 c9			        ret 
+c4f7			 
+c4f7			 
+c4f7			COMMA: 
+c4f7 eb			        ex de, hl 
+c4f8 36 2c		        ld (hl), $2C 
+c4fa 23			        inc hl 
+c4fb eb			        ex de, hl 
+c4fc c9			        ret 
+c4fd			 
+c4fd			 
+c4fd			POUND: 
+c4fd eb			        ex de, hl 
+c4fe 36 23		        ld (hl), $23 
+c500 23			        inc hl 
+c501 eb			        ex de, hl 
+c502 c9			        ret 
+c503			 
+c503			 
+c503			COPY6: 
+c503 ed a0		        ldi 
+c505			 
+c505			COPY5: 
+c505 ed a0		        ldi 
+c507			 
+c507			COPY4: 
+c507 ed a0		        ldi 
+c509			 
+c509			COPY3: 
+c509 ed a0		        ldi 
+c50b			 
+c50b			COPY2: 
+c50b ed a0		        ldi 
+c50d ed a0		        ldi 
+c50f c9			        ret 
+c510			 
+c510			 
+c510			FTADR: 
+c510 85			        add a, l 
+c511 6f			        ld l, a 
+c512 d0			        ret nc 
+c513 24			        inc h 
+c514 c9			        ret 
+c515			 
+c515			 
+c515			DECODE: 
+c515 f5			        push af 
+c516 e6 c0		        and $C0 
+c518 fe 40		        cp $40 
+c51a ca 9d c5		        jp z, LOAD8 
+c51d fe 80		        cp $80 
+c51f ca 04 c6		        jp z, ARITH8 
+c522 f1			        pop af 
+c523 f5			        push af 
+c524 e6 8f		        and $8F 
+c526 07			        rlca 
+c527 07			        rlca 
+c528 21 7f c9		        ld hl, TABLE 
+c52b cd 10 c5		        call FTADR 
+c52e 7e			        ld a, (hl) 
+c52f 23			        inc hl 
+c530 66			        ld h, (hl) 
+c531 6f			        ld l, a 
+c532 e9			        jp (hl) 
+c533			 
+c533			 
+c533			INC: 
+c533 21 bf c9		        ld hl, INCM 
+c536 18 03		        jr ID0 
+c538			 
+c538			 
+c538			DEC: 
+c538 21 c2 c9		        ld hl, DECM 
+c53b			 
+c53b			ID0: 
+c53b cd 38 c7		        call COPY3S 
+c53e f1			        pop af 
+c53f cb 57		        bit 2, a 
+c541 28 34		        jr z, REGPR 
+c543 0f			        rrca 
+c544 0f			        rrca 
+c545 0f			        rrca 
+c546 18 6c		        jr SREG 
+c548			 
+c548			 
+c548			LD16: 
+c548 cd ed c4		        call WRLD 
+c54b f1			        pop af 
+c54c cd 77 c5		        call REGPR 
+c54f cd f7 c4		        call COMMA 
+c552			 
+c552			LD16A: 
+c552 cd b8 c4		        call BYTE 
+c555 4f			        ld c, a 
+c556 cd b8 c4		        call BYTE 
+c559 67			        ld h, a 
+c55a 69			        ld l, c 
+c55b			 
+c55b			LD16B: 
+c55b ed 53 12 0e	        ld ($0E12), de 
+c55f 22 10 0e		        ld ($0E10), hl 
+c562 cd fd c4		        call POUND 
+c565 c3 9d c4		        jp HEX4 
+c568			 
+c568			 
+c568			ADDHL: 
+c568 21 d8 c9		        ld hl, ARTAB 
+c56b			 
+c56b			L_C56B: 
+c56b cd 38 c7		        call COPY3S 
+c56e 3e 20		        ld a, $20 
+c570 cd 77 c5		        call REGPR 
+c573 cd f7 c4		        call COMMA 
+c576			 
+c576			L_C576: 
+c576 f1			        pop af 
+c577			 
+c577			REGPR: 
+c577 47			        ld b, a 
+c578 0f			        rrca 
+c579 0f			        rrca 
+c57a 0f			        rrca 
+c57b c6 02		        add a, $02 
+c57d 0e 06		        ld c, $06 
+c57f a1			        and c 
+c580 21 c8 c9		        ld hl, RPRTAB 
+c583 20 08		        jr nz, NOTSP 
+c585 2b			        dec hl 
+c586 cb 78		        bit 7, b 
+c588 ca 0b c5		        jp z, COPY2 
+c58b 2b			        dec hl 
+c58c 2b			        dec hl 
+c58d			 
+c58d			NOTSP: 
+c58d b9			        cp c 
+c58e 20 07		        jr nz, L_C597 
+c590 3a 0c 0e		        ld a, ($0E0C) 
+c593 32 0d 0e		        ld ($0E0D), a 
+c596 81			        add a, c 
+c597			 
+c597			L_C597: 
+c597 cd 10 c5		        call FTADR 
+c59a c3 0b c5		        jp COPY2 
+c59d			 
+c59d			 
+c59d			LOAD8: 
+c59d f1			        pop af 
+c59e fe 76		        cp $76 
+c5a0 28 5c		        jr z, HALT 
+c5a2 f5			        push af 
+c5a3 cd ed c4		        call WRLD 
+c5a6 0f			        rrca 
+c5a7 0f			        rrca 
+c5a8 0f			        rrca 
+c5a9 cd b4 c5		        call SREG 
+c5ac cd f7 c4		        call COMMA 
+c5af			 
+c5af			L8B: 
+c5af f1			        pop af 
+c5b0 cb 77		        bit 6, a 
+c5b2 28 41		        jr z, IMM 
+c5b4			 
+c5b4			SREG: 
+c5b4 3c			        inc a 
+c5b5 e6 07		        and $07 
+c5b7 fe 07		        cp $07 
+c5b9 28 09		        jr z, MEM 
+c5bb 21 c9 c9		        ld hl, $C9C9 
+c5be cd 10 c5		        call FTADR 
+c5c1 ed a0		        ldi 
+c5c3 c9			        ret 
+c5c4			 
+c5c4			 
+c5c4			MEM: 
+c5c4 3e 28		        ld a, $28 
+c5c6 12			        ld (de), a 
+c5c7 13			        inc de 
+c5c8 21 ce c9		        ld hl, HXYTAB 
+c5cb 3a 0c 0e		        ld a, ($0E0C) 
+c5ce 32 0d 0e		        ld ($0E0D), a 
+c5d1 f5			        push af 
+c5d2 cd 97 c5		        call L_C597 
+c5d5 f1			        pop af 
+c5d6 a7			        and a 
+c5d7 28 17		        jr z, NOTIXY 
+c5d9 cd b8 c4		        call BYTE 
+c5dc a7			        and a 
+c5dd 0e 2b		        ld c, $2B 
+c5df 28 0f		        jr z, NOTIXY 
+c5e1 f2 e8 c5		        jp p, PLUS 
+c5e4 ed 44		        neg 
+c5e6 0e 2d		        ld c, $2D 
+c5e8			 
+c5e8			PLUS: 
+c5e8 47			        ld b, a 
+c5e9 79			        ld a, c 
+c5ea 12			        ld (de), a 
+c5eb 13			        inc de 
+c5ec 78			        ld a, b 
+c5ed cd f8 c5		        call PHEX2 
+c5f0			 
+c5f0			NOTIXY: 
+c5f0 3e 29		        ld a, $29 
+c5f2 12			        ld (de), a 
+c5f3 13			        inc de 
+c5f4 c9			        ret 
+c5f5			 
+c5f5			 
+c5f5			IMM: 
+c5f5 cd b8 c4		        call BYTE 
+c5f8			 
+c5f8			PHEX2: 
+c5f8 cd fd c4		        call POUND 
+c5fb c3 a2 c4		        jp HEX2 
+c5fe			 
+c5fe			 
+c5fe			HALT: 
+c5fe 21 d4 c9		        ld hl, HALTM 
+c601 c3 07 c5		        jp COPY4 
+c604			 
+c604			 
+c604			ARITH8: 
+c604 f1			        pop af 
+c605 ee 40		        xor $40 
+c607 f5			        push af 
+c608 0f			        rrca 
+c609 0f			        rrca 
+c60a e6 0e		        and $0E 
+c60c 47			        ld b, a 
+c60d 0f			        rrca 
+c60e 80			        add a, b 
+c60f 21 d8 c9		        ld hl, ARTAB 
+c612 c4 10 c5		        call nz, FTADR 
+c615 78			        ld a, b 
+c616 cd 38 c7		        call COPY3S 
+c619 21 b0 ca		        ld hl, $CAB0 
+c61c fe 06		        cp $06 
+c61e cc 0b c5		        call z, COPY2 
+c621 fe 03		        cp $03 
+c623 dc 0b c5		        call c, COPY2 
+c626 18 87		        jr L8B 
+c628			 
+c628			 
+c628			POP: 
+c628 21 f4 c9		        ld hl, POPM 
+c62b 18 03		        jr PP0 
+c62d			 
+c62d			 
+c62d			PUSH: 
+c62d 21 f0 c9		        ld hl, PUSHM 
+c630			 
+c630			PP0: 
+c630 cd 07 c5		        call COPY4 
+c633 13			        inc de 
+c634 c3 76 c5		        jp L_C576 
+c637			 
+c637			 
+c637			CALETC: 
+c637 f1			        pop af 
+c638 fe ed		        cp $ED 
+c63a ca c9 c8		        jp z, EXTND 
+c63d fe cd		        cp $CD 
+c63f 28 17		        jr z, L_C658 
+c641 d6 f9		        sub $F9 
+c643 30 02		        jr nc, CE0 
+c645 3e 02		        ld a, $02 
+c647			 
+c647			CE0: 
+c647 32 0c 0e		        ld ($0E0C), a 
+c64a cd b8 c4		        call BYTE 
+c64d 47			        ld b, a 
+c64e e6 0f		        and $0F 
+c650 fe 0d		        cp $0D 
+c652 78			        ld a, b 
+c653 c8			        ret z 
+c654 c3 15 c5		        jp DECODE 
+c657			 
+c657			 
+c657			CJR: 
+c657 f1			        pop af 
+c658			 
+c658			L_C658: 
+c658 f5			        push af 
+c659 e6 06		        and $06 
+c65b 07			        rlca 
+c65c 21 f8 c9		        ld hl, CJRTAB 
+c65f c4 10 c5		        call nz, FTADR 
+c662 cd 07 c5		        call COPY4 
+c665 13			        inc de 
+c666 f1			        pop af 
+c667 fe c9		        cp $C9 
+c669 c8			        ret z 
+c66a cb 47		        bit 0, a 
+c66c 20 0b		        jr nz, UNCND 
+c66e f5			        push af 
+c66f cd 7c c6		        call CCODES 
+c672 f1			        pop af 
+c673 e6 07		        and $07 
+c675 c8			        ret z 
+c676 cd f7 c4		        call COMMA 
+c679			 
+c679			UNCND: 
+c679 c3 52 c5		        jp LD16A 
+c67c			 
+c67c			 
+c67c			CCODES: 
+c67c 0f			        rrca 
+c67d 0f			        rrca 
+c67e e6 0e		        and $0E 
+c680 21 04 ca		        ld hl, CCTAB 
+c683 c3 97 c5		        jp L_C597 
+c686			 
+c686			 
+c686			ROTMIS: 
+c686 f1			        pop af 
+c687 0f			        rrca 
+c688 e6 1c		        and $1C 
+c68a 21 14 ca		        ld hl, RMTAB 
+c68d c4 10 c5		        call nz, FTADR 
+c690 c3 07 c5		        jp COPY4 
+c693			 
+c693			 
+c693			RST: 
+c693 21 34 ca		        ld hl, RSTM 
+c696 cd 38 c7		        call COPY3S 
+c699 f1			        pop af 
+c69a e6 38		        and $38 
+c69c cd f8 c5		        call PHEX2 
+c69f 21 03 0e		        ld hl, $0E03 
+c6a2 cb 46		        bit 0, (hl) 
+c6a4 c8			        ret z 
+c6a5 fe 10		        cp $10 
+c6a7 d8			        ret c 
+c6a8 fe 20		        cp $20 
+c6aa c8			        ret z 
+c6ab 38 3c		        jr c, FLUSH 
+c6ad fe 28		        cp $28 
+c6af c0			        ret nz 
+c6b0			 
+c6b0			BORM: 
+c6b0 cd e9 c6		        call FLUSH 
+c6b3 06 03		        ld b, $03 
+c6b5 38 22		        jr c, UNPRN 
+c6b7 04			        inc b 
+c6b8 21 30 0e		        ld hl, $0E30 
+c6bb 36 4d		        ld (hl), $4D 
+c6bd 23			        inc hl 
+c6be 23			        inc hl 
+c6bf 36 2f		        ld (hl), $2F 
+c6c1 23			        inc hl 
+c6c2 eb			        ex de, hl 
+c6c3 18 08		        jr MS1 
+c6c5			 
+c6c5			 
+c6c5			MOREMS: 
+c6c5 cd fc c6		        call PRTABL 
+c6c8 38 07		        jr c, DONEM 
+c6ca cd b8 c4		        call BYTE 
+c6cd			 
+c6cd			MS1: 
+c6cd 12			        ld (de), a 
+c6ce 13			        inc de 
+c6cf 10 f4		        djnz MOREMS 
+c6d1			 
+c6d1			DONEM: 
+c6d1 eb			        ex de, hl 
+c6d2 36 2f		        ld (hl), $2F 
+c6d4 18 da		        jr BORM 
+c6d6			 
+c6d6			 
+c6d6			UN0: 
+c6d6 cd b8 c4		        call BYTE 
+c6d9			 
+c6d9			UNPRN: 
+c6d9 b7			        or a 
+c6da ca 53 c9		        jp z, NOTVAL 
+c6dd cd fc c6		        call PRTABL 
+c6e0 30 02		        jr nc, UN1 
+c6e2 10 f2		        djnz UN0 
+c6e4			 
+c6e4			UN1: 
+c6e4 cd 53 c9		        call NOTVAL 
+c6e7 18 c7		        jr BORM 
+c6e9			 
+c6e9			 
+c6e9			FLUSH: 
+c6e9 21 14 0e		        ld hl, $0E14 
+c6ec cd 00 00		        call L_0E00 
+c6ef cd 6e c4		        call INITB 
+c6f2 cd b8 c4		        call BYTE 
+c6f5 f5			        push af 
+c6f6 cd 53 c9		        call NOTVAL 
+c6f9 f1			        pop af 
+c6fa 18 04		        jr PRTB1 
+c6fc			 
+c6fc			 
+c6fc			PRTABL: 
+c6fc 2a 06 0e		        ld hl, ($0E06) 
+c6ff 7e			        ld a, (hl) 
+c700			 
+c700			PRTB1: 
+c700 fe 20		        cp $20 
+c702 d8			        ret c 
+c703 fe 2f		        cp $2F 
+c705 37			        scf 
+c706 c8			        ret z 
+c707 fe 7f		        cp $7F 
+c709 3f			        ccf 
+c70a c9			        ret 
+c70b			 
+c70b			 
+c70b			NOPETC: 
+c70b f1			        pop af 
+c70c fe 10		        cp $10 
+c70e 28 2e		        jr z, DJNZ 
+c710 38 23		        jr c, NOP 
+c712			 
+c712			JR: 
+c712 eb			        ex de, hl 
+c713 36 4a		        ld (hl), $4A 
+c715 23			        inc hl 
+c716 36 52		        ld (hl), $52 
+c718 11 32 0e		        ld de, $0E32 
+c71b fe 18		        cp $18 
+c71d 28 08		        jr z, UCD 
+c71f e6 18		        and $18 
+c721 cd 7c c6		        call CCODES 
+c724 cd f7 c4		        call COMMA 
+c727			 
+c727			UCD: 
+c727 cd b8 c4		        call BYTE 
+c72a 4f			        ld c, a 
+c72b 07			        rlca 
+c72c 9f			        sbc a, a 
+c72d 47			        ld b, a 
+c72e 2a 04 0e		        ld hl, ($0E04) 
+c731 09			        add hl, bc 
+c732 c3 5b c5		        jp LD16B 
+c735			 
+c735			 
+c735			NOP: 
+c735 21 37 ca		        ld hl, NOPM 
+c738			 
+c738			COPY3S: 
+c738 cd 09 c5		        call COPY3 
+c73b 13			        inc de 
+c73c 13			        inc de 
+c73d c9			        ret 
+c73e			 
+c73e			 
+c73e			DJNZ: 
+c73e 21 3a ca		        ld hl, DJNZM 
+c741 cd 07 c5		        call COPY4 
+c744 13			        inc de 
+c745 18 e0		        jr UCD 
+c747			 
+c747			 
+c747			EXAETC: 
+c747 f1			        pop af 
+c748 fe 08		        cp $08 
+c74a 20 c6		        jr nz, JR 
+c74c cd e5 c4		        call WREX 
+c74f 21 3e ca		        ld hl, EXAFM 
+c752 c3 03 c5		        jp COPY6 
+c755			 
+c755			 
+c755			JPETC: 
+c755 f1			        pop af 
+c756 fe d3		        cp $D3 
+c758 da 58 c6		        jp c, L_C658 
+c75b ca 00 00		        jp z, OUT 
+c75e fe f3		        cp $F3 
+c760 28 0e		        jr z, DI 
+c762 cd e5 c4		        call WREX 
+c765 21 44 ca		        ld hl, BSPBM 
+c768 cd 05 c5		        call COPY5 
+c76b 3e 20		        ld a, $20 
+c76d c3 77 c5		        jp REGPR 
+c770			 
+c770			 
+c770			DI: 
+c770 3e 44		        ld a, $44 
+c772 18 02		        jr DEI 
+c774			 
+c774			 
+c774			EI: 
+c774 3e 45		        ld a, $45 
+c776			 
+c776			DEI: 
+c776 eb			        ex de, hl 
+c777 77			        ld (hl), a 
+c778 23			        inc hl 
+c779 36 49		        ld (hl), $49 
+c77b c9			        ret 
+c77c			 
+c77c			 
+c77c			CBETC: 
+c77c f1			        pop af 
+c77d fe db		        cp $DB 
+c77f ca a0 c8		        jp z, IN 
+c782 da 0d c8		        jp c, CB 
+c785 fe fb		        cp $FB 
+c787 28 eb		        jr z, EI 
+c789 cd e5 c4		        call WREX 
+c78c 21 cc c9		        ld hl, $C9CC 
+c78f cd 0b c5		        call COPY2 
+c792 cd f7 c4		        call COMMA 
+c795 c3 0b c5		        jp COPY2 
+c798			 
+c798			 
+c798			RETETC: 
+c798 f1			        pop af 
+c799 fe d9		        cp $D9 
+c79b da 58 c6		        jp c, L_C658 
+c79e 28 1d		        jr z, EXX 
+c7a0 fe f9		        cp $F9 
+c7a2 28 0b		        jr z, LDSP 
+c7a4 21 fc c9		        ld hl, $C9FC 
+c7a7 cd 0b c5		        call COPY2 
+c7aa 21 32 0e		        ld hl, $0E32 
+c7ad 18 3d		        jr L_C7EC 
+c7af			 
+c7af			 
+c7af			LDSP: 
+c7af cd ed c4		        call WRLD 
+c7b2 21 4f ca		        ld hl, SPM 
+c7b5 cd 09 c5		        call COPY3 
+c7b8 3e 20		        ld a, $20 
+c7ba c3 77 c5		        jp REGPR 
+c7bd			 
+c7bd			 
+c7bd			EXX: 
+c7bd cd e5 c4		        call WREX 
+c7c0 23			        inc hl 
+c7c1 36 58		        ld (hl), $58 
+c7c3 c9			        ret 
+c7c4			 
+c7c4			 
+c7c4			STIND: 
+c7c4 cd ed c4		        call WRLD 
+c7c7 f1			        pop af 
+c7c8 f5			        push af 
+c7c9 fe 22		        cp $22 
+c7cb 28 2d		        jr z, ST16I 
+c7cd f1			        pop af 
+c7ce cd e9 c7		        call LD1 
+c7d1 cd f7 c4		        call COMMA 
+c7d4			 
+c7d4			ST1: 
+c7d4 3e 41		        ld a, $41 
+c7d6 12			        ld (de), a 
+c7d7 13			        inc de 
+c7d8 c9			        ret 
+c7d9			 
+c7d9			 
+c7d9			LDIND: 
+c7d9 cd ed c4		        call WRLD 
+c7dc f1			        pop af 
+c7dd f5			        push af 
+c7de fe 2a		        cp $2A 
+c7e0 28 21		        jr z, LD16I 
+c7e2 cd d4 c7		        call ST1 
+c7e5 cd f7 c4		        call COMMA 
+c7e8 f1			        pop af 
+c7e9			 
+c7e9			LD1: 
+c7e9 fe 22		        cp $22 
+c7eb			 
+c7eb			L_C7EB: 
+c7eb eb			        ex de, hl 
+c7ec			 
+c7ec			L_C7EC: 
+c7ec 36 28		        ld (hl), $28 
+c7ee 23			        inc hl 
+c7ef eb			        ex de, hl 
+c7f0 3f			        ccf 
+c7f1 d4 77 c5		        call nc, REGPR 
+c7f4 dc 52 c5		        call c, LD16A 
+c7f7 c3 f0 c5		        jp NOTIXY 
+c7fa			 
+c7fa			 
+c7fa			ST16I: 
+c7fa cd e9 c7		        call LD1 
+c7fd cd f7 c4		        call COMMA 
+c800 c3 76 c5		        jp L_C576 
+c803			 
+c803			 
+c803			LD16I: 
+c803 f1			        pop af 
+c804			 
+c804			L_C804: 
+c804 cd 77 c5		        call REGPR 
+c807 cd f7 c4		        call COMMA 
+c80a a7			        and a 
+c80b 18 de		        jr L_C7EB 
+c80d			 
+c80d			 
+c80d			CB: 
+c80d 3a 0c 0e		        ld a, ($0E0C) 
+c810 a7			        and a 
+c811 f5			        push af 
+c812 28 0b		        jr z, NOTXY 
+c814 11 34 0e		        ld de, $0E34 
+c817 3e 06		        ld a, $06 
+c819 cd b4 c5		        call SREG 
+c81c 11 2d 0e		        ld de, $0E2D 
+c81f			 
+c81f			NOTXY: 
+c81f cd b8 c4		        call BYTE 
+c822 f5			        push af 
+c823 fe 40		        cp $40 
+c825 38 2c		        jr c, ROTATE 
+c827 21 4f ca		        ld hl, SPM 
+c82a 07			        rlca 
+c82b 07			        rlca 
+c82c e6 03		        and $03 
+c82e 47			        ld b, a 
+c82f 07			        rlca 
+c830 80			        add a, b 
+c831 cd 10 c5		        call FTADR 
+c834 cd 38 c7		        call COPY3S 
+c837 f1			        pop af 
+c838 f5			        push af 
+c839 0f			        rrca 
+c83a 0f			        rrca 
+c83b 0f			        rrca 
+c83c e6 07		        and $07 
+c83e f6 30		        or $30 
+c840 12			        ld (de), a 
+c841 13			        inc de 
+c842 cd f7 c4		        call COMMA 
+c845			 
+c845			TESTXY: 
+c845 c1			        pop bc 
+c846 f1			        pop af 
+c847 78			        ld a, b 
+c848 ca b4 c5		        jp z, SREG 
+c84b e6 07		        and $07 
+c84d fe 06		        cp $06 
+c84f c8			        ret z 
+c850 c3 53 c9		        jp NOTVAL 
+c853			 
+c853			 
+c853			ROTATE: 
+c853 0f			        rrca 
+c854 0f			        rrca 
+c855 c6 02		        add a, $02 
+c857 e6 0e		        and $0E 
+c859 fe 0e		        cp $0E 
+c85b ca 51 c9		        jp z, NTVL 
+c85e 47			        ld b, a 
+c85f 0f			        rrca 
+c860 80			        add a, b 
+c861 21 5b ca		        ld hl, ROTTAB 
+c864 cd 10 c5		        call FTADR 
+c867 cd 38 c7		        call COPY3S 
+c86a 18 d9		        jr TESTXY 
+c86c			 
+c86c			 
+c86c			AUTO: 
+c86c cb 57		        bit 2, a 
+c86e c2 53 c9		        jp nz, NOTVAL 
+c871 f5			        push af 
+c872 e6 03		        and $03 
+c874 07			        rlca 
+c875 21 70 ca		        ld hl, OPTAB 
+c878 cd 97 c5		        call L_C597 
+c87b f1			        pop af 
+c87c f5			        push af 
+c87d 3c			        inc a 
+c87e e6 13		        and $13 
+c880 20 04		        jr nz, AUTO0 
+c882 1b			        dec de 
+c883 cd 0b c5		        call COPY2 
+c886			 
+c886			AUTO0: 
+c886 f1			        pop af 
+c887 21 7a ca		        ld hl, $CA7A 
+c88a 0f			        rrca 
+c88b 0f			        rrca 
+c88c e6 06		        and $06 
+c88e c3 97 c5		        jp L_C597 
+c891			 
+c891			 
+c891			ADCSBC: 
+c891 21 e1 c9		        ld hl, $C9E1 
+c894 79			        ld a, c 
+c895 f5			        push af 
+c896 cb 5f		        bit 3, a 
+c898 28 03		        jr z, AS0 
+c89a 21 db c9		        ld hl, $C9DB 
+c89d			 
+c89d			AS0: 
+c89d c3 6b c5		        jp L_C56B 
+c8a0			 
+c8a0			 
+c8a0			IN: 
+c8a0 3e ff		        ld a, $FF 
+c8a2			 
+c8a2			INRC: 
+c8a2 fe 0e		        cp $0E 
+c8a4 ca 53 c9		        jp z, NOTVAL 
+c8a7 21 49 ca		        ld hl, INM 
+c8aa cd 38 c7		        call COPY3S 
+c8ad f5			        push af 
+c8ae cd b4 c5		        call SREG 
+c8b1 cd f7 c4		        call COMMA 
+c8b4 f1			        pop af 
+c8b5			 
+c8b5			PORT: 
+c8b5 eb			        ex de, hl 
+c8b6 36 28		        ld (hl), $28 
+c8b8 23			        inc hl 
+c8b9 3c			        inc a 
+c8ba 28 07		        jr z, INA 
+c8bc 36 43		        ld (hl), $43 
+c8be 23			        inc hl 
+c8bf eb			        ex de, hl 
+c8c0			 
+c8c0			L_C8C0: 
+c8c0 c3 f0 c5		        jp NOTIXY 
+c8c3			 
+c8c3			 
+c8c3			INA: 
+c8c3 eb			        ex de, hl 
+c8c4 cd f5 c5		        call IMM 
+c8c7 18 f7		        jr L_C8C0 
+c8c9			 
+c8c9			 
+c8c9			EXTND: 
+c8c9 cd b8 c4		        call BYTE 
+c8cc fe c0		        cp $C0 
+c8ce d2 53 c9		        jp nc, NOTVAL 
+c8d1 fe 40		        cp $40 
+c8d3 da 53 c9		        jp c, NOTVAL 
+c8d6 fe a0		        cp $A0 
+c8d8 30 92		        jr nc, AUTO 
+c8da fe 80		        cp $80 
+c8dc d2 53 c9		        jp nc, NOTVAL 
+c8df 4f			        ld c, a 
+c8e0 e6 07		        and $07 
+c8e2 47			        ld b, a 
+c8e3 79			        ld a, c 
+c8e4 0f			        rrca 
+c8e5 0f			        rrca 
+c8e6 0f			        rrca 
+c8e7 28 b9		        jr z, INRC 
+c8e9			 
+c8e9			NOTIN: 
+c8e9 10 19		        djnz NOTOUT 
+c8eb 21 3e ff		        ld hl, $FF3E 
+c8ee fe 2e		        cp $2E 
+c8f0 ca 53 c9		        jp z, NOTVAL 
+c8f3 21 4c ca		        ld hl, OUTM 
+c8f6 cd 38 c7		        call COPY3S 
+c8f9 f5			        push af 
+c8fa cd b5 c8		        call PORT 
+c8fd cd f7 c4		        call COMMA 
+c900 f1			        pop af 
+c901 c3 b4 c5		        jp SREG 
+c904			 
+c904			 
+c904			NOTOUT: 
+c904 05			        dec b 
+c905 28 8a		        jr z, ADCSBC 
+c907 10 14		        djnz NOTLD 
+c909 e6 0e		        and $0E 
+c90b fe 0c		        cp $0C 
+c90d ca 53 c9		        jp z, NOTVAL 
+c910 cd ed c4		        call WRLD 
+c913 cb 59		        bit 3, c 
+c915 79			        ld a, c 
+c916 c2 04 c8		        jp nz, L_C804 
+c919 f5			        push af 
+c91a c3 fa c7		        jp ST16I 
+c91d			 
+c91d			 
+c91d			NOTLD: 
+c91d 79			        ld a, c 
+c91e 01 0c 00		        ld bc, $000C 
+c921 21 82 ca		        ld hl, REMEXT 
+c924 ed b1		        cpir 
+c926 20 2b		        jr nz, NOTVAL 
+c928 79			        ld a, c 
+c929 07			        rlca 
+c92a fe 08		        cp $08 
+c92c 38 0e		        jr c, LDRI 
+c92e 07			        rlca 
+c92f 21 7e ca		        ld hl, $CA7E 
+c932 fe 1c		        cp $1C 
+c934 38 12		        jr c, INTMOD 
+c936 cd 10 c5		        call FTADR 
+c939 c3 07 c5		        jp COPY4 
+c93c			 
+c93c			 
+c93c			LDRI: 
+c93c cd ed c4		        call WRLD 
+c93f 21 ae ca		        ld hl, IRTAB 
+c942 cd 10 c5		        call FTADR 
+c945 c3 09 c5		        jp COPY3 
+c948			 
+c948			 
+c948			INTMOD: 
+c948 cd 97 c5		        call L_C597 
+c94b 11 32 0e		        ld de, $0E32 
+c94e ed a0		        ldi 
+c950 c9			        ret 
+c951			 
+c951			 
+c951			NTVL: 
+c951 e1			        pop hl 
+c952 e1			        pop hl 
+c953			 
+c953			NOTVAL: 
+c953 21 b7 ca		        ld hl, DEFB 
+c956 11 2d 0e		        ld de, $0E2D 
+c959 cd 07 c5		        call COPY4 
+c95c 13			        inc de 
+c95d 21 1a 0e		        ld hl, $0E1A 
+c960 0e 15		        ld c, $15 
+c962 3e 20		        ld a, $20 
+c964			 
+c964			NVLP: 
+c964 cd fd c4		        call POUND 
+c967 cd 0b c5		        call COPY2 
+c96a 23			        inc hl 
+c96b be			        cp (hl) 
+c96c 28 05		        jr z, DNV 
+c96e cd f7 c4		        call COMMA 
+c971 18 f1		        jr NVLP 
+c973			 
+c973			 
+c973			DNV: 
+c973 21 00 00		        ld hl, $0000 
+c976 22 12 0e		        ld ($0E12), hl 
+c979 79			        ld a, c 
+c97a fe 0d		        cp $0D 
+c97c c0			        ret nz 
+c97d 12			        ld (de), a 
+c97e c9			        ret 
+c97f			 
+c97f			 
+c97f			TABLE: 
+c97f 0b c7 57 c6 48 c5 28 c6 c4 c7 57 c6 33 c5 55 c7 33 c5 57 c6 38 c5 2d c6 9d c5 04 c6 86 c6 93 c6 47 c7 57 c6 68 c5 98 c7 d9 c7 57 c6 38 c5 7c c7 33 c5 57 c6 38 c5 37 c6 9d c5 04 c6 86 c6 93 c6	        defw NOPETC, CJR, LD16, POP, STIND, CJR, INC, JPETC, INC, CJR, DEC, PUSH, LOAD8, ARITH8, ROTMIS, RST, EXAETC, CJR, ADDHL, RETETC, LDIND, CJR, DEC, CBETC, INC, CJR, DEC, CALETC, LOAD8, ARITH8, ROTMIS, RST 
+c9bf			 
+c9bf			INCM: 
+c9bf ..			        defm "INC" 
+c9c2			 
+c9c2			DECM: 
+c9c2 ..			        defm "DEC" 
+c9c5 ..			        defm "AFS" 
+c9c8			 
+c9c8			RPRTAB: 
+c9c8 ..			        defm "PABCDE" 
+c9ce			 
+c9ce			HXYTAB: 
+c9ce ..			        defm "HLIXIY" 
+c9d4			 
+c9d4			HALTM: 
+c9d4 ..			        defm "HALT" 
+c9d8			 
+c9d8			ARTAB: 
+c9d8 ..			        defm "ADDADCSUBSBC" 
+c9e4 ..			        defm "ANDXOROR CP " 
+c9f0			 
+c9f0			PUSHM: 
+c9f0 ..			        defm "PUSH" 
+c9f4			 
+c9f4			POPM: 
+c9f4 ..			        defm "POP " 
+c9f8			 
+c9f8			CJRTAB: 
+c9f8 ..			        defm "RET JP  CALL" 
+ca04			 
+ca04			CCTAB: 
+ca04 ..			        defm "NZ ZNC CPOPE P M" 
+ca14			 
+ca14			RMTAB: 
+ca14 ..			        defm "RLCARRCARLA RRA " 
+ca24 ..			        defm "DAA CPL SCF CCF " 
+ca34			 
+ca34			RSTM: 
+ca34 ..			        defm "RST" 
+ca37			 
+ca37			NOPM: 
+ca37 ..			        defm "NOP" 
+ca3a			 
+ca3a			DJNZM: 
+ca3a ..			        defm "DJNZ" 
+ca3e			 
+ca3e			EXAFM: 
+ca3e ..			        defm "AF,AF'" 
+ca44			 
+ca44			BSPBM: 
+ca44 ..			        defm "(SP)," 
+ca49			 
+ca49			INM: 
+ca49 ..			        defm "IN " 
+ca4c			 
+ca4c			OUTM: 
+ca4c ..			        defm "OUT" 
+ca4f			 
+ca4f			SPM: 
+ca4f ..			        defm "SP," 
+ca52			 
+ca52			BRSTAB: 
+ca52 ..			        defm "BITRESSET" 
+ca5b			 
+ca5b			ROTTAB: 
+ca5b ..			        defm "SRLRLCRRCRL RR SLASRA" 
+ca70			 
+ca70			OPTAB: 
+ca70 ..			        defm "LDCPINOTUTI D IRDR" 
+ca82			 
+ca82			REMEXT: 
+ca82 44 45 4d 67 6f 46	        defb $44, $45, $4D, $67, $6F, $46 
+ca88 56 5e 57 4f 5f 47	        defb $56, $5E, $57, $4F, $5F, $47 
+ca8e			 
+ca8e			EXTMNE: 
+ca8e ..			        defm "IM2 IM1 IM0 RLD " 
+ca9e ..			        defm "RRD RETIRETNNEG " 
+caae			 
+caae			IRTAB: 
+caae ..			        defm "I,A,R,A,I" 
+cab7			 
+cab7			DEFB: 
+cab7 ..			        defm "DEFB" 
+cabb			 
+cabb			REVASC: 
+cabb 11 80 0e		        ld de, $0E80 
+cabe 21 e2 cf		        ld hl, RAMLD 
+cac1 01 12 00		        ld bc, $0012 
+cac4 ed b0		        ldir 
+cac6			 
+cac6			L_CAC6: 
+cac6 ef			        rst $28 
+cac7 ..			        defm " Options? (" 
+cad2			 
+cad2			OTAB: 
+cad2 ..			        defm "STZXLPDR" 
+cada ..			        defm "U)-
+cadd 11 00 00		        ld de, $0000 
+cae0 3e 01		        ld a, $01 
+cae2 01 d6 55		        ld bc, $55D6 
+cae5 20 03		        jr nz, OPT0 
+cae7 32 03 0e		        ld ($0E03), a 
+caea			 
+caea			OPT0: 
+caea 7b			        ld a, e 
+caeb b2			        or d 
+caec 57			        ld d, a 
+caed cf			        rst $08 
+caee f7			        rst $30 
+caef 37			        scf 
+caf0 1e 00		        ld e, $00 
+caf2 21 d2 ca		        ld hl, OTAB 
+caf5			 
+caf5			LUOP: 
+caf5 cb 13		        rl e 
+caf7 ed a1		        cpi 
+caf9 28 00		        jr z, XFOUND 
+cafb 30 f8		        jr nc, LUOP 
+cafd fe 0d		        cp $0D 
+caff 20 c5		        jr nz, L_CAC6 
+cb01 7a			        ld a, d 
+cb02 cb 57		        bit 2, a 
+cb04 28 02		        jr z, OPT1 
+cb06 f6 11		        or $11 
+cb08			 
+cb08			OPT1: 
+cb08 32 44 0e		        ld ($0E44), a 
+cb0b f5			        push af 
+cb0c e6 1c		        and $1C 
+cb0e 28 38		        jr z, NLABS 
+cb10			 
+cb10			GETSTA: 
+cb10 f1			        pop af 
+cb11 f5			        push af 
+cb12 cb 57		        bit 2, a 
+cb14 28 0b		        jr z, ST 
+cb16 ef			        rst $28 
+cb17 5a			        defb $5A 
+cb18 45			        defb $45 
+cb19 41			        defb $41 
+cb1a 50			        defb $50 
+cb1b 20			        defb $20 
+cb1c 66			        defb $66 
+cb1d 69			        defb $69 
+cb1e 00			        defb $00 
+cb1f 18 0c		        jr ST0 
+cb21			 
+cb21			 
+cb21			ST: 
+cb21 ef			        rst $28 
+cb22 53			        defb $53 
+cb23 79			        defb $79 
+cb24 6d			        defb $6D 
+cb25 62			        defb $62 
+cb26 6f			        defb $6F 
+cb27 6c			        defb $6C 
+cb28 20			        defb $20 
+cb29 74			        defb $74 
+cb2a 61			        defb $61 
+cb2b 62			        defb $62 
+cb2c 00			        defb $00 
+cb2d			 
+cb2d			ST0: 
+cb2d ef			        rst $28 
+cb2e 6c			        defb $6C 
+cb2f 65			        defb $65 
+cb30 20			        defb $20 
+cb31 61			        defb $61 
+cb32 72			        defb $72 
+cb33 65			        defb $65 
+cb34 61			        defb $61 
+cb35 3f			        defb $3F 
+cb36 0d			        defb $0D 
+cb37 00			        defb $00 
+cb38 cd fc cc		        call GETTWO 
+cb3b 38 d3		        jr c, GETSTA 
+cb3d ed 43 4e 0e	        ld ($0E4E), bc 
+cb41 ed 53 50 0e	        ld ($0E50), de 
+cb45 3e ff		        ld a, $FF 
+cb47 12			        ld (de), a 
+cb48			 
+cb48			NLABS: 
+cb48 f1			        pop af 
+cb49 cb 6f		        bit 5, a 
+cb4b 28 38		        jr z, NOTITL 
+cb4d			 
+cb4d			ASKT: 
+cb4d ef			        rst $28 
+cb4e 54			        defb $54 
+cb4f 69			        defb $69 
+cb50 74			        defb $74 
+cb51 6c			        defb $6C 
+cb52 65			        defb $65 
+cb53 3f			        defb $3F 
+cb54 0d			        defb $0D 
+cb55 00			        defb $00 
+cb56 df			        rst $18 
+cb57 63			        defb $63 
+cb58 21 3c 05		        ld hl, $053C 
+cb5b 1a			        ld a, (de) 
+cb5c fe 3d		        cp $3D 
+cb5e 20 08		        jr nz, SETLPP 
+cb60 13			        inc de 
+cb61 df			        rst $18 
+cb62 64			        defb $64 
+cb63 38 e8		        jr c, ASKT 
+cb65 2a 21 0c		        ld hl, ($0C21) 
+cb68			 
+cb68			SETLPP: 
+cb68 22 7e 0e		        ld ($0E7E), hl 
+cb6b 21 01 01		        ld hl, $0101 
+cb6e 22 7c 0e		        ld ($0E7C), hl 
+cb71 eb			        ex de, hl 
+cb72 11 92 0e		        ld de, $0E92 
+cb75 af			        xor a 
+cb76			 
+cb76			COPYT: 
+cb76 ed a0		        ldi 
+cb78 be			        cp (hl) 
+cb79 20 fb		        jr nz, COPYT 
+cb7b eb			        ex de, hl 
+cb7c 3e 20		        ld a, $20 
+cb7e			 
+cb7e			BACK: 
+cb7e 2b			        dec hl 
+cb7f be			        cp (hl) 
+cb80 28 fc		        jr z, BACK 
+cb82 23			        inc hl 
+cb83 36 0d		        ld (hl), $0D 
+cb85			 
+cb85			NOTITL: 
+cb85 ef			        rst $28 
+cb86 57			        defb $57 
+cb87 68			        defb $68 
+cb88 61			        defb $61 
+cb89 74			        defb $74 
+cb8a 20			        defb $20 
+cb8b 6f			        defb $6F 
+cb8c 6e			        defb $6E 
+cb8d 3f			        defb $3F 
+cb8e 0d			        defb $0D 
+cb8f 00			        defb $00 
+cb90 df			        rst $18 
+cb91 63			        defb $63 
+cb92 df			        rst $18 
+cb93 79			        defb $79 
+cb94 38 ef		        jr c, NOTITL 
+cb96 3a 0b 0c		        ld a, ($0C0B) 
+cb99 fe 02		        cp $02 
+cb9b 38 e8		        jr c, NOTITL 
+cb9d df			        rst $18 
+cb9e 60			        defb $60 
+cb9f 13			        inc de 
+cba0 ed 53 14 0e	        ld ($0E14), de 
+cba4 54			        ld d, h 
+cba5 5d			        ld e, l 
+cba6 2b			        dec hl 
+cba7 ed 73 46 0e	        ld ($0E46), sp 
+cbab e5			        push hl 
+cbac 23			        inc hl 
+cbad 28 02		        jr z, ONLY2 
+cbaf 60			        ld h, b 
+cbb0 69			        ld l, c 
+cbb1			 
+cbb1			ONLY2: 
+cbb1 ed 52		        sbc hl, de 
+cbb3 22 54 0e		        ld ($0E54), hl 
+cbb6 01 00 00		        ld bc, $0000 
+cbb9 11 ff ff		        ld de, $FFFF 
+cbbc 21 44 0e		        ld hl, $0E44 
+cbbf cb 7e		        bit 7, (hl) 
+cbc1 28 17		        jr z, DA 
+cbc3 cb be		        res 7, (hl) 
+cbc5			 
+cbc5			RNGRQ: 
+cbc5 ef			        rst $28 
+cbc6 ..			        defm "Listing range? 
+cbd5 cd fc cc		        call GETTWO 
+cbd8 38 eb		        jr c, RNGRQ 
+cbda			 
+cbda			DA: 
+cbda ed 43 48 0e	        ld ($0E48), bc 
+cbde ed 53 4a 0e	        ld ($0E4A), de 
+cbe2			 
+cbe2			DAREA: 
+cbe2 ef			        rst $28 
+cbe3 44			        defb $44 
+cbe4 41			        defb $41 
+cbe5 54			        defb $54 
+cbe6 41			        defb $41 
+cbe7 20			        defb $20 
+cbe8 61			        defb $61 
+cbe9 72			        defb $72 
+cbea 65			        defb $65 
+cbeb 61			        defb $61 
+cbec 73			        defb $73 
+cbed 3f			        defb $3F 
+cbee 0d			        defb $0D 
+cbef 00			        defb $00 
+cbf0 af			        xor a 
+cbf1			 
+cbf1			L_CBF3: 
+cbf1 f5			        push af 
+cbf2			 
+cbf2			DAREA0: 
+cbf2 cd fc cc		        call GETTWO 
+cbf5 38 27		        jr c, DAREA1 
+cbf7 60			        ld h, b 
+cbf8 69			        ld l, c 
+cbf9 ed 4b 54 0e	        ld bc, ($0E54) 
+cbfd c5			        push bc 
+cbfe ed 42		        sbc hl, bc 
+cc00 e3			        ex (sp), hl 
+cc01 c1			        pop bc 
+cc02 eb			        ex de, hl 
+cc03 b7			        or a 
+cc04 ed 52		        sbc hl, de 
+cc06 eb			        ex de, hl 
+cc07 f1			        pop af 
+cc08 e1			        pop hl 
+cc09 e5			        push hl 
+cc0a f5			        push af 
+cc0b 37			        scf 
+cc0c 23			        inc hl 
+cc0d ed 42		        sbc hl, bc 
+cc0f 30 24		        jr nc, DAREA2 
+cc11 2a 14 0e		        ld hl, ($0E14) 
+cc14 ed 52		        sbc hl, de 
+cc16 38 1d		        jr c, DAREA2 
+cc18 f1			        pop af 
+cc19 c5			        push bc 
+cc1a d5			        push de 
+cc1b 3c			        inc a 
+cc1c 18 d3		        jr L_CBF3 
+cc1e			 
+cc1e			 
+cc1e			DAREA1: 
+cc1e a7			        and a 
+cc1f 28 1d		        jr z, DAREA3 
+cc21 fe 2d		        cp $2D 
+cc23 20 10		        jr nz, DAREA2 
+cc25 f1			        pop af 
+cc26 a7			        and a 
+cc27 28 b9		        jr z, DAREA 
+cc29 e1			        pop hl 
+cc2a e1			        pop hl 
+cc2b 3d			        dec a 
+cc2c f5			        push af 
+cc2d ef			        rst $28 
+cc2e 13			        defb $13 
+cc2f 1b			        defb $1B 
+cc30 13			        defb $13 
+cc31 1b			        defb $1B 
+cc32 00			        defb $00 
+cc33 18 bd		        jr DAREA0 
+cc35			 
+cc35			 
+cc35			DAREA2: 
+cc35 df			        rst $18 
+cc36 6b			        defb $6B 
+cc37 ef			        rst $28 
+cc38 13			        defb $13 
+cc39 13			        defb $13 
+cc3a 17			        defb $17 
+cc3b 00			        defb $00 
+cc3c 18 b4		        jr DAREA0 
+cc3e			 
+cc3e			 
+cc3e			DAREA3: 
+cc3e f1			        pop af 
+cc3f 2a 14 0e		        ld hl, ($0E14) 
+cc42 e5			        push hl 
+cc43 21 ff ff		        ld hl, $FFFF 
+cc46 e5			        push hl 
+cc47 ef			        rst $28 
+cc48 47			        defb $47 
+cc49 6f			        defb $6F 
+cc4a 3f			        defb $3F 
+cc4b 00			        defb $00 
+cc4c df			        rst $18 
+cc4d 7b			        defb $7B 
+cc4e 32 45 0e		        ld ($0E45), a 
+cc51 df			        rst $18 
+cc52 6a			        defb $6A 
+cc53 3a 44 0e		        ld a, ($0E44) 
+cc56 e6 18		        and $18 
+cc58 21 86 cd		        ld hl, PASS1 
+cc5b c4 35 cd		        call nz, PASS 
+cc5e 21 44 0e		        ld hl, $0E44 
+cc61 cb fe		        set 7, (hl) 
+cc63 cb 56		        bit 2, (hl) 
+cc65 28 23		        jr z, ALLIN0 
+cc67 2a 50 0e		        ld hl, ($0E50) 
+cc6a 22 02 0f		        ld ($0F02), hl 
+cc6d 2a 4e 0e		        ld hl, ($0E4E) 
+cc70 22 00 0f		        ld ($0F00), hl 
+cc73 ed 5b 52 0e	        ld de, ($0E52) 
+cc77 ed 53 4e 0e	        ld ($0E4E), de 
+cc7b ed 5b 82 0e	        ld de, ($0E82) 
+cc7f 23			        inc hl 
+cc80 23			        inc hl 
+cc81 73			        ld (hl), e 
+cc82 23			        inc hl 
+cc83 72			        ld (hl), d 
+cc84 23			        inc hl 
+cc85 36 00		        ld (hl), $00 
+cc87 22 56 0e		        ld ($0E56), hl 
+cc8a			 
+cc8a			ALLIN0: 
+cc8a 21 22 ce		        ld hl, PASS2 
+cc8d cd 35 cd		        call PASS 
+cc90 21 44 0e		        ld hl, $0E44 
+cc93 cb be		        res 7, (hl) 
+cc95 cb 66		        bit 4, (hl) 
+cc97 e5			        push hl 
+cc98 c4 ff ce		        call nz, LABEL 
+cc9b e1			        pop hl 
+cc9c cb 5e		        bit 3, (hl) 
+cc9e 20 02		        jr nz, PCRT 
+cca0			 
+cca0			EXIT: 
+cca0 df			        rst $18 
+cca1 5b			        defb $5B 
+cca2			 
+cca2			PCRT: 
+cca2 7e			        ld a, (hl) 
+cca3 21 7d 0e		        ld hl, $0E7D 
+cca6 35			        dec (hl) 
+cca7 2b			        dec hl 
+cca8 e5			        push hl 
+cca9 cb 6f		        bit 5, a 
+ccab c4 7d cf		        call nz, EJECT 
+ccae e1			        pop hl 
+ccaf 34			        inc (hl) 
+ccb0 21 ff ff		        ld hl, $FFFF 
+ccb3 22 4a 0e		        ld ($0E4A), hl 
+ccb6 fd 2a 50 0e	        ld iy, ($0E50) 
+ccba			 
+ccba			XREF1: 
+ccba fd 7e 00		        ld a, (iy) 
+ccbd 3c			        inc a 
+ccbe 28 e0		        jr z, EXIT 
+ccc0 fd 2b		        dec iy 
+ccc2 4f			        ld c, a 
+ccc3 06 09		        ld b, $09 
+ccc5 11 14 0e		        ld de, $0E14 
+ccc8			 
+ccc8			XREF2: 
+ccc8 fd 6e 00		        ld l, (iy) 
+cccb fd 2b		        dec iy 
+cccd fd 66 00		        ld h, (iy) 
+ccd0 fd 2b		        dec iy 
+ccd2 cd 9d c4		        call HEX4 
+ccd5 3e 20		        ld a, $20 
+ccd7 12			        ld (de), a 
+ccd8 13			        inc de 
+ccd9 0d			        dec c 
+ccda 28 02		        jr z, XREF3 
+ccdc 10 ea		        djnz XREF2 
+ccde			 
+ccde			XREF3: 
+ccde c5			        push bc 
+ccdf eb			        ex de, hl 
+cce0 36 0d		        ld (hl), $0D 
+cce2 21 14 0e		        ld hl, $0E14 
+cce5 cd 4a ce		        call OUTPUT 
+cce8 c1			        pop bc 
+cce9 79			        ld a, c 
+ccea a7			        and a 
+cceb 28 cd		        jr z, XREF1 
+cced 21 14 0e		        ld hl, $0E14 
+ccf0 06 05		        ld b, $05 
+ccf2			 
+ccf2			XREF4: 
+ccf2 36 20		        ld (hl), $20 
+ccf4 23			        inc hl 
+ccf5 10 fb		        djnz XREF4 
+ccf7 eb			        ex de, hl 
+ccf8 06 08		        ld b, $08 
+ccfa 18 cc		        jr XREF2 
+ccfc			 
+ccfc			 
+ccfc			GETTWO: 
+ccfc df			        rst $18 
+ccfd 63			        defb $63 
+ccfe 3e 1b		        ld a, $1B 
+cd00 f7			        rst $30 
+cd01 d5			        push de 
+cd02 df			        rst $18 
+cd03 79			        defb $79 
+cd04 d1			        pop de 
+cd05 1a			        ld a, (de) 
+cd06 d8			        ret c 
+cd07 3a 0b 0c		        ld a, ($0C0B) 
+cd0a fe 02		        cp $02 
+cd0c 37			        scf 
+cd0d c0			        ret nz 
+cd0e df			        rst $18 
+cd0f 60			        defb $60 
+cd10 44			        ld b, h 
+cd11 4d			        ld c, l 
+cd12 b7			        or a 
+cd13 2b			        dec hl 
+cd14 ed 52		        sbc hl, de 
+cd16 3f			        ccf 
+cd17 c9			        ret 
+cd18			 
+cd18			 
+cd18			NEXTAD: 
+cd18 2a 4c 0e		        ld hl, ($0E4C) 
+cd1b 2b			        dec hl 
+cd1c 56			        ld d, (hl) 
+cd1d 2b			        dec hl 
+cd1e 5e			        ld e, (hl) 
+cd1f 22 4c 0e		        ld ($0E4C), hl 
+cd22 e5			        push hl 
+cd23 dd e1		        pop ix 
+cd25 62			        ld h, d 
+cd26 6b			        ld l, e 
+cd27 ed 4b 54 0e	        ld bc, ($0E54) 
+cd2b 09			        add hl, bc 
+cd2c 44			        ld b, h 
+cd2d 4d			        ld c, l 
+cd2e dd 66 ff		        ld h, (ix-$01) 
+cd31 dd 6e fe		        ld l, (ix-$02) 
+cd34 c9			        ret 
+cd35			 
+cd35			 
+cd35			PASS: 
+cd35 22 01 0e		        ld ($0E01), hl 
+cd38 2a 50 0e		        ld hl, ($0E50) 
+cd3b 22 52 0e		        ld ($0E52), hl 
+cd3e 2a 46 0e		        ld hl, ($0E46) 
+cd41 22 4c 0e		        ld ($0E4C), hl 
+cd44			 
+cd44			PASSL: 
+cd44 cd 18 cd		        call NEXTAD 
+cd47 03			        inc bc 
+cd48 13			        inc de 
+cd49 2b			        dec hl 
+cd4a cd 3e c4		        call REVAS 
+cd4d cd 18 cd		        call NEXTAD 
+cd50 7d			        ld a, l 
+cd51 a4			        and h 
+cd52 3c			        inc a 
+cd53 c8			        ret z 
+cd54 3a 44 0e		        ld a, ($0E44) 
+cd57 e6 80		        and $80 
+cd59 28 e9		        jr z, PASSL 
+cd5b ed 5b 06 0e	        ld de, ($0E06) 
+cd5f ed 52		        sbc hl, de 
+cd61 38 e1		        jr c, PASSL 
+cd63 23			        inc hl 
+cd64 e5			        push hl 
+cd65			 
+cd65			DATA1: 
+cd65 cd 6e c4		        call INITB 
+cd68 06 03		        ld b, $03 
+cd6a			 
+cd6a			DATA2: 
+cd6a cd b8 c4		        call BYTE 
+cd6d e1			        pop hl 
+cd6e 2b			        dec hl 
+cd6f 7d			        ld a, l 
+cd70 b4			        or h 
+cd71 e5			        push hl 
+cd72 28 02		        jr z, DATA3 
+cd74 10 f4		        djnz DATA2 
+cd76			 
+cd76			DATA3: 
+cd76 f5			        push af 
+cd77 cd 53 c9		        call NOTVAL 
+cd7a 21 14 0e		        ld hl, $0E14 
+cd7d cd 22 ce		        call PASS2 
+cd80 f1			        pop af 
+cd81 20 e2		        jr nz, DATA1 
+cd83 e1			        pop hl 
+cd84 18 be		        jr PASSL 
+cd86			 
+cd86			 
+cd86			PASS1: 
+cd86 2a 12 0e		        ld hl, ($0E12) 
+cd89 7d			        ld a, l 
+cd8a b4			        or h 
+cd8b c8			        ret z 
+cd8c 2a 50 0e		        ld hl, ($0E50) 
+cd8f			 
+cd8f			SRCHL: 
+cd8f 7e			        ld a, (hl) 
+cd90 e5			        push hl 
+cd91 fd e1		        pop iy 
+cd93 3c			        inc a 
+cd94 28 2d		        jr z, PAST 
+cd96 47			        ld b, a 
+cd97 2b			        dec hl 
+cd98 5e			        ld e, (hl) 
+cd99 2b			        dec hl 
+cd9a 56			        ld d, (hl) 
+cd9b 2b			        dec hl 
+cd9c e5			        push hl 
+cd9d 2a 10 0e		        ld hl, ($0E10) 
+cda0 a7			        and a 
+cda1 ed 52		        sbc hl, de 
+cda3 e1			        pop hl 
+cda4 18 02		        jr SRCH1 
+cda6			 
+cda6			 
+cda6			SRCH0: 
+cda6 2b			        dec hl 
+cda7 2b			        dec hl 
+cda8			 
+cda8			SRCH1: 
+cda8 10 fc		        djnz SRCH0 
+cdaa 3a 44 0e		        ld a, ($0E44) 
+cdad 38 14		        jr c, PAST 
+cdaf 20 de		        jr nz, SRCHL 
+cdb1 cb 5f		        bit 3, a 
+cdb3 c8			        ret z 
+cdb4 0e 02		        ld c, $02 
+cdb6 cd ec cd		        call MVUP 
+cdb9			 
+cdb9			FND: 
+cdb9 ed 5b 0e 0e	        ld de, ($0E0E) 
+cdbd 73			        ld (hl), e 
+cdbe 2b			        dec hl 
+cdbf 72			        ld (hl), d 
+cdc0 fd 34		        inc (iy) 
+cdc2 c9			        ret 
+cdc3			 
+cdc3			 
+cdc3			PAST: 
+cdc3 2a 82 0e		        ld hl, ($0E82) 
+cdc6 23			        inc hl 
+cdc7 23			        inc hl 
+cdc8 22 82 0e		        ld ($0E82), hl 
+cdcb fd e5		        push iy 
+cdcd e1			        pop hl 
+cdce 3a 44 0e		        ld a, ($0E44) 
+cdd1 0e 05		        ld c, $05 
+cdd3 cb 5f		        bit 3, a 
+cdd5 20 02		        jr nz, XR 
+cdd7 0e 03		        ld c, $03 
+cdd9			 
+cdd9			XR: 
+cdd9 cd ec cd		        call MVUP 
+cddc 36 00		        ld (hl), $00 
+cdde ed 5b 10 0e	        ld de, ($0E10) 
+cde2 2b			        dec hl 
+cde3 73			        ld (hl), e 
+cde4 2b			        dec hl 
+cde5 72			        ld (hl), d 
+cde6 2b			        dec hl 
+cde7 cb 5f		        bit 3, a 
+cde9 c8			        ret z 
+cdea 18 cd		        jr FND 
+cdec			 
+cdec			 
+cdec			MVUP: 
+cdec ed 5b 52 0e	        ld de, ($0E52) 
+cdf0 23			        inc hl 
+cdf1 a7			        and a 
+cdf2 06 00		        ld b, $00 
+cdf4 ed 52		        sbc hl, de 
+cdf6 eb			        ex de, hl 
+cdf7 ed 42		        sbc hl, bc 
+cdf9 42			        ld b, d 
+cdfa 4b			        ld c, e 
+cdfb eb			        ex de, hl 
+cdfc 2a 4e 0e		        ld hl, ($0E4E) 
+cdff 2b			        dec hl 
+ce00 ed 52		        sbc hl, de 
+ce02 30 0b		        jr nc, OVRFLW 
+ce04 2a 52 0e		        ld hl, ($0E52) 
+ce07 ed 53 52 0e	        ld ($0E52), de 
+ce0b ed b0		        ldir 
+ce0d 2b			        dec hl 
+ce0e c9			        ret 
+ce0f			 
+ce0f			 
+ce0f			OVRFLW: 
+ce0f ef			        rst $28 
+ce10 4f			        defb $4F 
+ce11 76			        defb $76 
+ce12 65			        defb $65 
+ce13 72			        defb $72 
+ce14 66			        defb $66 
+ce15 6c			        defb $6C 
+ce16 6f			        defb $6F 
+ce17 77			        defb $77 
+ce18 0d			        defb $0D 
+ce19 00			        defb $00 
+ce1a 21 14 0e		        ld hl, $0E14 
+ce1d cd f5 ce		        call OUTLIN 
+ce20 df			        rst $18 
+ce21 5b			        defb $5B 
+ce22			 
+ce22			PASS2: 
+ce22 01 13 00		        ld bc, $0013 
+ce25 fd 21 58 0e	        ld iy, $0E58 
+ce29 e5			        push hl 
+ce2a dd e1		        pop ix 
+ce2c dd 09		        add ix, bc 
+ce2e 3a 44 0e		        ld a, ($0E44) 
+ce31 cb 47		        bit 0, a 
+ce33 28 03		        jr z, KEEPO 
+ce35 09			        add hl, bc 
+ce36 fd 09		        add iy, bc 
+ce38			 
+ce38			KEEPO: 
+ce38 cb 67		        bit 4, a 
+ce3a 28 0e		        jr z, OUTPUT 
+ce3c e5			        push hl 
+ce3d cd ff ce		        call LABEL 
+ce40 2a 12 0e		        ld hl, ($0E12) 
+ce43 7d			        ld a, l 
+ce44 b4			        or h 
+ce45 28 02		        jr z, NOLB 
+ce47 36 4c		        ld (hl), $4C 
+ce49			 
+ce49			NOLB: 
+ce49 e1			        pop hl 
+ce4a			 
+ce4a			OUTPUT: 
+ce4a 44			        ld b, h 
+ce4b 4d			        ld c, l 
+ce4c 2a 4a 0e		        ld hl, ($0E4A) 
+ce4f ed 5b 0e 0e	        ld de, ($0E0E) 
+ce53 a7			        and a 
+ce54 ed 52		        sbc hl, de 
+ce56 d8			        ret c 
+ce57 2a 48 0e		        ld hl, ($0E48) 
+ce5a eb			        ex de, hl 
+ce5b ed 52		        sbc hl, de 
+ce5d d8			        ret c 
+ce5e c5			        push bc 
+ce5f 3a 44 0e		        ld a, ($0E44) 
+ce62 f5			        push af 
+ce63 cb 6f		        bit 5, a 
+ce65 c4 78 cf		        call nz, DPAGE 
+ce68 f1			        pop af 
+ce69 e1			        pop hl 
+ce6a f5			        push af 
+ce6b 0f			        rrca 
+ce6c 30 3d		        jr nc, ALLLIN 
+ce6e eb			        ex de, hl 
+ce6f 21 09 00		        ld hl, $0009 
+ce72 19			        add hl, de 
+ce73 7e			        ld a, (hl) 
+ce74 eb			        ex de, hl 
+ce75 11 58 0e		        ld de, $0E58 
+ce78 01 3b 20		        ld bc, $203B 
+ce7b d6 42		        sub $42 
+ce7d 20 01		        jr nz, SQSH1 
+ce7f 4f			        ld c, a 
+ce80			 
+ce80			SQSH1: 
+ce80 7e			        ld a, (hl) 
+ce81 fe 0d		        cp $0D 
+ce83 28 19		        jr z, SQSH3 
+ce85 b9			        cp c 
+ce86 28 16		        jr z, SQSH3 
+ce88 12			        ld (de), a 
+ce89 13			        inc de 
+ce8a 23			        inc hl 
+ce8b fe 2f		        cp $2F 
+ce8d 20 06		        jr nz, SQSH2 
+ce8f 78			        ld a, b 
+ce90 2f			        cpl 
+ce91 47			        ld b, a 
+ce92 79			        ld a, c 
+ce93 2f			        cpl 
+ce94 4f			        ld c, a 
+ce95			 
+ce95			SQSH2: 
+ce95 b8			        cp b 
+ce96 20 e8		        jr nz, SQSH1 
+ce98 be			        cp (hl) 
+ce99 20 e5		        jr nz, SQSH1 
+ce9b 23			        inc hl 
+ce9c 18 f7		        jr SQSH2 
+ce9e			 
+ce9e			 
+ce9e			SQSH3: 
+ce9e eb			        ex de, hl 
+ce9f 2b			        dec hl 
+cea0 7e			        ld a, (hl) 
+cea1 fe 20		        cp $20 
+cea3 28 01		        jr z, SQSH4 
+cea5 23			        inc hl 
+cea6			 
+cea6			SQSH4: 
+cea6 36 0d		        ld (hl), $0D 
+cea8 21 58 0e		        ld hl, $0E58 
+ceab			 
+ceab			ALLLIN: 
+ceab cd f5 ce		        call OUTLIN 
+ceae f1			        pop af 
+ceaf cb 57		        bit 2, a 
+ceb1 c8			        ret z 
+ceb2 ed 5b 80 0e	        ld de, ($0E80) 
+ceb6 2a 56 0e		        ld hl, ($0E56) 
+ceb9 23			        inc hl 
+ceba 73			        ld (hl), e 
+cebb 23			        inc hl 
+cebc 72			        ld (hl), d 
+cebd 23			        inc hl 
+cebe eb			        ex de, hl 
+cebf 3e 01		        ld a, $01 
+cec1 85			        add a, l 
+cec2 27			        daa 
+cec3 6f			        ld l, a 
+cec4 3e 00		        ld a, $00 
+cec6 8c			        adc a, h 
+cec7 27			        daa 
+cec8 67			        ld h, a 
+cec9 22 80 0e		        ld ($0E80), hl 
+cecc 21 58 0e		        ld hl, $0E58 
+cecf 3e 0d		        ld a, $0D 
+ced1			 
+ced1			Z1: 
+ced1 ed a0		        ldi 
+ced3 be			        cp (hl) 
+ced4 20 fb		        jr nz, Z1 
+ced6 eb			        ex de, hl 
+ced7 22 56 0e		        ld ($0E56), hl 
+ceda 36 00		        ld (hl), $00 
+cedc 23			        inc hl 
+cedd 36 ff		        ld (hl), $FF 
+cedf 23			        inc hl 
+cee0 e5			        push hl 
+cee1 ed 5b 00 0f	        ld de, ($0F00) 
+cee5 ed 52		        sbc hl, de 
+cee7 eb			        ex de, hl 
+cee8 73			        ld (hl), e 
+cee9 23			        inc hl 
+ceea 72			        ld (hl), d 
+ceeb d1			        pop de 
+ceec 2a 4e 0e		        ld hl, ($0E4E) 
+ceef ed 52		        sbc hl, de 
+cef1 d0			        ret nc 
+cef2 c3 0f ce		        jp OVRFLW 
+cef5			 
+cef5			 
+cef5			OUTLIN: 
+cef5 46			        ld b, (hl) 
+cef6 cd a7 cf		        call CHROUT 
+cef9 23			        inc hl 
+cefa fe 0d		        cp $0D 
+cefc 20 f7		        jr nz, OUTLIN 
+cefe c9			        ret 
+ceff			 
+ceff			 
+ceff			LABEL: 
+ceff 2a 52 0e		        ld hl, ($0E52) 
+cf02 7e			        ld a, (hl) 
+cf03 3c			        inc a 
+cf04 c8			        ret z 
+cf05 47			        ld b, a 
+cf06 2b			        dec hl 
+cf07 5e			        ld e, (hl) 
+cf08 2b			        dec hl 
+cf09 56			        ld d, (hl) 
+cf0a 2b			        dec hl 
+cf0b 18 02		        jr LABEL1 
+cf0d			 
+cf0d			 
+cf0d			LABEL0: 
+cf0d 2b			        dec hl 
+cf0e 2b			        dec hl 
+cf0f			 
+cf0f			LABEL1: 
+cf0f 10 fc		        djnz LABEL0 
+cf11 44			        ld b, h 
+cf12 4d			        ld c, l 
+cf13 2a 0e 0e		        ld hl, ($0E0E) 
+cf16 3a 44 0e		        ld a, ($0E44) 
+cf19 07			        rlca 
+cf1a 3f			        ccf 
+cf1b 38 03		        jr c, LABEL2 
+cf1d ed 52		        sbc hl, de 
+cf1f d8			        ret c 
+cf20			 
+cf20			LABEL2: 
+cf20 ed 43 52 0e	        ld ($0E52), bc 
+cf24 28 48		        jr z, ALAB 
+cf26 44			        ld b, h 
+cf27 4d			        ld c, l 
+cf28 c5			        push bc 
+cf29 06 13		        ld b, $13 
+cf2b 21 58 0e		        ld hl, $0E58 
+cf2e			 
+cf2e			CEQUB: 
+cf2e 36 20		        ld (hl), $20 
+cf30 23			        inc hl 
+cf31 10 fb		        djnz CEQUB 
+cf33 f5			        push af 
+cf34 cd 71 cf		        call ALAB1 
+cf37 f1			        pop af 
+cf38 e5			        push hl 
+cf39 21 f4 cf		        ld hl, EQU 
+cf3c 01 06 00		        ld bc, $0006 
+cf3f ed b0		        ldir 
+cf41 eb			        ex de, hl 
+cf42 d1			        pop de 
+cf43 c1			        pop bc 
+cf44 0f			        rrca 
+cf45 30 15		        jr nc, ABSOL 
+cf47 78			        ld a, b 
+cf48 a7			        and a 
+cf49 20 11		        jr nz, ABSOL 
+cf4b 79			        ld a, c 
+cf4c fe 05		        cp $05 
+cf4e 30 0c		        jr nc, ABSOL 
+cf50 36 24		        ld (hl), $24 
+cf52 23			        inc hl 
+cf53 36 2d		        ld (hl), $2D 
+cf55 23			        inc hl 
+cf56 f6 30		        or $30 
+cf58 77			        ld (hl), a 
+cf59 23			        inc hl 
+cf5a 18 08		        jr PEQU 
+cf5c			 
+cf5c			 
+cf5c			ABSOL: 
+cf5c 36 23		        ld (hl), $23 
+cf5e 23			        inc hl 
+cf5f eb			        ex de, hl 
+cf60 cd 9d c4		        call HEX4 
+cf63 eb			        ex de, hl 
+cf64			 
+cf64			PEQU: 
+cf64 36 0d		        ld (hl), $0D 
+cf66 fd e5		        push iy 
+cf68 e1			        pop hl 
+cf69 cd 4a ce		        call OUTPUT 
+cf6c 18 91		        jr LABEL 
+cf6e			 
+cf6e			 
+cf6e			ALAB: 
+cf6e dd e5		        push ix 
+cf70 e1			        pop hl 
+cf71			 
+cf71			ALAB1: 
+cf71 36 4c		        ld (hl), $4C 
+cf73 23			        inc hl 
+cf74 eb			        ex de, hl 
+cf75 c3 9d c4		        jp HEX4 
+cf78			 
+cf78			 
+cf78			DPAGE: 
+cf78 21 7c 0e		        ld hl, $0E7C 
+cf7b 35			        dec (hl) 
+cf7c c0			        ret nz 
+cf7d			 
+cf7d			EJECT: 
+cf7d 3a 7d 0e		        ld a, ($0E7D) 
+cf80 86			        add a, (hl) 
+cf81 57			        ld d, a 
+cf82 06 0d		        ld b, $0D 
+cf84 18 03		        jr EJ1 
+cf86			 
+cf86			 
+cf86			EJ0: 
+cf86 cd a7 cf		        call CHROUT 
+cf89			 
+cf89			EJ1: 
+cf89 15			        dec d 
+cf8a 20 fa		        jr nz, EJ0 
+cf8c 2a 7e 0e		        ld hl, ($0E7E) 
+cf8f 22 7c 0e		        ld ($0E7C), hl 
+cf92 21 8d 0e		        ld hl, $0E8D 
+cf95 34			        inc (hl) 
+cf96 7e			        ld a, (hl) 
+cf97 fe 3a		        cp $3A 
+cf99 20 04		        jr nz, NOINC 
+cf9b 36 30		        ld (hl), $30 
+cf9d 2b			        dec hl 
+cf9e 34			        inc (hl) 
+cf9f			 
+cf9f			NOINC: 
+cf9f 21 84 0e		        ld hl, $0E84 
+cfa2 cd f5 ce		        call OUTLIN 
+cfa5 06 0d		        ld b, $0D 
+cfa7			 
+cfa7			CHROUT: 
+cfa7 78			        ld a, b 
+cfa8 f7			        rst $30 
+cfa9 e5			        push hl 
+cfaa 21 44 0e		        ld hl, $0E44 
+cfad cd dc cf		        call PUNCH 
+cfb0 fe 0d		        cp $0D 
+cfb2 20 26		        jr nz, EXCHR 
+cfb4 3e 0a		        ld a, $0A 
+cfb6 cd dc cf		        call PUNCH 
+cfb9 3a 45 0e		        ld a, ($0E45) 
+cfbc fe 20		        cp $20 
+cfbe 28 04		        jr z, WAIT 
+cfc0 df			        rst $18 
+cfc1 62			        defb $62 
+cfc2 30 04		        jr nc, NOWT 
+cfc4			 
+cfc4			WAIT: 
+cfc4 cf			        rst $08 
+cfc5 32 45 0e		        ld ($0E45), a 
+cfc8			 
+cfc8			NOWT: 
+cfc8 fe 1b		        cp $1B 
+cfca ca a0 cc		        jp z, EXIT 
+cfcd 78			        ld a, b 
+cfce cb 76		        bit 6, (hl) 
+cfd0 28 08		        jr z, EXCHR 
+cfd2 c5			        push bc 
+cfd3 06 80		        ld b, $80 
+cfd5			 
+cfd5			DLOOP: 
+cfd5 ff			        rst $38 
+cfd6 10 fd		        djnz DLOOP 
+cfd8 c1			        pop bc 
+cfd9 78			        ld a, b 
+cfda			 
+cfda			EXCHR: 
+cfda e1			        pop hl 
+cfdb c9			        ret 
+cfdc			 
+cfdc			 
+cfdc			PUNCH: 
+cfdc cb 4e		        bit 1, (hl) 
+cfde c8			        ret z 
+cfdf df			        rst $18 
+cfe0 6f			        defb $6F 
+cfe1 c9			        ret 
+cfe2			 
+cfe2			 
+cfe2			RAMLD: 
+cfe2 00 00 00 00	        defw L_0010, $0000 
+cfe6 20 20 20 50 41 47 45 20 30 30 20 20 20 20	        defb $20, $20, $20, $50, $41, $47, $45, $20, $30, $30, $20, $20, $20, $20 
+cff4			 
+cff4			EQU: 
+cff4 20 45 51 55 20 20	        defb $20, $45, $51, $55, $20, $20 
+cffa			 
+cffa			L_CFFD: 
+cffa c3 3e c4		        jp REVAS 
+cffd			 
+cffd			 
+cffd			 
+cffd			 
+cffd			; $C000 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCBCCCCCCCCCB 
+cffd			; $C030 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C080 CCCCBCCCBCCCCCCCCCCCCCCCCCCCCCBCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C0D0 CCCBCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCBCCBCCCCCCCCCCCCCCC 
+cffd			; $C120 CCCCCCCCCCCCBCCCCCBCCBCCCCCCCCCCCCCCCBCCBCCCCCBCCCCCCCBCCCCCCCCCCCBCCCCCCCCCCCCC 
+cffd			; $C170 CCCCCBCCCCCCCCCCBCCCCCCCCCCCCCCCCCCBCCCCCCBCCCCBCCCCCBCCCCCCCCCCCCCCCBCCCCCCCCBC 
+cffd			; $C1C0 CCCBCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCBCBCCCCCCCCCCCBBBBCCCCBCCCCCCCCBCBBBBCCCCBC 
+cffd			; $C210 BBBBBBBCCCCCCCCCCBBBBCCCCBCBBBBCCCCCCCCBCBBBCCCCCCCBBBCBCCCCCCCCCCCBCCCCCCCCCCCB 
+cffd			; $C260 CBBBBCCCCBCCCCCCCCCCCCCCCCCCCCCBBCCCBCCCCCCBCCCCBCCCCCCCCCCCCCCCCBCCCCCCCBCCBCBC 
+cffd			; $C2B0 CCCCCCCCCCCCCCBBBBCCCCCCCCCCCCCCCCCCCCCCCBBBBCCCBCCCCCCCCCCCCCCCCCCBCCBCCBCCCCCC 
+cffd			; $C300 CCCCCCCBCCBCCCCCCCBCCCCCCCCCBCBCCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C350 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCBCCCCCCCCCCCCCC 
+cffd			; $C3A0 CCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCBCBBBBBBBBBWWBWWBWWBWWBWWBWWBWWBWWWWWWWWWWWWWWWW 
+cffd			; $C3F0 WWWWWWWWWWWWWWWWCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCC 
+cffd			; $C440 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C490 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C4E0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C530 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C580 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C5D0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C620 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C670 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C6C0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C710 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C760 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C7B0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C800 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C850 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C8A0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C8F0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $C940 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCWWWWWWWWWWWWWWWWW 
+cffd			; $C990 WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB 
+cffd			; $C9E0 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB 
+cffd			; $CA30 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB 
+cffd			; $CA80 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCBBBBBBBBB 
+cffd			; $CAD0 BBBBBBBBBBBBBBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBBBB 
+cffd			; $CB20 CCCBBBBBBBBBBBCBBBBBBBBBBCCCCCCCCCCCCCCCCCCCCCCBBBBBBBBCBCCCCCCCCCCBCCCCCCCCCCCC 
+cffd			; $CB70 CCCCCCCCCCCCCCCCCCCCCCCBBBBBBBBBBCBCBCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CBC0 CCCCCCCBBBBBBBBBBBBBBBBCCCCCCCCCCCCCCBBBBBBBBBBBBBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CC10 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBCCCBCBBBBCCCCCCCCCCCCBBBBCBCCCCBCCCCCCCCCCC 
+cffd			; $CC60 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCC 
+cffd			; $CCB0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCB 
+cffd			; $CD00 CCCCCBCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CD50 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CDA0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CDF0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBBBBBBCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CE40 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CE90 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CEE0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CF30 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+cffd			; $CF80 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCC 
+cffd			; $CFD0 CCCCCCCCCCCCCCCCCCCBCWWWWBBBBBBBBBBBBBBBBBBBBCC 
+cffd			 
+cffd			; Labels 
+cffd			; 
+cffd			; $0008 => L_0008        ABSOL  => $CF5F 
+cffd			; $000D => STMON         ADCSBC => $C891 
+cffd			; $0010 => L_0010        ADDHL  => $C568 
+cffd			; $0018 => L_0018        ALAB   => $CF71 
+cffd			; $0028 => L_0028        ALAB1  => $CF74 
+cffd			; $0030 => L_0030        ALLIN0 => $CC8C 
+cffd			; $0038 => L_0038        ALLLIN => $CEAE 
+cffd			; $0E00 => L_0E00        ALT    => $C2A2 
+cffd			; $C000 => DEBUG         ALTN   => $C2A0 
+cffd			; $C003 => START         ALTP   => $C09D 
+cffd			; $C026 => DENT          ARITH8 => $C604 
+cffd			; $C02B => SSTEP         ARTAB  => $C9D8 
+cffd			; $C03C => CMND          AS0    => $C89D 
+cffd			; $C048 => PNORM         ASKT   => $CB4E 
+cffd			; $C04D => DCMND         AUTO   => $C86C 
+cffd			; $C067 => PA1           AUTO0  => $C886 
+cffd			; $C075 => PA2           B2HCR  => $C2AB 
+cffd			; $C087 => DERR          BACK   => $CB7F 
+cffd			; $C089 => DPJ           BDUN   => $C35B 
+cffd			; $C08B => DPEND         BORM   => $C6B0 
+cffd			; $C093 => DP2           BOUT   => $C2CC 
+cffd			; $C09D => ALTP          BRSTAB => $CA52 
+cffd			; $C0A1 => TIN           BRSTO  => $C138 
+cffd			; $C0AA => EXCH          BSPBM  => $CA44 
+cffd			; $C0B7 => EX1           BYTE   => $C4B8 
+cffd			; $C0CB => CUR1          BYTE0  => $C4E0 
+cffd			; $C0CF => DPARSE        CALETC => $C637 
+cffd			; $C0EE => RNAM          CB     => $C80D 
+cffd			; $C0F4 => TSTREG        CBETC  => $C77C 
+cffd			; $C101 => EDERR         CCODES => $C67C 
+cffd			; $C103 => FOUND         CCTAB  => $CA04 
+cffd			; $C10C => FIN           CDUN   => $C363 
+cffd			; $C119 => SPLINE        CE0    => $C647 
+cffd			; $C11E => UPONE         CEQUB  => $CF31 
+cffd			; $C126 => REDO          CHROUT => $CFAA 
+cffd			; $C133 => NOMOP         CHUSR  => $C3AE 
+cffd			; $C136 => PAJ           CJR    => $C657 
+cffd			; $C138 => BRSTO         CJRTAB => $C9F8 
+cffd			; $C143 => RETURN        CMND   => $C03C 
+cffd			; $C144 => EDFIND        COMMA  => $C4F7 
+cffd			; $C155 => VALUES        COMP   => $C37D 
+cffd			; $C158 => GBDEC         COPY2  => $C50B 
+cffd			; $C15C => GBL           COPY3  => $C509 
+cffd			; $C15F => GBY           COPY3S => $C738 
+cffd			; $C160 => GB1           COPY4  => $C507 
+cffd			; $C16B => ERJ           COPY5  => $C505 
+cffd			; $C174 => XYC           COPY6  => $C503 
+cffd			; $C17E => JUMP          COPYT  => $CB77 
+cffd			; $C17F => PCR           CRRET  => $C2AD 
+cffd			; $C187 => IXY           CTAB   => $C3E0 
+cffd			; $C197 => IYR           CUR1   => $C0CB 
+cffd			; $C19E => SPR           DA     => $CBDC 
+cffd			; $C1A3 => IMAGEV        DAREA  => $CBE4 
+cffd			; $C1B4 => NUMBR         DAREA0 => $CBF4 
+cffd			; $C1BD => REGN          DAREA1 => $CC20 
+cffd			; $C1BF => REGDIS        DAREA2 => $CC37 
+cffd			; $C1CA => SPDIS         DAREA3 => $CC40 
+cffd			; $C1E2 => RD1           DATA1  => $CD67 
+cffd			; $C1EC => SSD           DATA2  => $CD6C 
+cffd			; $C21F => IFF           DATA3  => $CD78 
+cffd			; $C271 => PCL           DCMND  => $C04D 
+cffd			; $C27A => PRC           DEBUG  => $C000 
+cffd			; $C294 => RV1           DEC    => $C538 
+cffd			; $C2A0 => ALTN          DECM   => $C9C2 
+cffd			; $C2A2 => ALT           DECODE => $C515 
+cffd			; $C2AB => B2HCR         DEFB   => $CAB7 
+cffd			; $C2AD => CRRET         DEI    => $C776 
+cffd			; $C2B0 => REVAD         DENT   => $C026 
+cffd			; $C2BD => REVOUT        DERR   => $C087 
+cffd			; $C2C2 => REVO2         DI     => $C770 
+cffd			; $C2C4 => REVO          DJNZ   => $C73E 
+cffd			; $C2CC => BOUT          DJNZM  => $CA3A 
+cffd			; $C2D8 => REVO3         DLOOP  => $CFD8 
+cffd			; $C2DF => SPCS          DNV    => $C973 
+cffd			; $C2E4 => STLIN         DONEM  => $C6D1 
+cffd			; $C2EE => REVENT        DP2    => $C093 
+cffd			; $C2F4 => RM1           DPAGE  => $CF7B 
+cffd			; $C2F5 => RM2           DPARSE => $C0CF 
+cffd			; $C2F8 => INP           DPEND  => $C08B 
+cffd			; $C306 => NL            DPJ    => $C089 
+cffd			; $C319 => FIND          DSCALJ => $C3B6 
+cffd			; $C325 => MORE          EDERR  => $C101 
+cffd			; $C32F => STORE         EDFIND => $C144 
+cffd			; $C331 => L_C331        EI     => $C774 
+cffd			; $C33A => NOARGS        EJ0    => $CF89 
+cffd			; $C345 => MINUS         EJ1    => $CF8C 
+cffd			; $C34C => FERR          EJECT  => $CF80 
+cffd			; $C34F => FLAG          EQU    => $CFF7 
+cffd			; $C354 => F2            ERJ    => $C16B 
+cffd			; $C35B => BDUN          EX1    => $C0B7 
+cffd			; $C363 => CDUN          EXAETC => $C747 
+cffd			; $C366 => NEXT          EXAFM  => $CA3E 
+cffd			; $C375 => FTEST         EXCH   => $C0AA 
+cffd			; $C37D => COMP          EXCHR  => $CFDD 
+cffd			; $C389 => NEXTJ         EXIT   => $CCA2 
+cffd			; $C38D => PHA           EXTMNE => $CA8E 
+cffd			; $C39C => PRA           EXTND  => $C8C9 
+cffd			; $C3A7 => PRA2          EXX    => $C7BD 
+cffd			; $C3AE => CHUSR         F2     => $C354 
+cffd			; $C3B2 => OPTN          FERR   => $C34C 
+cffd			; $C3B6 => DSCALJ        FIN    => $C10C 
+cffd			; $C3C2 => STR           FIND   => $C319 
+cffd			; $C3CA => REGTAB        FLAG   => $C34F 
+cffd			; $C3E0 => CTAB          FLUSH  => $C6E9 
+cffd			; $C41C => SCO           FND    => $CDBB 
+cffd			; $C428 => PRINT         FOUND  => $C103 
+cffd			; $C43E => REVAS         FTADR  => $C510 
+cffd			; $C449 => NEXTL         FTEST  => $C375 
+cffd			; $C46E => INITB         GB1    => $C160 
+cffd			; $C48E => INITB0        GBDEC  => $C158 
+cffd			; $C49D => HEX4          GBL    => $C15C 
+cffd			; $C4A2 => HEX2          GBY    => $C15F 
+cffd			; $C4AB => HEX1          GETSTA => $CB11 
+cffd			; $C4B8 => BYTE          GETTWO => $CCFE 
+cffd			; $C4E0 => BYTE0         HALT   => $C5FE 
+cffd			; $C4E5 => WREX          HALTM  => $C9D4 
+cffd			; $C4ED => WRLD          HEX1   => $C4AB 
+cffd			; $C4F3 => WRLD0         HEX2   => $C4A2 
+cffd			; $C4F7 => COMMA         HEX4   => $C49D 
+cffd			; $C4FD => POUND         HXYTAB => $C9CE 
+cffd			; $C503 => COPY6         ID0    => $C53B 
+cffd			; $C505 => COPY5         IFF    => $C21F 
+cffd			; $C507 => COPY4         IMAGEV => $C1A3 
+cffd			; $C509 => COPY3         IMM    => $C5F5 
+cffd			; $C50B => COPY2         IN     => $C8A0 
+cffd			; $C510 => FTADR         INA    => $C8C3 
+cffd			; $C515 => DECODE        INC    => $C533 
+cffd			; $C533 => INC           INCM   => $C9BF 
+cffd			; $C538 => DEC           INITB  => $C46E 
+cffd			; $C53B => ID0           INITB0 => $C48E 
+cffd			; $C548 => LD16          INM    => $CA49 
+cffd			; $C552 => LD16A         INP    => $C2F8 
+cffd			; $C55B => LD16B         INRC   => $C8A2 
+cffd			; $C568 => ADDHL         INTMOD => $C948 
+cffd			; $C56B => L_C56B        IRTAB  => $CAAE 
+cffd			; $C576 => L_C576        IXY    => $C187 
+cffd			; $C577 => REGPR         IYR    => $C197 
+cffd			; $C58D => NOTSP         JPETC  => $C755 
+cffd			; $C597 => L_C597        JR     => $C712 
+cffd			; $C59D => LOAD8         JUMP   => $C17E 
+cffd			; $C5AF => L8B           KEEPO  => $CE3B 
+cffd			; $C5B4 => SREG          L8B    => $C5AF 
+cffd			; $C5C4 => MEM           L_0008 => $0008 
+cffd			; $C5E8 => PLUS          L_0010 => $0010 
+cffd			; $C5F0 => NOTIXY        L_0018 => $0018 
+cffd			; $C5F5 => IMM           L_0028 => $0028 
+cffd			; $C5F8 => PHEX2         L_0030 => $0030 
+cffd			; $C5FE => HALT          L_0038 => $0038 
+cffd			; $C604 => ARITH8        L_0E00 => $0E00 
+cffd			; $C628 => POP           L_C331 => $C331 
+cffd			; $C62D => PUSH          L_C56B => $C56B 
+cffd			; $C630 => PP0           L_C576 => $C576 
+cffd			; $C637 => CALETC        L_C597 => $C597 
+cffd			; $C647 => CE0           L_C658 => $C658 
+cffd			; $C657 => CJR           L_C7EB => $C7EB 
+cffd			; $C658 => L_C658        L_C7EC => $C7EC 
+cffd			; $C679 => UNCND         L_C804 => $C804 
+cffd			; $C67C => CCODES        L_C8C0 => $C8C0 
+cffd			; $C686 => ROTMIS        L_CAC6 => $CAC6 
+cffd			; $C693 => RST           L_CBF3 => $CBF3 
+cffd			; $C6B0 => BORM          L_CFFD => $CFFD 
+cffd			; $C6C5 => MOREMS        LABEL  => $CF02 
+cffd			; $C6CD => MS1           LABEL0 => $CF10 
+cffd			; $C6D1 => DONEM         LABEL1 => $CF12 
+cffd			; $C6D6 => UN0           LABEL2 => $CF23 
+cffd			; $C6D9 => UNPRN         LD1    => $C7E9 
+cffd			; $C6E4 => UN1           LD16   => $C548 
+cffd			; $C6E9 => FLUSH         LD16A  => $C552 
+cffd			; $C6FC => PRTABL        LD16B  => $C55B 
+cffd			; $C700 => PRTB1         LD16I  => $C803 
+cffd			; $C70B => NOPETC        LDIND  => $C7D9 
+cffd			; $C712 => JR            LDRI   => $C93C 
+cffd			; $C727 => UCD           LDSP   => $C7AF 
+cffd			; $C735 => NOP           LOAD8  => $C59D 
+cffd			; $C738 => COPY3S        LUOP   => $CAF6 
+cffd			; $C73E => DJNZ          MEM    => $C5C4 
+cffd			; $C747 => EXAETC        MINUS  => $C345 
+cffd			; $C755 => JPETC         MORE   => $C325 
+cffd			; $C770 => DI            MOREMS => $C6C5 
+cffd			; $C774 => EI            MS1    => $C6CD 
+cffd			; $C776 => DEI           MVUP   => $CDEF 
+cffd			; $C77C => CBETC         NEXT   => $C366 
+cffd			; $C798 => RETETC        NEXTAD => $CD1A 
+cffd			; $C7AF => LDSP          NEXTJ  => $C389 
+cffd			; $C7BD => EXX           NEXTL  => $C449 
+cffd			; $C7C4 => STIND         NL     => $C306 
+cffd			; $C7D4 => ST1           NLABS  => $CB49 
+cffd			; $C7D9 => LDIND         NOARGS => $C33A 
+cffd			; $C7E9 => LD1           NOINC  => $CFA2 
+cffd			; $C7EB => L_C7EB        NOLB   => $CE4C 
+cffd			; $C7EC => L_C7EC        NOMOP  => $C133 
+cffd			; $C7FA => ST16I         NOP    => $C735 
+cffd			; $C803 => LD16I         NOPETC => $C70B 
+cffd			; $C804 => L_C804        NOPM   => $CA37 
+cffd			; $C80D => CB            NOTIN  => $C8E9 
+cffd			; $C81F => NOTXY         NOTITL => $CB86 
+cffd			; $C845 => TESTXY        NOTIXY => $C5F0 
+cffd			; $C853 => ROTATE        NOTLD  => $C91D 
+cffd			; $C86C => AUTO          NOTOUT => $C904 
+cffd			; $C886 => AUTO0         NOTSP  => $C58D 
+cffd			; $C891 => ADCSBC        NOTVAL => $C953 
+cffd			; $C89D => AS0           NOTXY  => $C81F 
+cffd			; $C8A0 => IN            NOWT   => $CFCB 
+cffd			; $C8A2 => INRC          NTVL   => $C951 
+cffd			; $C8B5 => PORT          NUMBR  => $C1B4 
+cffd			; $C8C0 => L_C8C0        NVLP   => $C964 
+cffd			; $C8C3 => INA           ONLY2  => $CBB2 
+cffd			; $C8C9 => EXTND         OPT0   => $CAEB 
+cffd			; $C8E9 => NOTIN         OPT1   => $CB09 
+cffd			; $C8EC => OUT           OPTAB  => $CA70 
+cffd			; $C904 => NOTOUT        OPTN   => $C3B2 
+cffd			; $C91D => NOTLD         OTAB   => $CAD2 
+cffd			; $C93C => LDRI          OUT    => $C8EC 
+cffd			; $C948 => INTMOD        OUTLIN => $CEF8 
+cffd			; $C951 => NTVL          OUTM   => $CA4C 
+cffd			; $C953 => NOTVAL        OUTPUT => $CE4D 
+cffd			; $C964 => NVLP          OVRFLW => $CE12 
+cffd			; $C973 => DNV           PA1    => $C067 
+cffd			; $C97F => TABLE         PA2    => $C075 
+cffd			; $C9BF => INCM          PAJ    => $C136 
+cffd			; $C9C2 => DECM          PASS   => $CD37 
+cffd			; $C9C8 => RPRTAB        PASS1  => $CD88 
+cffd			; $C9CE => HXYTAB        PASS2  => $CE25 
+cffd			; $C9D4 => HALTM         PASSL  => $CD46 
+cffd			; $C9D8 => ARTAB         PAST   => $CDC6 
+cffd			; $C9F0 => PUSHM         PCL    => $C271 
+cffd			; $C9F4 => POPM          PCR    => $C17F 
+cffd			; $C9F8 => CJRTAB        PCRT   => $CCA4 
+cffd			; $CA04 => CCTAB         PEQU   => $CF67 
+cffd			; $CA14 => RMTAB         PHA    => $C38D 
+cffd			; $CA34 => RSTM          PHEX2  => $C5F8 
+cffd			; $CA37 => NOPM          PLUS   => $C5E8 
+cffd			; $CA3A => DJNZM         PNORM  => $C048 
+cffd			; $CA3E => EXAFM         POP    => $C628 
+cffd			; $CA44 => BSPBM         POPM   => $C9F4 
+cffd			; $CA49 => INM           PORT   => $C8B5 
+cffd			; $CA4C => OUTM          POUND  => $C4FD 
+cffd			; $CA4F => SPM           PP0    => $C630 
+cffd			; $CA52 => BRSTAB        PRA    => $C39C 
+cffd			; $CA5B => ROTTAB        PRA2   => $C3A7 
+cffd			; $CA70 => OPTAB         PRC    => $C27A 
+cffd			; $CA82 => REMEXT        PRINT  => $C428 
+cffd			; $CA8E => EXTMNE        PRTABL => $C6FC 
+cffd			; $CAAE => IRTAB         PRTB1  => $C700 
+cffd			; $CAB7 => DEFB          PUNCH  => $CFDF 
+cffd			; $CABB => REVASC        PUSH   => $C62D 
+cffd			; $CAC6 => L_CAC6        PUSHM  => $C9F0 
+cffd			; $CAD2 => OTAB          RAMLD  => $CFE5 
+cffd			; $CAE4 => XFOUND        RD1    => $C1E2 
+cffd			; $CAEB => OPT0          REDO   => $C126 
+cffd			; $CAF6 => LUOP          REGDIS => $C1BF 
+cffd			; $CB09 => OPT1          REGN   => $C1BD 
+cffd			; $CB11 => GETSTA        REGPR  => $C577 
+cffd			; $CB22 => ST            REGTAB => $C3CA 
+cffd			; $CB2E => ST0           REMEXT => $CA82 
+cffd			; $CB49 => NLABS         RETETC => $C798 
+cffd			; $CB4E => ASKT          RETURN => $C143 
+cffd			; $CB69 => SETLPP        REVAD  => $C2B0 
+cffd			; $CB77 => COPYT         REVAS  => $C43E 
+cffd			; $CB7F => BACK          REVASC => $CABB 
+cffd			; $CB86 => NOTITL        REVENT => $C2EE 
+cffd			; $CBB2 => ONLY2         REVO   => $C2C4 
+cffd			; $CBC6 => RNGRQ         REVO2  => $C2C2 
+cffd			; $CBDC => DA            REVO3  => $C2D8 
+cffd			; $CBE4 => DAREA         REVOUT => $C2BD 
+cffd			; $CBF3 => L_CBF3        RM1    => $C2F4 
+cffd			; $CBF4 => DAREA0        RM2    => $C2F5 
+cffd			; $CC20 => DAREA1        RMTAB  => $CA14 
+cffd			; $CC37 => DAREA2        RNAM   => $C0EE 
+cffd			; $CC40 => DAREA3        RNGRQ  => $CBC6 
+cffd			; $CC8C => ALLIN0        ROTATE => $C853 
+cffd			; $CCA2 => EXIT          ROTMIS => $C686 
+cffd			; $CCA4 => PCRT          ROTTAB => $CA5B 
+cffd			; $CCBC => XREF1         RPRTAB => $C9C8 
+cffd			; $CCCA => XREF2         RST    => $C693 
+cffd			; $CCE0 => XREF3         RSTM   => $CA34 
+cffd			; $CCF4 => XREF4         RV1    => $C294 
+cffd			; $CCFE => GETTWO        SCO    => $C41C 
+cffd			; $CD1A => NEXTAD        SETLPP => $CB69 
+cffd			; $CD37 => PASS          SPCS   => $C2DF 
+cffd			; $CD46 => PASSL         SPDIS  => $C1CA 
+cffd			; $CD67 => DATA1         SPLINE => $C119 
+cffd			; $CD6C => DATA2         SPM    => $CA4F 
+cffd			; $CD78 => DATA3         SPR    => $C19E 
+cffd			; $CD88 => PASS1         SQSH1  => $CE83 
+cffd			; $CD91 => SRCHL         SQSH2  => $CE98 
+cffd			; $CDA8 => SRCH0         SQSH3  => $CEA1 
+cffd			; $CDAA => SRCH1         SQSH4  => $CEA9 
+cffd			; $CDBB => FND           SRCH0  => $CDA8 
+cffd			; $CDC6 => PAST          SRCH1  => $CDAA 
+cffd			; $CDDC => XR            SRCHL  => $CD91 
+cffd			; $CDEF => MVUP          SREG   => $C5B4 
+cffd			; $CE12 => OVRFLW        SSD    => $C1EC 
+cffd			; $CE25 => PASS2         SSTEP  => $C02B 
+cffd			; $CE3B => KEEPO         ST     => $CB22 
+cffd			; $CE4C => NOLB          ST0    => $CB2E 
+cffd			; $CE4D => OUTPUT        ST1    => $C7D4 
+cffd			; $CE83 => SQSH1         ST16I  => $C7FA 
+cffd			; $CE98 => SQSH2         START  => $C003 
+cffd			; $CEA1 => SQSH3         STIND  => $C7C4 
+cffd			; $CEA9 => SQSH4         STLIN  => $C2E4 
+cffd			; $CEAE => ALLLIN        STMON  => $000D 
+cffd			; $CED4 => Z1            STORE  => $C32F 
+cffd			; $CEF8 => OUTLIN        STR    => $C3C2 
+cffd			; $CF02 => LABEL         TABLE  => $C97F 
+cffd			; $CF10 => LABEL0        TESTXY => $C845 
+cffd			; $CF12 => LABEL1        TIN    => $C0A1 
+cffd			; $CF23 => LABEL2        TSTREG => $C0F4 
+cffd			; $CF31 => CEQUB         UCD    => $C727 
+cffd			; $CF5F => ABSOL         UN0    => $C6D6 
+cffd			; $CF67 => PEQU          UN1    => $C6E4 
+cffd			; $CF71 => ALAB          UNCND  => $C679 
+cffd			; $CF74 => ALAB1         UNPRN  => $C6D9 
+cffd			; $CF7B => DPAGE         UPONE  => $C11E 
+cffd			; $CF80 => EJECT         VALUES => $C155 
+cffd			; $CF89 => EJ0           WAIT   => $CFC7 
+cffd			; $CF8C => EJ1           WREX   => $C4E5 
+cffd			; $CFA2 => NOINC         WRLD   => $C4ED 
+cffd			; $CFAA => CHROUT        WRLD0  => $C4F3 
+cffd			; $CFC7 => WAIT          XFOUND => $CAE4 
+cffd			; $CFCB => NOWT          XR     => $CDDC 
+cffd			; $CFD8 => DLOOP         XREF1  => $CCBC 
+cffd			; $CFDD => EXCHR         XREF2  => $CCCA 
+cffd			; $CFDF => PUNCH         XREF3  => $CCE0 
+cffd			; $CFE5 => RAMLD         XREF4  => $CCF4 
+cffd			; $CFF7 => EQU           XYC    => $C174 
+cffd			; $CFFD => L_CFFD        Z1     => $CED4 
+# End of file dis_debug_dis.asm
+cffd

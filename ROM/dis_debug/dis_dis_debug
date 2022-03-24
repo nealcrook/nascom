@@ -1,0 +1,493 @@
+#!/usr/bin/perl
+#
+# script to use the z80 disassembler to reverse the DIS/DEBUG source. Should
+# be asy because I have commented source for both
+
+use CPU::Z80::Disassembler;
+
+my $file_name = "dis_debug.bin_golden";
+my $addr = 0xc000;
+my $file = "dis_debug_dis.txt";
+my $asm_file = "dis_debug_dis.asm";
+
+
+$dis = CPU::Z80::Disassembler->new;
+$dis->memory->load_file($file_name, $addr);
+$dis->write_dump($file);
+
+# mock up stuff for NAS-SYS RST codes
+
+###########################################
+# RST 0 - START
+
+###########################################
+# RST 8 - RIN
+
+###########################################
+# RST 10 - RCAL
+## TODO put the actual code thread in here so that it can be followed.
+$dis->set_call(0x10, \&handle_rcal);
+
+# advance return PC past in-line subroutine code
+sub handle_rcal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 18 - SCAL
+$dis->set_call(0x18, \&handle_scal);
+
+# advance return PC past in-line subroutine code
+sub handle_scal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 20 - BRKPT
+
+###########################################
+# RST 28 - PRS
+$dis->set_call(0x28, \&handle_prs);
+
+# advance return PC past in-line null-terminated string
+sub handle_prs {
+    my $ref = $_[0];
+    my $addr = $_[1];
+    my $start = $addr;
+    while ($ref->memory->peek($addr) != 0) {
+        ##TODO work out length and use ->defm
+        ##TODO ..not that simple: need to detect CR and other non-printers
+        $dis->defb($addr);
+#        printf("Peek of 0x%04x for prs\n", $addr);
+        $addr = $addr + 1;
+    }
+    # the message and its terminating NULL
+    printf("RST PRS message at 0x%04x, length %d\n",$start, $addr - $start +1);
+#    $dis->defm($start, $addr - $start);
+    $dis->defb($addr);
+
+    # next PC is after NULL
+    return $addr+1;
+}
+
+###########################################
+# RST 30 - ROUT
+$dis->set_call(0x30, \&handle_rout);
+sub handle_rout {
+    my $addr = $_[1];
+    return $addr;
+}
+
+###########################################
+# RST 38 - RDEL
+##$dis->code(0x38);
+
+###########################################
+# NAS-SYS initialisation routine
+
+
+###########################################
+# NAS-SYS entry point
+# Never actually come back from here, but
+# model it as "ret"
+
+
+###########################################
+# Stuff specific to the code being disassembled
+
+# nas-sys init
+$dis->memory->poke(0x0d,0xc9);
+
+
+# workspace
+#for ($i=0xc000; $i<0xc00f; $i=$i+1) {
+#    $dis->memory->poke($i, 0);
+#}
+#$dis->defw(0xc000, 1, "WORKSP");
+#$dis->defb(0xc000, 1, "MDRV");
+#$dis->defb(0xc001, 1, "DDRV");
+#$dis->defb(0xc002, 1, "DRVCOD");
+#$dis->defb(0xc003, 1, "FIRST");
+#$dis->defb(0xc004, 1, "ERRFLG");
+#$dis->defb(0xc005, 1, "ERRCOD");
+
+
+##$dis->set_call(0x45, \&handle_xx);
+
+sub handle_xx {
+    my $ref = $_[0];
+    my $addr = $_[1];
+    printf "Unknown entry being called at 0x%04x\n", $addr;
+    return $addr;
+}
+
+$dis->code(0x000d,"STMON");
+
+$dis->code(0xc000,"DEBUG");
+$dis->code(0xc003,"START");
+$dis->code(0xc026,"DENT");
+$dis->code(0xc02b,"SSTEP");
+$dis->code(0xc03a);
+$dis->code(0xc03c,"CMND");
+$dis->code(0xc048,"PNORM");
+$dis->code(0xc04d,"DCMND");
+$dis->code(0xc067,"PA1");
+$dis->code(0xc075,"PA2");
+$dis->code(0xc087,"DERR");
+$dis->code(0xc089,"DPJ");
+$dis->code(0xc08b,"DPEND");
+$dis->code(0xc093,"DP2");
+$dis->code(0xc09b);
+$dis->code(0xc09d,"ALTP");
+$dis->code(0xc0a1,"TIN");
+$dis->code(0xc0aa,"EXCH");
+$dis->code(0xc0b7,"EX1");
+$dis->code(0xc0cb,"CUR1");
+$dis->code(0xc0cf,"DPARSE");
+$dis->code(0xc0ee,"RNAM");
+$dis->code(0xc0f4,"TSTREG");
+$dis->code(0xc101,"EDERR");
+$dis->code(0xc103,"FOUND");
+$dis->code(0xc10c,"FIN");
+$dis->code(0xc119,"SPLINE");
+$dis->code(0xc11e,"UPONE");
+$dis->code(0xc126,"REDO");
+$dis->code(0xc133,"NOMOP");
+$dis->code(0xc136,"PAJ");
+$dis->code(0xc138,"BRSTO");
+$dis->code(0xc143,"RETURN");
+$dis->code(0xc144,"EDFIND");
+$dis->code(0xc153);
+$dis->code(0xc155,"VALUES");
+$dis->code(0xc158,"GBDEC");
+$dis->code(0xc15c,"GBL");
+$dis->code(0xc15f,"GBY");
+$dis->code(0xc160,"GB1");
+$dis->code(0xc16b,"ERJ");
+$dis->code(0xc174,"XYC");
+$dis->code(0xc17e,"JUMP");
+$dis->code(0xc17f,"PCR");
+$dis->code(0xc187,"IXY");
+$dis->code(0xc197,"IYR");
+$dis->code(0xc19e,"SPR");
+$dis->code(0xc1a3,"IMAGEV");
+$dis->code(0xc1b4,"NUMBR");
+$dis->code(0xc1bd,"REGN");
+$dis->code(0xc1bf,"REGDIS");
+$dis->code(0xc1ca,"SPDIS");
+$dis->code(0xc1e2,"RD1");
+$dis->code(0xc1ec,"SSD");
+$dis->code(0xc201);
+$dis->code(0xc242);
+$dis->code(0xc21f,"IFF");
+$dis->code(0xc250);
+$dis->code(0xc271,"PCL");
+$dis->code(0xc27a,"PRC");
+$dis->code(0xc294,"RV1");
+$dis->code(0xc2a0,"ALTN");
+$dis->code(0xc2a2,"ALT");
+$dis->code(0xc2ab,"B2HCR");
+$dis->code(0xc2ad,"CRRET");
+$dis->code(0xc2b0,"REVAD");
+$dis->code(0xc2bd,"REVOUT");
+$dis->code(0xc2c2,"REVO2");
+$dis->code(0xc2c4,"REVO");
+$dis->code(0xc2cc,"BOUT");
+$dis->code(0xc2d8,"REVO3");
+$dis->code(0xc2df,"SPCS");
+$dis->code(0xc2e4,"STLIN");
+$dis->code(0xc2ee,"REVENT");
+$dis->code(0xc2f4,"RM1");
+$dis->code(0xc2f5,"RM2");
+$dis->code(0xc2f8,"INP");
+$dis->code(0xc306,"NL");
+$dis->code(0xc319,"FIND");
+$dis->code(0xc325,"MORE");
+$dis->code(0xc32f,"STORE");
+$dis->code(0xc33a,"NOARGS");
+$dis->code(0xc345,"MINUS");
+$dis->code(0xc34c,"FERR");
+$dis->code(0xc34f,"FLAG");
+$dis->code(0xc354,"F2");
+$dis->code(0xc35b,"BDUN");
+$dis->code(0xc363,"CDUN");
+$dis->code(0xc366,"NEXT");
+$dis->code(0xc375,"FTEST");
+$dis->code(0xc37d,"COMP");
+$dis->code(0xc389,"NEXTJ");
+$dis->code(0xc38d,"PHA");
+$dis->code(0xc399);
+$dis->code(0xc39c,"PRA");
+$dis->code(0xc3a7,"PRA2");
+$dis->code(0xc3ae,"CHUSR");
+$dis->code(0xc3b2,"OPTN");
+$dis->code(0xc3b6,"DSCALJ");
+$dis->defm(0xc3c2,0xc3c9-0xc3c2+1,"STR");
+$dis->defm(0xc3ca,1,"REGTAB");
+$dis->defw(0xc3cb,1);
+$dis->defm(0xc3cd,1);
+$dis->defw(0xc3ce,1);
+$dis->defm(0xc3d0,1);
+$dis->defw(0xc3d1,1);
+$dis->defm(0xc3d3,1);
+$dis->defw(0xc3d4,1);
+$dis->defm(0xc3d6,1);
+$dis->defw(0xc3d7,1);
+$dis->defm(0xc3d9,1);
+$dis->defw(0xc3da,1);
+$dis->defm(0xc3dc,1);
+$dis->defw(0xc3dd,1);
+$dis->defb(0xc3df,1);
+$dis->defw(0xc3e0, 32/2, "CTAB");
+
+## Start of DEBUG
+$dis->code(0xc400);
+$dis->code(0xc41c,"SCO");
+$dis->code(0xc428,"PRINT");
+$dis->code(0xc439);
+$dis->code(0xc43e,"REVAS");
+$dis->code(0xc449,"NEXTL");
+$dis->code(0xc46c);
+$dis->code(0xc46e,"INITB");
+$dis->code(0xc48e,"INITB0");
+$dis->code(0xc49d,"HEX4");
+$dis->code(0xc4a2,"HEX2");
+$dis->code(0xc4ab,"HEX1");
+$dis->code(0xc4b8,"BYTE");
+$dis->code(0xc4e0,"BYTE0");
+$dis->code(0xc4e5,"WREX");
+$dis->code(0xc4ed,"WRLD");
+$dis->code(0xc4f3,"WRLD0");
+$dis->code(0xc4f7,"COMMA");
+$dis->code(0xc4fd,"POUND");
+$dis->code(0xc503,"COPY6");
+$dis->code(0xc505,"COPY5");
+$dis->code(0xc507,"COPY4");
+$dis->code(0xc509,"COPY3");
+$dis->code(0xc50b,"COPY2");
+$dis->code(0xc510,"FTADR");
+$dis->code(0xc515,"DECODE");
+$dis->code(0xc533,"INC");
+$dis->code(0xc538,"DEC");
+$dis->code(0xc53b,"ID0");
+$dis->code(0xc548,"LD16");
+$dis->code(0xc552,"LD16A");
+$dis->code(0xc55b,"LD16B");
+$dis->code(0xc568,"ADDHL");
+$dis->code(0xc577,"REGPR");
+$dis->code(0xc58d,"NOTSP");
+$dis->code(0xc59d,"LOAD8");
+$dis->code(0xc5af,"L8B");
+$dis->code(0xc5b4,"SREG");
+$dis->code(0xc5c4,"MEM");
+$dis->code(0xc5e8,"PLUS");
+$dis->code(0xc5f0,"NOTIXY");
+$dis->code(0xc5f5,"IMM");
+$dis->code(0xc5f8,"PHEX2");
+$dis->code(0xc5fe,"HALT");
+$dis->code(0xc604,"ARITH8");
+$dis->code(0xc628,"POP");
+$dis->code(0xc62d,"PUSH");
+$dis->code(0xc630,"PP0");
+$dis->code(0xc637,"CALETC");
+$dis->code(0xc647,"CE0");
+$dis->code(0xc657,"CJR");
+$dis->code(0xc679,"UNCND");
+$dis->code(0xc67c,"CCODES");
+$dis->code(0xc686,"ROTMIS");
+$dis->code(0xc693,"RST");
+$dis->code(0xc6b0,"BORM");
+$dis->code(0xc6c5,"MOREMS");
+$dis->code(0xc6cd,"MS1");
+$dis->code(0xc6d1,"DONEM");
+$dis->code(0xc6d6,"UN0");
+$dis->code(0xc6d9,"UNPRN");
+$dis->code(0xc6e4,"UN1");
+$dis->code(0xc6e9,"FLUSH");
+$dis->code(0xc6fc,"PRTABL");
+$dis->code(0xc700,"PRTB1");
+$dis->code(0xc70b,"NOPETC");
+$dis->code(0xc712,"JR");
+$dis->code(0xc727,"UCD");
+$dis->code(0xc735,"NOP");
+$dis->code(0xc738,"COPY3S");
+$dis->code(0xc73e,"DJNZ");
+$dis->code(0xc747,"EXAETC");
+$dis->code(0xc755,"JPETC");
+$dis->code(0xc770,"DI");
+$dis->code(0xc774,"EI");
+$dis->code(0xc776,"DEI");
+$dis->code(0xc77c,"CBETC");
+$dis->code(0xc798,"RETETC");
+$dis->code(0xc7af,"LDSP");
+$dis->code(0xc7bd,"EXX");
+$dis->code(0xc7c4,"STIND");
+$dis->code(0xc7d4,"ST1");
+$dis->code(0xc7d9,"LDIND");
+$dis->code(0xc7e9,"LD1");
+$dis->code(0xc7fa,"ST16I");
+$dis->code(0xc803,"LD16I");
+$dis->code(0xc80d,"CB");
+$dis->code(0xc81f,"NOTXY");
+$dis->code(0xc845,"TESTXY");
+$dis->code(0xc853,"ROTATE");
+$dis->code(0xc86c,"AUTO");
+$dis->code(0xc886,"AUTO0");
+$dis->code(0xc891,"ADCSBC");
+$dis->code(0xc89d,"AS0");
+$dis->code(0xc8a0,"IN");
+$dis->code(0xc8a2,"INRC");
+$dis->code(0xc8b5,"PORT");
+$dis->code(0xc8c3,"INA");
+$dis->code(0xc8c9,"EXTND");
+$dis->code(0xc8e9,"NOTIN");
+$dis->code(0xc8ec,"OUT");
+$dis->code(0xc904,"NOTOUT");
+$dis->code(0xc91d,"NOTLD");
+$dis->code(0xc93c,"LDRI");
+$dis->code(0xc948,"INTMOD");
+$dis->code(0xc951,"NTVL");
+$dis->code(0xc953,"NOTVAL");
+$dis->code(0xc964,"NVLP");
+$dis->code(0xc973,"DNV");
+
+
+$dis->defw(0xc97f,32,TABLE);
+$dis->defm(0xc9bf,3,INCM);
+$dis->defm(0xc9c2,3,DECM);
+$dis->defm(0xc9c5,3);
+$dis->defm(0xc9c8,6,RPRTAB);
+$dis->defm(0xc9ce,6,HXYTAB);
+$dis->defm(0xc9d4,4,HALTM);
+$dis->defm(0xc9d8,12,ARTAB);
+$dis->defm(0xc9e4,12);
+$dis->defm(0xc9f0,4,PUSHM);
+$dis->defm(0xc9f4,4,POPM);
+$dis->defm(0xc9f8,12,CJRTAB);
+$dis->defm(0xca04,16,CCTAB);
+$dis->defm(0xca14,16,RMTAB);
+$dis->defm(0xca24,16);
+$dis->defm(0xca34,3,RSTM);
+$dis->defm(0xca37,3,NOPM);
+$dis->defm(0xca3a,4,DJNZM);
+$dis->defm(0xca3e,6,EXAFM);
+$dis->defm(0xca44,5,BSPBM);
+$dis->defm(0xca49,3,INM);
+$dis->defm(0xca4c,3,OUTM);
+$dis->defm(0xca4f,3,SPM);
+$dis->defm(0xca52,9,BRSTAB);
+$dis->defm(0xca5b,21,ROTTAB);
+$dis->defm(0xca70,18,OPTAB);
+$dis->defb(0xca82,6,REMEXT);
+$dis->defb(0xca88,6);
+$dis->defm(0xca8e,16,EXTMNE);
+$dis->defm(0xca9e,16);
+$dis->defm(0xcaae,9,IRTAB);
+
+$dis->defm(0xcab7,4,DEFB);
+
+$dis->code(0xcabb,"REVASC");
+
+$dis->defm(0xcac7,11);
+$dis->defm(0xcad2,8,OTAB);
+$dis->defm(0xcada,4);
+
+$dis->code(0xcae4,"XFOUND");
+$dis->code(0xcaeb,"OPT0");
+$dis->code(0xcaf6,"LUOP");
+$dis->code(0xcb09,"OPT1");
+$dis->code(0xcb11,"GETSTA");
+$dis->code(0xcb22,"ST");
+$dis->code(0xcb2e,"ST0");
+$dis->code(0xcb3c);
+$dis->code(0xcb49,"NLABS");
+$dis->code(0xcb4e,"ASKT");
+$dis->code(0xcb69,"SETLPP");
+$dis->code(0xcb77,"COPYT");
+$dis->code(0xcb7f,"BACK");
+$dis->code(0xcb86,"NOTITL");
+$dis->code(0xcbb2,"ONLY2");
+$dis->code(0xcbc6,"RNGRQ");
+$dis->defm(0xcbc7,16);
+$dis->code(0xcbdc,"DA");
+$dis->code(0xcbe4,"DAREA");
+$dis->code(0xcbf4,"DAREA0");
+$dis->code(0xcc20,"DAREA1");
+$dis->code(0xcc37,"DAREA2");
+$dis->code(0xcc40,"DAREA3");
+$dis->code(0xcc8c,"ALLIN0");
+$dis->code(0xcca2,"EXIT");
+$dis->code(0xcca4,"PCRT");
+$dis->code(0xccbc,"XREF1");
+$dis->code(0xccca,"XREF2");
+$dis->code(0xcce0,"XREF3");
+$dis->code(0xccf4,"XREF4");
+$dis->code(0xccfe,"GETTWO");
+$dis->code(0xcd1a,"NEXTAD");
+$dis->code(0xcd37,"PASS");
+$dis->code(0xcd46,"PASSL");
+$dis->code(0xcd67,"DATA1");
+$dis->code(0xcd6c,"DATA2");
+$dis->code(0xcd78,"DATA3");
+$dis->code(0xcd88,"PASS1");
+$dis->code(0xcd91,"SRCHL");
+$dis->code(0xcda8,"SRCH0");
+$dis->code(0xcdaa,"SRCH1");
+$dis->code(0xcdbb,"FND");
+$dis->code(0xcdc6,"PAST");
+$dis->code(0xcddc,"XR");
+$dis->code(0xcdef,"MVUP");
+$dis->code(0xce12,"OVRFLW");
+$dis->code(0xce25,"PASS2");
+$dis->code(0xce3b,"KEEPO");
+$dis->code(0xce4c,"NOLB");
+$dis->code(0xce4d,"OUTPUT");
+$dis->code(0xce83,"SQSH1");
+$dis->code(0xce98,"SQSH2");
+$dis->code(0xcea1,"SQSH3");
+$dis->code(0xcea9,"SQSH4");
+$dis->code(0xceae,"ALLLIN");
+$dis->code(0xced4,"Z1");
+$dis->code(0xcef8,"OUTLIN");
+$dis->code(0xcf02,"LABEL");
+$dis->code(0xcf10,"LABEL0");
+$dis->code(0xcf12,"LABEL1");
+$dis->code(0xcf23,"LABEL2");
+$dis->code(0xcf31,"CEQUB");
+$dis->code(0xcf5f,"ABSOL");
+$dis->code(0xcf67,"PEQU");
+$dis->code(0xcf71,"ALAB");
+$dis->code(0xcf74,"ALAB1");
+$dis->code(0xcf7b,"DPAGE");
+$dis->code(0xcf80,"EJECT");
+$dis->code(0xcf89,"EJ0");
+$dis->code(0xcf8c,"EJ1");
+$dis->code(0xcfa2,"NOINC");
+$dis->code(0xcfaa,"CHROUT");
+$dis->code(0xcfc7,"WAIT");
+$dis->code(0xcfcb,"NOWT");
+$dis->code(0xcfd8,"DLOOP");
+$dis->code(0xcfd9);
+$dis->code(0xcfdd,"EXCHR");
+$dis->code(0xcfdf,"PUNCH");
+$dis->defw(0xcfe5,2,"RAMLD");
+$dis->defb(0xcfe9,14);
+$dis->defb(0xcff7,6,"EQU");
+$dis->code(0xcffd);
+
+
+
+# unused
+####$dis->defb(0xd6fd, 0xd7d7 - 0xd6fd + 1);
+
+# msg
+###$dis->defm(0xd7d8, 0xd7ff - 0xd7d8 + 1, MSG);
+
+# This can optimise code and so it may prevent 100% match
+# on re-assembly.
+##$dis->analyse;
+$dis->write_asm($asm_file);
