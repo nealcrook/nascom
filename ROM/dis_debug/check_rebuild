@@ -1,7 +1,21 @@
 #!/bin/sh
 #
 # rebuild from source and check that the binary matches the golden version
-./build dis_debug
+./zeap2z80asm dis_debug.asm dis_debug_mod.asm
 
-../../converters/nascon dis_debug.bin   dis_debug.NAS_rebuilt -in bin -out nas -org c000 -csum
-diff dis_debug.NAS_golden dis_debug.NAS_rebuilt
+./build dis_debug_mod
+
+if [ $? -eq 0 ]
+then
+    # DEFS statements at start make the binary bigger than it should be. Chop them off
+    tail --bytes=4096 dis_debug_mod.bin > dis_debug.bin
+
+    mv dis_debug_mod.lst dis_debug.lst
+
+    ../../converters/nascon dis_debug.bin   dis_debug.NAS_rebuilt -in bin -out nas -org c000 -csum
+    diff dis_debug.NAS_golden dis_debug.NAS_rebuilt
+else
+    echo "Aborted due to assembly error"
+fi
+
+

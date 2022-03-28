@@ -1,5 +1,4 @@
-# File dis_debug.asm
-0000			;  (iy) must be changed to (iy+0) to avoid assembler bug 
+# File dis_debug_mod.asm
 0000			 
 0000			L_0008: EQU $0008 
 0000			L_0010: EQU $0010 
@@ -9,238 +8,362 @@
 0000			L_0038: EQU $0038 
 0000			L_0E00: EQU $0E00 
 0000			 
-0000			STMON:  EQU $000D 
 0000			 
-0000			        ORG $C000 
-c000			 
-c000 c3 03 c0		DEBUG:  JP START 
-c003			 
-c003			 
-c003 31 00 10		START:  LD SP, $1000 
+0000			;************************************* 
+0000			;*          NAS-DEBUG V3.2           * 
+0000			;*         22nd Feb  1981            * 
+0000			;*                                   * 
+0000			;*  (C) CCSOFT (Southfields) 1981    * 
+0000			;*    Written by Mick Scutt          * 
+0000			;*                                   * 
+0000			;*  A  debugging  aid and  monitor   * 
+0000			;*  extension package for use with   * 
+0000			;*  all NAS-SYS monitors and NAS-DIS * 
+0000			;*                                   * 
+0000			;* Commands -                        * 
+0000			;* :A            Alternate CRT page  * 
+0000			;* :C            Change USER o/p locn* 
+0000			;* :D nnn        Disassemble from nnn* 
+0000			;* :F nnnn nnnn  Find up to 8 bytes  * 
+0000			;* :O nnnn       Optional CRT page   * 
+0000			;* :P            Print stored regs   * 
+0000			;*                                   * 
+0000			;* This software was produced and    * 
+0000			;* developed on a 48k  Nascom  2,    * 
+0000			;* using the Zeap 2 assembler.       * 
+0000			;* Documentation was printed using a * 
+0000			;* Centronics 737 printer.           * 
+0000			;************************************* 
+0000			; 
+0000			;  NAS-SYS ROUTINE NUMBER EQUATES 
+0000			ZMRET:  EQU $5B 
+0000			ZARGS:  EQU $60 
+0000			ZINLIN: EQU $63 
+0000			ZNUM:   EQU $64 
+0000			ZTBCD3: EQU $66 
+0000			ZB2HEX: EQU $68 
+0000			ZSPACE: EQU $69 
+0000			ZCRLF:  EQU $6A 
+0000			ZNOM:   EQU $71 
+0000			ZNNOM:  EQU $77 
+0000			ZERRM:  EQU $6B 
+0000			ZRLIN:  EQU $79 
+0000			ZBLINK: EQU $7B 
+0000			RIN:    EQU $08 
+0000			PRS:    EQU $28 
+0000			; 
+0000			;  NAS-SYS WORKSPACE RAM 
+0000			        ORG $0C00 
+0c00 00...		PORT0:  DEFS 1 
+0c01 00...		KMAP:   DEFS 9 
+0c0a 00...		ARGC:   DEFS 1 
+0c0b 00...		ARGN:   DEFS 1 
+0c0c 00...		ARG1:   DEFS 2 
+0c0e 00...		ARG2:   DEFS 2 
+0c10 00...		ARG3:   DEFS 2 
+0c12 00...		ARG49:  DEFS 12 
+0c1e 00...		ARG10:  DEFS 2 
+0c20 00...		NUMN:   DEFS 1 
+0c21 00...		NUMV:   DEFS 2 
+0c23 00...		BRKADR: DEFS 2 
+0c25 00...		BRKVAL: DEFS 1 
+0c26 00...		CONFLG: DEFS 1 
+0c27 00...		_KOPT:  DEFS 1 
+0c28 00...		_XOPT:  DEFS 1 
+0c29 00...		CURSOR: DEFS 2 
+0c2b 00...		ARGX:   DEFS 1 
+0c2c 00...		MONSTK: DEFS $35 
+0c61			STACK:  EQU $ 
+0c61 00...		RBC:    DEFS 2 
+0c63 00...		RDE:    DEFS 2 
+0c65 00...		RHL:    DEFS 2 
+0c67 00...		RAF:    DEFS 2 
+0c69 00...		RPC:    DEFS 2 
+0c6b			INITR:  EQU $ 
+0c6b 00...		RSP:    DEFS 2 
+0c6d			RSAE:   EQU $ 
+0c6d 00...		_KTABL: DEFS 2 
+0c6f 00...		_KTAB:  DEFS 2 
+0c71 00...		_STAB:  DEFS 2 
+0c73 00...		_OUT:   DEFS 2 
+0c75 00...		_IN:    DEFS 2 
+0c77 00...		_UOUT:  DEFS 3 
+0c7a 00...		_UIN:   DEFS 3 
+0c7d 00...		_NMI:   DEFS 3 
+0c80			; 
+0c80			;   VIDEO RAM 
+0c80			VL7:    EQU $098A 
+0c80			; 
+0c80			;  NAS-SYS MONITOR ADDRESSES 
+0c80			ROUT:   EQU $30 
+0c80			STMON:  EQU $000D 
+0c80			; 
+0c80			;  CHARACTERS 
+0c80			CS:     EQU $0C 
+0c80			CR:     EQU $0D 
+0c80			CCR:    EQU $18 
+0c80			ESC:    EQU $1B 
+0c80			MARK:   EQU $A0 
+0c80			; 
+0c80			; DEBUG EQU'S 
+0c80			        ORG $0EF8; ** in ZEAP the DSTK can be on the same line but with but other assemblers leave DSTK at the PREVIOUS address. 
+0ef8			DSTK:   EQU $ 
+0ef8 00...		ACUR:   DEFS 2 
+0efa 00...		OPT:    DEFS 2 
+0efc 00...		NUSR:   DEFS 2 
+0efe 00...		_DCTAB: DEFS 2 
+0f00			SPTOP:  EQU $ 
+0f00			;************** DEBUG ************** 
+0f00			; 
+0f00			DEBUG:  ORG $C000 
+c000			;;;REVAS  EQU  £C400 
+c000			; 
+c000			; RESTART JUMP 
+c000 c3 03 c0		        JP START 
+c003			; INITIALISE NAS-SYS 
+c003 31 00 10		START:  LD SP,$1000 
 c006 cd 0d 00		        CALL STMON 
-c009 31 00 0f		        LD SP, $0F00 
-c00c 21 5e c3		        LD HL, $C35E 
+c009			; 
+c009			; SET UP $CTAB,USER O/P JUMP, 
+c009			; OPTION OFF,AND ALT CURSOR 
+c009 31 00 0f		        LD SP,SPTOP 
+c00c 21 5e c3		        LD HL,CTAB-$82 
 c00f e5			        PUSH HL 
-c010 21 43 c1		        LD HL, RETURN 
+c010 21 43 c1		        LD HL,RETURN 
 c013 e5			        PUSH HL 
-c014 21 00 00		        LD HL, $0000 
+c014 21 00 00		        LD HL,0 
 c017 e5			        PUSH HL 
-c018 21 0a 08		        LD HL, $080A 
+c018 21 0a 08		        LD HL,$080A 
 c01b e5			        PUSH HL 
-c01c 21 26 c0		        LD HL, DENT 
-c01f 22 78 0c		        LD ($0C78), HL 
+c01c			; 
+c01c			; SET USER O/P TO DEBUG ENTRY POINT 
+c01c 21 26 c0		        LD HL,DENT 
+c01f 22 78 0c		        LD (_UOUT+1),HL 
+c022			; 
+c022			; MAKE O/P TABLE INCLUDE USER O/P 
 c022 df			        RST $18 
 c023 55			        DEFB $55 
+c024			; 
+c024			; RETURN TO MONITOR 
 c024 df			        RST $18 
-c025 5b			        DEFB $5B 
-c026			 
+c025 5b			        DEFB ZMRET 
+c026			; 
+c026			; DEBUG ENTRY POINT FOR ALL OUTPUT 
+c026			; IF A CCR BEING O/P DO S-STEP DISPLAY 
 c026 f5			DENT:   PUSH AF 
-c027 fe 18		        CP $18 
-c029 20 11		        JR NZ, CMND 
-c02b			 
-c02b 31 f8 0e		SSTEP:  LD SP, $0EF8 
+c027 fe 18		        CP CCR 
+c029 20 11		        JR NZ,CMND 
+c02b 31 f8 0e		SSTEP:  LD SP,DSTK 
 c02e d7			        RST $10 
 c02f 7a			        DEFB $7A 
-c030 2a 23 0c		        LD HL, ($0C23) 
-c033 3a 25 0c		        LD A, ($0C25) 
-c036 77			        LD (HL), A 
+c030 2a 23 0c		        LD HL,(BRKADR); ** printed listing has these two LD swapped 
+c033 3a 25 0c		        LD A,(BRKVAL) 
+c036 77			        LD (HL),A 
 c037 cd ec c1		        CALL SSD 
 c03a 18 4d		        JR DPJ 
-c03c			 
-c03c fe 0d		CMND:   CP $0D 
-c03e 20 08		        JR NZ, PNORM 
+c03c			; IF CR , MAYBE A NEW COMMAND 
+c03c fe 0d		CMND:   CP CR 
+c03e 20 08		        JR NZ,PNORM 
+c040			; IT IS CR,IS A COLON AT START OF LINE 
 c040 cd e4 c2		        CALL STLIN 
-c043 3e 3a		        LD A, $3A 
+c043 3e 3a		        LD A,$3A 
 c045 be			        CP (HL) 
-c046 28 05		        JR Z, DCMND 
-c048			 
+c046 28 05		        JR Z,DCMND 
+c048			; CONTINUE  O/P NORMALLY 
 c048 f1			PNORM:  POP AF 
-c049 2a fc 0e		        LD HL, ($0EFC) 
+c049 2a fc 0e		        LD HL,(NUSR) 
+c04c			; JUMP TO NEW USER O/P ADDR 
 c04c e9			        JP (HL) 
-c04d			 
-c04d 31 f8 0e		DCMND:  LD SP, $0EF8 
-c050 36 20		        LD (HL), $20 
+c04d			; 
+c04d			; A COLON SAYS DEBUG COMMAND IS NEXT 
+c04d			; WILL NOT RETURN TO NAS-SYS 
+c04d			; SO THROW AWAY THE STACK 
+c04d 31 f8 0e		DCMND:  LD SP,DSTK 
+c050			; DELETE COLON AND DO A CR 
+c050 36 20		        LD (HL),$20 
 c052 df			        RST $18 
-c053 6a			        DEFB $6A 
-c054 2a 29 0c		        LD HL, ($0C29) 
-c057 11 c0 ff		        LD DE, $FFC0 
-c05a 19			        ADD HL, DE 
-c05b 36 3a		        LD (HL), $3A 
-c05d eb			        EX DE, HL 
+c053 6a			        DEFB ZCRLF 
+c054			; NOW REPLACE THE COLON 
+c054 2a 29 0c		        LD HL,(CURSOR) 
+c057 11 c0 ff		        LD DE,-64 
+c05a 19			        ADD HL,DE 
+c05b 36 3a		        LD (HL),$3A 
+c05d eb			        EX DE,HL 
+c05e			; DE IS SCREEN POINTER,STEP OVER THE : 
+c05e			; AND USE DEBUG'S COMMAND TABLE 
 c05e 13			        INC DE 
-c05f 1a			        LD A, (DE) 
-c060 fe 51		        CP $51 
-c062 30 23		        JR NC, DERR 
-c064 2a fe 0e		        LD HL, ($0EFE) 
-c067			 
+c05f 1a			        LD A,(DE) 
+c060 fe 51		        CP $51; ONLY ALLOW "A TO "P 
+c062 30 23		        JR NC,DERR 
+c064 2a fe 0e		        LD HL,($0EFE); ** will not allow $DCTAB.. bug in fixup script 
 c067 e5			PA1:    PUSH HL 
-c068 01 2b 0c		        LD BC, $0C2B 
-c06b 1a			        LD A, (DE) 
+c068 01 2b 0c		        LD BC,ARGX 
+c06b 1a			        LD A,(DE) 
 c06c fe 20		        CP $20 
-c06e 20 05		        JR NZ, PA2 
-c070 0a			        LD A, (BC) 
+c06e 20 05		        JR NZ,PA2 
+c070 0a			        LD A,(BC) 
 c071 fe 53		        CP $53 
-c073 20 5a		        JR NZ, DPARSE 
-c075			 
+c073 20 5a		        JR NZ,DPARSE 
 c075 fe 41		PA2:    CP $41 
-c077 38 0e		        JR C, DERR 
+c077 38 0e		        JR C,DERR 
 c079 fe 5b		        CP $5B 
-c07b 30 0a		        JR NC, DERR 
-c07d 02			        LD (BC), A 
-c07e 32 0a 0c		        LD ($0C0A), A 
+c07b 30 0a		        JR NC,DERR 
+c07d 02			        LD (BC),A 
+c07e 32 0a 0c		        LD (ARGC),A 
 c081 f5			        PUSH AF 
 c082 13			        INC DE 
 c083 df			        RST $18 
-c084 79			        DEFB $79 
-c085 30 04		        JR NC, DPEND 
-c087			 
+c084 79			        DEFB ZRLIN 
+c085 30 04		        JR NC,DPEND 
 c087 df			DERR:   RST $18 
-c088 6b			        DEFB $6B 
-c089			 
+c088 6b			        DEFB ZERRM 
 c089 18 44		DPJ:    JR DPARSE 
-c08b			 
+c08b			; IF S OR E CMND EXCHANGE CRT PAGE FIRST 
 c08b f1			DPEND:  POP AF 
 c08c f5			        PUSH AF 
 c08d fe 53		        CP $53 
-c08f 28 02		        JR Z, DP2 
+c08f 28 02		        JR Z,DP2 
 c091 fe 45		        CP $45 
-c093			 
-c093 cc aa c0		DP2:    CALL Z, EXCH 
+c093 cc aa c0		DP2:    CALL Z,EXCH 
 c096 f1			        POP AF 
 c097 e1			        POP HL 
 c098 cd b6 c3		        CALL DSCALJ 
 c09b 18 32		        JR DPARSE 
-c09d			 
 c09d d7			ALTP:   RST $10 
 c09e 0b			        DEFB $0B 
-c09f 30 2e		        JR NC, DPARSE 
-c0a1			 
+c09f 30 2e		        JR NC,DPARSE 
+c0a1			; CR WILL SWAP PAGE BACK 
 c0a1 df			TIN:    RST $18 
-c0a2 7b			        DEFB $7B 
-c0a3 fe 0d		        CP $0D 
-c0a5 28 03		        JR Z, EXCH 
-c0a7 f7			        RST $30 
+c0a2 7b			        DEFB ZBLINK 
+c0a3 fe 0d		        CP CR 
+c0a5 28 03		        JR Z,EXCH 
+c0a7 f7			        RST ROUT 
 c0a8 18 f7		        JR TIN 
-c0aa			 
-c0aa 2a fa 0e		EXCH:   LD HL, ($0EFA) 
-c0ad 7c			        LD A, H 
+c0aa 2a fa 0e		EXCH:   LD HL,(OPT) 
+c0ad 7c			        LD A,H 
 c0ae b5			        OR L 
 c0af c8			        RET Z 
 c0b0 37			        SCF 
-c0b1 11 00 08		        LD DE, $0800 
-c0b4 01 00 04		        LD BC, $0400 
-c0b7			 
-c0b7 1a			EX1:    LD A, (DE) 
+c0b1 11 00 08		        LD DE,$0800 
+c0b4 01 00 04		        LD BC,1024 
+c0b7 1a			EX1:    LD A,(DE) 
 c0b8 ed a0		        LDI 
 c0ba 2b			        DEC HL 
-c0bb 77			        LD (HL), A 
+c0bb 77			        LD (HL),A 
 c0bc 23			        INC HL 
-c0bd ea b7 c0		        JP PE, EX1 
-c0c0 2a f8 0e		        LD HL, ($0EF8) 
-c0c3 ed 5b 29 0c	        LD DE, ($0C29) 
-c0c7 ed 53 f8 0e	        LD ($0EF8), DE 
-c0cb			 
-c0cb 22 29 0c		CUR1:   LD ($0C29), HL 
+c0bd ea b7 c0		        JP PE,EX1 
+c0c0 2a f8 0e		        LD HL,(ACUR); SWAP CURSOR LOCATIONS 
+c0c3 ed 5b 29 0c	        LD DE,(CURSOR) 
+c0c7 ed 53 f8 0e	        LD (ACUR),DE 
+c0cb 22 29 0c		CUR1:   LD (CURSOR),HL 
 c0ce c9			        RET 
-c0cf			 
-c0cf			 
-c0cf 31 f8 0e		DPARSE: LD SP, $0EF8 
+c0cf			; 
+c0cf			;THIS TAKES OVER FROM PARSE IN NAS-SYS 
+c0cf			; MAY HAVE COME HERE WITH RUBBISH 
+c0cf			; ON STACK FROM PA1,EDIT ERROR ETC 
+c0cf			; 
+c0cf 31 f8 0e		DPARSE: LD SP,DSTK 
 c0d2 d7			        RST $10 
 c0d3 64			        DEFB $64 
+c0d4			; PRAY $NMI STILL POINTS TO TRAP 
 c0d4 df			        RST $18 
-c0d5 63			        DEFB $63 
-c0d6 3e a0		        LD A, $A0 
-c0d8 62			        LD H, D 
-c0d9 6b			        LD L, E 
+c0d5 63			        DEFB ZINLIN 
+c0d6			; IF MARK 1ST ON LINE EDIT"FIND"DSPLAY 
+c0d6 3e a0		        LD A,MARK 
+c0d8 62			        LD H,D 
+c0d9 6b			        LD L,E 
 c0da be			        CP (HL) 
-c0db 28 67		        JR Z, EDFIND 
+c0db 28 67		        JR Z,EDFIND 
 c0dd 23			        INC HL 
+c0de			; IF MARK 2ND ON LINE IGNORE REVAS XTRA 
 c0de be			        CP (HL) 
-c0df 28 ee		        JR Z, DPARSE 
+c0df 28 ee		        JR Z,DPARSE 
+c0e1			; IF MARK 3RD ON LINE EDIT SSTEP DSPLY 
 c0e1 23			        INC HL 
 c0e2 be			        CP (HL) 
-c0e3 28 09		        JR Z, RNAM 
-c0e5 2a 71 0c		        LD HL, ($0C71) 
-c0e8 31 61 0c		        LD SP, $0C61 
+c0e3			;IF NO MARK GOTO PA1, USE NAS-SYS STAB 
+c0e3			; AND NAS-SYS STACK 
+c0e3 28 09		        JR Z,RNAM 
+c0e5 2a 71 0c		        LD HL,(_STAB) 
+c0e8 31 61 0c		        LD SP,STACK 
 c0eb c3 67 c0		        JP PA1 
-c0ee			 
-c0ee 01 61 0c		RNAM:   LD BC, $0C61 
-c0f1 21 ca c3		        LD HL, REGTAB 
-c0f4			 
-c0f4 1a			TSTREG: LD A, (DE) 
+c0ee			; 
+c0ee			; IS A REGISTER  NAME ON THE LINE ? 
+c0ee 01 61 0c		RNAM:   LD BC,RBC 
+c0f1 21 ca c3		        LD HL,REGTAB 
+c0f4 1a			TSTREG: LD A,(DE) 
 c0f5 be			        CP (HL) 
 c0f6 23			        INC HL 
-c0f7 28 0a		        JR Z, FOUND 
+c0f7 28 0a		        JR Z,FOUND 
+c0f9			; STEP OVER REG IMAGE ADDR 
 c0f9 0c			        INC C 
 c0fa 0c			        INC C 
+c0fb			; STEP OVER ROUTINE ADDR 
 c0fb 23			        INC HL 
 c0fc 23			        INC HL 
-c0fd 7e			        LD A, (HL) 
+c0fd 7e			        LD A,(HL) 
 c0fe b7			        OR A 
-c0ff 20 f3		        JR NZ, TSTREG 
-c101			 
+c0ff 20 f3		        JR NZ,TSTREG 
+c101			; EDITING ERROR 
 c101 18 84		EDERR:  JR DERR 
-c103			 
-c103			 
+c103			; FOUND REG NAME,BC POINTS TO IMAGE 
+c103			; STEP OVER REG NAME AND MARK 
 c103 13			FOUND:  INC DE 
 c104 13			        INC DE 
 c105 13			        INC DE 
-c106 7e			        LD A, (HL) 
+c106 7e			        LD A,(HL); GET RTNE ADDR & GO TO IT 
 c107 23			        INC HL 
-c108 66			        LD H, (HL) 
-c109 6f			        LD L, A 
+c108 66			        LD H,(HL) 
+c109 6f			        LD L,A 
 c10a d7			        RST $10 
 c10b 72			        DEFB $72 
-c10c			 
 c10c df			FIN:    RST $18 
-c10d 77			        DEFB $77 
-c10e e5			        PUSH HL 
+c10d 77			        DEFB ZNNOM; NEW DISPLAY TO CRT ONLY 
+c10e e5			        PUSH HL; MAY HAVE A NEW BYTE 
 c10f d7			        RST $10 
-c110 27			        DEFB $27 
-c111 11 c0 ff		        LD DE, $FFC0 
-c114 06 07		        LD B, $07 
-c116 21 8a 09		        LD HL, $098A 
-c119			 
-c119 3e 53		SPLINE: LD A, $53 
+c110 27			        DEFB $27; AT PROG ADDR SO 
+c111 11 c0 ff		        LD DE,-64; IF POSS. REDO THE 
+c114 06 07		        LD B,$07; EXISTING DISPLAY 
+c116 21 8a 09		        LD HL,VL7; LOOK FOR THE LINE 
+c119 3e 53		SPLINE: LD A,$53; WITH SP ON 
 c11b be			        CP (HL) 
-c11c 28 08		        JR Z, REDO 
-c11e			 
-c11e 19			UPONE:  ADD HL, DE 
+c11c 28 08		        JR Z,REDO 
+c11e			; KEEP LOOKING 
+c11e 19			UPONE:  ADD HL,DE 
 c11f 10 f8		        DJNZ SPLINE 
-c121 cd ec c1		        CALL SSD 
+c121 cd ec c1		        CALL SSD; NOT FOUND,DO NEW DISPLAY 
 c124 18 0d		        JR NOMOP 
-c126			 
-c126 e5			REDO:   PUSH HL 
-c127 2a 29 0c		        LD HL, ($0C29) 
-c12a e3			        EX (SP), HL 
+c126 e5			REDO:   PUSH HL; FOUND,RE-DO OLD DISPLAY 
+c127 2a 29 0c		        LD HL,(CURSOR) 
+c12a e3			        EX (SP),HL; SAVE EXISTING CURSOR POSN 
 c12b d7			        RST $10 
 c12c 9e			        DEFB $9E 
 c12d cd ec c1		        CALL SSD 
 c130 e1			        POP HL 
 c131 d7			        RST $10 
 c132 98			        DEFB $98 
-c133			 
 c133 e1			NOMOP:  POP HL 
-c134 df			        RST $18 
-c135 71			        DEFB $71 
-c136			 
+c134 df			        RST $18; RESTORE O/P TABLE POINTER 
+c135 71			        DEFB ZNOM 
 c136 18 97		PAJ:    JR DPARSE 
-c138			 
+c138			; 
+c138			; 
 c138 af			BRSTO:  XOR A 
-c139 32 26 0c		        LD ($0C26), A 
-c13c 2a 23 0c		        LD HL, ($0C23) 
-c13f 7e			        LD A, (HL) 
-c140 32 25 0c		        LD ($0C25), A 
-c143			 
+c139 32 26 0c		        LD (CONFLG),A 
+c13c 2a 23 0c		        LD HL,(BRKADR) 
+c13f 7e			        LD A,(HL) 
+c140 32 25 0c		        LD (BRKVAL),A 
 c143 c9			RETURN: RET 
-c144			 
+c144			; 
+c144			; EDIT A "FIND" LINE 
 c144 d7			EDFIND: RST $10 
 c145 85			        DEFB $85 
 c146 13			        INC DE 
+c147			; GET THE ADDRESS 
 c147 d7			        RST $10 
 c148 6b			        DEFB $6B 
 c149 c5			        PUSH BC 
-c14a 21 19 00		        LD HL, $0019 
+c14a 21 19 00		        LD HL,$0019 
 c14d d7			        RST $10 
 c14e 10			        DEFB $10 
 c14f e1			        POP HL 
@@ -256,34 +379,34 @@ c159 0b			        DEC BC
 c15a 0b			        DEC BC 
 c15b 0b			        DEC BC 
 c15c			 
-c15c 21 1f 00		GBL:    LD HL, $001F 
+c15c 21 1f 00		GBL:    LD HL,$001F 
 c15f			 
-c15f 19			GBY:    ADD HL, DE 
+c15f 19			GBY:    ADD HL,DE 
 c160			 
 c160 e5			GB1:    PUSH HL 
 c161 df			        RST $18 
-c162 64			        DEFB $64 
+c162 64			        DEFB ZNUM 
 c163 e1			        POP HL 
-c164 9f			        SBC A, A 
+c164 9f			        SBC A,A 
 c165 b7			        OR A 
-c166 ed 52		        SBC HL, DE 
-c168 19			        ADD HL, DE 
+c166 ed 52		        SBC HL,DE 
+c168 19			        ADD HL,DE 
 c169 d8			        RET C 
 c16a 17			        RLA 
 c16b			 
-c16b 38 94		ERJ:    JR C, EDERR 
-c16d 3a 21 0c		        LD A, ($0C21) 
-c170 02			        LD (BC), A 
+c16b 38 94		ERJ:    JR C,EDERR 
+c16d 3a 21 0c		        LD A,($0C21) 
+c170 02			        LD (BC),A 
 c171 03			        INC BC 
 c172 18 ec		        JR GB1 
 c174			 
 c174 d7			XYC:    RST $10 
 c175 3e			        DEFB $3E 
 c176 e1			        POP HL 
-c177 e3			        EX (SP), HL 
-c178 ed 42		        SBC HL, BC 
+c177 e3			        EX (SP),HL 
+c178 ed 42		        SBC HL,BC 
 c17a e1			        POP HL 
-c17b 28 db		        JR Z, GBDEC 
+c17b 28 db		        JR Z,GBDEC 
 c17d c5			        PUSH BC 
 c17e			 
 c17e e9			JUMP:   JP (HL) 
@@ -292,16 +415,16 @@ c17f
 c17f d7			PCR:    RST $10 
 c180 22			        DEFB $22 
 c181 c0			        RET NZ 
-c182 21 11 00		        LD HL, $0011 
+c182 21 11 00		        LD HL,$0011 
 c185 18 d8		        JR GBY 
 c187			 
 c187 1b			IXY:    DEC DE 
 c188 1b			        DEC DE 
-c189 1a			        LD A, (DE) 
+c189 1a			        LD A,(DE) 
 c18a 13			        INC DE 
 c18b 13			        INC DE 
 c18c fe 59		        CP $59 
-c18e 28 07		        JR Z, IYR 
+c18e 28 07		        JR Z,IYR 
 c190 dd e5		        PUSH IX 
 c192 d7			        RST $10 
 c193 e0			        DEFB $E0 
@@ -317,7 +440,7 @@ c19e
 c19e			 
 c19e d7			SPR:    RST $10 
 c19f 03			        DEFB $03 
-c1a0 28 ba		        JR Z, GBL 
+c1a0 28 ba		        JR Z,GBL 
 c1a2 c9			        RET 
 c1a3			 
 c1a3 c5			IMAGEV: PUSH BC 
@@ -325,250 +448,243 @@ c1a4 d7			        RST $10
 c1a5 0e			        DEFB $0E 
 c1a6 e1			        POP HL 
 c1a7 e5			        PUSH HL 
-c1a8 7e			        LD A, (HL) 
+c1a8 7e			        LD A,(HL) 
 c1a9 23			        INC HL 
-c1aa 66			        LD H, (HL) 
-c1ab 6f			        LD L, A 
-c1ac ed 42		        SBC HL, BC 
+c1aa 66			        LD H,(HL) 
+c1ab 6f			        LD L,A 
+c1ac ed 42		        SBC HL,BC 
 c1ae e1			        POP HL 
 c1af c8			        RET Z 
-c1b0 71			        LD (HL), C 
+c1b0 71			        LD (HL),C 
 c1b1 23			        INC HL 
-c1b2 70			        LD (HL), B 
+c1b2 70			        LD (HL),B 
 c1b3 c9			        RET 
 c1b4			 
 c1b4 df			NUMBR:  RST $18 
-c1b5 64			        DEFB $64 
-c1b6 38 b3		        JR C, ERJ 
-c1b8 ed 4b 21 0c	        LD BC, ($0C21) 
+c1b5 64			        DEFB ZNUM 
+c1b6 38 b3		        JR C,ERJ 
+c1b8 ed 4b 21 0c	        LD BC,($0C21) 
 c1bc c9			        RET 
 c1bd			 
 c1bd df			REGN:   RST $18 
-c1be 68			        DEFB $68 
+c1be 68			        DEFB ZB2HEX 
 c1bf			 
-c1bf 3e a0		REGDIS: LD A, $A0 
-c1c1 f7			        RST $30 
+c1bf 3e a0		REGDIS: LD A,$A0 
+c1c1 f7			        RST ROUT 
 c1c2 df			        RST $18 
-c1c3 66			        DEFB $66 
-c1c4 06 0a		        LD B, $0A 
+c1c3 66			        DEFB ZTBCD3 
+c1c4 06 0a		        LD B,$0A 
 c1c6 2b			        DEC HL 
 c1c7 2b			        DEC HL 
 c1c8 2b			        DEC HL 
 c1c9 2b			        DEC HL 
 c1ca			 
 c1ca df			SPDIS:  RST $18 
-c1cb 69			        DEFB $69 
-c1cc 7c			        LD A, H 
+c1cb 69			        DEFB ZSPACE 
+c1cc 7c			        LD A,H 
 c1cd fe 08		        CP $08 
-c1cf 38 11		        JR C, RD1 
+c1cf 38 11		        JR C,RD1 
 c1d1 fe 0c		        CP $0C 
-c1d3 30 0d		        JR NC, RD1 
-c1d5 ed 5b fa 0e	        LD DE, ($0EFA) 
-c1d9 7a			        LD A, D 
+c1d3 30 0d		        JR NC,RD1 
+c1d5 ed 5b fa 0e	        LD DE,($0EFA) 
+c1d9 7a			        LD A,D 
 c1da b3			        OR E 
-c1db 28 05		        JR Z, RD1 
-c1dd 19			        ADD HL, DE 
-c1de 11 00 f8		        LD DE, $F800 
-c1e1 19			        ADD HL, DE 
+c1db 28 05		        JR Z,RD1 
+c1dd 19			        ADD HL,DE 
+c1de 11 00 f8		        LD DE,$F800 
+c1e1 19			        ADD HL,DE 
 c1e2			 
-c1e2 7e			RD1:    LD A, (HL) 
+c1e2 7e			RD1:    LD A,(HL) 
 c1e3 23			        INC HL 
 c1e4 df			        RST $18 
-c1e5 68			        DEFB $68 
+c1e5 68			        DEFB ZB2HEX 
 c1e6 df			        RST $18 
-c1e7 69			        DEFB $69 
+c1e7 69			        DEFB ZSPACE 
 c1e8 10 f8		        DJNZ RD1 
-c1ea f7			        RST $30 
+c1ea f7			        RST ROUT 
 c1eb c9			        RET 
 c1ec			 
 c1ec cd e4 c2		SSD:    CALL STLIN 
-c1ef 22 29 0c		        LD ($0C29), HL 
-c1f2 ef			        RST $28 
-c1f3 53			        DEFB $53 
-c1f4 50			        DEFB $50 
-c1f5 a0			        DEFB $A0 
-c1f6 00			        DEFB $00 
-c1f7 2a 6b 0c		        LD HL, ($0C6B) 
+c1ef 22 29 0c		        LD ($0C29),HL 
+c1f2 ef			        RST PRS 
+c1f3 ..			        DEFM "SP" 
+c1f5 a0 00		        DEFB MARK,0 
+c1f7 2a 6b 0c		        LD HL,($0C6B) 
 c1fa df			        RST $18 
-c1fb 66			        DEFB $66 
-c1fc 06 0c		        LD B, $0C 
+c1fb 66			        DEFB ZTBCD3 
+c1fc 06 0c		        LD B,$0C 
 c1fe cd df c2		        CALL SPCS 
-c201 06 06		        LD B, $06 
+c201 06 06		        LD B,$06 
 c203 d7			        RST $10 
 c204 c5			        DEFB $C5 
-c205 ef			        RST $28 
-c206 0d			        DEFB $0D 
-c207 49			        DEFB $49 
-c208 58			        DEFB $58 
-c209 00			        DEFB $00 
+c205 ef			        RST PRS 
+c206 0d			        DEFB CR 
+c207 ..			        DEFM "IX" 
+c209 00			        DEFB 0 
 c20a dd e5		        PUSH IX 
 c20c e1			        POP HL 
 c20d d7			        RST $10 
 c20e b0			        DEFB $B0 
-c20f ef			        RST $28 
-c210 20			        DEFB $20 
-c211 49			        DEFB $49 
-c212 46			        DEFB $46 
-c213 46			        DEFB $46 
-c214 32			        DEFB $32 
-c215 20			        DEFB $20 
-c216 00			        DEFB $00 
-c217 ed 57		        LD A, I 
-c219 3e 30		        LD A, $30 
-c21b e2 1f c2		        JP PO, IFF 
+c20f			; DISPLAY IFF2 
+c20f ef			        RST PRS 
+c210 ..			        DEFM " IFF2 " 
+c216 00			        DEFB 0 
+c217 ed 57		        LD A,I 
+c219 3e 30		        LD A,$30 
+c21b e2 1f c2		        JP PO,IFF 
 c21e 3c			        INC A 
 c21f			 
-c21f f7			IFF:    RST $30 
-c220 ef			        RST $28 
-c221 0d			        DEFB $0D 
-c222 49			        DEFB $49 
-c223 59			        DEFB $59 
-c224 00			        DEFB $00 
+c21f f7			IFF:    RST ROUT 
+c220 ef			        RST PRS 
+c221 0d			        DEFB CR 
+c222 ..			        DEFM "IY" 
+c224 00			        DEFB 0 
 c225 fd e5		        PUSH IY 
 c227 e1			        POP HL 
 c228 d7			        RST $10 
 c229 95			        DEFB $95 
-c22a ef			        RST $28 
-c22b 20			        DEFB $20 
-c22c 49			        DEFB $49 
-c22d 20			        DEFB $20 
-c22e 00			        DEFB $00 
-c22f ed 57		        LD A, I 
+c22a			; DISPLAY I REG 
+c22a ef			        RST PRS 
+c22b ..			        DEFM " I " 
+c22e 00			        DEFB 0 
+c22f ed 57		        LD A,I 
+c231			; 
+c231			; SAVE ALT REGS ON STACK 
 c231 d9			        EXX 
 c232 c5			        PUSH BC 
 c233 d5			        PUSH DE 
 c234 e5			        PUSH HL 
 c235 d9			        EXX 
+c236			; FINISH I REG 
 c236 d7			        RST $10 
 c237 73			        DEFB $73 
-c238 ef			        RST $28 
-c239 48			        DEFB $48 
-c23a 4c			        DEFB $4C 
-c23b 00			        DEFB $00 
-c23c 2a 65 0c		        LD HL, ($0C65) 
+c238			; DISPLAY HL,(HL) & HL' 
+c238 ef			        RST PRS 
+c239 ..			        DEFM "HL" 
+c23b 00			        DEFB 0 
+c23c 2a 65 0c		        LD HL,($0C65) 
 c23f cd bf c1		        CALL REGDIS 
-c242 ef			        RST $28 
-c243 48			        DEFB $48 
-c244 4c			        DEFB $4C 
-c245 00			        DEFB $00 
+c242 ef			        RST PRS 
+c243 ..			        DEFM "HL" 
+c245 00			        DEFB 0 
 c246 d7			        RST $10 
 c247 5a			        DEFB $5A 
-c248 3e de		        LD A, $DE 
-c24a 2a 63 0c		        LD HL, ($0C63) 
+c248 3e de		        LD A,$DE 
+c24a 2a 63 0c		        LD HL,($0C63) 
 c24d cd bd c1		        CALL REGN 
-c250 3e de		        LD A, $DE 
+c250 3e de		        LD A,$DE 
 c252 d7			        RST $10 
 c253 4c			        DEFB $4C 
-c254 3e bc		        LD A, $BC 
-c256 2a 61 0c		        LD HL, ($0C61) 
+c254 3e bc		        LD A,$BC 
+c256 2a 61 0c		        LD HL,($0C61) 
 c259 cd bd c1		        CALL REGN 
-c25c 3e bc		        LD A, $BC 
+c25c 3e bc		        LD A,$BC 
 c25e d7			        RST $10 
 c25f 40			        DEFB $40 
-c260 ef			        RST $28 
+c260 ef			        RST PRS 
 c261 41			        DEFB $41 
 c262 46			        DEFB $46 
 c263 a0			        DEFB $A0 
 c264 00			        DEFB $00 
-c265 2a 67 0c		        LD HL, ($0C67) 
+c265 2a 67 0c		        LD HL,($0C67) 
 c268 df			        RST $18 
-c269 66			        DEFB $66 
-c26a f7			        RST $30 
-c26b 7d			        LD A, L 
-c26c 21 c1 c3		        LD HL, $C3C1 
-c26f 06 0c		        LD B, $0C 
+c269 66			        DEFB ZTBCD3 
+c26a f7			        RST ROUT 
+c26b 7d			        LD A,L 
+c26c 21 c1 c3		        LD HL,$C3C1 
+c26f 06 0c		        LD B,$0C 
 c271			 
 c271 23			PCL:    INC HL 
 c272 cb 27		        SLA A 
 c274 f5			        PUSH AF 
-c275 7e			        LD A, (HL) 
-c276 38 02		        JR C, PRC 
-c278 3e 20		        LD A, $20 
+c275 7e			        LD A,(HL) 
+c276 38 02		        JR C,PRC 
+c278 3e 20		        LD A,$20 
 c27a			 
-c27a f7			PRC:    RST $30 
+c27a f7			PRC:    RST ROUT 
 c27b f1			        POP AF 
 c27c 10 f3		        DJNZ PCL 
-c27e ef			        RST $28 
+c27e ef			        RST PRS 
 c27f 5e			        DEFB $5E 
 c280 00			        DEFB $00 
-c281 06 12		        LD B, $12 
+c281 06 12		        LD B,$12 
 c283 d7			        RST $10 
 c284 5a			        DEFB $5A 
-c285 08			        EX AF, AF' 
+c285 08			        EX AF,AF' 
 c286 f5			        PUSH AF 
-c287 08			        EX AF, AF' 
-c288 3e af		        LD A, $AF 
+c287 08			        EX AF,AF' 
+c288 3e af		        LD A,$AF 
 c28a d7			        RST $10 
 c28b 14			        DEFB $14 
-c28c 11 bd c2		        LD DE, REVOUT 
+c28c 11 bd c2		        LD DE,REVOUT 
 c28f d7			        RST $10 
 c290 1f			        DEFB $1F 
-c291 2a 69 0c		        LD HL, ($0C69) 
+c291 2a 69 0c		        LD HL,($0C69) 
 c294			 
-c294 44			RV1:    LD B, H 
-c295 4d			        LD C, L 
-c296 54			        LD D, H 
-c297 5d			        LD E, L 
+c294 44			RV1:    LD B,H 
+c295 4d			        LD C,L 
+c296 54			        LD D,H 
+c297 5d			        LD E,L 
 c298 dd e5		        PUSH IX 
 c29a cd fd cf		        CALL L_CFFD 
 c29d dd e1		        POP IX 
 c29f c9			        RET 
 c2a0			 
 c2a0 df			ALTN:   RST $18 
-c2a1 68			        DEFB $68 
+c2a1 68			        DEFB ZB2HEX 
 c2a2			 
-c2a2 3e 27		ALT:    LD A, $27 
-c2a4 f7			        RST $30 
+c2a2 3e 27		ALT:    LD A,$27 
+c2a4 f7			        RST ROUT 
 c2a5 e1			        POP HL 
-c2a6 e3			        EX (SP), HL 
-c2a7 7c			        LD A, H 
+c2a6 e3			        EX (SP),HL 
+c2a7 7c			        LD A,H 
 c2a8 df			        RST $18 
-c2a9 68			        DEFB $68 
-c2aa 7d			        LD A, L 
+c2a9 68			        DEFB ZB2HEX 
+c2aa 7d			        LD A,L 
 c2ab			 
 c2ab df			B2HCR:  RST $18 
-c2ac 68			        DEFB $68 
+c2ac 68			        DEFB ZB2HEX 
 c2ad			 
 c2ad df			CRRET:  RST $18 
-c2ae 6a			        DEFB $6A 
+c2ae 6a			        DEFB ZCRLF 
 c2af c9			        RET 
 c2b0			 
 c2b0			 
-c2b0 2a 03 c4		REVAD:  LD HL, ($C403) 
-c2b3 36 c3		        LD (HL), $C3 
+c2b0 2a 03 c4		REVAD:  LD HL,($C403) 
+c2b3 36 c3		        LD (HL),$C3 
 c2b5 23			        INC HL 
-c2b6 73			        LD (HL), E 
+c2b6 73			        LD (HL),E 
 c2b7 23			        INC HL 
-c2b8 72			        LD (HL), D 
+c2b8 72			        LD (HL),D 
 c2b9 23			        INC HL 
-c2ba 36 01		        LD (HL), $01 
+c2ba 36 01		        LD (HL),$01 
 c2bc c9			        RET 
 c2bd			 
-c2bd ef			REVOUT: RST $28 
+c2bd ef			REVOUT: RST PRS 
 c2be 50			        DEFB $50 
 c2bf 43			        DEFB $43 
 c2c0 a0			        DEFB $A0 
 c2c1 00			        DEFB $00 
 c2c2			 
-c2c2 06 12		REVO2:  LD B, $12 
+c2c2 06 12		REVO2:  LD B,$12 
 c2c4			 
-c2c4 7e			REVO:   LD A, (HL) 
+c2c4 7e			REVO:   LD A,(HL) 
 c2c5 23			        INC HL 
-c2c6 f7			        RST $30 
+c2c6 f7			        RST ROUT 
 c2c7 10 fb		        DJNZ REVO 
 c2c9 23			        INC HL 
 c2ca 23			        INC HL 
 c2cb 23			        INC HL 
 c2cc			 
-c2cc 7e			BOUT:   LD A, (HL) 
-c2cd f7			        RST $30 
+c2cc 7e			BOUT:   LD A,(HL) 
+c2cd f7			        RST ROUT 
 c2ce 23			        INC HL 
-c2cf fe 0d		        CP $0D 
-c2d1 20 f9		        JR NZ, BOUT 
-c2d3 11 d8 c2		        LD DE, REVO3 
+c2cf fe 0d		        CP CR 
+c2d1 20 f9		        JR NZ,BOUT 
+c2d3 11 d8 c2		        LD DE,REVO3 
 c2d6 18 d8		        JR REVAD 
 c2d8			 
-c2d8 ef			REVO3:  RST $28 
+c2d8 ef			REVO3:  RST PRS 
 c2d9 20			        DEFB $20 
 c2da a0			        DEFB $A0 
 c2db 20			        DEFB $20 
@@ -576,19 +692,19 @@ c2dc 00			        DEFB $00
 c2dd 18 e3		        JR REVO2 
 c2df			 
 c2df df			SPCS:   RST $18 
-c2e0 69			        DEFB $69 
+c2e0 69			        DEFB ZSPACE 
 c2e1 10 fc		        DJNZ SPCS 
 c2e3 c9			        RET 
 c2e4			 
-c2e4 2a 29 0c		STLIN:  LD HL, ($0C29) 
-c2e7 7d			        LD A, L 
+c2e4 2a 29 0c		STLIN:  LD HL,($0C29) 
+c2e7 7d			        LD A,L 
 c2e8 e6 c0		        AND $C0 
 c2ea f6 0a		        OR $0A 
-c2ec 6f			        LD L, A 
+c2ec 6f			        LD L,A 
 c2ed c9			        RET 
 c2ee			 
 c2ee e5			REVENT: PUSH HL 
-c2ef 11 d8 c2		        LD DE, REVO3 
+c2ef 11 d8 c2		        LD DE,REVO3 
 c2f2 d7			        RST $10 
 c2f3 bc			        DEFB $BC 
 c2f4			 
@@ -599,116 +715,116 @@ c2f6 9d			        DEFB $9D
 c2f7 d5			        PUSH DE 
 c2f8			 
 c2f8 df			INP:    RST $18 
-c2f9 7b			        DEFB $7B 
-c2fa fe 0d		        CP $0D 
-c2fc 28 08		        JR Z, NL 
-c2fe f7			        RST $30 
+c2f9 7b			        DEFB ZBLINK 
+c2fa fe 0d		        CP CR 
+c2fc 28 08		        JR Z,NL 
+c2fe f7			        RST ROUT 
 c2ff fe 1b		        CP $1B 
-c301 20 f5		        JR NZ, INP 
+c301 20 f5		        JR NZ,INP 
 c303 f1			        POP AF 
 c304 18 a7		        JR CRRET 
 c306			 
 c306 d7			NL:     RST $10 
 c307 dc			        DEFB $DC 
-c308 eb			        EX DE, HL 
+c308 eb			        EX DE,HL 
 c309 df			        RST $18 
-c30a 64			        DEFB $64 
-c30b 38 3f		        JR C, FERR 
-c30d 7e			        LD A, (HL) 
+c30a 64			        DEFB ZNUM 
+c30b 38 3f		        JR C,FERR 
+c30d 7e			        LD A,(HL) 
 c30e b7			        OR A 
-c30f 28 e3		        JR Z, RM1 
+c30f 28 e3		        JR Z,RM1 
 c311 df			        RST $18 
-c312 6a			        DEFB $6A 
+c312 6a			        DEFB ZCRLF 
 c313 e1			        POP HL 
-c314 2a 21 0c		        LD HL, ($0C21) 
+c314 2a 21 0c		        LD HL,($0C21) 
 c317 18 dc		        JR RM2 
 c319			 
 c319			 
 c319 2b			FIND:   DEC HL 
 c31a e5			        PUSH HL 
 c31b df			        RST $18 
-c31c 69			        DEFB $69 
+c31c 69			        DEFB ZSPACE 
 c31d df			        RST $18 
-c31e 63			        DEFB $63 
-c31f 21 10 0c		        LD HL, $0C10 
-c322 01 00 00		        LD BC, $0000 
+c31e 63			        DEFB ZINLIN 
+c31f 21 10 0c		        LD HL,$0C10 
+c322 01 00 00		        LD BC,$0000 
 c325			 
 c325 e5			MORE:   PUSH HL 
 c326 df			        RST $18 
-c327 64			        DEFB $64 
-c328 7e			        LD A, (HL) 
+c327 64			        DEFB ZNUM 
+c328 7e			        LD A,(HL) 
 c329 b7			        OR A 
-c32a 28 0e		        JR Z, NOARGS 
+c32a 28 0e		        JR Z,NOARGS 
 c32c 23			        INC HL 
-c32d 7e			        LD A, (HL) 
+c32d 7e			        LD A,(HL) 
 c32e e1			        POP HL 
 c32f			 
-c32f 77			STORE:  LD (HL), A 
+c32f 77			STORE:  LD (HL),A 
 c330 23			        INC HL 
 c331			 
-c331			L_C331: 
+c331			L_C331:  
 c331 04			        INC B 
-c332 cb 58		        BIT 3, B 
-c334 20 1e		        JR NZ, F2 
+c332 cb 58		        BIT 3,B 
+c334 20 1e		        JR NZ,F2 
 c336 cb 01		        RLC C 
 c338 18 eb		        JR MORE 
 c33a			 
 c33a e1			NOARGS: POP HL 
-c33b 1a			        LD A, (DE) 
+c33b 1a			        LD A,(DE) 
 c33c fe 2c		        CP $2C 
-c33e 20 05		        JR NZ, MINUS 
+c33e 20 05		        JR NZ,MINUS 
 c340 13			        INC DE 
-c341 1a			        LD A, (DE) 
+c341 1a			        LD A,(DE) 
 c342 13			        INC DE 
 c343 18 ea		        JR STORE 
 c345			 
 c345 fe 2d		MINUS:  CP $2D 
-c347 28 06		        JR Z, FLAG 
+c347 28 06		        JR Z,FLAG 
 c349 b7			        OR A 
-c34a 28 08		        JR Z, F2 
+c34a 28 08		        JR Z,F2 
 c34c			 
 c34c c3 87 c0		FERR:   JP DERR 
 c34f			 
-c34f cb c1		FLAG:   SET 0, C 
+c34f cb c1		FLAG:   SET 0,C 
 c351 13			        INC DE 
 c352 18 dd		        JR L_C331 
 c354			 
-c354 79			F2:     LD A, C 
+c354 79			F2:     LD A,C 
 c355 3c			        INC A 
-c356 28 f4		        JR Z, FERR 
+c356 28 f4		        JR Z,FERR 
 c358 c5			        PUSH BC 
-c359 3e 06		        LD A, $06 
+c359 3e 06		        LD A,$06 
 c35b			 
 c35b b8			BDUN:   CP B 
-c35c 38 05		        JR C, CDUN 
+c35c 38 05		        JR C,CDUN 
 c35e cb 01		        RLC C 
 c360 04			        INC B 
 c361 18 f8		        JR BDUN 
 c363			 
 c363 f1			CDUN:   POP AF 
-c364 47			        LD B, A 
+c364 47			        LD B,A 
 c365 e1			        POP HL 
 c366			 
-c366 ed 5b 0e 0c	NEXT:   LD DE, ($0C0E) 
+c366 ed 5b 0e 0c	NEXT:   LD DE,($0C0E) 
 c36a 23			        INC HL 
 c36b b7			        OR A 
-c36c ed 52		        SBC HL, DE 
-c36e 19			        ADD HL, DE 
+c36c ed 52		        SBC HL,DE 
+c36e 19			        ADD HL,DE 
 c36f d0			        RET NC 
 c370 c5			        PUSH BC 
 c371 e5			        PUSH HL 
-c372 11 10 0c		        LD DE, $0C10 
+c372 11 10 0c		        LD DE,$0C10 
 c375			 
 c375 cb 01		FTEST:  RLC C 
-c377 30 04		        JR NC, COMP 
+c377 30 04		        JR NC,COMP 
 c379 23			        INC HL 
 c37a 05			        DEC B 
 c37b 18 f8		        JR FTEST 
 c37d			 
-c37d 1a			COMP:   LD A, (DE) 
+c37d 1a			COMP:   LD A,(DE) 
 c37e be			        CP (HL) 
 c37f 23			        INC HL 
-c380 20 07		        JR NZ, NEXTJ 
+c380 20 07		        JR NZ,NEXTJ 
 c382 13			        INC DE 
 c383 10 f0		        DJNZ FTEST 
 c385 e1			        POP HL 
@@ -720,48 +836,48 @@ c389 e1			NEXTJ:  POP HL
 c38a c1			        POP BC 
 c38b 18 d9		        JR NEXT 
 c38d			 
-c38d 3e a0		PHA:    LD A, $A0 
-c38f f7			        RST $30 
+c38d 3e a0		PHA:    LD A,$A0 
+c38f f7			        RST ROUT 
 c390 df			        RST $18 
-c391 66			        DEFB $66 
-c392 54			        LD D, H 
-c393 5d			        LD E, L 
-c394 06 08		        LD B, $08 
+c391 66			        DEFB ZTBCD3 
+c392 54			        LD D,H 
+c393 5d			        LD E,L 
+c394 06 08		        LD B,$08 
 c396 cd ca c1		        CALL SPDIS 
-c399 f7			        RST $30 
-c39a 06 08		        LD B, $08 
+c399 f7			        RST ROUT 
+c39a 06 08		        LD B,$08 
 c39c			 
-c39c 1a			PRA:    LD A, (DE) 
+c39c 1a			PRA:    LD A,(DE) 
 c39d 3c			        INC A 
 c39e e6 7f		        AND $7F 
 c3a0 fe 21		        CP $21 
-c3a2 1a			        LD A, (DE) 
-c3a3 30 02		        JR NC, PRA2 
-c3a5 3e 2e		        LD A, $2E 
+c3a2 1a			        LD A,(DE) 
+c3a3 30 02		        JR NC,PRA2 
+c3a5 3e 2e		        LD A,$2E 
 c3a7			 
-c3a7 f7			PRA2:   RST $30 
+c3a7 f7			PRA2:   RST ROUT 
 c3a8 13			        INC DE 
 c3a9 10 f1		        DJNZ PRA 
 c3ab df			        RST $18 
-c3ac 6a			        DEFB $6A 
+c3ac 6a			        DEFB ZCRLF 
 c3ad c9			        RET 
 c3ae			 
-c3ae 22 fc 0e		CHUSR:  LD ($0EFC), HL 
+c3ae 22 fc 0e		CHUSR:  LD ($0EFC),HL 
 c3b1 c9			        RET 
 c3b2			 
-c3b2 22 fa 0e		OPTN:   LD ($0EFA), HL 
+c3b2 22 fa 0e		OPTN:   LD ($0EFA),HL 
 c3b5 c9			        RET 
 c3b6			 
-c3b6 5f			DSCALJ: LD E, A 
-c3b7 16 00		        LD D, $00 
-c3b9 19			        ADD HL, DE 
-c3ba 19			        ADD HL, DE 
-c3bb 5e			        LD E, (HL) 
+c3b6 5f			DSCALJ: LD E,A 
+c3b7 16 00		        LD D,$00 
+c3b9 19			        ADD HL,DE 
+c3ba 19			        ADD HL,DE 
+c3bb 5e			        LD E,(HL) 
 c3bc 23			        INC HL 
-c3bd 56			        LD D, (HL) 
+c3bd 56			        LD D,(HL) 
 c3be d5			        PUSH DE 
 c3bf df			        RST $18 
-c3c0 60			        DEFB $60 
+c3c0 60			        DEFB ZARGS 
 c3c1 c9			        RET 
 c3c2			 
 c3c2 ..			STR:    DEFM "SZ H PNC" 
@@ -782,10 +898,10 @@ c3dc ..			        DEFM "I"
 c3dd 87 c1		        DEFW IXY 
 c3df 00			        DEFB $00 
 c3e0			 
-c3e0 9d c0 87 c0 ae c3 ee c2	CTAB:   DEFW ALTP, DERR, CHUSR, REVENT 
-c3e8 87 c0 19 c3 87 c0 87 c0	        DEFW DERR, FIND, DERR, DERR 
-c3f0 87 c0 87 c0 87 c0 87 c0	        DEFW DERR, DERR, DERR, DERR 
-c3f8 87 c0 87 c0 b2 c3 ec c1	        DEFW DERR, DERR, OPTN, SSD 
+c3e0 9d c0 87 c0 ae c3 ee c2	CTAB:   DEFW ALTP,DERR,CHUSR,REVENT 
+c3e8 87 c0 19 c3 87 c0 87 c0	        DEFW DERR,FIND,DERR,DERR 
+c3f0 87 c0 87 c0 87 c0 87 c0	        DEFW DERR,DERR,DERR,DERR 
+c3f8 87 c0 87 c0 b2 c3 ec c1	        DEFW DERR,DERR,OPTN,SSD 
 c400			 
 c400			 
 c400			; END OF NAS-DEBUG. 
@@ -794,100 +910,100 @@ c400
 c400			 
 c400			; START OF NAS-DIS 
 c400			 
-c400 3e c3		        LD A, $C3 
-c402 32 00 0e		        LD (L_0E00), A 
-c405 32 03 0e		        LD ($0E03), A 
-c408 21 28 c4		        LD HL, PRINT 
-c40b 22 01 0e		        LD ($0E01), HL 
-c40e 3a 0b 0c		        LD A, ($0C0B) 
+c400 3e c3		        LD A,$C3 
+c402 32 00 0e		        LD (L_0E00),A 
+c405 32 03 0e		        LD ($0E03),A 
+c408 21 28 c4		        LD HL,PRINT 
+c40b 22 01 0e		        LD ($0E01),HL 
+c40e 3a 0b 0c		        LD A,($0C0B) 
 c411 fe 02		        CP $02 
-c413 da bb ca		        JP C, REVASC 
+c413 da bb ca		        JP C,REVASC 
 c416 df			        RST $18 
-c417 60			        DEFB $60 
-c418 20 02		        JR NZ, SCO 
-c41a 0e 01		        LD C, $01 
+c417 60			        DEFB ZARGS 
+c418 20 02		        JR NZ,SCO 
+c41a 0e 01		        LD C,$01 
 c41c			 
-c41c 41			SCO:    LD B, C 
-c41d ed 43 10 0c	        LD ($0C10), BC 
-c421 42			        LD B, D 
-c422 4b			        LD C, E 
-c423 21 ff ff		        LD HL, $FFFF 
+c41c 41			SCO:    LD B,C 
+c41d ed 43 10 0c	        LD ($0C10),BC 
+c421 42			        LD B,D 
+c422 4b			        LD C,E 
+c423 21 ff ff		        LD HL,$FFFF 
 c426 18 16		        JR REVAS 
 c428			 
-c428 7e			PRINT:  LD A, (HL) 
-c429 f7			        RST $30 
+c428 7e			PRINT:  LD A,(HL) 
+c429 f7			        RST ROUT 
 c42a 23			        INC HL 
-c42b fe 0d		        CP $0D 
-c42d 20 f9		        JR NZ, PRINT 
-c42f 21 10 0c		        LD HL, $0C10 
+c42b fe 0d		        CP CR 
+c42d 20 f9		        JR NZ,PRINT 
+c42f 21 10 0c		        LD HL,$0C10 
 c432 35			        DEC (HL) 
 c433 c0			        RET NZ 
 c434 23			        INC HL 
-c435 7e			        LD A, (HL) 
+c435 7e			        LD A,(HL) 
 c436 2b			        DEC HL 
-c437 77			        LD (HL), A 
-c438 cf			        RST $08 
+c437 77			        LD (HL),A 
+c438 cf			        RST RIN 
 c439 d6 1b		        SUB $1B 
 c43b c0			        RET NZ 
 c43c df			        RST $18 
 c43d 5b			        DEFB $5B 
 c43e			 
-c43e			REVAS: 
-c43e ed 43 04 0e	        LD ($0E04), BC 
-c442 ed 53 06 0e	        LD ($0E06), DE 
-c446 22 08 0e		        LD ($0E08), HL 
+c43e			REVAS:   
+c43e ed 43 04 0e	        LD ($0E04),BC 
+c442 ed 53 06 0e	        LD ($0E06),DE 
+c446 22 08 0e		        LD ($0E08),HL 
 c449			 
-c449			NEXTL: 
-c449 2a 08 0e		        LD HL, ($0E08) 
-c44c ed 5b 06 0e	        LD DE, ($0E06) 
+c449			NEXTL:   
+c449 2a 08 0e		        LD HL,($0E08) 
+c44c ed 5b 06 0e	        LD DE,($0E06) 
 c450 af			        XOR A 
-c451 ed 52		        SBC HL, DE 
+c451 ed 52		        SBC HL,DE 
 c453 d8			        RET C 
 c454 cd 6e c4		        CALL INITB 
 c457 cd b8 c4		        CALL BYTE 
 c45a cd 15 c5		        CALL DECODE 
-c45d 21 0c 0e		        LD HL, $0E0C 
-c460 7e			        LD A, (HL) 
+c45d 21 0c 0e		        LD HL,$0E0C 
+c460 7e			        LD A,(HL) 
 c461 23			        INC HL 
 c462 be			        CP (HL) 
-c463 c4 53 c9		        CALL NZ, NOTVAL 
-c466 21 14 0e		        LD HL, $0E14 
+c463 c4 53 c9		        CALL NZ,NOTVAL 
+c466 21 14 0e		        LD HL,$0E14 
 c469 cd 00 0e		        CALL L_0E00 
 c46c 18 db		        JR NEXTL 
 c46e			 
 c46e			 
-c46e			INITB: 
-c46e 11 14 0e		        LD DE, $0E14 
+c46e			INITB:   
+c46e 11 14 0e		        LD DE,$0E14 
 c471 d5			        PUSH DE 
 c472 dd e1		        POP IX 
-c474 21 00 00		        LD HL, $0000 
-c477 22 12 0e		        LD ($0E12), HL 
-c47a 22 0c 0e		        LD ($0E0C), HL 
-c47d 2a 04 0e		        LD HL, ($0E04) 
-c480 22 0e 0e		        LD ($0E0E), HL 
+c474 21 00 00		        LD HL,$0000 
+c477 22 12 0e		        LD ($0E12),HL 
+c47a 22 0c 0e		        LD ($0E0C),HL 
+c47d 2a 04 0e		        LD HL,($0E04) 
+c480 22 0e 0e		        LD ($0E0E),HL 
 c483 cd 9d c4		        CALL HEX4 
-c486 eb			        EX DE, HL 
+c486 eb			        EX DE,HL 
 c487 23			        INC HL 
-c488 22 0a 0e		        LD ($0E0A), HL 
+c488 22 0a 0e		        LD ($0E0A),HL 
 c48b 2b			        DEC HL 
-c48c 06 2b		        LD B, $2B 
+c48c 06 2b		        LD B,$2B 
 c48e			 
-c48e			INITB0: 
-c48e 36 20		        LD (HL), $20 
+c48e			INITB0:  
+c48e 36 20		        LD (HL),$20 
 c490 23			        INC HL 
 c491 10 fb		        DJNZ INITB0 
-c493 dd 36 2a 3b	        LD (IX+$2A), $3B 
-c497 36 0d		        LD (HL), $0D 
-c499 11 2d 0e		        LD DE, $0E2D 
+c493 dd 36 2a 3b	        LD (IX+$2A),$3B 
+c497 36 0d		        LD (HL),CR 
+c499 11 2d 0e		        LD DE,$0E2D 
 c49c c9			        RET 
 c49d			 
 c49d			 
-c49d			HEX4: 
-c49d 7c			        LD A, H 
+c49d			HEX4:    
+c49d 7c			        LD A,H 
 c49e cd a2 c4		        CALL HEX2 
-c4a1 7d			        LD A, L 
+c4a1 7d			        LD A,L 
 c4a2			 
-c4a2			HEX2: 
+c4a2			HEX2:    
 c4a2 f5			        PUSH AF 
 c4a3 0f			        RRCA 
 c4a4 0f			        RRCA 
@@ -896,80 +1012,80 @@ c4a6 0f			        RRCA
 c4a7 cd ab c4		        CALL HEX1 
 c4aa f1			        POP AF 
 c4ab			 
-c4ab			HEX1: 
+c4ab			HEX1:    
 c4ab f5			        PUSH AF 
 c4ac e6 0f		        AND $0F 
-c4ae c6 90		        ADD A, $90 
+c4ae c6 90		        ADD A,$90 
 c4b0 27			        DAA 
-c4b1 ce 40		        ADC A, $40 
+c4b1 ce 40		        ADC A,$40 
 c4b3 27			        DAA 
-c4b4 12			        LD (DE), A 
+c4b4 12			        LD (DE),A 
 c4b5 13			        INC DE 
 c4b6 f1			        POP AF 
 c4b7 c9			        RET 
 c4b8			 
 c4b8			 
-c4b8			BYTE: 
+c4b8			BYTE:    
 c4b8 dd 23		        INC IX 
-c4ba 2a 04 0e		        LD HL, ($0E04) 
+c4ba 2a 04 0e		        LD HL,($0E04) 
 c4bd 23			        INC HL 
-c4be 22 04 0e		        LD ($0E04), HL 
-c4c1 2a 06 0e		        LD HL, ($0E06) 
-c4c4 7e			        LD A, (HL) 
+c4be 22 04 0e		        LD ($0E04),HL 
+c4c1 2a 06 0e		        LD HL,($0E06) 
+c4c4 7e			        LD A,(HL) 
 c4c5 23			        INC HL 
-c4c6 22 06 0e		        LD ($0E06), HL 
-c4c9 2a 0a 0e		        LD HL, ($0E0A) 
+c4c6 22 06 0e		        LD ($0E06),HL 
+c4c9 2a 0a 0e		        LD HL,($0E0A) 
 c4cc 23			        INC HL 
-c4cd eb			        EX DE, HL 
+c4cd eb			        EX DE,HL 
 c4ce cd a2 c4		        CALL HEX2 
-c4d1 eb			        EX DE, HL 
-c4d2 22 0a 0e		        LD ($0E0A), HL 
+c4d1 eb			        EX DE,HL 
+c4d2 22 0a 0e		        LD ($0E0A),HL 
 c4d5 f5			        PUSH AF 
 c4d6 3c			        INC A 
 c4d7 e6 7f		        AND $7F 
 c4d9 fe 21		        CP $21 
 c4db 3d			        DEC A 
-c4dc 30 02		        JR NC, BYTE0 
-c4de 3e 2e		        LD A, $2E 
+c4dc 30 02		        JR NC,BYTE0 
+c4de 3e 2e		        LD A,$2E 
 c4e0			 
-c4e0			BYTE0: 
-c4e0 dd 77 2a		        LD (IX+$2A), A 
+c4e0			BYTE0:   
+c4e0 dd 77 2a		        LD (IX+$2A),A 
 c4e3 f1			        POP AF 
 c4e4 c9			        RET 
 c4e5			 
 c4e5			 
-c4e5			WREX: 
-c4e5 eb			        EX DE, HL 
-c4e6 36 45		        LD (HL), $45 
+c4e5			WREX:    
+c4e5 eb			        EX DE,HL 
+c4e6 36 45		        LD (HL),$45 
 c4e8 23			        INC HL 
-c4e9 36 58		        LD (HL), $58 
+c4e9 36 58		        LD (HL),$58 
 c4eb 18 06		        JR WRLD0 
 c4ed			 
 c4ed			 
-c4ed			WRLD: 
-c4ed eb			        EX DE, HL 
-c4ee 36 4c		        LD (HL), $4C 
+c4ed			WRLD:    
+c4ed eb			        EX DE,HL 
+c4ee 36 4c		        LD (HL),$4C 
 c4f0 23			        INC HL 
-c4f1 36 44		        LD (HL), $44 
+c4f1 36 44		        LD (HL),$44 
 c4f3			 
-c4f3			WRLD0: 
-c4f3 11 32 0e		        LD DE, $0E32 
+c4f3			WRLD0:   
+c4f3 11 32 0e		        LD DE,$0E32 
 c4f6 c9			        RET 
 c4f7			 
 c4f7			 
-c4f7			COMMA: 
-c4f7 eb			        EX DE, HL 
-c4f8 36 2c		        LD (HL), $2C 
+c4f7			COMMA:   
+c4f7 eb			        EX DE,HL 
+c4f8 36 2c		        LD (HL),$2C 
 c4fa 23			        INC HL 
-c4fb eb			        EX DE, HL 
+c4fb eb			        EX DE,HL 
 c4fc c9			        RET 
 c4fd			 
 c4fd			 
-c4fd			POUND: 
-c4fd eb			        EX DE, HL 
-c4fe 36 23		        LD (HL), $23 
+c4fd			POUND:   
+c4fd eb			        EX DE,HL 
+c4fe 36 23		        LD (HL),$23 
 c500 23			        INC HL 
-c501 eb			        EX DE, HL 
+c501 eb			        EX DE,HL 
 c502 c9			        RET 
 c503			 
 c503			 
@@ -981,8 +1097,8 @@ c50b ed a0		COPY2:  LDI
 c50d ed a0		        LDI 
 c50f c9			        RET 
 c510			 
-c510 85			FTADR:  ADD A, L 
-c511 6f			        LD L, A 
+c510 85			FTADR:  ADD A,L 
+c511 6f			        LD L,A 
 c512 d0			        RET NC 
 c513 24			        INC H 
 c514 c9			        RET 
@@ -990,31 +1106,31 @@ c515
 c515 f5			DECODE: PUSH AF 
 c516 e6 c0		        AND $C0 
 c518 fe 40		        CP $40 
-c51a ca 9d c5		        JP Z, LOAD8 
+c51a ca 9d c5		        JP Z,LOAD8 
 c51d fe 80		        CP $80 
-c51f ca 04 c6		        JP Z, ARITH8 
+c51f ca 04 c6		        JP Z,ARITH8 
 c522 f1			        POP AF 
 c523 f5			        PUSH AF 
 c524 e6 8f		        AND $8F 
 c526 07			        RLCA 
 c527 07			        RLCA 
-c528 21 7f c9		        LD HL, TABLE 
+c528 21 7f c9		        LD HL,TABLE 
 c52b cd 10 c5		        CALL FTADR 
-c52e 7e			        LD A, (HL) 
+c52e 7e			        LD A,(HL) 
 c52f 23			        INC HL 
-c530 66			        LD H, (HL) 
-c531 6f			        LD L, A 
+c530 66			        LD H,(HL) 
+c531 6f			        LD L,A 
 c532 e9			        JP (HL) 
 c533			 
-c533 21 bf c9		INC:    LD HL, INCM 
+c533 21 bf c9		INC:    LD HL,INCM 
 c536 18 03		        JR ID0 
 c538			 
-c538 21 c2 c9		DEC:    LD HL, DECM 
+c538 21 c2 c9		DEC:    LD HL,DECM 
 c53b			 
 c53b cd 38 c7		ID0:    CALL COPY3S 
 c53e f1			        POP AF 
-c53f cb 57		        BIT 2, A 
-c541 28 34		        JR Z, REGPR 
+c53f cb 57		        BIT 2,A 
+c541 28 34		        JR Z,REGPR 
 c543 0f			        RRCA 
 c544 0f			        RRCA 
 c545 0f			        RRCA 
@@ -1027,57 +1143,57 @@ c54c cd 77 c5		        CALL REGPR
 c54f cd f7 c4		        CALL COMMA 
 c552			 
 c552 cd b8 c4		LD16A:  CALL BYTE 
-c555 4f			        LD C, A 
+c555 4f			        LD C,A 
 c556 cd b8 c4		        CALL BYTE 
-c559 67			        LD H, A 
-c55a 69			        LD L, C 
+c559 67			        LD H,A 
+c55a 69			        LD L,C 
 c55b			 
-c55b ed 53 12 0e	LD16B:  LD ($0E12), DE 
-c55f 22 10 0e		        LD ($0E10), HL 
+c55b ed 53 12 0e	LD16B:  LD ($0E12),DE 
+c55f 22 10 0e		        LD ($0E10),HL 
 c562 cd fd c4		        CALL POUND 
 c565 c3 9d c4		        JP HEX4 
 c568			 
 c568			 
-c568 21 d8 c9		ADDHL:  LD HL, ARTAB 
+c568 21 d8 c9		ADDHL:  LD HL,ARTAB 
 c56b			 
 c56b cd 38 c7		L_C56B: CALL COPY3S 
-c56e 3e 20		        LD A, $20 
+c56e 3e 20		        LD A,$20 
 c570 cd 77 c5		        CALL REGPR 
 c573 cd f7 c4		        CALL COMMA 
 c576			 
 c576 f1			L_C576: POP AF 
 c577			 
-c577 47			REGPR:  LD B, A 
+c577 47			REGPR:  LD B,A 
 c578 0f			        RRCA 
 c579 0f			        RRCA 
 c57a 0f			        RRCA 
-c57b c6 02		        ADD A, $02 
-c57d 0e 06		        LD C, $06 
+c57b c6 02		        ADD A,$02 
+c57d 0e 06		        LD C,$06 
 c57f a1			        AND C 
-c580 21 c8 c9		        LD HL, RPRTAB 
-c583 20 08		        JR NZ, NOTSP 
+c580 21 c8 c9		        LD HL,RPRTAB 
+c583 20 08		        JR NZ,NOTSP 
 c585 2b			        DEC HL 
-c586 cb 78		        BIT 7, B 
-c588 ca 0b c5		        JP Z, COPY2 
+c586 cb 78		        BIT 7,B 
+c588 ca 0b c5		        JP Z,COPY2 
 c58b 2b			        DEC HL 
 c58c 2b			        DEC HL 
 c58d			 
-c58d			NOTSP: 
+c58d			NOTSP:   
 c58d b9			        CP C 
-c58e 20 07		        JR NZ, L_C597 
-c590 3a 0c 0e		        LD A, ($0E0C) 
-c593 32 0d 0e		        LD ($0E0D), A 
-c596 81			        ADD A, C 
+c58e 20 07		        JR NZ,L_C597 
+c590 3a 0c 0e		        LD A,($0E0C) 
+c593 32 0d 0e		        LD ($0E0D),A 
+c596 81			        ADD A,C 
 c597			 
-c597			L_C597: 
+c597			L_C597:  
 c597 cd 10 c5		        CALL FTADR 
 c59a c3 0b c5		        JP COPY2 
 c59d			 
 c59d			 
-c59d			LOAD8: 
+c59d			LOAD8:   
 c59d f1			        POP AF 
 c59e fe 76		        CP $76 
-c5a0 28 5c		        JR Z, HALT 
+c5a0 28 5c		        JR Z,HALT 
 c5a2 f5			        PUSH AF 
 c5a3 cd ed c4		        CALL WRLD 
 c5a6 0f			        RRCA 
@@ -1086,143 +1202,143 @@ c5a8 0f			        RRCA
 c5a9 cd b4 c5		        CALL SREG 
 c5ac cd f7 c4		        CALL COMMA 
 c5af			 
-c5af			L8B: 
+c5af			L8B:     
 c5af f1			        POP AF 
-c5b0 cb 77		        BIT 6, A 
-c5b2 28 41		        JR Z, IMM 
+c5b0 cb 77		        BIT 6,A 
+c5b2 28 41		        JR Z,IMM 
 c5b4			 
-c5b4			SREG: 
+c5b4			SREG:    
 c5b4 3c			        INC A 
 c5b5 e6 07		        AND $07 
 c5b7 fe 07		        CP $07 
-c5b9 28 09		        JR Z, MEM 
-c5bb 21 c9 c9		        LD HL, $C9C9 
+c5b9 28 09		        JR Z,MEM 
+c5bb 21 c9 c9		        LD HL,$C9C9 
 c5be cd 10 c5		        CALL FTADR 
 c5c1 ed a0		        LDI 
 c5c3 c9			        RET 
 c5c4			 
 c5c4			 
-c5c4			MEM: 
-c5c4 3e 28		        LD A, $28 
-c5c6 12			        LD (DE), A 
+c5c4			MEM:     
+c5c4 3e 28		        LD A,$28 
+c5c6 12			        LD (DE),A 
 c5c7 13			        INC DE 
-c5c8 21 ce c9		        LD HL, HXYTAB 
-c5cb 3a 0c 0e		        LD A, ($0E0C) 
-c5ce 32 0d 0e		        LD ($0E0D), A 
+c5c8 21 ce c9		        LD HL,HXYTAB 
+c5cb 3a 0c 0e		        LD A,($0E0C) 
+c5ce 32 0d 0e		        LD ($0E0D),A 
 c5d1 f5			        PUSH AF 
 c5d2 cd 97 c5		        CALL L_C597 
 c5d5 f1			        POP AF 
 c5d6 a7			        AND A 
-c5d7 28 17		        JR Z, NOTIXY 
+c5d7 28 17		        JR Z,NOTIXY 
 c5d9 cd b8 c4		        CALL BYTE 
 c5dc a7			        AND A 
-c5dd 0e 2b		        LD C, $2B 
-c5df 28 0f		        JR Z, NOTIXY 
-c5e1 f2 e8 c5		        JP P, PLUS 
+c5dd 0e 2b		        LD C,$2B 
+c5df 28 0f		        JR Z,NOTIXY 
+c5e1 f2 e8 c5		        JP P,PLUS 
 c5e4 ed 44		        NEG 
-c5e6 0e 2d		        LD C, $2D 
+c5e6 0e 2d		        LD C,$2D 
 c5e8			 
-c5e8			PLUS: 
-c5e8 47			        LD B, A 
-c5e9 79			        LD A, C 
-c5ea 12			        LD (DE), A 
+c5e8			PLUS:    
+c5e8 47			        LD B,A 
+c5e9 79			        LD A,C 
+c5ea 12			        LD (DE),A 
 c5eb 13			        INC DE 
-c5ec 78			        LD A, B 
+c5ec 78			        LD A,B 
 c5ed cd f8 c5		        CALL PHEX2 
 c5f0			 
-c5f0			NOTIXY: 
-c5f0 3e 29		        LD A, $29 
-c5f2 12			        LD (DE), A 
+c5f0			NOTIXY:  
+c5f0 3e 29		        LD A,$29 
+c5f2 12			        LD (DE),A 
 c5f3 13			        INC DE 
 c5f4 c9			        RET 
 c5f5			 
 c5f5			 
-c5f5			IMM: 
+c5f5			IMM:     
 c5f5 cd b8 c4		        CALL BYTE 
 c5f8			 
-c5f8			PHEX2: 
+c5f8			PHEX2:   
 c5f8 cd fd c4		        CALL POUND 
 c5fb c3 a2 c4		        JP HEX2 
 c5fe			 
 c5fe			 
-c5fe			HALT: 
-c5fe 21 d4 c9		        LD HL, HALTM 
+c5fe			HALT:    
+c5fe 21 d4 c9		        LD HL,HALTM 
 c601 c3 07 c5		        JP COPY4 
 c604			 
 c604			 
-c604			ARITH8: 
+c604			ARITH8:  
 c604 f1			        POP AF 
 c605 ee 40		        XOR $40 
 c607 f5			        PUSH AF 
 c608 0f			        RRCA 
 c609 0f			        RRCA 
 c60a e6 0e		        AND $0E 
-c60c 47			        LD B, A 
+c60c 47			        LD B,A 
 c60d 0f			        RRCA 
-c60e 80			        ADD A, B 
-c60f 21 d8 c9		        LD HL, ARTAB 
-c612 c4 10 c5		        CALL NZ, FTADR 
-c615 78			        LD A, B 
+c60e 80			        ADD A,B 
+c60f 21 d8 c9		        LD HL,ARTAB 
+c612 c4 10 c5		        CALL NZ,FTADR 
+c615 78			        LD A,B 
 c616 cd 38 c7		        CALL COPY3S 
-c619 21 b0 ca		        LD HL, $CAB0 
+c619 21 b0 ca		        LD HL,$CAB0 
 c61c fe 06		        CP $06 
-c61e cc 0b c5		        CALL Z, COPY2 
+c61e cc 0b c5		        CALL Z,COPY2 
 c621 fe 03		        CP $03 
-c623 dc 0b c5		        CALL C, COPY2 
+c623 dc 0b c5		        CALL C,COPY2 
 c626 18 87		        JR L8B 
 c628			 
 c628			 
-c628			POP: 
-c628 21 f4 c9		        LD HL, POPM 
+c628			POP:     
+c628 21 f4 c9		        LD HL,POPM 
 c62b 18 03		        JR PP0 
 c62d			 
 c62d			 
-c62d			PUSH: 
-c62d 21 f0 c9		        LD HL, PUSHM 
+c62d			PUSH:    
+c62d 21 f0 c9		        LD HL,PUSHM 
 c630			 
-c630			PP0: 
+c630			PP0:     
 c630 cd 07 c5		        CALL COPY4 
 c633 13			        INC DE 
 c634 c3 76 c5		        JP L_C576 
 c637			 
 c637			 
-c637			CALETC: 
+c637			CALETC:  
 c637 f1			        POP AF 
 c638 fe ed		        CP $ED 
-c63a ca c9 c8		        JP Z, EXTND 
+c63a ca c9 c8		        JP Z,EXTND 
 c63d fe cd		        CP $CD 
-c63f 28 17		        JR Z, L_C658 
+c63f 28 17		        JR Z,L_C658 
 c641 d6 f9		        SUB $F9 
-c643 30 02		        JR NC, CE0 
-c645 3e 02		        LD A, $02 
+c643 30 02		        JR NC,CE0 
+c645 3e 02		        LD A,$02 
 c647			 
-c647			CE0: 
-c647 32 0c 0e		        LD ($0E0C), A 
+c647			CE0:     
+c647 32 0c 0e		        LD ($0E0C),A 
 c64a cd b8 c4		        CALL BYTE 
-c64d 47			        LD B, A 
+c64d 47			        LD B,A 
 c64e e6 0f		        AND $0F 
-c650 fe 0d		        CP $0D 
-c652 78			        LD A, B 
+c650 fe 0d		        CP CR 
+c652 78			        LD A,B 
 c653 c8			        RET Z 
 c654 c3 15 c5		        JP DECODE 
 c657			 
 c657			 
-c657			CJR: 
+c657			CJR:     
 c657 f1			        POP AF 
 c658			 
-c658			L_C658: 
+c658			L_C658:  
 c658 f5			        PUSH AF 
 c659 e6 06		        AND $06 
 c65b 07			        RLCA 
-c65c 21 f8 c9		        LD HL, CJRTAB 
-c65f c4 10 c5		        CALL NZ, FTADR 
+c65c 21 f8 c9		        LD HL,CJRTAB 
+c65f c4 10 c5		        CALL NZ,FTADR 
 c662 cd 07 c5		        CALL COPY4 
 c665 13			        INC DE 
 c666 f1			        POP AF 
 c667 fe c9		        CP $C9 
 c669 c8			        RET Z 
-c66a cb 47		        BIT 0, A 
-c66c 20 0b		        JR NZ, UNCND 
+c66a cb 47		        BIT 0,A 
+c66c 20 0b		        JR NZ,UNCND 
 c66e f5			        PUSH AF 
 c66f cd 7c c6		        CALL CCODES 
 c672 f1			        POP AF 
@@ -1230,92 +1346,92 @@ c673 e6 07		        AND $07
 c675 c8			        RET Z 
 c676 cd f7 c4		        CALL COMMA 
 c679			 
-c679			UNCND: 
+c679			UNCND:   
 c679 c3 52 c5		        JP LD16A 
 c67c			 
 c67c			 
-c67c			CCODES: 
+c67c			CCODES:  
 c67c 0f			        RRCA 
 c67d 0f			        RRCA 
 c67e e6 0e		        AND $0E 
-c680 21 04 ca		        LD HL, CCTAB 
+c680 21 04 ca		        LD HL,CCTAB 
 c683 c3 97 c5		        JP L_C597 
 c686			 
 c686			 
-c686			ROTMIS: 
+c686			ROTMIS:  
 c686 f1			        POP AF 
 c687 0f			        RRCA 
 c688 e6 1c		        AND $1C 
-c68a 21 14 ca		        LD HL, RMTAB 
-c68d c4 10 c5		        CALL NZ, FTADR 
+c68a 21 14 ca		        LD HL,RMTAB 
+c68d c4 10 c5		        CALL NZ,FTADR 
 c690 c3 07 c5		        JP COPY4 
 c693			 
 c693			 
-c693			RST: 
-c693 21 34 ca		        LD HL, RSTM 
+c693			RST:     
+c693 21 34 ca		        LD HL,RSTM 
 c696 cd 38 c7		        CALL COPY3S 
 c699 f1			        POP AF 
 c69a e6 38		        AND $38 
 c69c cd f8 c5		        CALL PHEX2 
-c69f 21 03 0e		        LD HL, $0E03 
-c6a2 cb 46		        BIT 0, (HL) 
+c69f 21 03 0e		        LD HL,$0E03 
+c6a2 cb 46		        BIT 0,(HL) 
 c6a4 c8			        RET Z 
 c6a5 fe 10		        CP $10 
 c6a7 d8			        RET C 
 c6a8 fe 20		        CP $20 
 c6aa c8			        RET Z 
-c6ab 38 3c		        JR C, FLUSH 
+c6ab 38 3c		        JR C,FLUSH 
 c6ad fe 28		        CP $28 
 c6af c0			        RET NZ 
 c6b0			 
-c6b0			BORM: 
+c6b0			BORM:    
 c6b0 cd e9 c6		        CALL FLUSH 
-c6b3 06 03		        LD B, $03 
-c6b5 38 22		        JR C, UNPRN 
+c6b3 06 03		        LD B,$03 
+c6b5 38 22		        JR C,UNPRN 
 c6b7 04			        INC B 
-c6b8 21 30 0e		        LD HL, $0E30 
-c6bb 36 4d		        LD (HL), $4D 
+c6b8 21 30 0e		        LD HL,$0E30 
+c6bb 36 4d		        LD (HL),$4D 
 c6bd 23			        INC HL 
 c6be 23			        INC HL 
-c6bf 36 2f		        LD (HL), $2F 
+c6bf 36 2f		        LD (HL),$2F 
 c6c1 23			        INC HL 
-c6c2 eb			        EX DE, HL 
+c6c2 eb			        EX DE,HL 
 c6c3 18 08		        JR MS1 
 c6c5			 
 c6c5			 
-c6c5			MOREMS: 
+c6c5			MOREMS:  
 c6c5 cd fc c6		        CALL PRTABL 
-c6c8 38 07		        JR C, DONEM 
+c6c8 38 07		        JR C,DONEM 
 c6ca cd b8 c4		        CALL BYTE 
 c6cd			 
-c6cd			MS1: 
-c6cd 12			        LD (DE), A 
+c6cd			MS1:     
+c6cd 12			        LD (DE),A 
 c6ce 13			        INC DE 
 c6cf 10 f4		        DJNZ MOREMS 
 c6d1			 
-c6d1			DONEM: 
-c6d1 eb			        EX DE, HL 
-c6d2 36 2f		        LD (HL), $2F 
+c6d1			DONEM:   
+c6d1 eb			        EX DE,HL 
+c6d2 36 2f		        LD (HL),$2F 
 c6d4 18 da		        JR BORM 
 c6d6			 
 c6d6			 
-c6d6			UN0: 
+c6d6			UN0:     
 c6d6 cd b8 c4		        CALL BYTE 
 c6d9			 
-c6d9			UNPRN: 
+c6d9			UNPRN:   
 c6d9 b7			        OR A 
-c6da ca 53 c9		        JP Z, NOTVAL 
+c6da ca 53 c9		        JP Z,NOTVAL 
 c6dd cd fc c6		        CALL PRTABL 
-c6e0 30 02		        JR NC, UN1 
+c6e0 30 02		        JR NC,UN1 
 c6e2 10 f2		        DJNZ UN0 
 c6e4			 
-c6e4			UN1: 
+c6e4			UN1:     
 c6e4 cd 53 c9		        CALL NOTVAL 
 c6e7 18 c7		        JR BORM 
 c6e9			 
 c6e9			 
-c6e9			FLUSH: 
-c6e9 21 14 0e		        LD HL, $0E14 
+c6e9			FLUSH:   
+c6e9 21 14 0e		        LD HL,$0E14 
 c6ec cd 00 0e		        CALL L_0E00 
 c6ef cd 6e c4		        CALL INITB 
 c6f2 cd b8 c4		        CALL BYTE 
@@ -1325,11 +1441,11 @@ c6f9 f1			        POP AF
 c6fa 18 04		        JR PRTB1 
 c6fc			 
 c6fc			 
-c6fc			PRTABL: 
-c6fc 2a 06 0e		        LD HL, ($0E06) 
-c6ff 7e			        LD A, (HL) 
+c6fc			PRTABL:  
+c6fc 2a 06 0e		        LD HL,($0E06) 
+c6ff 7e			        LD A,(HL) 
 c700			 
-c700			PRTB1: 
+c700			PRTB1:   
 c700 fe 20		        CP $20 
 c702 d8			        RET C 
 c703 fe 2f		        CP $2F 
@@ -1340,214 +1456,214 @@ c709 3f			        CCF
 c70a c9			        RET 
 c70b			 
 c70b			 
-c70b			NOPETC: 
+c70b			NOPETC:  
 c70b f1			        POP AF 
 c70c fe 10		        CP $10 
-c70e 28 2e		        JR Z, DJNZ 
-c710 38 23		        JR C, NOP 
+c70e 28 2e		        JR Z,DJNZ 
+c710 38 23		        JR C,NOP 
 c712			 
-c712			JR: 
-c712 eb			        EX DE, HL 
-c713 36 4a		        LD (HL), $4A 
+c712			JR:      
+c712 eb			        EX DE,HL 
+c713 36 4a		        LD (HL),$4A 
 c715 23			        INC HL 
-c716 36 52		        LD (HL), $52 
-c718 11 32 0e		        LD DE, $0E32 
+c716 36 52		        LD (HL),$52 
+c718 11 32 0e		        LD DE,$0E32 
 c71b fe 18		        CP $18 
-c71d 28 08		        JR Z, UCD 
+c71d 28 08		        JR Z,UCD 
 c71f e6 18		        AND $18 
 c721 cd 7c c6		        CALL CCODES 
 c724 cd f7 c4		        CALL COMMA 
 c727			 
-c727			UCD: 
+c727			UCD:     
 c727 cd b8 c4		        CALL BYTE 
-c72a 4f			        LD C, A 
+c72a 4f			        LD C,A 
 c72b 07			        RLCA 
-c72c 9f			        SBC A, A 
-c72d 47			        LD B, A 
-c72e 2a 04 0e		        LD HL, ($0E04) 
-c731 09			        ADD HL, BC 
+c72c 9f			        SBC A,A 
+c72d 47			        LD B,A 
+c72e 2a 04 0e		        LD HL,($0E04) 
+c731 09			        ADD HL,BC 
 c732 c3 5b c5		        JP LD16B 
 c735			 
 c735			 
-c735			NOP: 
-c735 21 37 ca		        LD HL, NOPM 
+c735			NOP:     
+c735 21 37 ca		        LD HL,NOPM 
 c738			 
-c738			COPY3S: 
+c738			COPY3S:  
 c738 cd 09 c5		        CALL COPY3 
 c73b 13			        INC DE 
 c73c 13			        INC DE 
 c73d c9			        RET 
 c73e			 
 c73e			 
-c73e			DJNZ: 
-c73e 21 3a ca		        LD HL, DJNZM 
+c73e			DJNZ:    
+c73e 21 3a ca		        LD HL,DJNZM 
 c741 cd 07 c5		        CALL COPY4 
 c744 13			        INC DE 
 c745 18 e0		        JR UCD 
 c747			 
 c747			 
-c747			EXAETC: 
+c747			EXAETC:  
 c747 f1			        POP AF 
 c748 fe 08		        CP $08 
-c74a 20 c6		        JR NZ, JR 
+c74a 20 c6		        JR NZ,JR 
 c74c cd e5 c4		        CALL WREX 
-c74f 21 3e ca		        LD HL, EXAFM 
+c74f 21 3e ca		        LD HL,EXAFM 
 c752 c3 03 c5		        JP COPY6 
 c755			 
 c755			 
-c755			JPETC: 
+c755			JPETC:   
 c755 f1			        POP AF 
 c756 fe d3		        CP $D3 
-c758 da 58 c6		        JP C, L_C658 
-c75b ca ec c8		        JP Z, OUT 
+c758 da 58 c6		        JP C,L_C658 
+c75b ca ec c8		        JP Z,OUT 
 c75e fe f3		        CP $F3 
-c760 28 0e		        JR Z, DI 
+c760 28 0e		        JR Z,DI 
 c762 cd e5 c4		        CALL WREX 
-c765 21 44 ca		        LD HL, BSPBM 
+c765 21 44 ca		        LD HL,BSPBM 
 c768 cd 05 c5		        CALL COPY5 
-c76b 3e 20		        LD A, $20 
+c76b 3e 20		        LD A,$20 
 c76d c3 77 c5		        JP REGPR 
 c770			 
 c770			 
-c770			DI: 
-c770 3e 44		        LD A, $44 
+c770			DI:      
+c770 3e 44		        LD A,$44 
 c772 18 02		        JR DEI 
 c774			 
 c774			 
-c774			EI: 
-c774 3e 45		        LD A, $45 
+c774			EI:      
+c774 3e 45		        LD A,$45 
 c776			 
-c776			DEI: 
-c776 eb			        EX DE, HL 
-c777 77			        LD (HL), A 
+c776			DEI:     
+c776 eb			        EX DE,HL 
+c777 77			        LD (HL),A 
 c778 23			        INC HL 
-c779 36 49		        LD (HL), $49 
+c779 36 49		        LD (HL),$49 
 c77b c9			        RET 
 c77c			 
 c77c			 
-c77c			CBETC: 
+c77c			CBETC:   
 c77c f1			        POP AF 
 c77d fe db		        CP $DB 
-c77f ca a0 c8		        JP Z, IN 
-c782 da 0d c8		        JP C, CB 
+c77f ca a0 c8		        JP Z,IN 
+c782 da 0d c8		        JP C,CB 
 c785 fe fb		        CP $FB 
-c787 28 eb		        JR Z, EI 
+c787 28 eb		        JR Z,EI 
 c789 cd e5 c4		        CALL WREX 
-c78c 21 cc c9		        LD HL, $C9CC 
+c78c 21 cc c9		        LD HL,$C9CC 
 c78f cd 0b c5		        CALL COPY2 
 c792 cd f7 c4		        CALL COMMA 
 c795 c3 0b c5		        JP COPY2 
 c798			 
 c798			 
-c798			RETETC: 
+c798			RETETC:  
 c798 f1			        POP AF 
 c799 fe d9		        CP $D9 
-c79b da 58 c6		        JP C, L_C658 
-c79e 28 1d		        JR Z, EXX 
+c79b da 58 c6		        JP C,L_C658 
+c79e 28 1d		        JR Z,EXX 
 c7a0 fe f9		        CP $F9 
-c7a2 28 0b		        JR Z, LDSP 
-c7a4 21 fc c9		        LD HL, $C9FC 
+c7a2 28 0b		        JR Z,LDSP 
+c7a4 21 fc c9		        LD HL,$C9FC 
 c7a7 cd 0b c5		        CALL COPY2 
-c7aa 21 32 0e		        LD HL, $0E32 
+c7aa 21 32 0e		        LD HL,$0E32 
 c7ad 18 3d		        JR L_C7EC 
 c7af			 
 c7af			 
-c7af			LDSP: 
+c7af			LDSP:    
 c7af cd ed c4		        CALL WRLD 
-c7b2 21 4f ca		        LD HL, SPM 
+c7b2 21 4f ca		        LD HL,SPM 
 c7b5 cd 09 c5		        CALL COPY3 
-c7b8 3e 20		        LD A, $20 
+c7b8 3e 20		        LD A,$20 
 c7ba c3 77 c5		        JP REGPR 
 c7bd			 
 c7bd			 
-c7bd			EXX: 
+c7bd			EXX:     
 c7bd cd e5 c4		        CALL WREX 
 c7c0 23			        INC HL 
-c7c1 36 58		        LD (HL), $58 
+c7c1 36 58		        LD (HL),$58 
 c7c3 c9			        RET 
 c7c4			 
 c7c4			 
-c7c4			STIND: 
+c7c4			STIND:   
 c7c4 cd ed c4		        CALL WRLD 
 c7c7 f1			        POP AF 
 c7c8 f5			        PUSH AF 
 c7c9 fe 22		        CP $22 
-c7cb 28 2d		        JR Z, ST16I 
+c7cb 28 2d		        JR Z,ST16I 
 c7cd f1			        POP AF 
 c7ce cd e9 c7		        CALL LD1 
 c7d1 cd f7 c4		        CALL COMMA 
 c7d4			 
-c7d4			ST1: 
-c7d4 3e 41		        LD A, $41 
-c7d6 12			        LD (DE), A 
+c7d4			ST1:     
+c7d4 3e 41		        LD A,$41 
+c7d6 12			        LD (DE),A 
 c7d7 13			        INC DE 
 c7d8 c9			        RET 
 c7d9			 
 c7d9			 
-c7d9			LDIND: 
+c7d9			LDIND:   
 c7d9 cd ed c4		        CALL WRLD 
 c7dc f1			        POP AF 
 c7dd f5			        PUSH AF 
 c7de fe 2a		        CP $2A 
-c7e0 28 21		        JR Z, LD16I 
+c7e0 28 21		        JR Z,LD16I 
 c7e2 cd d4 c7		        CALL ST1 
 c7e5 cd f7 c4		        CALL COMMA 
 c7e8 f1			        POP AF 
 c7e9			 
-c7e9			LD1: 
+c7e9			LD1:     
 c7e9 fe 22		        CP $22 
 c7eb			 
-c7eb			L_C7EB: 
-c7eb eb			        EX DE, HL 
+c7eb			L_C7EB:  
+c7eb eb			        EX DE,HL 
 c7ec			 
-c7ec			L_C7EC: 
-c7ec 36 28		        LD (HL), $28 
+c7ec			L_C7EC:  
+c7ec 36 28		        LD (HL),$28 
 c7ee 23			        INC HL 
-c7ef eb			        EX DE, HL 
+c7ef eb			        EX DE,HL 
 c7f0 3f			        CCF 
-c7f1 d4 77 c5		        CALL NC, REGPR 
-c7f4 dc 52 c5		        CALL C, LD16A 
+c7f1 d4 77 c5		        CALL NC,REGPR 
+c7f4 dc 52 c5		        CALL C,LD16A 
 c7f7 c3 f0 c5		        JP NOTIXY 
 c7fa			 
 c7fa			 
-c7fa			ST16I: 
+c7fa			ST16I:   
 c7fa cd e9 c7		        CALL LD1 
 c7fd cd f7 c4		        CALL COMMA 
 c800 c3 76 c5		        JP L_C576 
 c803			 
 c803			 
-c803			LD16I: 
+c803			LD16I:   
 c803 f1			        POP AF 
 c804			 
-c804			L_C804: 
+c804			L_C804:  
 c804 cd 77 c5		        CALL REGPR 
 c807 cd f7 c4		        CALL COMMA 
 c80a a7			        AND A 
 c80b 18 de		        JR L_C7EB 
 c80d			 
 c80d			 
-c80d			CB: 
-c80d 3a 0c 0e		        LD A, ($0E0C) 
+c80d			CB:      
+c80d 3a 0c 0e		        LD A,($0E0C) 
 c810 a7			        AND A 
 c811 f5			        PUSH AF 
-c812 28 0b		        JR Z, NOTXY 
-c814 11 34 0e		        LD DE, $0E34 
-c817 3e 06		        LD A, $06 
+c812 28 0b		        JR Z,NOTXY 
+c814 11 34 0e		        LD DE,$0E34 
+c817 3e 06		        LD A,$06 
 c819 cd b4 c5		        CALL SREG 
-c81c 11 2d 0e		        LD DE, $0E2D 
+c81c 11 2d 0e		        LD DE,$0E2D 
 c81f			 
-c81f			NOTXY: 
+c81f			NOTXY:   
 c81f cd b8 c4		        CALL BYTE 
 c822 f5			        PUSH AF 
 c823 fe 40		        CP $40 
-c825 38 2c		        JR C, ROTATE 
-c827 21 4f ca		        LD HL, SPM 
+c825 38 2c		        JR C,ROTATE 
+c827 21 4f ca		        LD HL,SPM 
 c82a 07			        RLCA 
 c82b 07			        RLCA 
 c82c e6 03		        AND $03 
-c82e 47			        LD B, A 
+c82e 47			        LD B,A 
 c82f 07			        RLCA 
-c830 80			        ADD A, B 
+c830 80			        ADD A,B 
 c831 cd 10 c5		        CALL FTADR 
 c834 cd 38 c7		        CALL COPY3S 
 c837 f1			        POP AF 
@@ -1557,132 +1673,132 @@ c83a 0f			        RRCA
 c83b 0f			        RRCA 
 c83c e6 07		        AND $07 
 c83e f6 30		        OR $30 
-c840 12			        LD (DE), A 
+c840 12			        LD (DE),A 
 c841 13			        INC DE 
 c842 cd f7 c4		        CALL COMMA 
 c845			 
-c845			TESTXY: 
+c845			TESTXY:  
 c845 c1			        POP BC 
 c846 f1			        POP AF 
-c847 78			        LD A, B 
-c848 ca b4 c5		        JP Z, SREG 
+c847 78			        LD A,B 
+c848 ca b4 c5		        JP Z,SREG 
 c84b e6 07		        AND $07 
 c84d fe 06		        CP $06 
 c84f c8			        RET Z 
 c850 c3 53 c9		        JP NOTVAL 
 c853			 
 c853			 
-c853			ROTATE: 
+c853			ROTATE:  
 c853 0f			        RRCA 
 c854 0f			        RRCA 
-c855 c6 02		        ADD A, $02 
+c855 c6 02		        ADD A,$02 
 c857 e6 0e		        AND $0E 
 c859 fe 0e		        CP $0E 
-c85b ca 51 c9		        JP Z, NTVL 
-c85e 47			        LD B, A 
+c85b ca 51 c9		        JP Z,NTVL 
+c85e 47			        LD B,A 
 c85f 0f			        RRCA 
-c860 80			        ADD A, B 
-c861 21 5b ca		        LD HL, ROTTAB 
+c860 80			        ADD A,B 
+c861 21 5b ca		        LD HL,ROTTAB 
 c864 cd 10 c5		        CALL FTADR 
 c867 cd 38 c7		        CALL COPY3S 
 c86a 18 d9		        JR TESTXY 
 c86c			 
 c86c			 
-c86c			AUTO: 
-c86c cb 57		        BIT 2, A 
-c86e c2 53 c9		        JP NZ, NOTVAL 
+c86c			AUTO:    
+c86c cb 57		        BIT 2,A 
+c86e c2 53 c9		        JP NZ,NOTVAL 
 c871 f5			        PUSH AF 
 c872 e6 03		        AND $03 
 c874 07			        RLCA 
-c875 21 70 ca		        LD HL, OPTAB 
+c875 21 70 ca		        LD HL,OPTAB 
 c878 cd 97 c5		        CALL L_C597 
 c87b f1			        POP AF 
 c87c f5			        PUSH AF 
 c87d 3c			        INC A 
 c87e e6 13		        AND $13 
-c880 20 04		        JR NZ, AUTO0 
+c880 20 04		        JR NZ,AUTO0 
 c882 1b			        DEC DE 
 c883 cd 0b c5		        CALL COPY2 
 c886			 
-c886			AUTO0: 
+c886			AUTO0:   
 c886 f1			        POP AF 
-c887 21 7a ca		        LD HL, $CA7A 
+c887 21 7a ca		        LD HL,$CA7A 
 c88a 0f			        RRCA 
 c88b 0f			        RRCA 
 c88c e6 06		        AND $06 
 c88e c3 97 c5		        JP L_C597 
 c891			 
 c891			 
-c891			ADCSBC: 
-c891 21 e1 c9		        LD HL, $C9E1 
-c894 79			        LD A, C 
+c891			ADCSBC:  
+c891 21 e1 c9		        LD HL,$C9E1 
+c894 79			        LD A,C 
 c895 f5			        PUSH AF 
-c896 cb 5f		        BIT 3, A 
-c898 28 03		        JR Z, AS0 
-c89a 21 db c9		        LD HL, $C9DB 
+c896 cb 5f		        BIT 3,A 
+c898 28 03		        JR Z,AS0 
+c89a 21 db c9		        LD HL,$C9DB 
 c89d			 
-c89d			AS0: 
+c89d			AS0:     
 c89d c3 6b c5		        JP L_C56B 
 c8a0			 
 c8a0			 
-c8a0			IN: 
-c8a0 3e ff		        LD A, $FF 
+c8a0			IN:      
+c8a0 3e ff		        LD A,$FF 
 c8a2			 
-c8a2			INRC: 
+c8a2			INRC:    
 c8a2 fe 0e		        CP $0E 
-c8a4 ca 53 c9		        JP Z, NOTVAL 
-c8a7 21 49 ca		        LD HL, INM 
+c8a4 ca 53 c9		        JP Z,NOTVAL 
+c8a7 21 49 ca		        LD HL,INM 
 c8aa cd 38 c7		        CALL COPY3S 
 c8ad f5			        PUSH AF 
 c8ae cd b4 c5		        CALL SREG 
 c8b1 cd f7 c4		        CALL COMMA 
 c8b4 f1			        POP AF 
 c8b5			 
-c8b5			PORT: 
-c8b5 eb			        EX DE, HL 
-c8b6 36 28		        LD (HL), $28 
+c8b5			PORT:    
+c8b5 eb			        EX DE,HL 
+c8b6 36 28		        LD (HL),$28 
 c8b8 23			        INC HL 
 c8b9 3c			        INC A 
-c8ba 28 07		        JR Z, INA 
-c8bc 36 43		        LD (HL), $43 
+c8ba 28 07		        JR Z,INA 
+c8bc 36 43		        LD (HL),$43 
 c8be 23			        INC HL 
-c8bf eb			        EX DE, HL 
+c8bf eb			        EX DE,HL 
 c8c0			 
-c8c0			L_C8C0: 
+c8c0			L_C8C0:  
 c8c0 c3 f0 c5		        JP NOTIXY 
 c8c3			 
 c8c3			 
-c8c3			INA: 
-c8c3 eb			        EX DE, HL 
+c8c3			INA:     
+c8c3 eb			        EX DE,HL 
 c8c4 cd f5 c5		        CALL IMM 
 c8c7 18 f7		        JR L_C8C0 
 c8c9			 
 c8c9			 
-c8c9			EXTND: 
+c8c9			EXTND:   
 c8c9 cd b8 c4		        CALL BYTE 
 c8cc fe c0		        CP $C0 
-c8ce d2 53 c9		        JP NC, NOTVAL 
+c8ce d2 53 c9		        JP NC,NOTVAL 
 c8d1 fe 40		        CP $40 
-c8d3 da 53 c9		        JP C, NOTVAL 
+c8d3 da 53 c9		        JP C,NOTVAL 
 c8d6 fe a0		        CP $A0 
-c8d8 30 92		        JR NC, AUTO 
+c8d8 30 92		        JR NC,AUTO 
 c8da fe 80		        CP $80 
-c8dc d2 53 c9		        JP NC, NOTVAL 
-c8df 4f			        LD C, A 
+c8dc d2 53 c9		        JP NC,NOTVAL 
+c8df 4f			        LD C,A 
 c8e0 e6 07		        AND $07 
-c8e2 47			        LD B, A 
-c8e3 79			        LD A, C 
+c8e2 47			        LD B,A 
+c8e3 79			        LD A,C 
 c8e4 0f			        RRCA 
 c8e5 0f			        RRCA 
 c8e6 0f			        RRCA 
-c8e7 28 b9		        JR Z, INRC 
+c8e7 28 b9		        JR Z,INRC 
 c8e9			 
 c8e9 10 19		NOTIN:  DJNZ NOTOUT 
 c8eb 21			        DEFB 021H 
-c8ec 3e ff		OUT:    LD A, 0FFH 
+c8ec 3e ff		OUT:    LD A,0FFH 
 c8ee fe 2e		        CP $2E 
-c8f0 ca 53 c9		        JP Z, NOTVAL 
-c8f3 21 4c ca		        LD HL, OUTM 
+c8f0 ca 53 c9		        JP Z,NOTVAL 
+c8f3 21 4c ca		        LD HL,OUTM 
 c8f6 cd 38 c7		        CALL COPY3S 
 c8f9 f5			        PUSH AF 
 c8fa cd b5 c8		        CALL PORT 
@@ -1691,91 +1807,91 @@ c900 f1			        POP AF
 c901 c3 b4 c5		        JP SREG 
 c904			 
 c904			 
-c904			NOTOUT: 
+c904			NOTOUT:  
 c904 05			        DEC B 
-c905 28 8a		        JR Z, ADCSBC 
+c905 28 8a		        JR Z,ADCSBC 
 c907 10 14		        DJNZ NOTLD 
 c909 e6 0e		        AND $0E 
 c90b fe 0c		        CP $0C 
-c90d ca 53 c9		        JP Z, NOTVAL 
+c90d ca 53 c9		        JP Z,NOTVAL 
 c910 cd ed c4		        CALL WRLD 
-c913 cb 59		        BIT 3, C 
-c915 79			        LD A, C 
-c916 c2 04 c8		        JP NZ, L_C804 
+c913 cb 59		        BIT 3,C 
+c915 79			        LD A,C 
+c916 c2 04 c8		        JP NZ,L_C804 
 c919 f5			        PUSH AF 
 c91a c3 fa c7		        JP ST16I 
 c91d			 
 c91d			 
-c91d			NOTLD: 
-c91d 79			        LD A, C 
-c91e 01 0c 00		        LD BC, $000C 
-c921 21 82 ca		        LD HL, REMEXT 
+c91d			NOTLD:   
+c91d 79			        LD A,C 
+c91e 01 0c 00		        LD BC,$000C 
+c921 21 82 ca		        LD HL,REMEXT 
 c924 ed b1		        CPIR 
-c926 20 2b		        JR NZ, NOTVAL 
-c928 79			        LD A, C 
+c926 20 2b		        JR NZ,NOTVAL 
+c928 79			        LD A,C 
 c929 07			        RLCA 
 c92a fe 08		        CP $08 
-c92c 38 0e		        JR C, LDRI 
+c92c 38 0e		        JR C,LDRI 
 c92e 07			        RLCA 
-c92f 21 7e ca		        LD HL, $CA7E 
+c92f 21 7e ca		        LD HL,$CA7E 
 c932 fe 1c		        CP $1C 
-c934 38 12		        JR C, INTMOD 
+c934 38 12		        JR C,INTMOD 
 c936 cd 10 c5		        CALL FTADR 
 c939 c3 07 c5		        JP COPY4 
 c93c			 
 c93c			 
-c93c			LDRI: 
+c93c			LDRI:    
 c93c cd ed c4		        CALL WRLD 
-c93f 21 ae ca		        LD HL, IRTAB 
+c93f 21 ae ca		        LD HL,IRTAB 
 c942 cd 10 c5		        CALL FTADR 
 c945 c3 09 c5		        JP COPY3 
 c948			 
 c948			 
-c948			INTMOD: 
+c948			INTMOD:  
 c948 cd 97 c5		        CALL L_C597 
-c94b 11 32 0e		        LD DE, $0E32 
+c94b 11 32 0e		        LD DE,$0E32 
 c94e ed a0		        LDI 
 c950 c9			        RET 
 c951			 
 c951			 
-c951			NTVL: 
+c951			NTVL:    
 c951 e1			        POP HL 
 c952 e1			        POP HL 
 c953			 
-c953			NOTVAL: 
-c953 21 b7 ca		        LD HL, DEFB 
-c956 11 2d 0e		        LD DE, $0E2D 
+c953			NOTVAL:  
+c953 21 b7 ca		        LD HL,DEFB 
+c956 11 2d 0e		        LD DE,$0E2D 
 c959 cd 07 c5		        CALL COPY4 
 c95c 13			        INC DE 
-c95d 21 1a 0e		        LD HL, $0E1A 
-c960 0e 15		        LD C, $15 
-c962 3e 20		        LD A, $20 
+c95d 21 1a 0e		        LD HL,$0E1A 
+c960 0e 15		        LD C,$15 
+c962 3e 20		        LD A,$20 
 c964			 
-c964			NVLP: 
+c964			NVLP:    
 c964 cd fd c4		        CALL POUND 
 c967 cd 0b c5		        CALL COPY2 
 c96a 23			        INC HL 
 c96b be			        CP (HL) 
-c96c 28 05		        JR Z, DNV 
+c96c 28 05		        JR Z,DNV 
 c96e cd f7 c4		        CALL COMMA 
 c971 18 f1		        JR NVLP 
 c973			 
 c973			 
-c973			DNV: 
-c973 21 00 00		        LD HL, $0000 
-c976 22 12 0e		        LD ($0E12), HL 
-c979 79			        LD A, C 
-c97a fe 0d		        CP $0D 
+c973			DNV:     
+c973 21 00 00		        LD HL,$0000 
+c976 22 12 0e		        LD ($0E12),HL 
+c979 79			        LD A,C 
+c97a fe 0d		        CP CR 
 c97c c0			        RET NZ 
-c97d 12			        LD (DE), A 
+c97d 12			        LD (DE),A 
 c97e c9			        RET 
 c97f			 
 c97f			 
-c97f			TABLE: 
-c97f 0b c7 57 c6 48 c5 28 c6 c4 c7 57 c6 33 c5 55 c7	        DEFW NOPETC, CJR, LD16, POP, STIND, CJR, INC, JPETC 
-c98f 33 c5 57 c6 38 c5 2d c6 9d c5 04 c6 86 c6 93 c6	        DEFW INC, CJR, DEC, PUSH, LOAD8, ARITH8, ROTMIS, RST 
-c99f 47 c7 57 c6 68 c5 98 c7 d9 c7 57 c6 38 c5 7c c7	        DEFW EXAETC, CJR, ADDHL, RETETC, LDIND, CJR, DEC, CBETC 
-c9af 33 c5 57 c6 38 c5 37 c6 9d c5 04 c6 86 c6 93 c6	        DEFW INC, CJR, DEC, CALETC, LOAD8, ARITH8, ROTMIS, RST 
+c97f			TABLE:   
+c97f 0b c7 57 c6 48 c5 28 c6 c4 c7 57 c6 33 c5 55 c7	        DEFW NOPETC,CJR,LD16,POP,STIND,CJR,INC,JPETC 
+c98f 33 c5 57 c6 38 c5 2d c6 9d c5 04 c6 86 c6 93 c6	        DEFW INC,CJR,DEC,PUSH,LOAD8,ARITH8,ROTMIS,RST 
+c99f 47 c7 57 c6 68 c5 98 c7 d9 c7 57 c6 38 c5 7c c7	        DEFW EXAETC,CJR,ADDHL,RETETC,LDIND,CJR,DEC,CBETC 
+c9af 33 c5 57 c6 38 c5 37 c6 9d c5 04 c6 86 c6 93 c6	        DEFW INC,CJR,DEC,CALETC,LOAD8,ARITH8,ROTMIS,RST 
 c9bf			 
 c9bf ..			INCM:   DEFM "INC" 
 c9c2			 
@@ -1824,8 +1940,8 @@ ca5b ..			ROTTAB: DEFM "SRLRLCRRCRL RR SLASRA"
 ca70			 
 ca70 ..			OPTAB:  DEFM "LDCPINOTUTI D IRDR" 
 ca82			 
-ca82 44 45 4d 67 6f 46	REMEXT: DEFB $44, $45, $4D, $67, $6F, $46 
-ca88 56 5e 57 4f 5f 47	        DEFB $56, $5E, $57, $4F, $5F, $47 
+ca82 44 45 4d 67 6f 46	REMEXT: DEFB $44,$45,$4D,$67,$6F,$46 
+ca88 56 5e 57 4f 5f 47	        DEFB $56,$5E,$57,$4F,$5F,$47 
 ca8e			 
 ca8e ..			EXTMNE: DEFM "IM2 IM1 IM0 RLD " 
 ca9e ..			        DEFM "RRD RETIRETNNEG " 
@@ -1834,55 +1950,55 @@ caae ..			IRTAB:  DEFM "I,A,R,A,I"
 cab7			 
 cab7 ..			DEFB:   DEFM "DEFB" 
 cabb			 
-cabb 11 80 0e		REVASC: LD DE, $0E80 
-cabe 21 e5 cf		        LD HL, RAMLD 
-cac1 01 12 00		        LD BC, $0012 
+cabb 11 80 0e		REVASC: LD DE,$0E80 
+cabe 21 e5 cf		        LD HL,RAMLD 
+cac1 01 12 00		        LD BC,$0012 
 cac4 ed b0		        LDIR 
 cac6			 
-cac6 ef			L_CAC6: RST $28 
-cac7 0d			        DEFB $0D 
+cac6 ef			L_CAC6: RST PRS 
+cac7 0d			        DEFB CR 
 cac8 ..			        DEFM "Options? (" 
 cad2			 
 cad2 ..			OTAB:   DEFM "STZXLPDR" 
 cada ..			        DEFM "U)-" 
 cadd 00			        DEFB 0 
-cade 11 00 00		        LD DE, $0000 
-cae1 3e 01		        LD A, $01 
+cade 11 00 00		        LD DE,$0000 
+cae1 3e 01		        LD A,$01 
 cae3 01			        DEFB 1 
 cae4 d6 55		XFOUND: SUB 'U' 
-cae6 20 03		        JR NZ, OPT0 
-cae8 32 03 0e		        LD ($0E03), A 
+cae6 20 03		        JR NZ,OPT0 
+cae8 32 03 0e		        LD ($0E03),A 
 caeb			 
-caeb 7b			OPT0:   LD A, E 
+caeb 7b			OPT0:   LD A,E 
 caec b2			        OR D 
-caed 57			        LD D, A 
-caee cf			        RST $08 
-caef f7			        RST $30 
+caed 57			        LD D,A 
+caee cf			        RST RIN 
+caef f7			        RST ROUT 
 caf0 37			        SCF 
-caf1 1e 00		        LD E, $00 
-caf3 21 d2 ca		        LD HL, OTAB 
+caf1 1e 00		        LD E,$00 
+caf3 21 d2 ca		        LD HL,OTAB 
 caf6			 
 caf6 cb 13		LUOP:   RL E 
 caf8 ed a1		        CPI 
-cafa 28 e8		        JR Z, XFOUND 
-cafc 30 f8		        JR NC, LUOP 
-cafe fe 0d		        CP $0D 
-cb00 20 c4		        JR NZ, L_CAC6 
-cb02 7a			        LD A, D 
-cb03 cb 57		        BIT 2, A 
-cb05 28 02		        JR Z, OPT1 
+cafa 28 e8		        JR Z,XFOUND 
+cafc 30 f8		        JR NC,LUOP 
+cafe fe 0d		        CP CR 
+cb00 20 c4		        JR NZ,L_CAC6 
+cb02 7a			        LD A,D 
+cb03 cb 57		        BIT 2,A 
+cb05 28 02		        JR Z,OPT1 
 cb07 f6 11		        OR $11 
 cb09			 
-cb09 32 44 0e		OPT1:   LD ($0E44), A 
+cb09 32 44 0e		OPT1:   LD ($0E44),A 
 cb0c f5			        PUSH AF 
 cb0d e6 1c		        AND $1C 
-cb0f 28 38		        JR Z, NLABS 
+cb0f 28 38		        JR Z,NLABS 
 cb11			 
 cb11 f1			GETSTA: POP AF 
 cb12 f5			        PUSH AF 
-cb13 cb 57		        BIT 2, A 
-cb15 28 0b		        JR Z, ST 
-cb17 ef			        RST $28 
+cb13 cb 57		        BIT 2,A 
+cb15 28 0b		        JR Z,ST 
+cb17 ef			        RST PRS 
 cb18 5a			        DEFB $5A 
 cb19 45			        DEFB $45 
 cb1a 41			        DEFB $41 
@@ -1893,7 +2009,7 @@ cb1e 69			        DEFB $69
 cb1f 00			        DEFB $00 
 cb20 18 0c		        JR ST0 
 cb22			 
-cb22 ef			ST:     RST $28 
+cb22 ef			ST:     RST PRS 
 cb23 53			        DEFB $53 
 cb24 79			        DEFB $79 
 cb25 6d			        DEFB $6D 
@@ -1906,7 +2022,7 @@ cb2b 61			        DEFB $61
 cb2c 62			        DEFB $62 
 cb2d 00			        DEFB $00 
 cb2e			 
-cb2e ef			ST0:    RST $28 
+cb2e ef			ST0:    RST PRS 
 cb2f 6c			        DEFB $6C 
 cb30 65			        DEFB $65 
 cb31 20			        DEFB $20 
@@ -1915,60 +2031,58 @@ cb33 72			        DEFB $72
 cb34 65			        DEFB $65 
 cb35 61			        DEFB $61 
 cb36 3f			        DEFB $3F 
-cb37 0d			        DEFB $0D 
-cb38 00			        DEFB $00 
+cb37 0d 00		        DEFB CR,0 
 cb39 cd fe cc		        CALL GETTWO 
-cb3c 38 d3		        JR C, GETSTA 
-cb3e ed 43 4e 0e	        LD ($0E4E), BC 
-cb42 ed 53 50 0e	        LD ($0E50), DE 
-cb46 3e ff		        LD A, $FF 
-cb48 12			        LD (DE), A 
+cb3c 38 d3		        JR C,GETSTA 
+cb3e ed 43 4e 0e	        LD ($0E4E),BC 
+cb42 ed 53 50 0e	        LD ($0E50),DE 
+cb46 3e ff		        LD A,$FF 
+cb48 12			        LD (DE),A 
 cb49			 
 cb49 f1			NLABS:  POP AF 
-cb4a cb 6f		        BIT 5, A 
-cb4c 28 38		        JR Z, NOTITL 
+cb4a cb 6f		        BIT 5,A 
+cb4c 28 38		        JR Z,NOTITL 
 cb4e			 
-cb4e ef			ASKT:   RST $28 
+cb4e ef			ASKT:   RST PRS 
 cb4f 54			        DEFB $54 
 cb50 69			        DEFB $69 
 cb51 74			        DEFB $74 
 cb52 6c			        DEFB $6C 
 cb53 65			        DEFB $65 
 cb54 3f			        DEFB $3F 
-cb55 0d			        DEFB $0D 
-cb56 00			        DEFB $00 
+cb55 0d 00		        DEFB CR,0 
 cb57 df			        RST $18 
-cb58 63			        DEFB $63 
-cb59 21 3c 05		        LD HL, $053C 
-cb5c 1a			        LD A, (DE) 
+cb58 63			        DEFB ZINLIN 
+cb59 21 3c 05		        LD HL,$053C 
+cb5c 1a			        LD A,(DE) 
 cb5d fe 3d		        CP $3D 
-cb5f 20 08		        JR NZ, SETLPP 
+cb5f 20 08		        JR NZ,SETLPP 
 cb61 13			        INC DE 
 cb62 df			        RST $18 
-cb63 64			        DEFB $64 
-cb64 38 e8		        JR C, ASKT 
-cb66 2a 21 0c		        LD HL, ($0C21) 
+cb63 64			        DEFB ZNUM 
+cb64 38 e8		        JR C,ASKT 
+cb66 2a 21 0c		        LD HL,($0C21) 
 cb69			 
-cb69 22 7e 0e		SETLPP: LD ($0E7E), HL 
-cb6c 21 01 01		        LD HL, $0101 
-cb6f 22 7c 0e		        LD ($0E7C), HL 
-cb72 eb			        EX DE, HL 
-cb73 11 92 0e		        LD DE, $0E92 
+cb69 22 7e 0e		SETLPP: LD ($0E7E),HL 
+cb6c 21 01 01		        LD HL,$0101 
+cb6f 22 7c 0e		        LD ($0E7C),HL 
+cb72 eb			        EX DE,HL 
+cb73 11 92 0e		        LD DE,$0E92 
 cb76 af			        XOR A 
 cb77			 
 cb77 ed a0		COPYT:  LDI 
 cb79 be			        CP (HL) 
-cb7a 20 fb		        JR NZ, COPYT 
-cb7c eb			        EX DE, HL 
-cb7d 3e 20		        LD A, $20 
+cb7a 20 fb		        JR NZ,COPYT 
+cb7c eb			        EX DE,HL 
+cb7d 3e 20		        LD A,$20 
 cb7f			 
 cb7f 2b			BACK:   DEC HL 
 cb80 be			        CP (HL) 
-cb81 28 fc		        JR Z, BACK 
+cb81 28 fc		        JR Z,BACK 
 cb83 23			        INC HL 
-cb84 36 0d		        LD (HL), $0D 
+cb84 36 0d		        LD (HL),CR 
 cb86			 
-cb86 ef			NOTITL: RST $28 
+cb86 ef			NOTITL: RST PRS 
 cb87 57			        DEFB $57 
 cb88 68			        DEFB $68 
 cb89 61			        DEFB $61 
@@ -1977,95 +2091,94 @@ cb8b 20			        DEFB $20
 cb8c 6f			        DEFB $6F 
 cb8d 6e			        DEFB $6E 
 cb8e 3f			        DEFB $3F 
-cb8f 0d			        DEFB $0D 
-cb90 00			        DEFB $00 
+cb8f 0d 00		        DEFB CR,0 
 cb91 df			        RST $18 
-cb92 63			        DEFB $63 
+cb92 63			        DEFB ZINLIN 
 cb93 df			        RST $18 
-cb94 79			        DEFB $79 
-cb95 38 ef		        JR C, NOTITL 
-cb97 3a 0b 0c		        LD A, ($0C0B) 
+cb94 79			        DEFB ZRLIN 
+cb95 38 ef		        JR C,NOTITL 
+cb97 3a 0b 0c		        LD A,($0C0B) 
 cb9a fe 02		        CP $02 
-cb9c 38 e8		        JR C, NOTITL 
+cb9c 38 e8		        JR C,NOTITL 
 cb9e df			        RST $18 
-cb9f 60			        DEFB $60 
+cb9f 60			        DEFB ZARGS 
 cba0 13			        INC DE 
-cba1 ed 53 14 0e	        LD ($0E14), DE 
-cba5 54			        LD D, H 
-cba6 5d			        LD E, L 
+cba1 ed 53 14 0e	        LD ($0E14),DE 
+cba5 54			        LD D,H 
+cba6 5d			        LD E,L 
 cba7 2b			        DEC HL 
-cba8 ed 73 46 0e	        LD ($0E46), SP 
+cba8 ed 73 46 0e	        LD ($0E46),SP 
 cbac e5			        PUSH HL 
 cbad 23			        INC HL 
-cbae 28 02		        JR Z, ONLY2 
-cbb0 60			        LD H, B 
-cbb1 69			        LD L, C 
+cbae 28 02		        JR Z,ONLY2 
+cbb0 60			        LD H,B 
+cbb1 69			        LD L,C 
 cbb2			 
-cbb2 ed 52		ONLY2:  SBC HL, DE 
-cbb4 22 54 0e		        LD ($0E54), HL 
-cbb7 01 00 00		        LD BC, $0000 
-cbba 11 ff ff		        LD DE, $FFFF 
-cbbd 21 44 0e		        LD HL, $0E44 
-cbc0 cb 7e		        BIT 7, (HL) 
-cbc2 28 18		        JR Z, DA 
-cbc4 cb be		        RES 7, (HL) 
-cbc6 ef			RNGRQ:  RST $28 
+cbb2 ed 52		ONLY2:  SBC HL,DE 
+cbb4 22 54 0e		        LD ($0E54),HL 
+cbb7 01 00 00		        LD BC,$0000 
+cbba 11 ff ff		        LD DE,$FFFF 
+cbbd 21 44 0e		        LD HL,$0E44 
+cbc0 cb 7e		        BIT 7,(HL) 
+cbc2 28 18		        JR Z,DA 
+cbc4 cb be		        RES 7,(HL) 
+cbc6 ef			RNGRQ:  RST PRS 
 cbc7 ..			        DEFM "Listing range?" 
-cbd5 0d 00		        DEFB 0DH, 00 
+cbd5 0d 00		        DEFB CR,0 
 cbd7 cd fe cc		        CALL GETTWO 
-cbda 38 ea		        JR C, RNGRQ 
+cbda 38 ea		        JR C,RNGRQ 
 cbdc			 
-cbdc ed 43 48 0e	DA:     LD ($0E48), BC 
-cbe0 ed 53 4a 0e	        LD ($0E4A), DE 
+cbdc ed 43 48 0e	DA:     LD ($0E48),BC 
+cbe0 ed 53 4a 0e	        LD ($0E4A),DE 
 cbe4			 
-cbe4 ef			DAREA:  RST $28 
+cbe4 ef			DAREA:  RST PRS 
 cbe5 ..			        DEFM "DATA areas?" 
-cbf0 0d 00		        DEFB 0DH, 00H 
+cbf0 0d 00		        DEFB CR,0 
 cbf2 af			        XOR A 
 cbf3			 
 cbf3 f5			L_CBF3: PUSH AF 
 cbf4			 
 cbf4 cd fe cc		DAREA0: CALL GETTWO 
-cbf7 38 27		        JR C, DAREA1 
-cbf9 60			        LD H, B 
-cbfa 69			        LD L, C 
-cbfb ed 4b 54 0e	        LD BC, ($0E54) 
+cbf7 38 27		        JR C,DAREA1 
+cbf9 60			        LD H,B 
+cbfa 69			        LD L,C 
+cbfb ed 4b 54 0e	        LD BC,($0E54) 
 cbff c5			        PUSH BC 
-cc00 ed 42		        SBC HL, BC 
-cc02 e3			        EX (SP), HL 
+cc00 ed 42		        SBC HL,BC 
+cc02 e3			        EX (SP),HL 
 cc03 c1			        POP BC 
-cc04 eb			        EX DE, HL 
+cc04 eb			        EX DE,HL 
 cc05 b7			        OR A 
-cc06 ed 52		        SBC HL, DE 
-cc08 eb			        EX DE, HL 
+cc06 ed 52		        SBC HL,DE 
+cc08 eb			        EX DE,HL 
 cc09 f1			        POP AF 
 cc0a e1			        POP HL 
 cc0b e5			        PUSH HL 
 cc0c f5			        PUSH AF 
 cc0d 37			        SCF 
 cc0e 23			        INC HL 
-cc0f ed 42		        SBC HL, BC 
-cc11 30 24		        JR NC, DAREA2 
-cc13 2a 14 0e		        LD HL, ($0E14) 
-cc16 ed 52		        SBC HL, DE 
-cc18 38 1d		        JR C, DAREA2 
+cc0f ed 42		        SBC HL,BC 
+cc11 30 24		        JR NC,DAREA2 
+cc13 2a 14 0e		        LD HL,($0E14) 
+cc16 ed 52		        SBC HL,DE 
+cc18 38 1d		        JR C,DAREA2 
 cc1a f1			        POP AF 
 cc1b c5			        PUSH BC 
 cc1c d5			        PUSH DE 
 cc1d 3c			        INC A 
 cc1e 18 d3		        JR L_CBF3 
 cc20 a7			DAREA1: AND A 
-cc21 28 1d		        JR Z, DAREA3 
+cc21 28 1d		        JR Z,DAREA3 
 cc23 fe 2d		        CP $2D 
-cc25 20 10		        JR NZ, DAREA2 
+cc25 20 10		        JR NZ,DAREA2 
 cc27 f1			        POP AF 
 cc28 a7			        AND A 
-cc29 28 b9		        JR Z, DAREA 
+cc29 28 b9		        JR Z,DAREA 
 cc2b e1			        POP HL 
 cc2c e1			        POP HL 
 cc2d 3d			        DEC A 
 cc2e f5			        PUSH AF 
-cc2f ef			        RST $28 
+cc2f ef			        RST PRS 
 cc30 13			        DEFB $13 
 cc31 1b			        DEFB $1B 
 cc32 13			        DEFB $13 
@@ -2074,8 +2187,8 @@ cc34 00			        DEFB $00
 cc35 18 bd		        JR DAREA0 
 cc37			 
 cc37 df			DAREA2: RST $18 
-cc38 6b			        DEFB $6B 
-cc39 ef			        RST $28 
+cc38 6b			        DEFB ZERRM 
+cc39 ef			        RST PRS 
 cc3a 13			        DEFB $13 
 cc3b 13			        DEFB $13 
 cc3c 17			        DEFB $17 
@@ -2084,159 +2197,159 @@ cc3e 18 b4		        JR DAREA0
 cc40			 
 cc40			 
 cc40 f1			DAREA3: POP AF 
-cc41 2a 14 0e		        LD HL, ($0E14) 
+cc41 2a 14 0e		        LD HL,($0E14) 
 cc44 e5			        PUSH HL 
-cc45 21 ff ff		        LD HL, $FFFF 
+cc45 21 ff ff		        LD HL,$FFFF 
 cc48 e5			        PUSH HL 
-cc49 ef			        RST $28 
+cc49 ef			        RST PRS 
 cc4a 47			        DEFB $47 
 cc4b 6f			        DEFB $6F 
 cc4c 3f			        DEFB $3F 
 cc4d 00			        DEFB $00 
 cc4e df			        RST $18 
-cc4f 7b			        DEFB $7B 
-cc50 32 45 0e		        LD ($0E45), A 
+cc4f 7b			        DEFB ZBLINK 
+cc50 32 45 0e		        LD ($0E45),A 
 cc53 df			        RST $18 
-cc54 6a			        DEFB $6A 
-cc55 3a 44 0e		        LD A, ($0E44) 
+cc54 6a			        DEFB ZCRLF 
+cc55 3a 44 0e		        LD A,($0E44) 
 cc58 e6 18		        AND $18 
-cc5a 21 88 cd		        LD HL, PASS1 
-cc5d c4 37 cd		        CALL NZ, PASS 
-cc60 21 44 0e		        LD HL, $0E44 
-cc63 cb fe		        SET 7, (HL) 
-cc65 cb 56		        BIT 2, (HL) 
-cc67 28 23		        JR Z, ALLIN0 
-cc69 2a 50 0e		        LD HL, ($0E50) 
-cc6c 22 02 0f		        LD ($0F02), HL 
-cc6f 2a 4e 0e		        LD HL, ($0E4E) 
-cc72 22 00 0f		        LD ($0F00), HL 
-cc75 ed 5b 52 0e	        LD DE, ($0E52) 
-cc79 ed 53 4e 0e	        LD ($0E4E), DE 
-cc7d ed 5b 82 0e	        LD DE, ($0E82) 
+cc5a 21 88 cd		        LD HL,PASS1 
+cc5d c4 37 cd		        CALL NZ,PASS 
+cc60 21 44 0e		        LD HL,$0E44 
+cc63 cb fe		        SET 7,(HL) 
+cc65 cb 56		        BIT 2,(HL) 
+cc67 28 23		        JR Z,ALLIN0 
+cc69 2a 50 0e		        LD HL,($0E50) 
+cc6c 22 02 0f		        LD ($0F02),HL 
+cc6f 2a 4e 0e		        LD HL,($0E4E) 
+cc72 22 00 0f		        LD ($0F00),HL 
+cc75 ed 5b 52 0e	        LD DE,($0E52) 
+cc79 ed 53 4e 0e	        LD ($0E4E),DE 
+cc7d ed 5b 82 0e	        LD DE,($0E82) 
 cc81 23			        INC HL 
 cc82 23			        INC HL 
-cc83 73			        LD (HL), E 
+cc83 73			        LD (HL),E 
 cc84 23			        INC HL 
-cc85 72			        LD (HL), D 
+cc85 72			        LD (HL),D 
 cc86 23			        INC HL 
-cc87 36 00		        LD (HL), $00 
-cc89 22 56 0e		        LD ($0E56), HL 
+cc87 36 00		        LD (HL),$00 
+cc89 22 56 0e		        LD ($0E56),HL 
 cc8c			 
-cc8c 21 25 ce		ALLIN0: LD HL, PASS2 
+cc8c 21 25 ce		ALLIN0: LD HL,PASS2 
 cc8f cd 37 cd		        CALL PASS 
-cc92 21 44 0e		        LD HL, $0E44 
-cc95 cb be		        RES 7, (HL) 
-cc97 cb 66		        BIT 4, (HL) 
+cc92 21 44 0e		        LD HL,$0E44 
+cc95 cb be		        RES 7,(HL) 
+cc97 cb 66		        BIT 4,(HL) 
 cc99 e5			        PUSH HL 
-cc9a c4 02 cf		        CALL NZ, LABEL 
+cc9a c4 02 cf		        CALL NZ,LABEL 
 cc9d e1			        POP HL 
-cc9e cb 5e		        BIT 3, (HL) 
-cca0 20 02		        JR NZ, PCRT 
+cc9e cb 5e		        BIT 3,(HL) 
+cca0 20 02		        JR NZ,PCRT 
 cca2			 
 cca2 df			EXIT:   RST $18 
 cca3 5b			        DEFB $5B 
 cca4			 
-cca4 7e			PCRT:   LD A, (HL) 
-cca5 21 7d 0e		        LD HL, $0E7D 
+cca4 7e			PCRT:   LD A,(HL) 
+cca5 21 7d 0e		        LD HL,$0E7D 
 cca8 35			        DEC (HL) 
 cca9 2b			        DEC HL 
 ccaa e5			        PUSH HL 
-ccab cb 6f		        BIT 5, A 
-ccad c4 80 cf		        CALL NZ, EJECT 
+ccab cb 6f		        BIT 5,A 
+ccad c4 80 cf		        CALL NZ,EJECT 
 ccb0 e1			        POP HL 
 ccb1 34			        INC (HL) 
-ccb2 21 ff ff		        LD HL, $FFFF 
-ccb5 22 4a 0e		        LD ($0E4A), HL 
-ccb8 fd 2a 50 0e	        LD IY, ($0E50) 
+ccb2 21 ff ff		        LD HL,$FFFF 
+ccb5 22 4a 0e		        LD ($0E4A),HL 
+ccb8 fd 2a 50 0e	        LD IY,($0E50) 
 ccbc			 
-ccbc fd 7e 00		XREF1:  LD A, (IY+0) 
+ccbc fd 7e 00		XREF1:  LD A,(IY+0) 
 ccbf 3c			        INC A 
-ccc0 28 e0		        JR Z, EXIT 
+ccc0 28 e0		        JR Z,EXIT 
 ccc2 fd 2b		        DEC IY 
-ccc4 4f			        LD C, A 
-ccc5 06 09		        LD B, $09 
-ccc7 11 14 0e		        LD DE, $0E14 
+ccc4 4f			        LD C,A 
+ccc5 06 09		        LD B,$09 
+ccc7 11 14 0e		        LD DE,$0E14 
 ccca			 
-ccca fd 6e 00		XREF2:  LD L, (IY+0) 
+ccca fd 6e 00		XREF2:  LD L,(IY+0) 
 cccd fd 2b		        DEC IY 
-cccf fd 66 00		        LD H, (IY+0) 
+cccf fd 66 00		        LD H,(IY+0) 
 ccd2 fd 2b		        DEC IY 
 ccd4 cd 9d c4		        CALL HEX4 
-ccd7 3e 20		        LD A, $20 
-ccd9 12			        LD (DE), A 
+ccd7 3e 20		        LD A,$20 
+ccd9 12			        LD (DE),A 
 ccda 13			        INC DE 
 ccdb 0d			        DEC C 
-ccdc 28 02		        JR Z, XREF3 
+ccdc 28 02		        JR Z,XREF3 
 ccde 10 ea		        DJNZ XREF2 
 cce0			 
 cce0 c5			XREF3:  PUSH BC 
-cce1 eb			        EX DE, HL 
-cce2 36 0d		        LD (HL), $0D 
-cce4 21 14 0e		        LD HL, $0E14 
+cce1 eb			        EX DE,HL 
+cce2 36 0d		        LD (HL),CR 
+cce4 21 14 0e		        LD HL,$0E14 
 cce7 cd 4d ce		        CALL OUTPUT 
 ccea c1			        POP BC 
-cceb 79			        LD A, C 
+cceb 79			        LD A,C 
 ccec a7			        AND A 
-cced 28 cd		        JR Z, XREF1 
-ccef 21 14 0e		        LD HL, $0E14 
-ccf2 06 05		        LD B, $05 
+cced 28 cd		        JR Z,XREF1 
+ccef 21 14 0e		        LD HL,$0E14 
+ccf2 06 05		        LD B,$05 
 ccf4			 
-ccf4 36 20		XREF4:  LD (HL), $20 
+ccf4 36 20		XREF4:  LD (HL),$20 
 ccf6 23			        INC HL 
 ccf7 10 fb		        DJNZ XREF4 
-ccf9 eb			        EX DE, HL 
-ccfa 06 08		        LD B, $08 
+ccf9 eb			        EX DE,HL 
+ccfa 06 08		        LD B,$08 
 ccfc 18 cc		        JR XREF2 
 ccfe			 
 ccfe			 
 ccfe df			GETTWO: RST $18 
-ccff 63			        DEFB $63 
-cd00 3e 1b		        LD A, $1B 
-cd02 f7			        RST $30 
+ccff 63			        DEFB ZINLIN 
+cd00 3e 1b		        LD A,$1B 
+cd02 f7			        RST ROUT 
 cd03 d5			        PUSH DE 
 cd04 df			        RST $18 
-cd05 79			        DEFB $79 
+cd05 79			        DEFB ZRLIN 
 cd06 d1			        POP DE 
-cd07 1a			        LD A, (DE) 
+cd07 1a			        LD A,(DE) 
 cd08 d8			        RET C 
-cd09 3a 0b 0c		        LD A, ($0C0B) 
+cd09 3a 0b 0c		        LD A,($0C0B) 
 cd0c fe 02		        CP $02 
 cd0e 37			        SCF 
 cd0f c0			        RET NZ 
 cd10 df			        RST $18 
-cd11 60			        DEFB $60 
-cd12 44			        LD B, H 
-cd13 4d			        LD C, L 
+cd11 60			        DEFB ZARGS 
+cd12 44			        LD B,H 
+cd13 4d			        LD C,L 
 cd14 b7			        OR A 
 cd15 2b			        DEC HL 
-cd16 ed 52		        SBC HL, DE 
+cd16 ed 52		        SBC HL,DE 
 cd18 3f			        CCF 
 cd19 c9			        RET 
 cd1a			 
-cd1a 2a 4c 0e		NEXTAD: LD HL, ($0E4C) 
+cd1a 2a 4c 0e		NEXTAD: LD HL,($0E4C) 
 cd1d 2b			        DEC HL 
-cd1e 56			        LD D, (HL) 
+cd1e 56			        LD D,(HL) 
 cd1f 2b			        DEC HL 
-cd20 5e			        LD E, (HL) 
-cd21 22 4c 0e		        LD ($0E4C), HL 
+cd20 5e			        LD E,(HL) 
+cd21 22 4c 0e		        LD ($0E4C),HL 
 cd24 e5			        PUSH HL 
 cd25 dd e1		        POP IX 
-cd27 62			        LD H, D 
-cd28 6b			        LD L, E 
-cd29 ed 4b 54 0e	        LD BC, ($0E54) 
-cd2d 09			        ADD HL, BC 
-cd2e 44			        LD B, H 
-cd2f 4d			        LD C, L 
-cd30 dd 66 ff		        LD H, (IX-$01) 
-cd33 dd 6e fe		        LD L, (IX-$02) 
+cd27 62			        LD H,D 
+cd28 6b			        LD L,E 
+cd29 ed 4b 54 0e	        LD BC,($0E54) 
+cd2d 09			        ADD HL,BC 
+cd2e 44			        LD B,H 
+cd2f 4d			        LD C,L 
+cd30 dd 66 ff		        LD H,(IX-$01) 
+cd33 dd 6e fe		        LD L,(IX-$02) 
 cd36 c9			        RET 
 cd37			 
 cd37			 
-cd37 22 01 0e		PASS:   LD ($0E01), HL 
-cd3a 2a 50 0e		        LD HL, ($0E50) 
-cd3d 22 52 0e		        LD ($0E52), HL 
-cd40 2a 46 0e		        LD HL, ($0E46) 
-cd43 22 4c 0e		        LD ($0E4C), HL 
+cd37 22 01 0e		PASS:   LD ($0E01),HL 
+cd3a 2a 50 0e		        LD HL,($0E50) 
+cd3d 22 52 0e		        LD ($0E52),HL 
+cd40 2a 46 0e		        LD HL,($0E46) 
+cd43 22 4c 0e		        LD ($0E4C),HL 
 cd46			 
 cd46 cd 1a cd		PASSL:  CALL NEXTAD 
 cd49 03			        INC BC 
@@ -2244,62 +2357,62 @@ cd4a 13			        INC DE
 cd4b 2b			        DEC HL 
 cd4c cd 3e c4		        CALL REVAS 
 cd4f cd 1a cd		        CALL NEXTAD 
-cd52 7d			        LD A, L 
+cd52 7d			        LD A,L 
 cd53 a4			        AND H 
 cd54 3c			        INC A 
 cd55 c8			        RET Z 
-cd56 3a 44 0e		        LD A, ($0E44) 
+cd56 3a 44 0e		        LD A,($0E44) 
 cd59 e6 80		        AND $80 
-cd5b 28 e9		        JR Z, PASSL 
-cd5d ed 5b 06 0e	        LD DE, ($0E06) 
-cd61 ed 52		        SBC HL, DE 
-cd63 38 e1		        JR C, PASSL 
+cd5b 28 e9		        JR Z,PASSL 
+cd5d ed 5b 06 0e	        LD DE,($0E06) 
+cd61 ed 52		        SBC HL,DE 
+cd63 38 e1		        JR C,PASSL 
 cd65 23			        INC HL 
 cd66 e5			        PUSH HL 
 cd67			 
 cd67 cd 6e c4		DATA1:  CALL INITB 
-cd6a 06 03		        LD B, $03 
+cd6a 06 03		        LD B,$03 
 cd6c			 
 cd6c cd b8 c4		DATA2:  CALL BYTE 
 cd6f e1			        POP HL 
 cd70 2b			        DEC HL 
-cd71 7d			        LD A, L 
+cd71 7d			        LD A,L 
 cd72 b4			        OR H 
 cd73 e5			        PUSH HL 
-cd74 28 02		        JR Z, DATA3 
+cd74 28 02		        JR Z,DATA3 
 cd76 10 f4		        DJNZ DATA2 
 cd78			 
 cd78 f5			DATA3:  PUSH AF 
 cd79 cd 53 c9		        CALL NOTVAL 
-cd7c 21 14 0e		        LD HL, $0E14 
+cd7c 21 14 0e		        LD HL,$0E14 
 cd7f cd 25 ce		        CALL PASS2 
 cd82 f1			        POP AF 
-cd83 20 e2		        JR NZ, DATA1 
+cd83 20 e2		        JR NZ,DATA1 
 cd85 e1			        POP HL 
 cd86 18 be		        JR PASSL 
 cd88			 
 cd88			 
-cd88 2a 12 0e		PASS1:  LD HL, ($0E12) 
-cd8b 7d			        LD A, L 
+cd88 2a 12 0e		PASS1:  LD HL,($0E12) 
+cd8b 7d			        LD A,L 
 cd8c b4			        OR H 
 cd8d c8			        RET Z 
-cd8e 2a 50 0e		        LD HL, ($0E50) 
+cd8e 2a 50 0e		        LD HL,($0E50) 
 cd91			 
-cd91 7e			SRCHL:  LD A, (HL) 
+cd91 7e			SRCHL:  LD A,(HL) 
 cd92 e5			        PUSH HL 
 cd93 fd e1		        POP IY 
 cd95 3c			        INC A 
-cd96 28 2e		        JR Z, PAST 
-cd98 47			        LD B, A 
+cd96 28 2e		        JR Z,PAST 
+cd98 47			        LD B,A 
 cd99 2b			        DEC HL 
-cd9a 5e			        LD E, (HL) 
+cd9a 5e			        LD E,(HL) 
 cd9b 2b			        DEC HL 
-cd9c 56			        LD D, (HL) 
+cd9c 56			        LD D,(HL) 
 cd9d 2b			        DEC HL 
 cd9e e5			        PUSH HL 
-cd9f 2a 10 0e		        LD HL, ($0E10) 
+cd9f 2a 10 0e		        LD HL,($0E10) 
 cda2 a7			        AND A 
-cda3 ed 52		        SBC HL, DE 
+cda3 ed 52		        SBC HL,DE 
 cda5 e1			        POP HL 
 cda6 18 02		        JR SRCH1 
 cda8			 
@@ -2308,69 +2421,69 @@ cda8 2b			SRCH0:  DEC HL
 cda9 2b			        DEC HL 
 cdaa			 
 cdaa 10 fc		SRCH1:  DJNZ SRCH0 
-cdac 3a 44 0e		        LD A, ($0E44) 
-cdaf 38 15		        JR C, PAST 
-cdb1 20 de		        JR NZ, SRCHL 
-cdb3 cb 5f		        BIT 3, A 
+cdac 3a 44 0e		        LD A,($0E44) 
+cdaf 38 15		        JR C,PAST 
+cdb1 20 de		        JR NZ,SRCHL 
+cdb3 cb 5f		        BIT 3,A 
 cdb5 c8			        RET Z 
-cdb6 0e 02		        LD C, $02 
+cdb6 0e 02		        LD C,$02 
 cdb8 cd ef cd		        CALL MVUP 
 cdbb			 
-cdbb ed 5b 0e 0e	FND:    LD DE, ($0E0E) 
-cdbf 73			        LD (HL), E 
+cdbb ed 5b 0e 0e	FND:    LD DE,($0E0E) 
+cdbf 73			        LD (HL),E 
 cdc0 2b			        DEC HL 
-cdc1 72			        LD (HL), D 
+cdc1 72			        LD (HL),D 
 cdc2 fd 34 00		        INC (IY+0) 
 cdc5 c9			        RET 
 cdc6			 
 cdc6			 
-cdc6 2a 82 0e		PAST:   LD HL, ($0E82) 
+cdc6 2a 82 0e		PAST:   LD HL,($0E82) 
 cdc9 23			        INC HL 
 cdca 23			        INC HL 
-cdcb 22 82 0e		        LD ($0E82), HL 
+cdcb 22 82 0e		        LD ($0E82),HL 
 cdce fd e5		        PUSH IY 
 cdd0 e1			        POP HL 
-cdd1 3a 44 0e		        LD A, ($0E44) 
-cdd4 0e 05		        LD C, $05 
-cdd6 cb 5f		        BIT 3, A 
-cdd8 20 02		        JR NZ, XR 
-cdda 0e 03		        LD C, $03 
+cdd1 3a 44 0e		        LD A,($0E44) 
+cdd4 0e 05		        LD C,$05 
+cdd6 cb 5f		        BIT 3,A 
+cdd8 20 02		        JR NZ,XR 
+cdda 0e 03		        LD C,$03 
 cddc			 
 cddc cd ef cd		XR:     CALL MVUP 
-cddf 36 00		        LD (HL), $00 
-cde1 ed 5b 10 0e	        LD DE, ($0E10) 
+cddf 36 00		        LD (HL),$00 
+cde1 ed 5b 10 0e	        LD DE,($0E10) 
 cde5 2b			        DEC HL 
-cde6 73			        LD (HL), E 
+cde6 73			        LD (HL),E 
 cde7 2b			        DEC HL 
-cde8 72			        LD (HL), D 
+cde8 72			        LD (HL),D 
 cde9 2b			        DEC HL 
-cdea cb 5f		        BIT 3, A 
+cdea cb 5f		        BIT 3,A 
 cdec c8			        RET Z 
 cded 18 cc		        JR FND 
 cdef			 
 cdef			 
-cdef ed 5b 52 0e	MVUP:   LD DE, ($0E52) 
+cdef ed 5b 52 0e	MVUP:   LD DE,($0E52) 
 cdf3 23			        INC HL 
 cdf4 a7			        AND A 
-cdf5 06 00		        LD B, $00 
-cdf7 ed 52		        SBC HL, DE 
-cdf9 eb			        EX DE, HL 
-cdfa ed 42		        SBC HL, BC 
-cdfc 42			        LD B, D 
-cdfd 4b			        LD C, E 
-cdfe eb			        EX DE, HL 
-cdff 2a 4e 0e		        LD HL, ($0E4E) 
+cdf5 06 00		        LD B,$00 
+cdf7 ed 52		        SBC HL,DE 
+cdf9 eb			        EX DE,HL 
+cdfa ed 42		        SBC HL,BC 
+cdfc 42			        LD B,D 
+cdfd 4b			        LD C,E 
+cdfe eb			        EX DE,HL 
+cdff 2a 4e 0e		        LD HL,($0E4E) 
 ce02 2b			        DEC HL 
-ce03 ed 52		        SBC HL, DE 
-ce05 30 0b		        JR NC, OVRFLW 
-ce07 2a 52 0e		        LD HL, ($0E52) 
-ce0a ed 53 52 0e	        LD ($0E52), DE 
+ce03 ed 52		        SBC HL,DE 
+ce05 30 0b		        JR NC,OVRFLW 
+ce07 2a 52 0e		        LD HL,($0E52) 
+ce0a ed 53 52 0e	        LD ($0E52),DE 
 ce0e ed b0		        LDIR 
 ce10 2b			        DEC HL 
 ce11 c9			        RET 
 ce12			 
 ce12			 
-ce12 ef			OVRFLW: RST $28 
+ce12 ef			OVRFLW: RST PRS 
 ce13 4f			        DEFB $4F 
 ce14 76			        DEFB $76 
 ce15 65			        DEFB $65 
@@ -2379,169 +2492,168 @@ ce17 66			        DEFB $66
 ce18 6c			        DEFB $6C 
 ce19 6f			        DEFB $6F 
 ce1a 77			        DEFB $77 
-ce1b 0d			        DEFB $0D 
-ce1c 00			        DEFB $00 
-ce1d 21 14 0e		        LD HL, $0E14 
+ce1b 0d 00		        DEFB CR,0 
+ce1d 21 14 0e		        LD HL,$0E14 
 ce20 cd f8 ce		        CALL OUTLIN 
 ce23 df			        RST $18 
 ce24 5b			        DEFB $5B 
 ce25			 
-ce25 01 13 00		PASS2:  LD BC, $0013 
-ce28 fd 21 58 0e	        LD IY, $0E58 
+ce25 01 13 00		PASS2:  LD BC,$0013 
+ce28 fd 21 58 0e	        LD IY,$0E58 
 ce2c e5			        PUSH HL 
 ce2d dd e1		        POP IX 
-ce2f dd 09		        ADD IX, BC 
-ce31 3a 44 0e		        LD A, ($0E44) 
-ce34 cb 47		        BIT 0, A 
-ce36 28 03		        JR Z, KEEPO 
-ce38 09			        ADD HL, BC 
-ce39 fd 09		        ADD IY, BC 
+ce2f dd 09		        ADD IX,BC 
+ce31 3a 44 0e		        LD A,($0E44) 
+ce34 cb 47		        BIT 0,A 
+ce36 28 03		        JR Z,KEEPO 
+ce38 09			        ADD HL,BC 
+ce39 fd 09		        ADD IY,BC 
 ce3b			 
-ce3b cb 67		KEEPO:  BIT 4, A 
-ce3d 28 0e		        JR Z, OUTPUT 
+ce3b cb 67		KEEPO:  BIT 4,A 
+ce3d 28 0e		        JR Z,OUTPUT 
 ce3f e5			        PUSH HL 
 ce40 cd 02 cf		        CALL LABEL 
-ce43 2a 12 0e		        LD HL, ($0E12) 
-ce46 7d			        LD A, L 
+ce43 2a 12 0e		        LD HL,($0E12) 
+ce46 7d			        LD A,L 
 ce47 b4			        OR H 
-ce48 28 02		        JR Z, NOLB 
-ce4a 36 4c		        LD (HL), $4C 
+ce48 28 02		        JR Z,NOLB 
+ce4a 36 4c		        LD (HL),$4C 
 ce4c			 
 ce4c e1			NOLB:   POP HL 
 ce4d			 
-ce4d 44			OUTPUT: LD B, H 
-ce4e 4d			        LD C, L 
-ce4f 2a 4a 0e		        LD HL, ($0E4A) 
-ce52 ed 5b 0e 0e	        LD DE, ($0E0E) 
+ce4d 44			OUTPUT: LD B,H 
+ce4e 4d			        LD C,L 
+ce4f 2a 4a 0e		        LD HL,($0E4A) 
+ce52 ed 5b 0e 0e	        LD DE,($0E0E) 
 ce56 a7			        AND A 
-ce57 ed 52		        SBC HL, DE 
+ce57 ed 52		        SBC HL,DE 
 ce59 d8			        RET C 
-ce5a 2a 48 0e		        LD HL, ($0E48) 
-ce5d eb			        EX DE, HL 
-ce5e ed 52		        SBC HL, DE 
+ce5a 2a 48 0e		        LD HL,($0E48) 
+ce5d eb			        EX DE,HL 
+ce5e ed 52		        SBC HL,DE 
 ce60 d8			        RET C 
 ce61 c5			        PUSH BC 
-ce62 3a 44 0e		        LD A, ($0E44) 
+ce62 3a 44 0e		        LD A,($0E44) 
 ce65 f5			        PUSH AF 
-ce66 cb 6f		        BIT 5, A 
-ce68 c4 7b cf		        CALL NZ, DPAGE 
+ce66 cb 6f		        BIT 5,A 
+ce68 c4 7b cf		        CALL NZ,DPAGE 
 ce6b f1			        POP AF 
 ce6c e1			        POP HL 
 ce6d f5			        PUSH AF 
 ce6e 0f			        RRCA 
-ce6f 30 3d		        JR NC, ALLLIN 
-ce71 eb			        EX DE, HL 
-ce72 21 09 00		        LD HL, $0009 
-ce75 19			        ADD HL, DE 
-ce76 7e			        LD A, (HL) 
-ce77 eb			        EX DE, HL 
-ce78 11 58 0e		        LD DE, $0E58 
-ce7b 01 3b 20		        LD BC, $203B 
+ce6f 30 3d		        JR NC,ALLLIN 
+ce71 eb			        EX DE,HL 
+ce72 21 09 00		        LD HL,$0009 
+ce75 19			        ADD HL,DE 
+ce76 7e			        LD A,(HL) 
+ce77 eb			        EX DE,HL 
+ce78 11 58 0e		        LD DE,$0E58 
+ce7b 01 3b 20		        LD BC,$203B 
 ce7e d6 42		        SUB $42 
-ce80 20 01		        JR NZ, SQSH1 
-ce82 4f			        LD C, A 
+ce80 20 01		        JR NZ,SQSH1 
+ce82 4f			        LD C,A 
 ce83			 
-ce83			SQSH1: 
-ce83 7e			        LD A, (HL) 
-ce84 fe 0d		        CP $0D 
-ce86 28 19		        JR Z, SQSH3 
+ce83			SQSH1:   
+ce83 7e			        LD A,(HL) 
+ce84 fe 0d		        CP CR 
+ce86 28 19		        JR Z,SQSH3 
 ce88 b9			        CP C 
-ce89 28 16		        JR Z, SQSH3 
-ce8b 12			        LD (DE), A 
+ce89 28 16		        JR Z,SQSH3 
+ce8b 12			        LD (DE),A 
 ce8c 13			        INC DE 
 ce8d 23			        INC HL 
 ce8e fe 2f		        CP $2F 
-ce90 20 06		        JR NZ, SQSH2 
-ce92 78			        LD A, B 
+ce90 20 06		        JR NZ,SQSH2 
+ce92 78			        LD A,B 
 ce93 2f			        CPL 
-ce94 47			        LD B, A 
-ce95 79			        LD A, C 
+ce94 47			        LD B,A 
+ce95 79			        LD A,C 
 ce96 2f			        CPL 
-ce97 4f			        LD C, A 
+ce97 4f			        LD C,A 
 ce98			 
-ce98			SQSH2: 
+ce98			SQSH2:   
 ce98 b8			        CP B 
-ce99 20 e8		        JR NZ, SQSH1 
+ce99 20 e8		        JR NZ,SQSH1 
 ce9b be			        CP (HL) 
-ce9c 20 e5		        JR NZ, SQSH1 
+ce9c 20 e5		        JR NZ,SQSH1 
 ce9e 23			        INC HL 
 ce9f 18 f7		        JR SQSH2 
 cea1			 
 cea1			 
-cea1 eb			SQSH3:  EX DE, HL 
+cea1 eb			SQSH3:  EX DE,HL 
 cea2 2b			        DEC HL 
-cea3 7e			        LD A, (HL) 
+cea3 7e			        LD A,(HL) 
 cea4 fe 20		        CP $20 
-cea6 28 01		        JR Z, SQSH4 
+cea6 28 01		        JR Z,SQSH4 
 cea8 23			        INC HL 
 cea9			 
-cea9 36 0d		SQSH4:  LD (HL), $0D 
-ceab 21 58 0e		        LD HL, $0E58 
+cea9 36 0d		SQSH4:  LD (HL),CR 
+ceab 21 58 0e		        LD HL,$0E58 
 ceae			 
 ceae cd f8 ce		ALLLIN: CALL OUTLIN 
 ceb1 f1			        POP AF 
-ceb2 cb 57		        BIT 2, A 
+ceb2 cb 57		        BIT 2,A 
 ceb4 c8			        RET Z 
-ceb5 ed 5b 80 0e	        LD DE, ($0E80) 
-ceb9 2a 56 0e		        LD HL, ($0E56) 
+ceb5 ed 5b 80 0e	        LD DE,($0E80) 
+ceb9 2a 56 0e		        LD HL,($0E56) 
 cebc 23			        INC HL 
-cebd 73			        LD (HL), E 
+cebd 73			        LD (HL),E 
 cebe 23			        INC HL 
-cebf 72			        LD (HL), D 
+cebf 72			        LD (HL),D 
 cec0 23			        INC HL 
-cec1 eb			        EX DE, HL 
-cec2 3e 01		        LD A, $01 
-cec4 85			        ADD A, L 
+cec1 eb			        EX DE,HL 
+cec2 3e 01		        LD A,$01 
+cec4 85			        ADD A,L 
 cec5 27			        DAA 
-cec6 6f			        LD L, A 
-cec7 3e 00		        LD A, $00 
-cec9 8c			        ADC A, H 
+cec6 6f			        LD L,A 
+cec7 3e 00		        LD A,$00 
+cec9 8c			        ADC A,H 
 ceca 27			        DAA 
-cecb 67			        LD H, A 
-cecc 22 80 0e		        LD ($0E80), HL 
-cecf 21 58 0e		        LD HL, $0E58 
-ced2 3e 0d		        LD A, $0D 
+cecb 67			        LD H,A 
+cecc 22 80 0e		        LD ($0E80),HL 
+cecf 21 58 0e		        LD HL,$0E58 
+ced2 3e 0d		        LD A,CR 
 ced4			 
 ced4 ed a0		Z1:     LDI 
 ced6 be			        CP (HL) 
-ced7 20 fb		        JR NZ, Z1 
-ced9 eb			        EX DE, HL 
-ceda 22 56 0e		        LD ($0E56), HL 
-cedd 36 00		        LD (HL), $00 
+ced7 20 fb		        JR NZ,Z1 
+ced9 eb			        EX DE,HL 
+ceda 22 56 0e		        LD ($0E56),HL 
+cedd 36 00		        LD (HL),$00 
 cedf 23			        INC HL 
-cee0 36 ff		        LD (HL), $FF 
+cee0 36 ff		        LD (HL),$FF 
 cee2 23			        INC HL 
 cee3 e5			        PUSH HL 
-cee4 ed 5b 00 0f	        LD DE, ($0F00) 
-cee8 ed 52		        SBC HL, DE 
-ceea eb			        EX DE, HL 
-ceeb 73			        LD (HL), E 
+cee4 ed 5b 00 0f	        LD DE,($0F00) 
+cee8 ed 52		        SBC HL,DE 
+ceea eb			        EX DE,HL 
+ceeb 73			        LD (HL),E 
 ceec 23			        INC HL 
-ceed 72			        LD (HL), D 
+ceed 72			        LD (HL),D 
 ceee d1			        POP DE 
-ceef 2a 4e 0e		        LD HL, ($0E4E) 
-cef2 ed 52		        SBC HL, DE 
+ceef 2a 4e 0e		        LD HL,($0E4E) 
+cef2 ed 52		        SBC HL,DE 
 cef4 d0			        RET NC 
 cef5 c3 12 ce		        JP OVRFLW 
 cef8			 
 cef8			 
-cef8 46			OUTLIN: LD B, (HL) 
+cef8 46			OUTLIN: LD B,(HL) 
 cef9 cd aa cf		        CALL CHROUT 
 cefc 23			        INC HL 
-cefd fe 0d		        CP $0D 
-ceff 20 f7		        JR NZ, OUTLIN 
+cefd fe 0d		        CP CR 
+ceff 20 f7		        JR NZ,OUTLIN 
 cf01 c9			        RET 
 cf02			 
 cf02			 
-cf02 2a 52 0e		LABEL:  LD HL, ($0E52) 
-cf05 7e			        LD A, (HL) 
+cf02 2a 52 0e		LABEL:  LD HL,($0E52) 
+cf05 7e			        LD A,(HL) 
 cf06 3c			        INC A 
 cf07 c8			        RET Z 
-cf08 47			        LD B, A 
+cf08 47			        LD B,A 
 cf09 2b			        DEC HL 
-cf0a 5e			        LD E, (HL) 
+cf0a 5e			        LD E,(HL) 
 cf0b 2b			        DEC HL 
-cf0c 56			        LD D, (HL) 
+cf0c 56			        LD D,(HL) 
 cf0d 2b			        DEC HL 
 cf0e 18 02		        JR LABEL1 
 cf10			 
@@ -2550,61 +2662,61 @@ cf10 2b			LABEL0: DEC HL
 cf11 2b			        DEC HL 
 cf12			 
 cf12 10 fc		LABEL1: DJNZ LABEL0 
-cf14 44			        LD B, H 
-cf15 4d			        LD C, L 
-cf16 2a 0e 0e		        LD HL, ($0E0E) 
-cf19 3a 44 0e		        LD A, ($0E44) 
+cf14 44			        LD B,H 
+cf15 4d			        LD C,L 
+cf16 2a 0e 0e		        LD HL,($0E0E) 
+cf19 3a 44 0e		        LD A,($0E44) 
 cf1c 07			        RLCA 
 cf1d 3f			        CCF 
-cf1e 38 03		        JR C, LABEL2 
-cf20 ed 52		        SBC HL, DE 
+cf1e 38 03		        JR C,LABEL2 
+cf20 ed 52		        SBC HL,DE 
 cf22 d8			        RET C 
 cf23			 
-cf23 ed 43 52 0e	LABEL2: LD ($0E52), BC 
-cf27 28 48		        JR Z, ALAB 
-cf29 44			        LD B, H 
-cf2a 4d			        LD C, L 
+cf23 ed 43 52 0e	LABEL2: LD ($0E52),BC 
+cf27 28 48		        JR Z,ALAB 
+cf29 44			        LD B,H 
+cf2a 4d			        LD C,L 
 cf2b c5			        PUSH BC 
-cf2c 06 13		        LD B, $13 
-cf2e 21 58 0e		        LD HL, $0E58 
+cf2c 06 13		        LD B,$13 
+cf2e 21 58 0e		        LD HL,$0E58 
 cf31			 
-cf31 36 20		CEQUB:  LD (HL), $20 
+cf31 36 20		CEQUB:  LD (HL),$20 
 cf33 23			        INC HL 
 cf34 10 fb		        DJNZ CEQUB 
 cf36 f5			        PUSH AF 
 cf37 cd 74 cf		        CALL ALAB1 
 cf3a f1			        POP AF 
 cf3b e5			        PUSH HL 
-cf3c 21 f7 cf		        LD HL, EQU 
-cf3f 01 06 00		        LD BC, $0006 
+cf3c 21 f7 cf		        LD HL,EQU 
+cf3f 01 06 00		        LD BC,$0006 
 cf42 ed b0		        LDIR 
-cf44 eb			        EX DE, HL 
+cf44 eb			        EX DE,HL 
 cf45 d1			        POP DE 
 cf46 c1			        POP BC 
 cf47 0f			        RRCA 
-cf48 30 15		        JR NC, ABSOL 
-cf4a 78			        LD A, B 
+cf48 30 15		        JR NC,ABSOL 
+cf4a 78			        LD A,B 
 cf4b a7			        AND A 
-cf4c 20 11		        JR NZ, ABSOL 
-cf4e 79			        LD A, C 
+cf4c 20 11		        JR NZ,ABSOL 
+cf4e 79			        LD A,C 
 cf4f fe 05		        CP $05 
-cf51 30 0c		        JR NC, ABSOL 
-cf53 36 24		        LD (HL), $24 
+cf51 30 0c		        JR NC,ABSOL 
+cf53 36 24		        LD (HL),$24 
 cf55 23			        INC HL 
-cf56 36 2d		        LD (HL), $2D 
+cf56 36 2d		        LD (HL),$2D 
 cf58 23			        INC HL 
 cf59 f6 30		        OR $30 
-cf5b 77			        LD (HL), A 
+cf5b 77			        LD (HL),A 
 cf5c 23			        INC HL 
 cf5d 18 08		        JR PEQU 
 cf5f			 
-cf5f 36 23		ABSOL:  LD (HL), $23 
+cf5f 36 23		ABSOL:  LD (HL),$23 
 cf61 23			        INC HL 
-cf62 eb			        EX DE, HL 
+cf62 eb			        EX DE,HL 
 cf63 cd 9d c4		        CALL HEX4 
-cf66 eb			        EX DE, HL 
+cf66 eb			        EX DE,HL 
 cf67			 
-cf67 36 0d		PEQU:   LD (HL), $0D 
+cf67 36 0d		PEQU:   LD (HL),CR 
 cf69 fd e5		        PUSH IY 
 cf6b e1			        POP HL 
 cf6c cd 4d ce		        CALL OUTPUT 
@@ -2614,89 +2726,89 @@ cf71
 cf71 dd e5		ALAB:   PUSH IX 
 cf73 e1			        POP HL 
 cf74			 
-cf74 36 4c		ALAB1:  LD (HL), $4C 
+cf74 36 4c		ALAB1:  LD (HL),$4C 
 cf76 23			        INC HL 
-cf77 eb			        EX DE, HL 
+cf77 eb			        EX DE,HL 
 cf78 c3 9d c4		        JP HEX4 
 cf7b			 
-cf7b 21 7c 0e		DPAGE:  LD HL, $0E7C 
+cf7b 21 7c 0e		DPAGE:  LD HL,$0E7C 
 cf7e 35			        DEC (HL) 
 cf7f c0			        RET NZ 
 cf80			 
-cf80 3a 7d 0e		EJECT:  LD A, ($0E7D) 
-cf83 86			        ADD A, (HL) 
-cf84 57			        LD D, A 
-cf85 06 0d		        LD B, $0D 
+cf80 3a 7d 0e		EJECT:  LD A,($0E7D) 
+cf83 86			        ADD A,(HL) 
+cf84 57			        LD D,A 
+cf85 06 0d		        LD B,CR 
 cf87 18 03		        JR EJ1 
 cf89			 
 cf89 cd aa cf		EJ0:    CALL CHROUT 
 cf8c			 
 cf8c 15			EJ1:    DEC D 
-cf8d 20 fa		        JR NZ, EJ0 
-cf8f 2a 7e 0e		        LD HL, ($0E7E) 
-cf92 22 7c 0e		        LD ($0E7C), HL 
-cf95 21 8d 0e		        LD HL, $0E8D 
+cf8d 20 fa		        JR NZ,EJ0 
+cf8f 2a 7e 0e		        LD HL,($0E7E) 
+cf92 22 7c 0e		        LD ($0E7C),HL 
+cf95 21 8d 0e		        LD HL,$0E8D 
 cf98 34			        INC (HL) 
-cf99 7e			        LD A, (HL) 
+cf99 7e			        LD A,(HL) 
 cf9a fe 3a		        CP $3A 
-cf9c 20 04		        JR NZ, NOINC 
-cf9e 36 30		        LD (HL), $30 
+cf9c 20 04		        JR NZ,NOINC 
+cf9e 36 30		        LD (HL),$30 
 cfa0 2b			        DEC HL 
 cfa1 34			        INC (HL) 
 cfa2			 
-cfa2 21 84 0e		NOINC:  LD HL, $0E84 
+cfa2 21 84 0e		NOINC:  LD HL,$0E84 
 cfa5 cd f8 ce		        CALL OUTLIN 
-cfa8 06 0d		        LD B, $0D 
+cfa8 06 0d		        LD B,CR 
 cfaa			 
-cfaa 78			CHROUT: LD A, B 
-cfab f7			        RST $30 
+cfaa 78			CHROUT: LD A,B 
+cfab f7			        RST ROUT 
 cfac e5			        PUSH HL 
-cfad 21 44 0e		        LD HL, $0E44 
+cfad 21 44 0e		        LD HL,$0E44 
 cfb0 cd df cf		        CALL PUNCH 
-cfb3 fe 0d		        CP $0D 
-cfb5 20 26		        JR NZ, EXCHR 
-cfb7 3e 0a		        LD A, $0A 
+cfb3 fe 0d		        CP CR 
+cfb5 20 26		        JR NZ,EXCHR 
+cfb7 3e 0a		        LD A,$0A 
 cfb9 cd df cf		        CALL PUNCH 
-cfbc 3a 45 0e		        LD A, ($0E45) 
+cfbc 3a 45 0e		        LD A,($0E45) 
 cfbf fe 20		        CP $20 
-cfc1 28 04		        JR Z, WAIT 
+cfc1 28 04		        JR Z,WAIT 
 cfc3 df			        RST $18 
 cfc4 62			        DEFB $62 
-cfc5 30 04		        JR NC, NOWT 
+cfc5 30 04		        JR NC,NOWT 
 cfc7			 
-cfc7 cf			WAIT:   RST $08 
-cfc8 32 45 0e		        LD ($0E45), A 
+cfc7 cf			WAIT:   RST RIN 
+cfc8 32 45 0e		        LD ($0E45),A 
 cfcb			 
 cfcb fe 1b		NOWT:   CP $1B 
-cfcd ca a2 cc		        JP Z, EXIT 
-cfd0 78			        LD A, B 
-cfd1 cb 76		        BIT 6, (HL) 
-cfd3 28 08		        JR Z, EXCHR 
+cfcd ca a2 cc		        JP Z,EXIT 
+cfd0 78			        LD A,B 
+cfd1 cb 76		        BIT 6,(HL) 
+cfd3 28 08		        JR Z,EXCHR 
 cfd5 c5			        PUSH BC 
-cfd6 06 80		        LD B, $80 
+cfd6 06 80		        LD B,$80 
 cfd8			 
 cfd8 ff			DLOOP:  RST $38 
 cfd9 10 fd		        DJNZ DLOOP 
 cfdb c1			        POP BC 
-cfdc 78			        LD A, B 
+cfdc 78			        LD A,B 
 cfdd			 
 cfdd e1			EXCHR:  POP HL 
 cfde c9			        RET 
 cfdf			 
 cfdf			 
-cfdf cb 4e		PUNCH:  BIT 1, (HL) 
+cfdf cb 4e		PUNCH:  BIT 1,(HL) 
 cfe1 c8			        RET Z 
 cfe2 df			        RST $18 
 cfe3 6f			        DEFB $6F 
 cfe4 c9			        RET 
 cfe5			 
 cfe5			 
-cfe5 10 00 00 00	RAMLD:  DEFW L_0010, $0000 
-cfe9 20 20 20 50 41 47 45 20 30 30 20 20 20 20	        DEFB $20, $20, $20, $50, $41, $47, $45, $20, $30, $30, $20, $20, $20, $20 
+cfe5 10 00 00 00	RAMLD:  DEFW L_0010,$0000 
+cfe9 20 20 20 50 41 47 45 20 30 30 20 20 20 20	        DEFB $20,$20,$20,$50,$41,$47,$45,$20,$30,$30,$20,$20,$20,$20 
 cff7			 
-cff7 20 45 51 55 20 20	EQU:    DEFB $20, $45, $51, $55, $20, $20 
+cff7 20 45 51 55 20 20	EQU:    DEFB $20,$45,$51,$55,$20,$20 
 cffd			 
-cffd			L_CFFD: 
+cffd			L_CFFD:  
 cffd c3 3e c4		        JP REVAS 
 d000			 
 d000			 
@@ -3084,5 +3196,5 @@ d000			; $CFDF => PUNCH         XREF3  => $CCE0
 d000			; $CFE5 => RAMLD         XREF4  => $CCF4 
 d000			; $CFF7 => EQU           XYC    => $C174 
 d000			; $CFFD => L_CFFD        Z1     => $CED4 
-# End of file dis_debug.asm
+# End of file dis_debug_mod.asm
 d000

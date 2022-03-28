@@ -1,4 +1,3 @@
-;  (iy) must be changed to (iy+0) to avoid assembler bug
 
 L_0008: EQU $0008
 L_0010: EQU $0010
@@ -8,260 +7,387 @@ L_0030: EQU $0030
 L_0038: EQU $0038
 L_0E00: EQU $0E00
 
-STMON:  EQU $000D
 
-        ORG $C000
-
-DEBUG:  JP START
-
-
-START:  LD SP, $1000
-        CALL STMON
-        LD SP, $0F00
-        LD HL, $C35E
-        PUSH HL
-        LD HL, RETURN
-        PUSH HL
-        LD HL, $0000
-        PUSH HL
-        LD HL, $080A
-        PUSH HL
-        LD HL, DENT
-        LD ($0C78), HL
-        RST $18
-        DEFB $55
-        RST $18
-        DEFB $5B
-
-DENT:   PUSH AF
-        CP $18
-        JR NZ, CMND
-
-SSTEP:  LD SP, $0EF8
-        RST $10
-        DEFB $7A
-        LD HL, ($0C23)
-        LD A, ($0C25)
-        LD (HL), A
-        CALL SSD
-        JR DPJ
-
-CMND:   CP $0D
-        JR NZ, PNORM
-        CALL STLIN
-        LD A, $3A
-        CP (HL)
-        JR Z, DCMND
-
-PNORM:  POP AF
-        LD HL, ($0EFC)
-        JP (HL)
-
-DCMND:  LD SP, $0EF8
-        LD (HL), $20
-        RST $18
-        DEFB $6A
-        LD HL, ($0C29)
-        LD DE, $FFC0
-        ADD HL, DE
-        LD (HL), $3A
-        EX DE, HL
+;*************************************
+;*          NAS-DEBUG V3.2           *
+;*         22nd Feb  1981            *
+;*                                   *
+;*  (C) CCSOFT (Southfields) 1981    *
+;*    Written by Mick Scutt          *
+;*                                   *
+;*  A  debugging  aid and  monitor   *
+;*  extension package for use with   *
+;*  all NAS-SYS monitors and NAS-DIS *
+;*                                   *
+;* Commands -                        *
+;* :A            Alternate CRT page  *
+;* :C            Change USER o/p locn*
+;* :D nnn        Disassemble from nnn*
+;* :F nnnn nnnn  Find up to 8 bytes  *
+;* :O nnnn       Optional CRT page   *
+;* :P            Print stored regs   *
+;*                                   *
+;* This software was produced and    *
+;* developed on a 48k  Nascom  2,    *
+;* using the Zeap 2 assembler.       *
+;* Documentation was printed using a *
+;* Centronics 737 printer.           *
+;*************************************
+;
+;  NAS-SYS ROUTINE NUMBER EQUATES
+ZMRET  EQU  £5B
+ZARGS  EQU  £60
+ZINLIN EQU  £63
+ZNUM   EQU  £64
+ZTBCD3 EQU  £66
+ZB2HEX EQU  £68
+ZSPACE EQU  £69
+ZCRLF  EQU  £6A
+ZNOM   EQU  £71
+ZNNOM  EQU  £77
+ZERRM  EQU  £6B
+ZRLIN  EQU  £79
+ZBLINK EQU  £7B
+RIN    EQU  £08
+PRS    EQU  £28
+;
+;  NAS-SYS WORKSPACE RAM
+       ORG £0C00
+PORT0  DEFS 1
+KMAP   DEFS 9
+ARGC   DEFS 1
+ARGN   DEFS 1
+ARG1   DEFS 2
+ARG2   DEFS 2
+ARG3   DEFS 2
+ARG49  DEFS 12
+ARG10  DEFS 2
+NUMN   DEFS 1
+NUMV   DEFS 2
+BRKADR DEFS 2
+BRKVAL DEFS 1
+CONFLG DEFS 1
+$KOPT  DEFS 1
+$XOPT  DEFS 1
+CURSOR DEFS 2
+ARGX   DEFS 1
+MONSTK DEFS £35
+STACK  EQU  $
+RBC    DEFS 2
+RDE    DEFS 2
+RHL    DEFS 2
+RAF    DEFS 2
+RPC    DEFS 2
+INITR  EQU $
+RSP    DEFS 2
+RSAE   EQU $
+$KTABL DEFS 2
+$KTAB  DEFS 2
+$STAB  DEFS 2
+$OUT   DEFS 2
+$IN    DEFS 2
+$UOUT  DEFS 3
+$UIN   DEFS 3
+$NMI   DEFS 3
+;
+;   VIDEO RAM
+VL7    EQU £098A
+;
+;  NAS-SYS MONITOR ADDRESSES
+ROUT   EQU  £30
+STMON  EQU  £000D
+;
+;  CHARACTERS
+CS     EQU £0C
+CR     EQU £0D
+CCR    EQU £18
+ESC    EQU £1B
+MARK   EQU £A0
+;
+; DEBUG EQU'S
+       ORG  £0EF8 ; ** in ZEAP the DSTK can be on the same line but with but other assemblers leave DSTK at the PREVIOUS address.
+DSTK   EQU $
+ACUR   DEFS 2
+OPT    DEFS 2
+NUSR   DEFS 2
+$DCTAB DEFS 2
+SPTOP  EQU  $
+;************** DEBUG **************
+;
+DEBUG  ORG  £C000
+;;;REVAS  EQU  £C400
+;
+; RESTART JUMP
+       JP   START
+; INITIALISE NAS-SYS
+START  LD   SP £1000
+       CALL STMON
+;
+; SET UP $CTAB,USER O/P JUMP,
+; OPTION OFF,AND ALT CURSOR
+       LD   SP SPTOP
+       LD   HL CTAB-£82
+       PUSH HL
+       LD   HL RETURN
+       PUSH HL
+       LD   HL 0
+       PUSH HL
+       LD   HL £080A
+       PUSH HL
+;
+; SET USER O/P TO DEBUG ENTRY POINT
+       LD   HL DENT
+       LD   ($UOUT+1) HL
+;
+; MAKE O/P TABLE INCLUDE USER O/P
+       RST  $18
+       DEFB $55
+;
+; RETURN TO MONITOR
+       RST  $18
+       DEFB ZMRET
+;
+; DEBUG ENTRY POINT FOR ALL OUTPUT
+; IF A CCR BEING O/P DO S-STEP DISPLAY
+DENT  PUSH AF
+       CP   CCR
+       JR   NZ CMND
+SSTEP  LD   SP DSTK
+       RST  $10
+       DEFB $7A
+       LD   HL (BRKADR)  ; ** printed listing has these two LD swapped
+       LD   A (BRKVAL)
+       LD   (HL) A
+       CALL SSD
+       JR   DPJ
+; IF CR , MAYBE A NEW COMMAND
+CMND   CP   CR
+       JR   NZ PNORM
+; IT IS CR,IS A COLON AT START OF LINE
+       CALL STLIN
+       LD   A $3A
+       CP   (HL)
+       JR   Z DCMND
+; CONTINUE  O/P NORMALLY
+PNORM: POP  AF
+       LD   HL (NUSR)
+; JUMP TO NEW USER O/P ADDR
+       JP   (HL)
+;
+; A COLON SAYS DEBUG COMMAND IS NEXT
+; WILL NOT RETURN TO NAS-SYS
+; SO THROW AWAY THE STACK
+DCMND:  LD   SP DSTK
+; DELETE COLON AND DO A CR
+        LD   (HL) $20
+        RST  $18
+        DEFB ZCRLF
+; NOW REPLACE THE COLON
+        LD   HL (CURSOR)
+        LD   DE -64
+        ADD  HL DE
+        LD   (HL) $3A
+        EX   DE HL
+; DE IS SCREEN POINTER,STEP OVER THE :
+; AND USE DEBUG'S COMMAND TABLE
         INC DE
-        LD A, (DE)
-        CP $51
-        JR NC, DERR
-        LD HL, ($0EFE)
-
+        LD A (DE)
+        CP $51    ; ONLY ALLOW "A TO "P
+        JR NC DERR
+        LD HL ($0EFE) ; ** will not allow $DCTAB.. bug in fixup script
 PA1:    PUSH HL
-        LD BC, $0C2B
-        LD A, (DE)
+        LD BC ARGX
+        LD A (DE)
         CP $20
-        JR NZ, PA2
-        LD A, (BC)
+        JR NZ PA2
+        LD A (BC)
         CP $53
-        JR NZ, DPARSE
-
-PA2:    CP $41
-        JR C, DERR
+        JR NZ DPARSE
+PA2     CP $41
+        JR C DERR
         CP $5B
-        JR NC, DERR
-        LD (BC), A
-        LD ($0C0A), A
+        JR NC DERR
+        LD (BC) A
+        LD (ARGC) A
         PUSH AF
         INC DE
         RST $18
-        DEFB $79
-        JR NC, DPEND
-
-DERR:   RST $18
-        DEFB $6B
-
-DPJ:    JR DPARSE
-
-DPEND:  POP AF
+        DEFB ZRLIN
+        JR NC DPEND
+DERR    RST $18
+        DEFB ZERRM
+DPJ     JR DPARSE
+; IF S OR E CMND EXCHANGE CRT PAGE FIRST
+DPEND   POP AF
         PUSH AF
         CP $53
-        JR Z, DP2
+        JR Z DP2
         CP $45
-
-DP2:    CALL Z, EXCH
+DP2     CALL Z EXCH
         POP AF
         POP HL
         CALL DSCALJ
         JR DPARSE
-
-ALTP:   RST $10
+ALTP    RST $10
         DEFB $0B
-        JR NC, DPARSE
-
-TIN:    RST $18
-        DEFB $7B
-        CP $0D
-        JR Z, EXCH
-        RST $30
+        JR NC DPARSE
+; CR WILL SWAP PAGE BACK
+TIN     RST $18
+        DEFB ZBLINK
+        CP CR
+        JR Z EXCH
+        RST ROUT
         JR TIN
-
-EXCH:   LD HL, ($0EFA)
-        LD A, H
+EXCH    LD HL (OPT)
+        LD A H
         OR L
         RET Z
         SCF
-        LD DE, $0800
-        LD BC, $0400
-
-EX1:    LD A, (DE)
+        LD DE $0800
+        LD BC 1024
+EX1     LD A (DE)
         LDI
         DEC HL
-        LD (HL), A
+        LD (HL) A
         INC HL
-        JP PE, EX1
-        LD HL, ($0EF8)
-        LD DE, ($0C29)
-        LD ($0EF8), DE
-
-CUR1:   LD ($0C29), HL
+        JP PE EX1
+        LD HL, (ACUR)    ; SWAP CURSOR LOCATIONS
+        LD DE, (CURSOR)
+        LD (ACUR) DE
+CUR1    LD (CURSOR) HL
         RET
-
-
-DPARSE: LD SP, $0EF8
+;
+;THIS TAKES OVER FROM PARSE IN NAS-SYS
+; MAY HAVE COME HERE WITH RUBBISH
+; ON STACK FROM PA1,EDIT ERROR ETC
+;
+DPARSE  LD SP DSTK
         RST $10
         DEFB $64
+; PRAY $NMI STILL POINTS TO TRAP
         RST $18
-        DEFB $63
-        LD A, $A0
-        LD H, D
-        LD L, E
+        DEFB ZINLIN
+; IF MARK 1ST ON LINE EDIT"FIND"DSPLAY
+        LD A MARK
+        LD H D
+        LD L E
         CP (HL)
         JR Z, EDFIND
         INC HL
+; IF MARK 2ND ON LINE IGNORE REVAS XTRA
         CP (HL)
         JR Z, DPARSE
+; IF MARK 3RD ON LINE EDIT SSTEP DSPLY
         INC HL
         CP (HL)
-        JR Z, RNAM
-        LD HL, ($0C71)
-        LD SP, $0C61
+;IF NO MARK GOTO PA1, USE NAS-SYS STAB
+; AND NAS-SYS STACK
+        JR Z RNAM
+        LD HL ($STAB)
+        LD SP STACK
         JP PA1
-
-RNAM:   LD BC, $0C61
-        LD HL, REGTAB
-
-TSTREG: LD A, (DE)
+;
+; IS A REGISTER  NAME ON THE LINE ?
+RNAM    LD BC RBC
+        LD HL REGTAB
+TSTREG  LD A (DE)
         CP (HL)
         INC HL
-        JR Z, FOUND
+        JR Z FOUND
+; STEP OVER REG IMAGE ADDR
         INC C
         INC C
+; STEP OVER ROUTINE ADDR
         INC HL
         INC HL
-        LD A, (HL)
+        LD A (HL)
         OR A
-        JR NZ, TSTREG
-
-EDERR:  JR DERR
-
-
-FOUND:  INC DE
+        JR NZ TSTREG
+; EDITING ERROR
+EDERR   JR DERR
+; FOUND REG NAME,BC POINTS TO IMAGE
+; STEP OVER REG NAME AND MARK
+FOUND   INC DE
         INC DE
         INC DE
-        LD A, (HL)
+        LD A (HL)       ; GET RTNE ADDR & GO TO IT
         INC HL
-        LD H, (HL)
-        LD L, A
+        LD H (HL)
+        LD L A
         RST $10
         DEFB $72
-
-FIN:    RST $18
-        DEFB $77
-        PUSH HL
+FIN     RST $18
+        DEFB ZNNOM      ; NEW DISPLAY TO CRT ONLY
+        PUSH HL         ; MAY HAVE A NEW BYTE
         RST $10
-        DEFB $27
-        LD DE, $FFC0
-        LD B, $07
-        LD HL, $098A
-
-SPLINE: LD A, $53
+        DEFB $27        ; AT PROG ADDR SO
+        LD DE -64       ; IF POSS. REDO THE
+        LD B $07        ; EXISTING DISPLAY
+        LD HL VL7       ; LOOK FOR THE LINE
+SPLINE  LD A $53        ; WITH SP ON
         CP (HL)
         JR Z, REDO
-
-UPONE:  ADD HL, DE
+; KEEP LOOKING
+UPONE   ADD HL DE
         DJNZ SPLINE
-        CALL SSD
+        CALL SSD        ; NOT FOUND,DO NEW DISPLAY
         JR NOMOP
-
-REDO:   PUSH HL
-        LD HL, ($0C29)
-        EX (SP), HL
+REDO    PUSH HL         ; FOUND,RE-DO OLD DISPLAY
+        LD HL (CURSOR)
+        EX (SP), HL     ; SAVE EXISTING CURSOR POSN
         RST $10
         DEFB $9E
         CALL SSD
         POP HL
         RST $10
         DEFB $98
-
-NOMOP:  POP HL
-        RST $18
-        DEFB $71
-
-PAJ:    JR DPARSE
-
-BRSTO:  XOR A
-        LD ($0C26), A
-        LD HL, ($0C23)
-        LD A, (HL)
-        LD ($0C25), A
-
-RETURN: RET
-
-EDFIND: RST $10
+NOMOP   POP HL
+        RST $18         ; RESTORE O/P TABLE POINTER
+        DEFB ZNOM
+PAJ     JR DPARSE
+;
+;
+BRSTO   XOR A
+        LD (CONFLG) A
+        LD HL (BRKADR)
+        LD A (HL)
+        LD (BRKVAL) A
+RETURN  RET
+;
+; EDIT A "FIND" LINE
+EDFIND  RST $10
         DEFB $85
         INC DE
+; GET THE ADDRESS
         RST $10
         DEFB $6B
         PUSH BC
-        LD HL, $0019
+        LD HL 25
+; GET THE BYTES
         RST $10
         DEFB $10
+; REPRINT THE LINE & RET TO DPARSE
         POP HL
         CALL PHA
         JR PAJ
-
-VALUES: RST $10
+; GET REG VALUE OFF SCREEN
+VALUES  RST $10
         DEFB $4C
+; IF ZERO CAN EDIT THE BYTES
         RET NZ
-
-GBDEC:  DEC BC
+;
+; GET THE BYTES OFF THE SCREEN
+GBDEC   DEC BC
         DEC BC
         DEC BC
         DEC BC
-
-GBL:    LD HL, $001F
+GBL     LD HL 31
 
 GBY:    ADD HL, DE
 
 GB1:    PUSH HL
         RST $18
-        DEFB $64
+        DEFB ZNUM
         POP HL
         SBC A, A
         OR A
@@ -337,18 +463,18 @@ IMAGEV: PUSH BC
         RET
 
 NUMBR:  RST $18
-        DEFB $64
+        DEFB ZNUM
         JR C, ERJ
         LD BC, ($0C21)
         RET
 
 REGN:   RST $18
-        DEFB $68
+        DEFB ZB2HEX
 
 REGDIS: LD A, $A0
-        RST $30
+        RST ROUT
         RST $18
-        DEFB $66
+        DEFB ZTBCD3
         LD B, $0A
         DEC HL
         DEC HL
@@ -356,7 +482,7 @@ REGDIS: LD A, $A0
         DEC HL
 
 SPDIS:  RST $18
-        DEFB $69
+        DEFB ZSPACE
         LD A, H
         CP $08
         JR C, RD1
@@ -373,83 +499,76 @@ SPDIS:  RST $18
 RD1:    LD A, (HL)
         INC HL
         RST $18
-        DEFB $68
+        DEFB ZB2HEX
         RST $18
-        DEFB $69
+        DEFB ZSPACE
         DJNZ RD1
-        RST $30
+        RST ROUT
         RET
 
-SSD:    CALL STLIN
+SSD     CALL STLIN
         LD ($0C29), HL
-        RST $28
-        DEFB $53
-        DEFB $50
-        DEFB $A0
-        DEFB $00
+        RST PRS
+        DEFM /SP/
+        DEFB MARK,0
         LD HL, ($0C6B)
         RST $18
-        DEFB $66
+        DEFB ZTBCD3
         LD B, $0C
         CALL SPCS
         LD B, $06
         RST $10
         DEFB $C5
-        RST $28
-        DEFB $0D
-        DEFB $49
-        DEFB $58
-        DEFB $00
+        RST PRS
+        DEFB CR
+        DEFM /IX/
+        DEFB 0
         PUSH IX
         POP HL
         RST $10
         DEFB $B0
-        RST $28
-        DEFB $20
-        DEFB $49
-        DEFB $46
-        DEFB $46
-        DEFB $32
-        DEFB $20
-        DEFB $00
+; DISPLAY IFF2
+        RST PRS
+        DEFM / IFF2 /
+        DEFB 0
         LD A, I
         LD A, $30
         JP PO, IFF
         INC A
 
-IFF:    RST $30
-        RST $28
-        DEFB $0D
-        DEFB $49
-        DEFB $59
-        DEFB $00
+IFF:    RST ROUT
+        RST PRS
+        DEFB CR
+        DEFM /IY/
+        DEFB 0
         PUSH IY
         POP HL
         RST $10
         DEFB $95
-        RST $28
-        DEFB $20
-        DEFB $49
-        DEFB $20
-        DEFB $00
+; DISPLAY I REG
+        RST PRS
+        DEFM / I /
+        DEFB 0
         LD A, I
+;
+; SAVE ALT REGS ON STACK
         EXX
         PUSH BC
         PUSH DE
         PUSH HL
         EXX
+; FINISH I REG
         RST $10
         DEFB $73
-        RST $28
-        DEFB $48
-        DEFB $4C
-        DEFB $00
+; DISPLAY HL,(HL) & HL'
+        RST PRS
+        DEFM /HL/
+        DEFB 0
         LD HL, ($0C65)
         CALL REGDIS
-        RST $28
-        DEFB $48
-        DEFB $4C
-        DEFB $00
+        RST PRS
+        DEFM /HL/
+        DEFB 0
         RST $10
         DEFB $5A
         LD A, $DE
@@ -464,15 +583,15 @@ IFF:    RST $30
         LD A, $BC
         RST $10
         DEFB $40
-        RST $28
+        RST PRS
         DEFB $41
         DEFB $46
         DEFB $A0
         DEFB $00
         LD HL, ($0C67)
         RST $18
-        DEFB $66
-        RST $30
+        DEFB ZTBCD3
+        RST ROUT
         LD A, L
         LD HL, $C3C1
         LD B, $0C
@@ -484,10 +603,10 @@ PCL:    INC HL
         JR C, PRC
         LD A, $20
 
-PRC:    RST $30
+PRC:    RST ROUT
         POP AF
         DJNZ PCL
-        RST $28
+        RST PRS
         DEFB $5E
         DEFB $00
         LD B, $12
@@ -514,22 +633,22 @@ RV1:    LD B, H
         RET
 
 ALTN:   RST $18
-        DEFB $68
+        DEFB ZB2HEX
 
 ALT:    LD A, $27
-        RST $30
+        RST ROUT
         POP HL
         EX (SP), HL
         LD A, H
         RST $18
-        DEFB $68
+        DEFB ZB2HEX
         LD A, L
 
 B2HCR:  RST $18
-        DEFB $68
+        DEFB ZB2HEX
 
 CRRET:  RST $18
-        DEFB $6A
+        DEFB ZCRLF
         RET
 
 
@@ -543,7 +662,7 @@ REVAD:  LD HL, ($C403)
         LD (HL), $01
         RET
 
-REVOUT: RST $28
+REVOUT: RST PRS
         DEFB $50
         DEFB $43
         DEFB $A0
@@ -553,21 +672,21 @@ REVO2:  LD B, $12
 
 REVO:   LD A, (HL)
         INC HL
-        RST $30
+        RST ROUT
         DJNZ REVO
         INC HL
         INC HL
         INC HL
 
 BOUT:   LD A, (HL)
-        RST $30
+        RST ROUT
         INC HL
-        CP $0D
+        CP CR
         JR NZ, BOUT
         LD DE, REVO3
         JR REVAD
 
-REVO3:  RST $28
+REVO3:  RST PRS
         DEFB $20
         DEFB $A0
         DEFB $20
@@ -575,7 +694,7 @@ REVO3:  RST $28
         JR REVO2
 
 SPCS:   RST $18
-        DEFB $69
+        DEFB ZSPACE
         DJNZ SPCS
         RET
 
@@ -598,10 +717,10 @@ RM2:    RST $10
         PUSH DE
 
 INP:    RST $18
-        DEFB $7B
-        CP $0D
+        DEFB ZBLINK
+        CP CR
         JR Z, NL
-        RST $30
+        RST ROUT
         CP $1B
         JR NZ, INP
         POP AF
@@ -611,13 +730,13 @@ NL:     RST $10
         DEFB $DC
         EX DE, HL
         RST $18
-        DEFB $64
+        DEFB ZNUM
         JR C, FERR
         LD A, (HL)
         OR A
         JR Z, RM1
         RST $18
-        DEFB $6A
+        DEFB ZCRLF
         POP HL
         LD HL, ($0C21)
         JR RM2
@@ -626,15 +745,15 @@ NL:     RST $10
 FIND:   DEC HL
         PUSH HL
         RST $18
-        DEFB $69
+        DEFB ZSPACE
         RST $18
-        DEFB $63
+        DEFB ZINLIN
         LD HL, $0C10
         LD BC, $0000
 
 MORE:   PUSH HL
         RST $18
-        DEFB $64
+        DEFB ZNUM
         LD A, (HL)
         OR A
         JR Z, NOARGS
@@ -720,14 +839,14 @@ NEXTJ:  POP HL
         JR NEXT
 
 PHA:    LD A, $A0
-        RST $30
+        RST ROUT
         RST $18
-        DEFB $66
+        DEFB ZTBCD3
         LD D, H
         LD E, L
         LD B, $08
         CALL SPDIS
-        RST $30
+        RST ROUT
         LD B, $08
 
 PRA:    LD A, (DE)
@@ -738,11 +857,11 @@ PRA:    LD A, (DE)
         JR NC, PRA2
         LD A, $2E
 
-PRA2:   RST $30
+PRA2:   RST ROUT
         INC DE
         DJNZ PRA
         RST $18
-        DEFB $6A
+        DEFB ZCRLF
         RET
 
 CHUSR:  LD ($0EFC), HL
@@ -760,7 +879,7 @@ DSCALJ: LD E, A
         LD D, (HL)
         PUSH DE
         RST $18
-        DEFB $60
+        DEFB ZARGS
         RET
 
 STR:    DEFM "SZ H PNC"
@@ -802,7 +921,7 @@ CTAB:   DEFW ALTP, DERR, CHUSR, REVENT
         CP $02
         JP C, REVASC
         RST $18
-        DEFB $60
+        DEFB ZARGS
         JR NZ, SCO
         LD C, $01
 
@@ -814,9 +933,9 @@ SCO:    LD B, C
         JR REVAS
 
 PRINT:  LD A, (HL)
-        RST $30
+        RST ROUT
         INC HL
-        CP $0D
+        CP CR
         JR NZ, PRINT
         LD HL, $0C10
         DEC (HL)
@@ -825,7 +944,7 @@ PRINT:  LD A, (HL)
         LD A, (HL)
         DEC HL
         LD (HL), A
-        RST $08
+        RST RIN
         SUB $1B
         RET NZ
         RST $18
@@ -876,7 +995,7 @@ INITB0:
         INC HL
         DJNZ INITB0
         LD (IX+$2A), $3B
-        LD (HL), $0D
+        LD (HL), CR
         LD DE, $0E2D
         RET
 
@@ -1200,7 +1319,7 @@ CE0:
         CALL BYTE
         LD B, A
         AND $0F
-        CP $0D
+        CP CR
         LD A, B
         RET Z
         JP DECODE
@@ -1764,7 +1883,7 @@ DNV:
         LD HL, $0000
         LD ($0E12), HL
         LD A, C
-        CP $0D
+        CP CR
         RET NZ
         LD (DE), A
         RET
@@ -1838,8 +1957,8 @@ REVASC: LD DE, $0E80
         LD BC, $0012
         LDIR
 
-L_CAC6: RST $28
-        DEFB $0D
+L_CAC6: RST PRS
+        DEFB CR
         DEFM "Options? ("
 
 OTAB:   DEFM "STZXLPDR"
@@ -1855,8 +1974,8 @@ XFOUND: SUB 'U'
 OPT0:   LD A, E
         OR D
         LD D, A
-        RST $08
-        RST $30
+        RST RIN
+        RST ROUT
         SCF
         LD E, $00
         LD HL, OTAB
@@ -1865,7 +1984,7 @@ LUOP:   RL E
         CPI
         JR Z, XFOUND
         JR NC, LUOP
-        CP $0D
+        CP CR
         JR NZ, L_CAC6
         LD A, D
         BIT 2, A
@@ -1881,7 +2000,7 @@ GETSTA: POP AF
         PUSH AF
         BIT 2, A
         JR Z, ST
-        RST $28
+        RST PRS
         DEFB $5A
         DEFB $45
         DEFB $41
@@ -1892,7 +2011,7 @@ GETSTA: POP AF
         DEFB $00
         JR ST0
 
-ST:     RST $28
+ST:     RST PRS
         DEFB $53
         DEFB $79
         DEFB $6D
@@ -1905,7 +2024,7 @@ ST:     RST $28
         DEFB $62
         DEFB $00
 
-ST0:    RST $28
+ST0:    RST PRS
         DEFB $6C
         DEFB $65
         DEFB $20
@@ -1914,8 +2033,7 @@ ST0:    RST $28
         DEFB $65
         DEFB $61
         DEFB $3F
-        DEFB $0D
-        DEFB $00
+        DEFB CR, 0
         CALL GETTWO
         JR C, GETSTA
         LD ($0E4E), BC
@@ -1927,24 +2045,23 @@ NLABS:  POP AF
         BIT 5, A
         JR Z, NOTITL
 
-ASKT:   RST $28
+ASKT:   RST PRS
         DEFB $54
         DEFB $69
         DEFB $74
         DEFB $6C
         DEFB $65
         DEFB $3F
-        DEFB $0D
-        DEFB $00
+        DEFB CR,0
         RST $18
-        DEFB $63
+        DEFB ZINLIN
         LD HL, $053C
         LD A, (DE)
         CP $3D
         JR NZ, SETLPP
         INC DE
         RST $18
-        DEFB $64
+        DEFB ZNUM
         JR C, ASKT
         LD HL, ($0C21)
 
@@ -1965,9 +2082,9 @@ BACK:   DEC HL
         CP (HL)
         JR Z, BACK
         INC HL
-        LD (HL), $0D
+        LD (HL), CR
 
-NOTITL: RST $28
+NOTITL: RST PRS
         DEFB $57
         DEFB $68
         DEFB $61
@@ -1976,18 +2093,17 @@ NOTITL: RST $28
         DEFB $6F
         DEFB $6E
         DEFB $3F
-        DEFB $0D
-        DEFB $00
+        DEFB CR,0
         RST $18
-        DEFB $63
+        DEFB ZINLIN
         RST $18
-        DEFB $79
+        DEFB ZRLIN
         JR C, NOTITL
         LD A, ($0C0B)
         CP $02
         JR C, NOTITL
         RST $18
-        DEFB $60
+        DEFB ZARGS
         INC DE
         LD ($0E14), DE
         LD D, H
@@ -2008,18 +2124,18 @@ ONLY2:  SBC HL, DE
         BIT 7, (HL)
         JR Z, DA
         RES 7, (HL)
-RNGRQ:  RST $28
+RNGRQ:  RST PRS
         DEFM "Listing range?"
-        DEFB 0DH, 00
+        DEFB CR,0
         CALL GETTWO
         JR C, RNGRQ
 
 DA:     LD ($0E48), BC
         LD ($0E4A), DE
 
-DAREA:  RST $28
+DAREA:  RST PRS
         DEFM "DATA areas?"
-        DEFB 0DH, 00H
+        DEFB CR,0
         XOR A
 
 L_CBF3: PUSH AF
@@ -2064,7 +2180,7 @@ DAREA1: AND A
         POP HL
         DEC A
         PUSH AF
-        RST $28
+        RST PRS
         DEFB $13
         DEFB $1B
         DEFB $13
@@ -2073,8 +2189,8 @@ DAREA1: AND A
         JR DAREA0
 
 DAREA2: RST $18
-        DEFB $6B
-        RST $28
+        DEFB ZERRM
+        RST PRS
         DEFB $13
         DEFB $13
         DEFB $17
@@ -2087,16 +2203,16 @@ DAREA3: POP AF
         PUSH HL
         LD HL, $FFFF
         PUSH HL
-        RST $28
+        RST PRS
         DEFB $47
         DEFB $6F
         DEFB $3F
         DEFB $00
         RST $18
-        DEFB $7B
+        DEFB ZBLINK
         LD ($0E45), A
         RST $18
-        DEFB $6A
+        DEFB ZCRLF
         LD A, ($0E44)
         AND $18
         LD HL, PASS1
@@ -2170,7 +2286,7 @@ XREF2:  LD L, (IY+0)
 
 XREF3:  PUSH BC
         EX DE, HL
-        LD (HL), $0D
+        LD (HL), CR
         LD HL, $0E14
         CALL OUTPUT
         POP BC
@@ -2189,12 +2305,12 @@ XREF4:  LD (HL), $20
 
 
 GETTWO: RST $18
-        DEFB $63
+        DEFB ZINLIN
         LD A, $1B
-        RST $30
+        RST ROUT
         PUSH DE
         RST $18
-        DEFB $79
+        DEFB ZRLIN
         POP DE
         LD A, (DE)
         RET C
@@ -2203,7 +2319,7 @@ GETTWO: RST $18
         SCF
         RET NZ
         RST $18
-        DEFB $60
+        DEFB ZARGS
         LD B, H
         LD C, L
         OR A
@@ -2369,7 +2485,7 @@ MVUP:   LD DE, ($0E52)
         RET
 
 
-OVRFLW: RST $28
+OVRFLW: RST PRS
         DEFB $4F
         DEFB $76
         DEFB $65
@@ -2378,8 +2494,7 @@ OVRFLW: RST $28
         DEFB $6C
         DEFB $6F
         DEFB $77
-        DEFB $0D
-        DEFB $00
+        DEFB CR,0
         LD HL, $0E14
         CALL OUTLIN
         RST $18
@@ -2442,7 +2557,7 @@ OUTPUT: LD B, H
 
 SQSH1:
         LD A, (HL)
-        CP $0D
+        CP CR
         JR Z, SQSH3
         CP C
         JR Z, SQSH3
@@ -2474,7 +2589,7 @@ SQSH3:  EX DE, HL
         JR Z, SQSH4
         INC HL
 
-SQSH4:  LD (HL), $0D
+SQSH4:  LD (HL), CR
         LD HL, $0E58
 
 ALLLIN: CALL OUTLIN
@@ -2499,7 +2614,7 @@ ALLLIN: CALL OUTLIN
         LD H, A
         LD ($0E80), HL
         LD HL, $0E58
-        LD A, $0D
+        LD A, CR
 
 Z1:     LDI
         CP (HL)
@@ -2527,7 +2642,7 @@ Z1:     LDI
 OUTLIN: LD B, (HL)
         CALL CHROUT
         INC HL
-        CP $0D
+        CP CR
         JR NZ, OUTLIN
         RET
 
@@ -2603,7 +2718,7 @@ ABSOL:  LD (HL), $23
         CALL HEX4
         EX DE, HL
 
-PEQU:   LD (HL), $0D
+PEQU:   LD (HL), CR
         PUSH IY
         POP HL
         CALL OUTPUT
@@ -2625,7 +2740,7 @@ DPAGE:  LD HL, $0E7C
 EJECT:  LD A, ($0E7D)
         ADD A, (HL)
         LD D, A
-        LD B, $0D
+        LD B, CR
         JR EJ1
 
 EJ0:    CALL CHROUT
@@ -2645,14 +2760,14 @@ EJ1:    DEC D
 
 NOINC:  LD HL, $0E84
         CALL OUTLIN
-        LD B, $0D
+        LD B, CR
 
 CHROUT: LD A, B
-        RST $30
+        RST ROUT
         PUSH HL
         LD HL, $0E44
         CALL PUNCH
-        CP $0D
+        CP CR
         JR NZ, EXCHR
         LD A, $0A
         CALL PUNCH
@@ -2663,7 +2778,7 @@ CHROUT: LD A, B
         DEFB $62
         JR NC, NOWT
 
-WAIT:   RST $08
+WAIT:   RST RIN
         LD ($0E45), A
 
 NOWT:   CP $1B

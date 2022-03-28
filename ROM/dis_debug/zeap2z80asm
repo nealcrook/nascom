@@ -1,0 +1,162 @@
+#!/usr/bin/perl
+#
+# reformat assembler source from ZEAP to suit z80asm
+
+# usage:
+# ./zeap2z80asm foo.asm foo_mod.asm
+
+use strict;
+use warnings;
+
+my $infile = $ARGV[0];
+my $outfile = $ARGV[1];
+
+open IN, $infile or die "Could not open $infile for input";
+open OUT, ">$outfile" or die "Could not open $outfile for output";
+
+while (my $line = <IN>) {
+    # remove any line endings
+    $line =~ s/[\r\n]//;
+
+    my $index = 0;
+    my $outline = "";
+    my $has_label = 0;
+    my $op = 0;
+    while (1) {
+        my $token;
+        my $type;
+        ($token, $type, $index) = get_token($line, $index);
+
+        if ($type eq "LABEL") {
+            # ZEAP allows it to contain a $ but no other assemblers do, so swap it
+            # to _ and hope that no name-space clash occurs!
+            # ZEAP does not allow label to end with : but other assemblers require it
+            $token =~ s/\$/_/g;
+            $outline = sprintf("% -8s","$token:");
+            $has_label = 1;
+        }
+        elsif ($type eq "COMMENT" or $type eq "NONE") {
+            print OUT "$outline$token\n";
+            last;
+        }
+        elsif ($type eq "STRING") {
+            $outline = $outline . " \"$token\"";
+        }
+        elsif ($type eq "TOK") {
+            if ($op == 0) {
+                # op or pseudo-op. Do it as-is, may need indent
+                if ($has_label) {
+                    $outline = $outline . $token;
+                }
+                else {
+                    $outline = $outline . "        " . $token;
+                }
+            }
+            else {
+                # operands
+
+                # Hex numbers ZEAP: £50 z80ASM: $50
+                $token =~ s/£([0-9a-fA-F]+)/\$$1/g;
+
+                # detect and fix label name that includes a $
+                if ($token =~ /\$[0-9a-fA-F]+/) {
+                    # just hex prefix. Leave as-is
+                }
+                elsif ($token =~ /([A-Za-z0-9_\$]+)([ \t\+\)]+)/) {
+                    # looks like a label with a $ in it
+                    my $label = $1;
+                    my $ws = $2;
+                    $label =~ s/\$/_/g;
+                    $token =~ s/([A-Za-z0-9_\$]+)([ \t\+\)]+)/$label$ws/;
+                }
+
+                if ($op == 1) {
+                    $outline = $outline . " " . $token;
+                }
+                else {
+                    $outline = $outline . "," . $token;
+                }
+            }
+            $op = $op + 1;
+        }
+    }
+}
+close IN;
+close OUT;
+
+
+
+# my ($token, $type, $index) = get_token($line, $index);
+# $line is a string, a line of assembler source with line ending(s) removed.
+# $index is the first character to examine (eg, 0 to start at the beginning)
+# return the next token as $token, with $index pointing to the next location to examine.
+# $type says what it is..
+#
+# $type = "LABEL" if the token is a label; remove trailing : if present
+# $type = "NONE" if the end of the line has been reached
+# $type = "COMMENT" if the token is a comment (the end of the line HAS been reached). The ";" is included in $token
+# $type = "TOK" if the token is an op-code or operand; delimiters are removed
+# $type = "STRING" if the token is an operand, a ZEAP string delimited by /. Delimiters are removed
+sub get_token {
+    my $line = $_[0];
+    my $i = $_[1];
+
+    my $length = length($line);
+
+    if ($i >= $length) {
+        return ("", "NONE", $i);
+    }
+
+    my @x = split //,$line;
+    while ($i < $length) {
+        if ($x[$i] eq ";") {
+            # comment. Consume the rest of the line
+            my $comment = substr($line, $i, $length - $i + 1);
+            return ($comment, "COMMENT", $length);
+        }
+        if ($x[$i] !~ /\s/ and $i == 0) {
+            # label. Consume to white-space or :
+            while ($i < $length) {
+                last if $x[$i] =~ /[\s\:]/;
+                $i = $i + 1;
+            }
+            my $label = substr($line, 0 , $i);
+            return ($label, "LABEL", $i+1);
+        }
+        if ($x[$i] =~ /\//) {
+            # zeap string. Consume to terminator.
+            my $start = $i + 1; # exclude start delimiter
+            while ($i < $length) {
+                $i = $i + 1;
+                last if $x[$i] =~ /\//;
+            }
+            my $tok = substr($line, $start, $i - $start);
+            return ($tok, "STRING", $i+1);
+        }
+        if ($x[$i] =~ /\"/) {
+            # masm string. Consume to terminator.
+            my $start = $i + 1; # exclude start delimiter
+            while ($i < $length) {
+                $i = $i + 1;
+                last if $x[$i] =~ /\"/;
+            }
+            my $tok = substr($line, $start, $i - $start);
+            return ($tok, "STRING", $i+1);
+        }
+        if ($x[$i] !~ /[\s\,]/) {
+            # op or operand. Consume to white-space or ","
+            my $start = $i;
+            while ($i < $length) {
+                last if $x[$i] =~ /[\s\,]/;
+                $i = $i + 1;
+            }
+            my $tok = substr($line, $start, $i - $start);
+            return ($tok, "TOK", $i+1);
+        }
+
+        # skip over whitespace or other delimiter
+        $i = $i + 1;
+    }
+    # copes with trailing whitespace
+    return ("", "NONE", $i);
+}
