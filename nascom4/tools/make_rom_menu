@@ -81,11 +81,12 @@ add_image("POLYDOS2-SD", 0xD000, "$nascom/sdcard/host_programs/polydos_util_rom_
 add_image("POLYDOS-LSD", 0xD000, "$nascom/nascom4/PolyDos/polydos_rom_d000.bin");
 add_image("POLYDOS3", 0xD000, "$nascom/PolyDos/rom/PolyDos_3_Boot_ROM.bin");
 add_image("PASCAL",   0xD000, "$nascom/ROM/pascal/bls_pascal2_d000.bin");
+add_image("NASFORTH", 0x1000, "../../../nascom_other/NASFORTH.NAS");
 add_image("NASDOS",   0xD000, "../../../nascom_other/nascom_nasdos/NASDOS/nasdos.rom");
 add_image("NASDOS-SD",0xD000, "../../../nascom_other/nascom_nasdos/NASDOS/nasdos_sd.rom");
 add_image("NASCPM",   0xF000, "../../../nascom_other/cpm_polydos/bootrom/cpmboot.go");
 add_image("LOLLIPOP", 0x1000, "/home/crook/Arduino/VGANoFrameBufferNAS/data/lollipop.bin");
-add_image("DISDEB",   0xC000, "../../../nascom_other/Odebdis.nas");
+add_image("DISDEB",   0xC000, "$nascom/ROM/dis_debug/dis_debug.bin_golden");
 add_image("INVADERS", 0x1000, "../../../nascom_other/Spaceii.nas");
 add_image("MEMTEST",  0x0c80, "../../../nascom_other/map80memorytest/m80memtp.bin");
 add_image("CPM-LSD",  0xc000, "$nascom/nascom4/cpm/map80vfc_rom/boot_code_standalone_sd.bin");
@@ -108,14 +109,14 @@ my $menu =
     "H: NAS-SYS3 + ZEAP + BASIC + DISDEBUG\r" .
     "I: NAS-SYS3 + BASIC + POLYDOS2  J: POLYDOS2-SD\r" .
     "K: NAS-SYS3 + BASIC + POLYDOS3  L: POLYDOS-LSD\r" .
-    "M  NAS-SYS3 + BASIC + NASDOS    N: NASDOS-SD\r" .
-    "O: NAS-SYS3 + PASCAL\r" .
-    "P: NASCOM CP/M\r" .
-    "Q: MAP80 VFC CP/M      R: MAP80 VFC CP/M-LSD\r" .
-    "S: NAS-SYS3 + LOLLIPOP        Reload char-gen:\r" .
-    "T: NAS-SYS3 + INVADERS         X: NASCOM\r" .
-    "U: NAS-SYS3 + NASPEN           Y: VFC\r" .
-    "V: NAS-SYS3 + MEMORY TEST      Z: SARGON\r" ;
+    "M: NAS-SYS3 + BASIC + NASDOS    N: NASDOS-SD\r" .
+    "O: NAS-SYS3 + PASCAL   P: NAS-SYS3 + NASFORTH\r" .
+    "Q: NASCOM CP/M\r" .
+    "R: MAP80 VFC CP/M      S: MAP80 VFC CP/M-LSD\r" .
+    "T: NAS-SYS3 + LOLLIPOP        Reload char-gen:\r" .
+    "U: NAS-SYS3 + INVADERS         X: NASCOM\r" .
+    "V: NAS-SYS3 + NASPEN           Y: VFC\r" .
+    "W: NAS-SYS3 + MEMORY TEST      Z: SARGON\r" ;
 
 my $pad = $menu_blocks * 512 - length($menu);
 if ($pad < 0) {
@@ -176,18 +177,19 @@ add_profile('L',              "L:POLYDOS-LSD", "L:BASIC",       "P19=60", "GD000
 add_profile('M',              "L:NASDOS",   "L:BASIC",          "P19=60", "GD000=19");
 add_profile('N',              "L:NASDOS-SD","L:BASIC",          "P19=60", "GD000=19");
 add_profile('O',                            "L:PASCAL",         "P19=60", "GD000=19");
-add_profile('P', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
-add_profile('Q',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
-add_profile('R', "L:CPM-LSD",                                   "PEE=00", "GC000=20");# MAP80 CP/M  - switch video, SDcard boot
-add_profile('S',               "L:LOLLIPOP",                              "G1000=19");
-add_profile('T',               "L:INVADERS",                              "G1000=19");
-add_profile('U', "L:NASPEN",                                    "P19=08", "G0=19");
-add_profile('V',               "L:MEMTEST",                               "G0=19"); # Load then start NAS-SYS
+add_profile('P',                            "L:NASFORTH",       "P19=00", "G1000=19");
+add_profile('Q', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
+add_profile('R',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
+add_profile('S', "L:CPM-LSD",                                   "PEE=00", "GC000=20");# MAP80 CP/M  - switch video, SDcard boot
+add_profile('T',               "L:LOLLIPOP",                              "G1000=19");
+add_profile('U',               "L:INVADERS",                              "G1000=19");
+add_profile('V', "L:NASPEN",                                    "P19=08", "G0=19");
+add_profile('W',               "L:MEMTEST",                               "G0=19"); # Load then start NAS-SYS
 # Load chargen then restart SBROM, using 104F (MENU) as entry is nasty, but restarting
 # from 1000 did not work for some reason.
-add_profile('X', "PEC=E1", "P18=5D", "L:CGEN-NAS",   "PEC=E0", "G104F=1D");
-add_profile('Y', "PEC=E1", "P18=5D", "L:CGEN-VFC",   "PEC=E0", "G104F=1D");
-add_profile('Z', "PEC=E1", "P18=5D", "L:CGEN-SARGON","PEC=E0", "G104F=1D");
+add_profile('X', "PEC=E1", "P18=5D", "L:CGEN-NAS",   "PEC=0", "G104F=1D");
+add_profile('Y', "PEC=E1", "P18=5D", "L:CGEN-VFC",   "PEC=0", "G104F=1D");
+add_profile('Z', "PEC=E1", "P18=5D", "L:CGEN-SARGON","PEC=0", "G104F=1D");
 
 ################################################################################
 # Generate the image
