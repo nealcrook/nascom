@@ -528,6 +528,11 @@ sub cmd_quit {
     cmd_exit();
 }
 
+
+sub cmd_q {
+    cmd_exit();
+}
+
 #################################################################
 #################################################################
 ## Help
@@ -773,8 +778,7 @@ Commands are:
     usage            - print brief usage message
     help             - print this message
     help=cmd         - print help on command cmd (eg: help=ind-poly)
-    exit             - leave sdcard_editor
-    quit             - synonym for exit
+    exit quit q      - leave sdcard_editor
 
 EOF
 }
