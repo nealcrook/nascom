@@ -2,7 +2,7 @@
 ;;; https://github.com/nealcrook/nascom
 ;;;
 ;;; Loaded via dskboot, like this:
-;;; NAScas> RS DSKBOOT.CAS
+;;; NAScas> RF DSKBOOT.CAS
 ;;; NAScas> .
 ;;; R
 ;;; E C80 <optional args -- see below>
@@ -104,11 +104,20 @@ copy:
         defb    $00, $92, $00, $00 ;32-bit byte offset to start of image, low byte first
         defw    $0800              ;16-bit byte count to transfer, low byte first
         defw    $b800              ;16-bit destination address, low byte first
+        ;; Image 8: DIS/DEBUG (ROM version): 4Kbytes at C000
+        defb    $00, $9a, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $1000              ;16-bit byte count to transfer, low byte first
+        defw    $c000              ;16-bit destination address, low byte first
+        ;; Image 9: NAS-FORTH (RAM version): 10Kbytes at 1000
+        defb    $00, $aa, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $2800              ;16-bit byte count to transfer, low byte first
+        defw    $1000              ;16-bit destination address, low byte first
+        ;; Image 10: ZEN and its source (RAM version): 24Kbytes at 1000
+        defb    $00, $d2, $00, $00 ;32-bit byte offset to start of image, low byte first
+        defw    $6000              ;16-bit byte count to transfer, low byte first
+        defw    $1000              ;16-bit destination address, low byte first
 
         ;; space for more images..
-        ds      8, $ff          ; Image 8
-        ds      8, $ff          ; Image 9
-        ds      8, $ff          ; Image 10
         ds      8, $ff          ; Image 11
         ds      8, $ff          ; Image 12
         ds      8, $ff          ; Image 13
