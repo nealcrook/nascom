@@ -112,9 +112,9 @@ copy:
         defb    $00, $aa, $00, $00 ;32-bit byte offset to start of image, low byte first
         defw    $2800              ;16-bit byte count to transfer, low byte first
         defw    $1000              ;16-bit destination address, low byte first
-        ;; Image 10: ZEN and its source (RAM version): 24Kbytes at 1000
+        ;; Image 10: ZEN and its source (RAM version): 27Kbytes at 1000
         defb    $00, $d2, $00, $00 ;32-bit byte offset to start of image, low byte first
-        defw    $6000              ;16-bit byte count to transfer, low byte first
+        defw    $6C00              ;16-bit byte count to transfer, low byte first
         defw    $1000              ;16-bit destination address, low byte first
 
         ;; space for more images..
