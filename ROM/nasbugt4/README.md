@@ -4,13 +4,14 @@ The monitor source code:
 
     NASBUGT4.asm
 
-Has been recreated by disassembly of the binary (see below).  It seems that the
-source code was never published even though source was published for earlier
-(T2) and later (NAS-SYS) monitors. Much of the first 1Kbytes is very similar to
-T2 and so label names and comments have been pasted from that code. T4 was the
-first sight of the R/W/G commands and some label names and comments for these
-have been pasted the NAS-SYS1 source.  Some stuff here still needs tidying up,
-but this does assemble to produce a match to the golden binary.
+Has been recreated by disassembly of the binary (see below).  It seems that
+early copies of T4 did not come with source code, even though source was
+published for earlier (T2) and later (NAS-SYS) monitors. Much of the first
+1Kbytes is very similar to T2 and so label names and comments have been pasted
+from that code. T4 was the first sight of the R/W/G commands and some label
+names and comments for these have been pasted the NAS-SYS1 source.  Some stuff
+here still needs tidying up, but this does assemble to produce a match to the
+golden binary.
 
 The binary file:
 
@@ -23,9 +24,19 @@ The documentation:
 
     NASBUGT4_manual.pdf
 
-came from nascomhomepage.com "NASCOM_T4_MANUAL.pdf" and is a scan of the original
-documentation, which is written as a supplement to the T2 document. Unlike the other
-monitors, no source code seems to have been published for this code.
+came from nascomhomepage.com "NASCOM_T4_MANUAL.pdf" and is a scan of the
+original documentation, which is written as a supplement to the T2 document. It
+does not include source code.
+
+    NASBUGT4_manual2.pdf
+
+is a scan that I made from an original copy of T4 documentation that was
+gifted to me. This is a full manual, including source code.
+
+In an article written by Richard Beal (the author of T4) he explained that T4
+was hand-assembled. It was only later that he had a copy of the Zeap
+assembler. I concluded that "manual2" was created later in the life of T4 and
+replaced the older material.
 
 # Rebuild From Source
 
