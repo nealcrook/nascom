@@ -24,6 +24,14 @@ on NASBUGT2 (including a source listing) and other programming notes. Casual ins
 of the source listing shows that the NASBUGT2.asm contains the same content and comments
 as this listing (but I have not checked it in detail).
 
+    NASBUG_amendment.pdf
+
+This is a memo dated July 1978 which details 2 code changes to the NASBUG
+monitor. The first (a modification to routine chin) is part of the source code
+here. The second (remapping the < and > keys from shift-M, shift-N to shift-,
+and shift-.) is not part of the source code here. The remapped keys reflect what
+was used in subsequent monitors and engraved on the NASCOM 2 keyboard.
+
 # Rebuild From Source
 
 To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but effective)
