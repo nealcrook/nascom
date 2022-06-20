@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# rebuild from source and check that the binary matches the golden version
+
+z80asm -i setver20.asm -i rpmXX.asm -lrpm20.lst -orpm20.bin
+z80asm -i setver21.asm -i rpmXX.asm -lrpm21.lst -orpm21.bin
+z80asm -i setver23.asm -i rpmXX.asm -lrpm23.lst -orpm23.bin
+
+# check them
+diff rpm20.bin rpm20.bin_golden
+diff rpm21.bin rpm21.bin_golden
+diff rpm23.bin rpm23.bin_golden

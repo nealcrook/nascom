@@ -1,0 +1,1037 @@
+#!/usr/bin/perl
+#
+# script to use the z80 disassembler to reverse the RP/M version 2.3 ROM
+# The ROM is located at 0xf000 and expects RAM at 0.
+
+use warnings;
+use CPU::Z80::Disassembler;
+
+my $file_name = "rpm23.bin_golden";
+my $addr = 0xf000;
+my $file = "rpm23.txt";
+my $asm_file = "rpm23.asm";
+
+
+$dis = CPU::Z80::Disassembler->new;
+$dis->memory->load_file($file_name, $addr);
+$dis->write_dump($file);
+
+# mock up stuff for NAS-SYS RST codes
+
+###########################################
+# RST 0 - START
+
+###########################################
+# RST 8 - RIN
+
+###########################################
+# RST 10 - RCAL
+## TODO put the actual code thread in here so that it can be followed.
+##$dis->memory->poke(0x10, 0xc9);
+##$dis->code(0x10);
+##$dis->set_call(0x10, \&handle_rcal);
+
+# advance return PC past in-line subroutine code
+sub handle_rcal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 18 - SCAL
+##$dis->memory->poke(0x18, 0xc9);
+##$dis->code(0x18);
+##$dis->set_call(0x18, \&handle_scal);
+
+# advance return PC past in-line subroutine code
+##  sub handle_scal {
+##      my $addr = $_[1];
+##      $dis->defb($addr);
+##      return $addr+1;
+##  }
+
+###########################################
+# RST 20 - BRKPT
+
+###########################################
+# RST 28 - PRS
+##  $dis->memory->poke(0x28, 0xc9);
+##  $dis->code(0x28);
+##  $dis->set_call(0x28, \&handle_prs);
+
+# advance return PC past in-line null-terminated string
+sub handle_prs {
+    my $ref = $_[0];
+    my $addr = $_[1];
+
+    my $start = $addr;
+    my $len = 0;
+    my $is_string;
+    while (1) {
+        my $byte = $dis->memory->peek($addr);
+        if (($byte > 31) and ($byte < 128)) {
+            # printable
+            if (($len == 0) or ($is_string==1)) {
+                # string, new section, first of section OR
+                # string continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 1;
+            }
+            else {
+                # byte -> string change
+                if ($gen_label) {
+                    $dis->defb($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defb($start, $len);
+                }
+                $len = 1;
+                $is_string = 1;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        else {
+            # not printable
+            if (($len == 0) or ($is_string==0)) {
+                # byte, new section, first of section OR
+                # byte continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 0;
+            }
+            else {
+                # string -> byte change
+                if ($gen_label) {
+                    $dis->defm($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defm($start, $len);
+                }
+                $len = 1;
+                $is_string = 0;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        last if ($byte==0);
+    }
+
+    # emit the final section
+    if ($len != 0) {
+        if ($is_string) {
+            if ($gen_label) {
+                $dis->defm($start, $len, $label);
+            }
+            else {
+                $dis->defm($start, $len);
+            }
+        }
+        else {
+            if ($gen_label) {
+                $dis->defb($start, $len, $label);
+            }
+            else {
+                $dis->defb($start, $len);
+            }
+        }
+    }
+    return $addr;
+}
+
+
+# Create a message of length $len starting at address $addr and
+# using label $label.
+# Use defm and defb to report the bytes of the message
+# Return the next address
+sub msg_by_len {
+    my $addr = $_[0];
+    my $len = $_[1];
+    my $label = $_[2];
+
+    my $start = $addr;
+    my $end = $addr + $len; # loop while < $end
+    my $gen_label = 1;  # flag
+    $len = 0;
+    my $is_string;
+
+    # byte new section, first of section
+    # byte continue existing section
+    # string -> byte change
+
+    while ($addr < $end) {
+        my $byte = $dis->memory->peek($addr);
+        if (($byte > 31) and ($byte < 128)) {
+            # printable
+            if (($len == 0) or ($is_string==1)) {
+                # string, new section, first of section OR
+                # string continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 1;
+            }
+            else {
+                # byte -> string change
+                if ($gen_label) {
+                    $dis->defb($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defb($start, $len);
+                }
+                $len = 1;
+                $is_string = 1;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        else {
+            # not printable
+            if (($len == 0) or ($is_string==0)) {
+                # byte, new section, first of section OR
+                # byte continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 0;
+            }
+            else {
+                # string -> byte change
+                if ($gen_label) {
+                    $dis->defm($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defm($start, $len);
+                }
+                $len = 1;
+                $is_string = 0;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+    }
+    # emit the final section
+    if ($len != 0) {
+        if ($is_string) {
+            if ($gen_label) {
+                $dis->defm($start, $len, $label);
+            }
+            else {
+                $dis->defm($start, $len);
+            }
+        }
+        else {
+            if ($gen_label) {
+                $dis->defb($start, $len, $label);
+            }
+            else {
+                $dis->defb($start, $len);
+            }
+        }
+    }
+    return $end;
+}
+
+###########################################
+# RST 30 - ROUT
+##$dis->memory->poke(0x30, 0xc9);
+##$dis->code(0x30);
+
+###########################################
+# RST 38 - RDEL
+##$dis->memory->poke(0x38, 0xc9);
+##$dis->code(0x38);
+
+###########################################
+# NAS-SYS initialisation routine
+##$dis->memory->poke(0xd, 0xc9);
+##$dis->code(0xd,"STMON");
+
+###########################################
+# NAS-SYS entry point
+# Never actually come back from here, but
+# model it as "ret"
+##$dis->memory->poke(0x5, 0xc9);
+##$dis->code(0x5,"NAS");
+
+# given a list of addresses, do a $dis->code on each
+# of them, with a label of the form X_<addr> where
+# <addr> is a 4-digit hex address with leading zeros
+sub dis_here {
+    while (my $addr = shift @_) {
+        my $label = sprintf("X_%04X", $addr);
+        $dis->code($addr,$label);
+    }
+}
+
+# given an address, declare the first as a byte and the next two as a word
+# with a label
+# and return the next address
+# $prefix is the prefix of the label, and $use_addr defines the format
+sub dis_tab1 {
+    my $prefix = $_[0];
+    my $addr = $_[1];
+    my $use_addr = $_[2];
+    $dis->defb($addr,1);
+    $dis->defw($addr+1,1);
+    my $ascii = $dis->memory->peek($addr);
+    my $val = $dis->memory->peek16u($addr+1);
+    my $label;
+    if ($use_addr) {
+        $label = sprintf("%s_%04X", $prefix, $val);
+    }
+    else {
+        $label = sprintf("%s_CHR%02X", $prefix, $ascii);
+    }
+    $dis->code($val,$label);
+    return $addr+3;
+}
+
+# @comments = ("foo", "bar");
+# code_com(0x1234, "label", @comments);
+#
+# gotcha: need all the subsequent commented lines to be marked as code BEFORE this is called
+sub code_com {
+    my $addr = shift @_;
+    my $label = shift @_;
+
+    $dis->code($addr, $label);
+    $dis->line_comments($addr, @_);
+}
+
+
+###########################################
+# Stuff specific to the code being disassembled
+
+# Commands:
+# B disk boot
+# R tape read
+# W tape write
+# L tape length
+# D memory display
+# S memory set/examine
+# C memory copy
+# F memory fill
+# P memory move package to 0x100
+# U port uart init
+# O port output
+# Q port query
+# G execute from specified address
+# I execute from 0x100 with CP/M args
+
+# Workspace:
+# 0x3B-0x3C Baud rate divisor; initialised from UARTDIV
+#
+# 0x41      Current printer line count
+# 0x42      Lines per page; initialised to LINPPAG
+# 0x48-0x49 Cursor column, cursor row
+# 0x4A-0x4B ?? Initialised to 0x0080
+# 0x4C-0x4D ?? Initialised to 0x0200
+# 0x4E-0x4F RAM top
+# 0x55-0x56 SP store
+# 0x57-0x58 DE store
+# 0x59-0x5A HL store (also used as temp store for IOBYTE?)
+# 0x5B
+
+
+$dis->block_comment(0xf000,";;; After reset, the ROM is decoded at 0 and throughout the address map. After the\n;;; first write to port 0xFF, the ROM is only decoded at 0xFXXX. Before that write,\n;;; there must be a jump to 0xFXXX. ROM can be disabled by setting port 0xBC[3]=1\n;;;ports: 0xB4-0xB7 PIO\n;;;        0xB8-0xBF 8250 UART\n;;;        0xFE      Memory mapper\n;;;        0xFF      Page-mode.\n;;; IVC:\n;;;        0xB1      IVC Data (r/w)\n;;;        0xB2      IVC Status (ro)\n;;;        0xB3      IVC Reset (r/w)\n;;; 0x3B-0x5B RP/M Workspace");
+
+
+$dis->code(0xf000,"CBOOT");
+$dis->code(0xf003,"WBOOT");
+
+@comments = ("??",
+             "B=?? C= memory mapper port",
+             "value?",
+             "initialise memory mapper",
+             "",
+             "",
+             "",
+             "",
+             "continue",
+             "",
+             "0x64 = 40",
+             "value?",
+             "Page-mode register",
+             "Reset IVC (if present)",
+             "",
+             "",
+             "",
+             "",
+             "zero out the first 256 bytes of memory",
+             "",
+             "RAM sizing? Read value",
+             "",
+             "store complement",
+             "should match..",
+             "..but does not: found top of RAM",
+             "",
+             "restore original",
+             "next location to test",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+    );
+code_com(0xf06a, "START", @comments);
+
+
+@comments = ("Store RAM top",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "get initial/default value of IOBYTE",
+             "",
+             "store in 0x0003",
+             "",
+    );
+$dis->line_comments(0xf0ab, @comments);
+
+
+msg_by_len(0xf04c, 30, "MSGSIZ");
+msg_by_len(0xf3de, 8, "MSG2");
+msg_by_len(0xf3e6, 8, "MSG3");
+msg_by_len(0xf3ee, 7, "MSG4");
+msg_by_len(0xf3f5, 16, "MSG5");
+msg_by_len(0xf405, 18, "MSG6");
+msg_by_len(0xf417, 14, "MSG7");
+msg_by_len(0xf425, 3, "MSG8");
+msg_by_len(0xf428, 14, "MSG9");
+msg_by_len(0xf436, 20, "MSG10");
+msg_by_len(0xf44a, 13, "MSGIO"); # Invalid I/O
+msg_by_len(0xf457, 11, "MSGMEM"); # No memory"
+
+msg_by_len(0xf6f4, 19, "MSGRDY"); # ** RP/M ready **
+msg_by_len(0xf707, 6, "MSGWOT"); # What?
+msg_by_len(0xf70d, 16, "MSGCMD"); # No such command
+msg_by_len(0xf71d, 20, "MSGARG"); # Too many/few values
+msg_by_len(0xf731, 14, "MSG17"); # Trap at..
+
+msg_by_len(0xfc99, 8, "MSGNODSK"); # No disk
+msg_by_len(0xfca1, 9, "MSGBAD"); # Bad disk
+msg_by_len(0xfcaa, 11, "MSGINV"); # Wrong disk
+msg_by_len(0xfcb5, 15, "MSGBOOT"); # Executing boot
+
+
+$dis->code(0xf7ad,"BADARG");
+$dis->code(0xf7b2,"WOT");
+$dis->code(0xf006,"XF006");
+$dis->defw(0xf009,1,"UARTDIV");
+$dis->defb(0xf00b,1,"IOBYTE");
+$dis->defb(0xf00c,1,"LINPPAG");
+
+# Set of jumps
+$dis->code(0xfcc4, "CONST");
+$dis->code(0xfcdf, "CONIN");
+$dis->code(0xfd99, "CONOU");
+$dis->code(0xfdb1, "LIST");
+$dis->code(0xfdca, "PUNCH");
+$dis->line_comments(0xfdca, "Output character in C to UART");
+$dis->code(0xfdce, "READ");
+$dis->line_comments(0xfdce, "Wait for character from UART. Return character in A");
+
+$dis->block_comment(0xf00d,";;; Table of jumps to RP/M I/O routines. Copied to RAM by code at L_F0AB");
+$dis->defb(0xf00d,1, "XF00D");
+$dis->defw(0xf00e,1);
+$dis->defb(0xf010,1);
+$dis->defw(0xf011,1);
+$dis->defb(0xf013,1);
+$dis->defw(0xf014,1);
+$dis->defb(0xf016,1);
+$dis->defw(0xf017,1);
+$dis->defb(0xf019,1);
+$dis->defw(0xf01a,1);
+$dis->defb(0xf01c,1);
+$dis->defw(0xf01d,1);
+$dis->defb(0xf01f,1);
+$dis->defw(0xf020,1);
+$dis->defb(0xf022,1);
+$dis->defw(0xf023,1);
+
+#################################################################################
+#################################################################################
+# Entries in SYSTAB
+
+$dis->defw(0xf1b3,8, "SYSTAB");
+$dis->defw(0xf1c3,8);
+$dis->defw(0xf1d3,8);
+$dis->defw(0xf1e3,3);
+
+@comments = ("Routine 0: Restart R/PM",
+             "go via jump table to CBOOT",
+    );
+code_com(0xf025, "SYS0", @comments);
+
+
+@comments = ("Routine 1: Console Input ",
+             "",
+    );
+code_com(0xf3a6, "SYS1", @comments);
+
+
+@comments = ("Routine 2: Console Output",
+             "",
+    );
+code_com(0xf283, "SYS2", @comments);
+
+
+@comments = ("Routine 3: Reader Input (serial in)",
+             "",
+    );
+$dis->code(0xf3ae);
+code_com(0xf3ab, "SYS3", @comments);
+
+
+@comments = ("Routine 4: Punch Output (serial out)",
+             "go via jump table to ???order seems wrong..",
+    );
+code_com(0xf03e, "SYS4", @comments);
+
+
+@comments = ("Routine 5: List Output (printer: serial or parallel)",
+             "go via jump table to CONOU",
+    );
+code_com(0xf039, "SYS5", @comments);
+
+
+@comments = ("Routine 6: Direct Console I/O",
+             "",
+    );
+code_com(0xf3b0, "SYS6", @comments);
+
+
+@comments = ("Routine 7: Get IOBYTE",
+             "",
+    );
+code_com(0xf3c7, "SYS7", @comments);
+
+
+@comments = ("Routine 8: Set IOBYTE",
+             "",
+    );
+code_com(0xf3cc, "SYS8", @comments);
+
+
+@comments = ("Routine 9: Print String",
+             "",
+    );
+code_com(0xf3d1, "SYS9", @comments);
+
+
+@comments = ("Routine 10: Read Console Buffer",
+             "",
+    );
+code_com(0xf2d0, "SYS10", @comments);
+
+
+@comments = ("Routine 11: Get Console Status",
+             "",
+    );
+code_com(0xf3d7, "SYS11", @comments);
+
+
+@comments = ("Routine 13: Reset File I/O System",
+             "",
+    );
+code_com(0xf64a, "SYS13", @comments);
+
+
+@comments = ("Routine 15: Open File",
+             "",
+    );
+code_com(0xf462, "SYS15", @comments);
+
+
+@comments = ("Routine 16: Close File",
+             "",
+    );
+code_com(0xf483, "SYS16", @comments);
+
+
+@comments = ("Read Cassette Record",
+             "",
+    );
+code_com(0xf4ae, "SYS20", @comments);
+
+
+@comments = ("Write Cassette Record",
+             "",
+    );
+code_com(0xf5ca, "SYS21", @comments);
+
+
+@comments = ("Set Data Address",
+             "",
+    );
+code_com(0xf64d, "SYS26", @comments);
+
+#################################################################################
+#################################################################################
+
+
+$dis->code(0xf224);
+$dis->code(0xf22a);
+$dis->code(0xf24d);
+$dis->code(0xfbef,"XFBEF");
+$dis->code(0xfdf3,"XFDF3");
+
+##$dis->line_comments(0xf6e5,"HL=string address, B=string length. Print string.");
+$dis->code(0xf6e5,"PRMSG");
+
+$dis->line_comments(0xfb22,"DE=string address, terminated by \$. CP/M routine 9: print string.");
+$dis->code(0xfb22,"PRS09");
+$dis->code(0xfc3a,"PRS09I1");
+$dis->code(0xf7b5,"PRS09I2");
+
+$dis->code(0xf7b8,"CMD_RWI");
+$dis->code(0xf8a2,"CMD_D");
+$dis->code(0xf932,"CMD_S");
+$dis->code(0xf9d1,"CMD_G");
+$dis->code(0xf9ef,"CMD_C");
+$dis->code(0xfa0c,"CMD_F");
+$dis->code(0xfa29,"CMD_P");
+$dis->code(0xfa6b,"CMD_U");
+$dis->code(0xfac3,"CMD_L");
+$dis->code(0xfade,"CMD_O");
+$dis->code(0xfaf3,"CMD_Q");
+$dis->code(0xfb08,"CMD_B");
+
+$dis->code(0xfef3,"PUTIVC");
+$dis->code(0xfefd,"GETIVC");
+
+
+$dis->line_comments(0xfb2e,"CP/M routine 2: console output.");
+$dis->code(0xfb2e,"COUT02");
+
+@comments = ("",
+             "Initialise ??what",
+             "",
+             "Initialise printer lines per page from ROM default",
+             "IVC data",
+             "Scan?/Initialise? local keyboard, if any",
+             "",
+             "Initialise baud rate from ROM default",
+             "",
+             "First unused location in ROM",
+             "unprogrammed?",
+             "if not, call custom user post-reset routine",
+             "",
+             "",
+             "print memory size.. 5 digits?",
+    );
+$dis->line_comments(0xf10e, @comments);
+
+@comments = ("HL = RAM top",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "init current printer line count to 0",
+             "",
+             "",
+             "",
+             "soft init",
+             "of PIO",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "Fourth unused location in ROM",
+             "unprogrammed?",
+             "if not, call custom user post-restart (warm start) routine",
+             "",
+    );
+$dis->line_comments(0xf152, @comments);
+
+@comments = ("load IOBYTE",
+             "check Video Card bit",
+             "no video card -> do nothing",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+    );
+$dis->line_comments(0xfecf, @comments);
+
+@comments = ("",
+             "cursor type ??decode",
+             "",
+             "",
+             "cursor type ??decode",
+             "",
+             "get IOBYTE",
+             "check Video Card bit",
+             "no video card -> skip",
+             "",
+             "",
+             "1B 59 = Define Cursor Type",
+             "",
+             "CRTC register 10",
+             "",
+             "CRTC register 11",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "Cursor type ??decode",
+             "",
+    );
+$dis->line_comments(0xff41, @comments);
+
+
+$dis->code(0xff6e,"SELCASS");
+$dis->code(0xff78,"SELSER");
+@comments = ("",
+             "enable UART for cassette, switch TR1 on for motor control",
+             "baud rate divisor for 1200bd - fixed value for cassette",
+             "",
+             "",
+             "enable UART for serial port, switch TR1 off",
+             "current selected baud rate divider for serial",
+             "allow access to UART baud rate divisor registers",
+             "",
+             "",
+             "set baud rate divisor hi",
+             "",
+             "set baud rate divisor lo",
+             "",
+             "restore access to UART data/interrupt registers",
+             "",
+    );
+$dis->line_comments(0xff6e, @comments);
+
+
+
+
+@comments = ("get IOBYTE",
+             "CPU card with keyboard port?",
+             "no local keyboard port; return",
+             "?Scan of GM813 serial port",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+    );
+$dis->line_comments(0xfeb6, @comments);
+
+$dis->code(0xfbff,"CHKDSK");
+
+@comments = ("Load boot sector..",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "destination of boot sector",
+             "",
+             "load 128 bytes",
+             "data available?",
+             "no so wait",
+             "get data byte",
+             "store",
+             "next",
+             "loop for all 128 bytes",
+             "but that isn't the whole of the sector..",
+             "so loop until next byte",
+             "fetch and discard data",
+             "until command complete (ie whole sector processed)",
+             "??status",
+             "",
+             "bad disk.. abort?",
+             "",
+             "expect first 2 bytes to contain magic value GG",
+             "",
+             "",
+             "",
+             "not the right disk for this system.. abort?",
+             "",
+             "announce that we're booting in case we die/hang in the attempt",
+             "",
+             "",
+             "",
+             "copy the boot sector code from \$80 to \$0",
+             "and jump to it (not the GG, but to address 2)",
+    );
+$dis->line_comments(0xfc3d, @comments);
+
+@comments = ("",
+             "",
+             "",
+             "point to IOBYTE",
+             "0 -> serial printer, 1 -> parallel printer",
+             "parallel printer",
+             "?serial printer",
+    );
+$dis->line_comments(0xfdb1, @comments);
+
+$dis->code(0xfe65, "SOUT");
+
+$dis->code(0xfe99, "SIN");
+@comments = ("check UART for input character. Return C and character in A or NC if no character",
+    );
+$dis->line_comments(0xfe99, @comments);
+
+@comments = ("1b 3f = Get cursor co-ordinates",
+             "",
+             "",
+             "",
+             "",
+             "store row",
+             "",
+             "store column",
+             "",
+             "A holds character at cursor position",
+    );
+$dis->line_comments(0xff05, @comments);
+
+@comments = ("1b 3d = Set cursor position (screen top-left is 0,0)",
+             "H holds row, L holds col",
+             "",
+             "",
+             "",
+             "row of N is sent as N+0x20",
+             "",
+             "",
+             "col of N is sent as N+0x20",
+             "",
+    );
+$dis->line_comments(0xff1f, @comments);
+
+@comments = ("1b 5a = Get line where cursor is currently positioned",
+             "strip trailing blanks",
+             "line is terminated by CR",
+             "",
+             "",
+    );
+$dis->line_comments(0xff36, @comments);
+
+
+$dis->block_comment(0xff8e,";;; Lookup table baud rate -> divisor terminated by 0000");
+$dis->defw(0xff8e,2,"BAUDTAB");
+$dis->defw(0xff90,2);
+$dis->defw(0xff92,2);
+$dis->defw(0xff94,2);
+$dis->defw(0xff96,2);
+$dis->defw(0xff98,2);
+$dis->defw(0xff9a,2);
+$dis->defw(0xff9c,2);
+$dis->defw(0xff9e,2);
+$dis->defw(0xffa0,2);
+$dis->defw(0xffa2,2);
+$dis->defw(0xffa4,2);
+$dis->defw(0xffa6,2);
+$dis->defw(0xffa8,2);
+$dis->defw(0xffaa,2);
+$dis->defw(0xffac,2);
+$dis->defw(0xffae,2);
+$dis->defw(0xffb0,2);
+$dis->defw(0xffb2,2);
+$dis->defw(0xffb4,2);
+$dis->defw(0xffb6,2);
+$dis->defw(0xffb8,2);
+$dis->defw(0xffba,2);
+$dis->defw(0xffbc,2);
+$dis->defw(0xffbe,2);
+$dis->defw(0xffc0,2);
+$dis->defw(0xffc2,2);
+$dis->defw(0xffc4,2);
+$dis->defw(0xffc6,2);
+$dis->defw(0xffc8,2);
+$dis->defw(0xffca,2);
+$dis->defw(0xffcc,2);
+$dis->defw(0xffce,2);
+$dis->defw(0xffd0,2);
+$dis->defw(0xffd2,2);
+$dis->defw(0xffd4,2);
+$dis->defw(0xffd6,1);
+
+#$dis->defb(0xffd8,3,"CUSTOM1");
+#$dis->defb(0xffdb,3,"CUSTOM2");
+
+@comments = ("point to argument count",
+             "",
+             "set it to 0",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "point to argument count",
+             "increment",
+             "get argument count",
+             "max number we're prepared to look for??",
+             "go back for more",
+             "",
+             "return with carry set",
+    );
+$dis->line_comments(0xfb68, @comments);
+
+
+@comments = ("",
+             "print startup message",
+             "interactive command loop. Commands are dispatched with a JP/JR and terminate with RET",
+             "print prompt: *",
+             "??",
+             "??",
+             "??nothing to do",
+             "??",
+             "0x5C is start of default file control block (FCB) used as command line buffer?",
+             "",
+             "",
+             "put CMDLOP on stack so that a command that terminates with a RET will re-enter the command loop",
+             "",
+             "R - needs filename",
+             "",
+             "W - needs filename",
+             "",
+             "I - needs filename",
+             "??",
+             "",
+             "get 1st letter of command",
+             "",
+             "Display memory in hex and ASCII",
+             "",
+             "Set or examine memory",
+             "",
+             "Go to code at address",
+             "",
+             "Copy memory from/to/length",
+             "",
+             "Fill memory start/end/character",
+             "",
+             "move Package to 0x100 ??and execute",
+             "",
+             "UART configure",
+             "",
+             "display or set the Length of a program",
+             "",
+             "Out to port",
+             "",
+             "Query port",
+             "",
+             "Boot from floppy",
+             "no such command",
+             "print message ??how to get back to cmd loop",
+    );
+$dis->line_comments(0xf73f, @comments);
+$dis->code(0xf745, "CMDLOP");
+
+$dis->code(0xf1e9, "CMDRET");
+@comments = ("return from RP/M system routine to RP/M command environment: restore stack",
+             "restore HL",
+             "return values??",
+             "",
+             "",
+    );
+$dis->line_comments(0xf1e9, @comments);
+
+
+@comments = ("Dispatcher for RP/M System routines",
+             "",
+             "save",
+             "save",
+             "switch to/clear System Stack at top of memory ",
+             "will return to RP/M command environment??",
+             "",
+             "move routine number from C to A",
+             "routines 0-26 (0x1A) are defined",
+             "ignore undefined routine number",
+             "move command argument from E to C",
+             "point to table of system commands",
+             "",
+             "DE is routine number",
+             "",
+             "HL is pointing to the routine address in SYSTAB",
+             "get..",
+             "",
+             "..routine address in DE",
+             "this will set DE to 0",
+             "",
+             "go to system routine",
+    );
+$dis->line_comments(0xf188, @comments);
+
+$dis->code(0xf1f2,"DUMMY");
+
+#@comments = ("",
+#             "",
+#    );
+#$dis->line_comments(0xfdb1, @comments);
+
+
+# This can optimise code and so it may prevent 100% match
+# on re-assembly.
+##$dis->analyse;
+
+$dis->write_asm($asm_file);
