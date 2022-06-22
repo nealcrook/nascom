@@ -3,19 +3,48 @@ L_0002: equ $0002
 L_0005: equ $0005
 L_0038: equ $0038
 
+
+;;; Ports for GM811/GM813 CPU board
+
+KBD:    equ $B0                 ; keyboard - GM811 only
+
+PIOADAT:equ $B4
+PIOBDAT:equ $B5
+PIOACTL:equ $B6
+PIOBCTL:equ $B7
+
+MMAP:   equ $FE                 ; memory mapper - GM813 only
+PMOD:   equ $FF                 ; page mode     - GM813 only
+
+UARTDAT:equ $B8                 ; data holding
+UARTIE: equ $B9                 ; interrupt enable         UNUSED HERE
+UARTII: equ $BA                 ; interrupt identification UNUSED HERE
+UARTLC: equ $BB                 ; line control             UNUSED HERE
+UARTMC: equ $BC                 ; modem control
+UARTLS: equ $BD                 ; line status
+UARTMS: equ $BE                 ; modem status
+
+
+;;; Ports for IVC board
+IVCDAT: equ $B1    ;data (r/w)
+IVCSTA: equ $B2    ;status (ro)
+IVCRST: equ $B3    ;reset (r/w)
+
+;;; Ports for FDC board
+FDCCMD: equ $E0    ;1793 command register
+FDCSTA: equ $E0    ;1793 status register
+FDCTRK: equ $E1    ;1793 track register
+FDCSEC: equ $E2    ;1793 sector register
+FDCDAT: equ $E3    ;1793 data register
+FDCDRV: equ $E4    ;FDC card drive select port
+
+
         org $F000
 
 ;;; After reset, the ROM is decoded at 0 and throughout the address map. After the
 ;;; first write to port 0xFF, the ROM is only decoded at 0xFXXX. Before that write,
 ;;; there must be a jump to 0xFXXX. ROM can be disabled by setting port 0xBC[3]=1
-;;;ports: 0xB4-0xB7 PIO
-;;;        0xB8-0xBF 8250 UART
-;;;        0xFE      Memory mapper
-;;;        0xFF      Page-mode.
-;;; IVC:
-;;;        0xB1      IVC Data (r/w)
-;;;        0xB2      IVC Status (ro)
-;;;        0xB3      IVC Reset (r/w)
+;;;
 ;;; 0x3B-0x5B RP/M Workspace
 
 CBOOT:  jp START
@@ -95,43 +124,43 @@ MSGSIZ:
         ;; ===================================
 
 START:  ld d, $64               ; ??
-L_F06C: ld bc, L_F0FE           ; B=?? C= memory mapper port
+L_F06C: ld bc, L_F0FE           ; B=?? C= port for MMAP
         ld e, $0F               ; value?
 L_F071: out (c), e              ; initialise memory mapper
-        dec e                   ; 
-        ld a, b                 ; 
-        sub $10                 ; 
-        ld b, a                 ; 
+        dec e
+        ld a, b
+        sub $10
+        ld b, a
         jr nc, L_F071           ; continue
-        dec d                   ; 
+        dec d
         jr nz, L_F06C           ; 0x64 = 40
         ld a, $11               ; value?
-        out ($FF), a            ; Page-mode register
-        out ($B3), a            ; Reset IVC (if present)
-        ld hl, L_0000           ; 
-        ld (hl), $00            ; 
-        ld de, $0001            ; 
-        ld bc, $00FF            ; 
+        out (PMOD), a           ; Page-mode register
+        out (IVCRST), a         ; Reset IVC (if present)
+        ld hl, L_0000
+        ld (hl), $00
+        ld de, $0001
+        ld bc, $00FF
         ldir                    ; zero out the first 256 bytes of memory
-        ld hl, L_0000           ; 
+        ld hl, L_0000
 L_F093: ld a, (hl)              ; RAM sizing? Read value
-        cpl                     ; 
+        cpl
         ld (hl), a              ; store complement
         cp (hl)                 ; should match..
         jr nz, L_F0AB           ; ..but does not: found top of RAM
-        cpl                     ; 
+        cpl
         ld (hl), a              ; restore original
         inc hl                  ; next location to test
-        ld de, $000C            ; 
-L_F09F: ld a, (de)              ; 
-        inc a                   ; 
-        ld (de), a              ; 
-        cp $0A                  ; 
-        jr nz, L_F093           ; 
-        xor a                   ; 
-        ld (de), a              ; 
-        dec de                  ; 
-        jr L_F09F               ; 
+        ld de, $000C
+L_F09F: ld a, (de)
+        inc a
+        ld (de), a
+        cp $0A
+        jr nz, L_F093
+        xor a
+        ld (de), a
+        dec de
+        jr L_F09F
 
 
 L_F0AB: ld ($004E), hl          ; Store RAM top
@@ -140,7 +169,7 @@ L_F0AB: ld ($004E), hl          ; Store RAM top
         ld sp, hl               ; 
         ld de, $FF40            ; 
         add hl, de              ; 
-        ld a, $C3               ; 
+        ld a, $C3               ; JP
         ld (L_0005), a          ; 
         ld ($0006), hl          ; 
         ld (hl), a              ; 
@@ -163,7 +192,7 @@ L_F0AB: ld ($004E), hl          ; Store RAM top
         ld hl, XF00D            ; 
         ld bc, $0018            ; 
         ldir                    ; 
-        ld (L_0038), a          ; 
+        ld (L_0038), a          ; ??trap restart?? insert JP
         ld hl, XFBEF            ; 
         ld ($0039), hl          ; 
         ld a, (IOBYTE)          ; get initial/default value of IOBYTE
@@ -179,7 +208,7 @@ L_F0FE: ld bc, $00FE
         ld a, $0F
         out (c), a
         ld a, (hl)
-        cp $C3
+        cp $C3                  ; is it JP
 
         ;; ===================================
         if RPMVER = 20
@@ -201,16 +230,16 @@ L_F10E: ld hl, $0200            ;
         ld ($004C), hl          ; Initialise ??what
         ld a, (LINPPAG)         ; 
         ld ($0042), a           ; Initialise printer lines per page from ROM default
-        in a, ($B1)             ; IVC data
+        in a, (IVCDAT)
         call L_FEB6             ; Scan?/Initialise? local keyboard, if any
         ld hl, (UARTDIV)        ; 
         ld ($003B), hl          ; Initialise baud rate from ROM default
         call SELSER             ; 
-        ld a, (L_FFD8)          ; First unused location in ROM
+        ld a, (USER0)           ; First unused location in ROM
         cp $FF                  ; unprogrammed?
-        call nz, L_FFD8         ; if not, call custom user post-reset routine
-        call L_FB27             ; 
-        ld hl, $0008            ; 
+        call nz, USER0          ; if not, call custom user post-reset routine
+        call CRLF
+        ld hl, $0008
         ld b, $05               ; print memory size.. 5 digits?
 L_F138: ld a, (hl)
         add a, $30
@@ -237,42 +266,42 @@ L_F152: ld hl, ($004E)          ; HL = RAM top
         ld ($0045), a           ; 
         ld ($0053), a           ; 
         ld a, $FF               ; 
-        out ($B4), a            ; soft init
-        out ($B5), a            ; of PIO
-        out ($B6), a            ; 
-        ld a, $FD               ; 
-        out ($B6), a            ; 
-        ld a, $FF               ; 
-        out ($B7), a            ; 
-        xor a                   ; 
-        out ($B7), a            ; 
-        ld a, (L_FFDB)          ; Fourth unused location in ROM
+        out (PIOADAT), a        ; soft init of PIO
+        out (PIOBDAT), a
+        out (PIOACTL), a
+        ld a, $FD
+        out (PIOACTL), a
+        ld a, $FF
+        out (PIOBCTL), a
+        xor a
+        out (PIOBCTL), a
+        ld a, (USER1)           ; Fourth unused location in ROM
         cp $FF                  ; unprogrammed?
-        call nz, L_FFDB         ; if not, call custom user post-restart (warm start) routine
-        jp L_F73F               ; 
+        call nz, USER1          ; if not, call custom user post-restart (warm start) routine
+        jp L_F73F
 
 
 L_F188: ld ($0057), de          ; Dispatcher for RP/M System routines
-        ld hl, L_0000           ; 
+        ld hl, L_0000
         ld ($0059), hl          ; save
         ld ($0055), sp          ; save
-        ld sp, ($004E)          ; switch to/clear System Stack at top of memory 
+        ld sp, ($004E)          ; switch to/clear System Stack at top of memory
         ld hl, CMDRET           ; will return to RP/M command environment??
-        push hl                 ; 
+        push hl
         ld a, c                 ; move routine number from C to A
         cp $1B                  ; routines 0-26 (0x1A) are defined
         ret nc                  ; ignore undefined routine number
         ld c, e                 ; move command argument from E to C
         ld hl, SYSTAB           ; point to table of system commands
-        ld e, a                 ; 
+        ld e, a
         ld d, $00               ; DE is routine number
-        add hl, de              ; 
+        add hl, de
         add hl, de              ; HL is pointing to the routine address in SYSTAB
         ld e, (hl)              ; get..
-        inc hl                  ; 
+        inc hl
         ld d, (hl)              ; ..routine address in DE
         ld hl, ($0057)          ; this will set DE to 0
-        ex de, hl               ; 
+        ex de, hl
         jp (hl)                 ; go to system routine
 
 
@@ -284,8 +313,8 @@ SYSTAB: defw SYS0, SYS1, SYS2, SYS3, SYS4, SYS5, SYS6, SYS7
 CMDRET: ld sp, ($0055)          ; return from RP/M system routine to RP/M command environment: restore stack
         ld hl, ($0059)          ; restore HL
         ld a, l                 ; return values??
-        ld b, h                 ; 
-DUMMY:  ret                     ; 
+        ld b, h
+DUMMY:  ret
 
 
 L_F1F3: ld hl, $0054
@@ -387,7 +416,7 @@ L_F273: ld a, c
         or $40
         ld c, a
 SYS2:   ld a, c                 ; Routine 2: Console Output
-        cp $09                  ; 
+        cp $09
         jr nz, L_F23E
 L_F288: ld c, $20
         call L_F23E
@@ -434,7 +463,7 @@ L_F2C3: ld a, (bc)
 
 
 SYS10:  ld a, ($0052)           ; Routine 10: Read Console Buffer
-        ld ($0051), a           ; 
+        ld ($0051), a
         ld hl, ($0057)
         ld c, (hl)
         inc hl
@@ -571,7 +600,7 @@ L_F39F: pop hl
         jp L_F23E
 
 
-SYS1:   call L_F1FE             ; Routine 1: Console Input 
+SYS1:   call L_F1FE             ; Routine 1: Console Input
         jr L_F3DA               ; 
 
 
@@ -604,7 +633,7 @@ SYS8:   ld hl, $0003            ; Routine 8: Set IOBYTE
 
 
 SYS9:   ex de, hl               ; Routine 9: Print String
-        ld c, l                 ; 
+        ld c, l                 ; DE=string address, terminated by $
         ld b, h
         jp L_F2C3
 
@@ -761,7 +790,7 @@ L_F51B: ld a, (hl)
         or a
         sbc hl, bc
         jr z, L_F53B
-        ld a, $3F
+        ld a, "?"
         call PUTIVC
         jp L_F4B1
 
@@ -849,7 +878,7 @@ L_F5BA: ld hl, MSG8
 
 
 SYS21:  call L_F5D1             ; Write Cassette Record
-        xor a                   ; 
+        xor a
         jp L_F3DA
 
 
@@ -1037,39 +1066,39 @@ CMDLOP: ld e, $2A               ; interactive command loop. Commands are dispatc
         jr z, CMDLOP            ; ??nothing to do
         call L_FB43             ; ??
         ld ($005C), a           ; 0x5C is start of default file control block (FCB) used as command line buffer?
-        inc de                  ; 
-        ld hl, CMDLOP           ; 
+        inc de
+        ld hl, CMDLOP
         push hl                 ; put CMDLOP on stack so that a command that terminates with a RET will re-enter the command loop
-        cp $52                  ; 
+        cp "R"
         jr z, CMD_RWI           ; R - needs filename
-        cp $57                  ; 
+        cp "W"
         jr z, CMD_RWI           ; W - needs filename
-        cp $49                  ; 
+        cp "I"
         jr z, CMD_RWI           ; I - needs filename
         call L_FB68             ; ??
-        jr c, WOT               ; 
+        jr c, WOT
         ld a, ($005C)           ; get 1st letter of command
-        cp $44                  ; 
+        cp "D"
         jp z, CMD_D             ; Display memory in hex and ASCII
-        cp $53                  ; 
+        cp "S"
         jp z, CMD_S             ; Set or examine memory
-        cp $47                  ; 
+        cp "G"
         jp z, CMD_G             ; Go to code at address
-        cp $43                  ; 
+        cp "C"
         jp z, CMD_C             ; Copy memory from/to/length
-        cp $46                  ; 
+        cp "F"
         jp z, CMD_F             ; Fill memory start/end/character
-        cp $50                  ; 
+        cp "P"
         jp z, CMD_P             ; move Package to 0x100 ??and execute
-        cp $55                  ; 
+        cp "U"
         jp z, CMD_U             ; UART configure
-        cp $4C                  ; 
+        cp "L"
         jp z, CMD_L             ; display or set the Length of a program
-        cp $4F                  ; 
+        cp "O"
         jp z, CMD_O             ; Out to port
-        cp $51                  ; 
+        cp "Q"
         jp z, CMD_Q             ; Query port
-        cp $42                  ; 
+        cp "B"
         jp z, CMD_B             ; Boot from floppy
         ld de, MSGCMD           ; no such command
         jr PRS09I2              ; print message ??how to get back to cmd loop
@@ -1131,11 +1160,11 @@ L_F804: ld a, ($0003)
         xor a
         ld ($007C), a
         ld de, $005C
-        ld c, $0F
+        ld c, $0F               ; open file
         call L_0005
         ld de, $0100
         ld ($0069), de
-        ld c, $1A
+        ld c, $1A               ; set data address
         call L_0005
         ld a, ($005C)
         cp $52
@@ -1150,14 +1179,14 @@ L_F832: ld hl, ($0065)
         jr z, L_F87E
         ld ($0065), hl
         ld de, $005C
-        ld c, $15
+        ld c, $15               ; write cassette record
         call L_0005
         ld hl, ($0069)
         ld de, $0080
         add hl, de
         ld ($0069), hl
         ex de, hl
-        ld c, $1A
+        ld c, $1A               ; set data address to DE
         call L_0005
         jr L_F832
 
@@ -1165,7 +1194,7 @@ L_F832: ld hl, ($0065)
 L_F857: ld hl, L_0000
 L_F85A: ld ($003D), hl
         ld de, $005C
-        ld c, $14
+        ld c, $14               ; read cassette record
         call L_0005
         or a
         jr nz, L_F87E
@@ -1174,7 +1203,7 @@ L_F85A: ld ($003D), hl
         add hl, de
         ld ($0069), hl
         ex de, hl
-        ld c, $1A
+        ld c, $1A               ; set data address to DE
         call L_0005
         ld hl, ($003D)
         inc hl
@@ -1182,7 +1211,7 @@ L_F85A: ld ($003D), hl
 
 
 L_F87E: ld de, $005C
-        ld c, $10
+        ld c, $10               ; close file
         jp L_0005
 
 
@@ -1224,7 +1253,7 @@ L_F8BC: push hl
         push de
         push hl
         push de
-        call L_FBC5
+        call B4HEX
         ld b, $02
         call L_FB37
         pop de
@@ -1234,7 +1263,7 @@ L_F8CC: ld a, (hl)
         push hl
         push de
         push bc
-        call L_FBCC
+        call B2HEX
         call L_FB33
         pop bc
         call L_F928
@@ -1259,7 +1288,7 @@ L_F8ED: ld a, (hl)
         jr c, L_F8F9
         cp $7F
         jr c, L_F8FB
-L_F8F9: ld a, $2E
+L_F8F9: ld a, "."
 L_F8FB: ld e, a
         call COUT02
         pop bc
@@ -1271,20 +1300,20 @@ L_F8FB: ld e, a
         dec de
         ld a, d
         or e
-        jp z, L_FB27
+        jp z, CRLF              ; print CRLF then return to command loop
         djnz L_F8ED
         push hl
         push de
-        call L_FB27
-        ld c, $0B
+        call CRLF
+        ld c, $0B               ; get console status
         call L_0005
         pop de
         pop hl
         or a
         jr z, L_F8BC
-        ld c, $01
+        ld c, $01               ; console input
         call L_0005
-        jp L_FB27
+        jp CRLF                 ; print CRLF then return to command loop
 
 
 L_F928: ld a, b
@@ -1302,13 +1331,13 @@ CMD_S:  ld a, ($0060)
 L_F93A: ld hl, ($0061)
 L_F93D: ld ($0061), hl
         push hl
-        call L_FBC5
+        call B4HEX
         call L_FB33
         pop hl
         ld a, (hl)
         push hl
         push af
-        call L_FBCC
+        call B2HEX
         call L_FB33
         pop af
         cp $20
@@ -1321,7 +1350,7 @@ L_F93D: ld ($0061), hl
         ld e, a
         call COUT02
         call L_FB3F
-L_F966: call L_FB27
+L_F966: call CRLF
         ld b, $0B
         call L_FB37
         call L_FB4C
@@ -1357,7 +1386,7 @@ L_F992: ld (hl), a
 
 L_F996: pop hl
         ld a, (de)
-        cp $2E
+        cp "."
         jr nz, L_F9A3
         inc de
         call L_FB13
@@ -1365,7 +1394,7 @@ L_F996: pop hl
         jr L_F9CB
 
 
-L_F9A3: cp $22
+L_F9A3: cp '"'                  ; "
         jr nz, L_F9AF
         inc de
         ld a, (de)
@@ -1375,14 +1404,14 @@ L_F9A3: cp $22
         jr L_F992
 
 
-L_F9AF: cp $2D
+L_F9AF: cp "-"
         jr nz, L_F9B7
         dec hl
         inc de
         jr L_F974
 
 
-L_F9B7: cp $2F
+L_F9B7: cp "/"
         jr nz, L_F9CB
         inc de
         call L_FB87
@@ -1410,7 +1439,7 @@ CMD_G:  ld a, ($0060)
         ld hl, ($0061)
 L_F9E6: push hl
         ld de, $0080
-        ld c, $1A
+        ld c, $1A               ; set data address to DE
         jp L_0005
 
 
@@ -1549,8 +1578,8 @@ CMD_L:  ld a, ($0060)
         ld hl, ($0061)
         ld ($003D), hl
 L_FAD4: ld hl, ($003D)
-        call L_FBC5
-        call L_FB27
+        call B4HEX
+        call CRLF               ;could be JP CRLF and delete RET
         ret
 
 
@@ -1563,8 +1592,8 @@ CMD_O:  ld a, ($0060)
         jp nz, WOT
         ld b, h
         ld c, l
-        out (c), e
-        ret
+        out (c), e              ; output value to port
+        ret                     ; return to command loop
 
 
 CMD_Q:  ld a, ($0060)
@@ -1574,8 +1603,8 @@ CMD_Q:  ld a, ($0060)
         ld b, h
         ld c, l
         in a, (c)
-        call L_FBCC
-        jp L_FB27
+        call B2HEX
+        jp CRLF                 ; print CRLF then return to command loop
 
 
 CMD_B:
@@ -1607,12 +1636,12 @@ L_FB13: ld a, (de)
         ret
 
 
-PRS09:  ld c, $09               ; DE=string address, terminated by $. CP/M routine 9: print string.
+PRS09:  ld c, $09               ; print string
         call L_0005
-L_FB27: ld e, $0D
+CRLF:   ld e, $0D
         call COUT02
         ld e, $0A
-COUT02: ld c, $02               ; CP/M routine 2: console output.
+COUT02: ld c, $02               ; console output
         jp L_0005
 
 
@@ -1631,9 +1660,9 @@ L_FB3F: ld e, $22
         jr COUT02
 
 
-L_FB43: cp $61
+L_FB43: cp "a"
         ret c
-        cp $7B
+        cp "{"                  ;"z"+1
         ret nc
         sub $20
         ret
@@ -1642,9 +1671,9 @@ L_FB43: cp $61
 L_FB4C: ld de, $007F
         ld a, $7E
         ld (de), a
-        ld c, $0A
+        ld c, $0A               ; read console buffer
         call L_0005
-        call L_FB27
+        call CRLF
         ld hl, $0080
         ld e, (hl)
         ld d, $00
@@ -1723,12 +1752,12 @@ L_FBB6: inc de
         ret
 
 
-L_FBC5: ld a, h
+B4HEX:  ld a, h                 ;print HL as 4 hex digits
         push hl
-        call L_FBCC
+        call B2HEX
         pop hl
         ld a, l
-L_FBCC: push af
+B2HEX:  push af                 ;print A as 2 hex digits "B2HEX" from NAS-SYS
         rra
         rra
         rra
@@ -1741,7 +1770,7 @@ L_FBD5: and $0F
         adc a, $40
         daa
         ld e, a
-        ld c, $02
+        ld c, $02               ; console output
         jp L_0005
 
 
@@ -1752,16 +1781,16 @@ L_FBE3: ld hl, ($0061)
 
 
 XFBEF:  ld de, MSG17
-        ld c, $09
+        ld c, $09               ; print string
         call L_0005
         pop hl
         dec hl
-        call L_FBC5
+        call B4HEX
         jp L_0000
 
 
 CHKDSK: ld a, $55
-        out ($E1), a
+        out (FDCTRK), a
 L_FC03:
         ;; ===================================
         if RPMVER = 20
@@ -1777,7 +1806,7 @@ L_FC03:
         ;; ===================================
 
         ld hl, L_0000
-        in a, ($E1)
+        in a, (FDCTRK)
         cp $55
         ret
 
@@ -1787,38 +1816,38 @@ L_FC0E: call CHKDSK
         if RPMVER = 20
         jr nz, PRS09I1
         ld a, $D0
-        call L_FC8C
+        call CMD2FDC
         ld a, $01
-        out ($E4), a
+        out (FDCDRV), a
         ld a, $5B
         endif
         if RPMVER = 21
         jr nz, PRS09I1
         ld a, $D0
-        call L_FC8C
+        call CMD2FDC
         ld a, $01
-        out ($E4), a
+        out (FDCDRV), a
         ld a, $5B
         endif
         if RPMVER = 23
         ld de, MSGNODSK
         jr nz, PRS09I1
         ld a, $D0
-        call L_FC8C
+        call CMD2FDC
         call L_FFDE
         endif
         ;; ===================================
 
-        call L_FC8C
-        in a, ($E0)
+        call CMD2FDC
+        in a, (FDCSTA)
         ld b, a
         ld c, $00
-L_FC26: in a, ($E0)
+L_FC26: in a, (FDCSTA)
         xor b
         or c
         and $02
         ld c, a
-        in a, ($E0)
+        in a, (FDCSTA)
         rlca
         rlca
         cpl
@@ -1830,75 +1859,75 @@ L_FC26: in a, ($E0)
         jr nz, L_FC26
 PRS09I1: jp PRS09
 
-
-L_FC3D: ld a, $0B               ; Load boot sector..
-        call L_FC8C             ; 
+;;; Load boot sector
+L_FC3D: ld a, $0B               ; Unload heads and restore
+        call CMD2FDC
         ;; ===================================
         if RPMVER = 20
         xor a
-        out ($E2), a
+        out (FDCSEC), a
         endif
         if RPMVER = 21
         xor a
-        out ($E2), a
+        out (FDCSEC), a
         endif
         if RPMVER = 23
-        nop                     ; 
-        nop                     ; 
-        nop                     ; 
+        nop
+        nop
+        nop
         endif
         ;; ===================================
 
-        ld a, $88               ; 
-        out ($E0), a            ; 
+        ld a, $88               ; read sector
+        out (FDCCMD), a         ; send command
         ld hl, $0080            ; destination of boot sector
-        ld c, $E4               ; 
+        ld c, FDCDRV
         ld b, $80               ; load 128 bytes
 L_FC50: in a, (c)               ; data available?
         jr z, L_FC50            ; no so wait
-        in a, ($E3)             ; get data byte
+        in a, (FDCDAT)          ; get data byte
         ld (hl), a              ; store
         inc hl                  ; next
         djnz L_FC50             ; loop for all 128 bytes
 L_FC5A: in a, (c)               ; but that isn't the whole of the sector..
         jr z, L_FC5A            ; so loop until next byte
-        in a, ($E3)             ; fetch and discard data
+        in a, (FDCDAT)          ; fetch and discard data
         jp m, L_FC5A            ; until command complete (ie whole sector processed)
-        in a, ($E0)             ; ??status
-        or a                    ; 
+        in a, (FDCSTA)
+        or a
         ld de, MSGBAD           ; bad disk.. abort?
-        jr nz, PRS09I1          ; 
+        jr nz, PRS09I1
         ld hl, ($0080)          ; expect first 2 bytes to contain magic value GG
-        ld de, $4747            ; 
-        sbc hl, de              ; 
-        ld de, MSGINV           ; 
+        ld de, $4747            ; "GG"
+        sbc hl, de
+        ld de, MSGINV
         jr nz, PRS09I1          ; not the right disk for this system.. abort?
-        ld de, MSGBOOT          ; 
+        ld de, MSGBOOT
         call PRS09I1            ; announce that we're booting in case we die/hang in the attempt
-        ld de, L_0000           ; 
-        ld hl, $0080            ; 
-        ld bc, $0080            ; 
+        ld de, L_0000
+        ld hl, $0080
+        ld bc, $0080
         ldir                    ; copy the boot sector code from $80 to $0
         jp L_0002               ; and jump to it (not the GG, but to address 2)
 
 
-L_FC8C: out ($E0), a
+CMD2FDC: out (FDCCMD), a         ; send command in A then wait, then poll status (for completion?)
         ld a, $0A
 L_FC90: dec a
         jr nz, L_FC90
-L_FC93: in a, ($E0)
+L_FC93: in a, (FDCSTA)
         rrca
         jr c, L_FC93
         ret
 
 
-MSGNODSK: defm "No disk$"
+MSGNODSK:defm "No disk$"
 
 MSGBAD: defm "Bad disk$"
 
 MSGINV: defm "Wrong disk$"
 
-MSGBOOT: defm "Executing boot$"
+MSGBOOT:defm "Executing boot$"
 
 
 CONST:  ld a, ($0045)
@@ -2008,11 +2037,11 @@ L_FD5A: call L_FF68
 
 
 L_FD79: ld a, (hl)
-        cp $2A
+        cp "*"
         jr z, L_FD87
-        cp $2D
+        cp "-"
         jr z, L_FD87
-        cp $23
+        cp "#"
         jp nz, CONIN
 L_FD87: ld a, $02
 L_FD89: ld ($0045), a
@@ -2039,9 +2068,9 @@ CONOU:  ld a, c
 L_FDAE: jp PUTIVC
 
 
-LIST:   call L_FDD4             ; 
-        call L_FDFD             ; 
-        ld a, c                 ; 
+LIST:   call L_FDD4
+        call L_FDFD
+        ld a, c
         ld hl, $0003            ; point to IOBYTE
         bit 7, (hl)             ; 0 -> serial printer, 1 -> parallel printer
         jp nz, L_FEA0           ; parallel printer
@@ -2051,11 +2080,11 @@ L_FDC0: call L_FE70             ; ?serial printer
         jp SOUT
 
 
-PUNCH:  ld a, c                 ; Output character in C to UART
+PUNCH:  ld a, c                 ; output character in C to UART
         jp SOUT
 
 
-READ:   call SIN                ; Wait for character from UART. Return character in A
+READ:   call SIN                ; wait for character from UART. Return character in A
         jr nc, READ
         ret
 
@@ -2152,11 +2181,11 @@ L_FE58: push af
 
 
 SOUT:   push af
-L_FE66: in a, ($BD)
+OBSY:   in a, (UARTLS)
         bit 5, a
-        jr z, L_FE66
+        jr z, OBSY
         pop af
-        out ($B8), a
+        out (UARTDAT), a
         ret
 
 
@@ -2189,26 +2218,26 @@ L_FE91: call L_FEB6
         ret c
         call L_FECF
         ret c
-SIN:    in a, ($BD)             ; check UART for input character. Return C and character in A or NC if no character
+SIN:    in a, (UARTLS)          ; check UART for input character. Return C and character in A or NC if no character
         rra
         ret nc
-        in a, ($B8)
+        in a, (UARTDAT)
         ret
 
 
 L_FEA0: push af
-L_FEA1: in a, ($B4)
+L_FEA1: in a, (PIOADAT)
         rra
         jr c, L_FEA1
         pop af
         push af
-        out ($B5), a
+        out (PIOBDAT), a
         nop
         ld a, $FD
-        out ($B4), a
+        out (PIOADAT), a
         nop
         ld a, $FF
-        out ($B4), a
+        out (PIOADAT), a
         pop af
         ret
 
@@ -2216,19 +2245,19 @@ L_FEA1: in a, ($B4)
 L_FEB6: ld a, ($0003)           ; get IOBYTE
         and $02                 ; CPU card with keyboard port?
         ret nz                  ; no local keyboard port; return
-        push de                 ; ?Scan of GM813 serial port
-        ld a, ($003F)           ; 
-        ld e, a                 ; 
-        in a, ($B0)             ; 
-        xor e                   ; 
-        jr z, L_FECD            ; 
-        xor e                   ; 
-        ld ($003F), a           ; 
-        rlca                    ; 
-        or a                    ; 
-        rra                     ; 
-L_FECD: pop de                  ; 
-        ret                     ; 
+        push de                 ; scan of GM811 serial port
+        ld a, ($003F)
+        ld e, a
+        in a, (KBD)
+        xor e
+        jr z, L_FECD
+        xor e
+        ld ($003F), a
+        rlca
+        or a
+        rra
+L_FECD: pop de
+        ret
 
 
 L_FECF: ld a, ($0003)           ; load IOBYTE
@@ -2251,18 +2280,18 @@ L_FECF: ld a, ($0003)           ; load IOBYTE
 
 
 PUTIVC: push af
-L_FEF4: in a, ($B2)
+L_FEF4: in a, (IVCSTA)
         rra
         jr c, L_FEF4
         pop af
-        out ($B1), a
+        out (IVCDAT), a
         ret
 
 
-GETIVC: in a, ($B2)
+GETIVC: in a, (IVCSTA)
         rla
         jr c, GETIVC
-        in a, ($B1)
+        in a, (IVCDAT)
         ret
 
 
@@ -2328,23 +2357,23 @@ L_FF68: push de                 ;
         jr L_FF4B               ; 
 
 
-SELCASS: ld a, $03               ; 
-        out ($BC), a            ; enable UART for cassette, switch TR1 on for motor control
+SELCASS: ld a, $03              ; 
+        out (UARTMC), a         ; enable UART for cassette, switch TR1 on for motor control
         ld hl, $0068            ; baud rate divisor for 1200bd - fixed value for cassette
         jp L_FF7F               ; 
 
 
 SELSER: ld a, $07               ; 
-        out ($BC), a            ; enable UART for serial port, switch TR1 off
+        out (UARTMC), a         ; enable UART for serial port, switch TR1 off
         ld hl, ($003B)          ; current selected baud rate divider for serial
 L_FF7F: ld a, $83               ; allow access to UART baud rate divisor registers
-        out ($BB), a            ; 
+        out (UARTLC), a
         ld a, h                 ; 
-        out ($B9), a            ; set baud rate divisor hi
+        out (UARTIE), a         ; set baud rate divisor hi
         ld a, l                 ; 
-        out ($B8), a            ; set baud rate divisor lo
+        out (UARTDAT), a        ; set baud rate divisor lo
         ld a, $03               ; 
-        out ($BB), a            ; restore access to UART data/interrupt registers
+        out (UARTLC), a         ; restore access to UART data/interrupt registers
         ret                     ; 
 
 ;;; lookup table: baud rate -> divisor -- terminated by 0000
@@ -2368,9 +2397,8 @@ BAUDTAB:defw $0050, $09C4
         defw $560F, $0002
         defw $0000
 
-L_FFD8: defb $FF, $FF, $FF
-
-L_FFDB: defb $FF, $FF, $FF
+USER0:  defb $FF, $FF, $FF
+USER1:  defb $FF, $FF, $FF
 
         ;; ===================================
         if RPMVER = 23
@@ -2379,9 +2407,9 @@ L_FFDE: ld a, ($0061)
         or a
         jr nz, L_FFE5
         inc a
-L_FFE5: out ($E4), a
+L_FFE5: out (FDCDRV), a
         ld a, ($0062)
-        out ($E2), a
+        out (FDCSEC), a
         ld a, $5B
         ret
 
