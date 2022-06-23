@@ -231,7 +231,7 @@ L_F10E: ld hl, $0200            ;
         ld a, (LINPPAG)         ; 
         ld ($0042), a           ; Initialise printer lines per page from ROM default
         in a, (IVCDAT)
-        call L_FEB6             ; Scan?/Initialise? local keyboard, if any
+        call CPUKBD             ; Check for key on CPU keyboard, if any
         ld hl, (UARTDIV)        ; 
         ld ($003B), hl          ; Initialise baud rate from ROM default
         call SELSER             ; 
@@ -2195,12 +2195,12 @@ L_FE70: in a, ($BE)
         ret
 
 
-L_FE77: call L_FEB6
+L_FE77: call CPUKBD
         ret c
-        call L_FECF
+        call IVCKBD
         ret c
-        call SIN
-        res 7, a
+        call SIN                ; might be 8-bit data
+        res 7, a                ; clear MSB
         ret
 
 
@@ -2209,14 +2209,14 @@ L_FE85: call L_FE77
         ret
 
 
-L_FE8B: call L_FE91
+L_FE8B: call L_FE91             ; get 8-bit data (used for cassette read)
         jr nc, L_FE8B
         ret
 
 
-L_FE91: call L_FEB6
+L_FE91: call CPUKBD
         ret c
-        call L_FECF
+        call IVCKBD
         ret c
 SIN:    in a, (UARTLS)          ; check UART for input character. Return C and character in A or NC if no character
         rra
@@ -2242,7 +2242,8 @@ L_FEA1: in a, (PIOADAT)
         ret
 
 
-L_FEB6: ld a, ($0003)           ; get IOBYTE
+;;; Check CPU card keyboard, if available. Return NZ if no keyboard. TODO..
+CPUKBD: ld a, ($0003)           ; get IOBYTE
         and $02                 ; CPU card with keyboard port?
         ret nz                  ; no local keyboard port; return
         push de                 ; scan of GM811 serial port
@@ -2260,23 +2261,24 @@ L_FECD: pop de
         ret
 
 
-L_FECF: ld a, ($0003)           ; load IOBYTE
+;;; Check IVC keyboard, if available. Return Z if no keyboard/no character, C if character; returned in A
+IVCKBD: ld a, ($0003)           ; load IOBYTE
         and $01                 ; check Video Card bit
         ret z                   ; no video card -> do nothing
-        ld a, $1B               ; 
-        call PUTIVC             ; 
-        ld a, $6B               ; 
-        call PUTIVC             ; 
-        call GETIVC             ; 
-        or a                    ; 
-        ret z                   ; 
-        ld a, $1B               ; 
-        call PUTIVC             ; 
-        ld a, $4B               ; 
-        call PUTIVC             ; 
-        call GETIVC             ; 
-        scf                     ; 
-        ret                     ; 
+        ld a, $1B               ; ESC
+        call PUTIVC
+        ld a, $6B               ; Keyboard Status
+        call PUTIVC
+        call GETIVC
+        or a
+        ret z                   ; 0 -> no characters waiting
+        ld a, $1B               ; ESC
+        call PUTIVC
+        ld a, $4B               ; Ask for character from buffer
+        call PUTIVC
+        call GETIVC             ; Get character
+        scf
+        ret
 
 
 PUTIVC: push af
