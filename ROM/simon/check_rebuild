@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# rebuild from source and check that the binary matches the golden version
+
+z80asm -i simon42.asm -lsimon42.lst -osimon42.bin
+
+# check
+diff simon42.bin simon42.bin_golden
