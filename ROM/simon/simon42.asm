@@ -17,10 +17,10 @@
 ;;; V                - print SIMON version number
 ;;; 8                - ?? boot 8" disk
 
-L_0002: equ $0002
-L_00E6: equ $00E6
-L_00E9: equ $00E9
-L_00EC: equ $00EC
+L_0002: equ $0002               ; entry point of loaded boot sector
+L_00E6: equ $00E6               ; 1st entry in JPTAB1 or JPTAB2
+L_00E9: equ $00E9               ; 2nd entry in JPTAB1 or JPTAB2
+L_00EC: equ $00EC               ; 3rd entry in JPTAB1 or JPTAB2
 
 ;;; Ports for GM811/GM813 CPU board
 
@@ -86,24 +86,24 @@ MSG19:  defm "GG"               ; magic compared with first 2 bytes of boot sect
 
 XCOLD:  in a, (IVCRST)          ; reset IVC
         ld a, $01
-        out ($E4), a            ; select drive 0/A
+        out (FDCDRV), a            ; select drive 0/A
         ld d, $40               ; count ??of mapper pages to init??
-L_F03B: ld bc, $F0FE            ; B=?? C= port for MMAP
+CLOP1:  ld bc, $F0FE            ; B=?? C= port for MMAP
         ld e, $0F               ; value?
-L_F040: out (c), e              ; initialise memory mapper
+CLOP2:  out (c), e              ; initialise memory mapper
         dec e
         ld a, b
         sub $10
         ld b, a
-        jr nc, L_F040           ; continue
+        jr nc, CLOP2            ; continue
         dec d
-        jr nz, L_F03B           ; 0x64 = 40
+        jr nz, CLOP1            ; 0x64 = 40
         ld a, $11               ; value?
         out (PMOD), a           ; page-mode register
         ld sp, L_00E6           ;
         call L_F1ED             ; Will execute at FXXX instead of 0XXX
                                 ; BUT: how does the ROM get disabled so that the
-                                ; stack at $000E6 can be used?
+                                ; stack at $000E6 can be used??
         ld a, i                 ; 
         ld a, $01               ; 
         push af                 ; wot??
@@ -111,7 +111,7 @@ L_F040: out (c), e              ; initialise memory mapper
         pop af                  ; 
         jr z, L_F063            ; 
         ld a, ($00EF)           ; 
-L_F063: ld ($00EF), a           ; 
+L_F063: ld ($00EF), a           ; comes here from A and B commands
         push af                 ; 
         ld a, $F3               ; 
         out ($E5), a            ; e5
@@ -260,7 +260,7 @@ L_F1ED: in a, (UARTMS)
         and $40
         ld ($00F0), a
         jr nz, L_F233
-        ld hl, JPTAB1
+        ld hl, JPTAB1           ; use IVC for kbd/display
         call CP92E6
         in a, (IVCDAT)
         ld a, $1A               ; home/clear screen
@@ -297,7 +297,7 @@ L_F225: dec hl
         ret
 
 
-L_F233: ld hl, JPTAB2
+L_F233: ld hl, JPTAB2           ; use UART for kbd/display
         call CP92E6
         ld a, $03
         out (UARTLC), a
@@ -351,12 +351,12 @@ CP92E6: ld de, L_00E6           ; copy 9 bytes (3 x JP XXXX) to $00E6
         ret
 
 
-JPTAB1: jp L_F42A
-        jp L_F439
+JPTAB1: jp POLIVC               ; vectored I/O using IVC
+        jp GETIVC
         jp PUTIVC
-JPTAB2: jp L_F457
-        jp L_F45C
-        jp L_F41D
+JPTAB2: jp POLSER               ; vectored I/O using UART
+        jp GETSER
+        jp PUTSER
 
 
 L_F2A1: ld a, ($00F0)
@@ -367,7 +367,7 @@ L_F2A1: ld a, ($00F0)
 L_F2A6: ld a, $D0
         call CMD2FDC
         ld a, ($00EF)
-        out ($E4), a
+        out (FDCDRV), a
         ld a, $0B
         out (FDCCMD), a
         ld b, $28
@@ -611,7 +611,7 @@ L_F414: in a, (IVCSTA)
         ret
 
 
-L_F41D: push af
+PUTSER: push af
 L_F41E: in a, (UARTLS)
         and $20
         jr z, L_F41E
@@ -621,18 +621,18 @@ L_F41E: in a, (UARTLS)
         ret
 
 
-L_F42A: ld a, $1B               ; check keyboard status return with Z if no character
+POLIVC: ld a, $1B               ; check IVC keyboard status return with Z if no character
         call PUTIVC             ; else fall through to get character
         ld a, $6B
         call PUTIVC
-        call GETIVC
+        call INIVC
         or a
         ret z                   ; no character
-L_F439: ld a, $1B               ; get character (wait if necessary). Return with character in A
+GETIVC: ld a, $1B               ; get character from IVC kbd (wait if necessary). Return with character in A
         call PUTIVC             ; -- force a-z to upper case.
         ld a, $4B               ; get character
         call PUTIVC
-        call GETIVC
+        call INIVC
 L_F446: cp $61                  ; "a"
         ret c
         cp $7B                  ; "z" + 1
@@ -641,19 +641,19 @@ L_F446: cp $61                  ; "a"
         ret
 
 
-GETIVC: in a, (IVCSTA)
+INIVC:  in a, (IVCSTA)          ; wait for byte from IVC
         rlca
-        jr c, GETIVC
+        jr c, INIVC
         in a, (IVCDAT)
         ret
 
 
-L_F457: in a, (UARTLS)
+POLSER: in a, (UARTLS)          ; check for character from serial
         and $01
         ret z
-L_F45C: in a, (UARTLS)
+GETSER: in a, (UARTLS)          ; block, waiting for character from serial
         and $01
-        jr z, L_F45C
+        jr z, GETSER
         in a, (UARTDAT)
         and $7F
         jr L_F446
@@ -683,7 +683,7 @@ MSG6:   defb $0D
         defb $00
 
 
-CMD_8:  ld hl, MSG7
+CMD_8:  ld hl, MSG7             ; select 8" drive..
         call PRS
 L_F4AD: call L_00E9
         sub $31
@@ -718,7 +718,7 @@ MSG11:  defm "           GM849 present"
 
 
 L_F56C: xor a
-        out ($E4), a            ; turn off all the drives
+        out (FDCDRV), a         ; turn off all the drives
         ld hl, MSG18            ; SIMON banner
         call PRS
         ld a, $0F
@@ -1115,7 +1115,7 @@ L_F746: ld a, d
 ; $F000 => COLD           CMD_V   => $F725
 ; $F003 => CHRIN          COLD    => $F000
 ; $F006 => CHROUT         CRLF    => $F012
-; $F009 => P2HEX          GETIVC  => $F44F
+; $F009 => P2HEX          INIVC   => $F44F
 ; $F00C => P4HEX          L_0002  => $0002
 ; $F00F => SPACE          L_0020  => $0020
 ; $F012 => CRLF           L_0028  => $0028
@@ -1199,7 +1199,7 @@ L_F746: ld a, d
 ; $F42A => L_F42A         L_F457  => $F457
 ; $F439 => L_F439         L_F45C  => $F45C
 ; $F446 => L_F446         L_F46E  => $F46E
-; $F44F => GETIVC         L_F47B  => $F47B
+; $F44F => INIVC          L_F47B  => $F47B
 ; $F457 => L_F457         L_F47F  => $F47F
 ; $F45C => L_F45C         L_F4AD  => $F4AD
 ; $F468 => CMD_A          L_F56C  => $F56C
