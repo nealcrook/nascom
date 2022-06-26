@@ -86,7 +86,7 @@ MSG19:  defm "GG"               ; magic compared with first 2 bytes of boot sect
 
 XCOLD:  in a, (IVCRST)          ; reset IVC
         ld a, $01
-        out (FDCDRV), a            ; select drive 0/A
+        out (FDCDRV), a         ; select drive 0/A
         ld d, $40               ; count ??of mapper pages to init??
 CLOP1:  ld bc, $F0FE            ; B=?? C= port for MMAP
         ld e, $0F               ; value?
@@ -106,20 +106,20 @@ CLOP2:  out (c), e              ; initialise memory mapper
                                 ; stack at $000E6 can be used??
         ld a, i                 ; 
         ld a, $01               ; 
-        push af                 ; wot??
+        push af                 ; wot?? could this be some kind of warm/cold check?
         ld i, a                 ; 
         pop af                  ; 
         jr z, L_F063            ; 
-        ld a, ($00EF)           ; 
+        ld a, ($00EF)           ; boot drive code
 L_F063: ld ($00EF), a           ; comes here from A and B commands
         push af                 ; 
         ld a, $F3               ; 
-        out ($E5), a            ; e5
+        out (SCSCTL), a
         ld a, $09
 L_F06D: dec a
         jr nz, L_F06D
         ld a, $F7
-        out ($E5), a
+        out (SCSCTL), a
         ld hl, MSG8             ; clear screen, power-on message
         call PRS
         pop af
@@ -133,6 +133,7 @@ MSG2:   defm " while loading Boot sector"
 MSG3:   defm " during System load"
         defb $00
 
+;;; TODO how is this used?
 MSG4:   defb $C0, $D2, $C5, $C1, $C4, $80, $C5, $D2, $D2, $CF, $D2, $C0, $00
 
 MSG5:   defm " - Press any key to repeat<"
@@ -158,6 +159,7 @@ L_F0F8: call L_F2DF
         jr L_F14B
 
 
+;;; TODO how is this used?
 MSG15:  defb $1B, $2A           ; delete to end of line
         defm "<"
         defb $09, $80, $C9, $EE, $F3, $E5, $F2, $F4, $80, $C4, $E9, $F3, $EB, $80, $E9, $EE, $80, $E4, $F2, $E9, $F6, $E5, $80, $00
@@ -169,7 +171,7 @@ MSG16:  defb $A0                ;TODO no reference.
 
 L_F11B: ld hl, MSG15
         call PRS
-        ld a, ($00EF)
+        ld a, ($00EF)           ; get drive
         ld b, $C0
 L_F126: inc b
         rrca
@@ -213,7 +215,7 @@ L_F16E: or a
         or a
         sbc hl, de
         call z, L_F2E2          ; if good disk??
-        ld a, ($00EF)
+        ld a, ($00EF)           ; get drive
         jp z, L_0002            ; enter code loaded from boot sector (first 2 bytes is "magic" eg GG for Gemini)
         ld hl, MSG17            ; ??wot??
         jp L_F0EE
@@ -229,7 +231,7 @@ MSG17:  defb $09, $80, $C0, $CE, $EF, $80, $F2, $E5, $E3, $EF, $E7, $EE, $E9, $F
 
 L_F1BA: ld a, $0B
         call CMD2FDC
-        ld a, ($00EF)
+        ld a, ($00EF)           ; get drive
         and $20
         jr z, L_F1C8
         ld a, $01
@@ -257,8 +259,8 @@ L_F1E1: in a, (c)               ; read and discard remaining bytes, if any
 
 
 L_F1ED: in a, (UARTMS)
-        and $40
-        ld ($00F0), a
+        and $40                 ; ??check board link??
+        ld ($00F0), a           ; record what I/O is used 
         jr nz, L_F233
         ld hl, JPTAB1           ; use IVC for kbd/display
         call CP92E6
@@ -359,14 +361,14 @@ JPTAB2: jp POLSER               ; vectored I/O using UART
         jp PUTSER
 
 
-L_F2A1: ld a, ($00F0)
+L_F2A1: ld a, ($00F0)           ; says what type of I/O is in use??
         or a
         ret
 
 
 L_F2A6: ld a, $D0
         call CMD2FDC
-        ld a, ($00EF)
+        ld a, ($00EF)           ; get drive
         out (FDCDRV), a
         ld a, $0B
         out (FDCCMD), a
@@ -414,7 +416,7 @@ L_F2E2: call L_00E6
         ld a, $01
         ret nz
         call L_F2FE
-        jp L_F56C               ; continue to command loop
+        jp L_F56C               ; ?did not autoboot: continue to command loop
 
 
 L_F2FE: call L_F2A1
@@ -432,7 +434,7 @@ MSG14:  defm "<"
 
 CMD2FDC:out (FDCCMD), a         ; send command in A to FDC then wait then poll status (for completion?)
         ld a, $0A               ; delay loop count for command acceptance
-L_F316: dec a                   ; 
+L_F316: dec a
         jr nz, L_F316           ; wait a little while
 L_F319: in a, (FDCSTA)          ; read status
         bit 0, a                ; completion?
@@ -441,12 +443,12 @@ L_F319: in a, (FDCSTA)          ; read status
 
 
 L_F320: ld a, $55
-        out ($E6), a
-        in a, ($E6)
+        out (SCSDAT), a
+        in a, (SCSDAT)
         cpl
-        out ($E6), a
+        out (SCSDAT), a
         ld b, a
-        in a, ($E6)
+        in a, (SCSDAT)
         xor b
         ret nz
         call L_F369
@@ -461,7 +463,7 @@ L_F320: ld a, $55
 
 L_F33A: xor a
 L_F33B: push af
-        in a, ($E5)
+        in a, (SCSCTL)
         and $10
         jr z, L_F348
         pop af
@@ -472,58 +474,58 @@ L_F33B: push af
 
 L_F348: pop af
 L_F349: ld a, $F7
-        out ($E5), a
+        out (SCSCTL), a
         ret
 
 
-L_F34E: in a, ($E5)
+L_F34E: in a, (SCSCTL)
         and $10
         ld a, $01
         ret nz
-L_F355: in a, ($E5)
+L_F355: in a, (SCSCTL)
         rrca
         jr c, L_F355
         ret
 
 
 L_F35B: ld a, $FF
-        out ($E6), a
+        out (SCSDAT), a
         ld b, $00
-L_F361: in a, ($E6)
+L_F361: in a, (SCSDAT)
         djnz L_F361
         ld a, $04
         or a
         ret
 
 
-L_F369: in a, ($E5)
+L_F369: in a, (SCSCTL)
         or $E0
         inc a
         jr nz, L_F35B
         ld a, $FE
-        out ($E6), a
+        out (SCSDAT), a
         ld a, $F5
-        out ($E5), a
+        out (SCSCTL), a
         call L_F33A
         pop hl
         call L_F34E
         ld a, (hl)
 L_F380: cpl
-        out ($E6), a
+        out (SCSDAT), a
         inc hl
         inc hl
         call L_F34E
-        ld a, ($00EF)
+        ld a, ($00EF)           ; get drive
         dec a
         jr z, L_F390
         ld a, $20
 L_F390: cpl
-        out ($E6), a
+        out (SCSDAT), a
         ld b, $04
 L_F395: call L_F34E
         ld a, (hl)
         cpl
-        out ($E6), a
+        out (SCSDAT), a
         inc hl
         djnz L_F395
         jp (hl)
@@ -542,7 +544,7 @@ L_F3AC: call L_F34E
         jr c, L_F35B
         rrca
         jr nc, L_F3C1
-        in a, ($E6)
+        in a, (SCSDAT)
         cpl
         ld (hl), a
         ld a, l
@@ -552,13 +554,13 @@ L_F3AC: call L_F34E
         jr L_F3AC
 
 
-L_F3C1: in a, ($E6)
+L_F3C1: in a, (SCSDAT)
         cpl
         ld b, a
         call L_F34E
         rrca
         jr c, L_F35B
-        in a, ($E6)
+        in a, (SCSDAT)
         ld a, b
         and $0F
         ret
@@ -659,15 +661,15 @@ GETSER: in a, (UARTLS)          ; block, waiting for character from serial
         jr L_F446
 
 
-CMD_A:  ld hl, MSG6
+CMD_A:  ld hl, MSG6             ; select master drive
         call PRS
-L_F46E: call L_00E9
+L_F46E: call L_00E9             ; get character
         sub $31
-        jr c, L_F46E
-        cp $04
-        jr nc, L_F46E
+        jr c, L_F46E            ; illegal
+        cp $04                  ; 1-4 are legal (not 1-2 per message)
+        jr nc, L_F46E           ; illegal
         ld c, $00
-L_F47B: ld b, a
+L_F47B: ld b, a                 ; common path for CMD_A, CMD_8; C differs
         inc b
         xor a
         scf
@@ -685,11 +687,11 @@ MSG6:   defb $0D
 
 CMD_8:  ld hl, MSG7             ; select 8" drive..
         call PRS
-L_F4AD: call L_00E9
+L_F4AD: call L_00E9             ; get character
         sub $31
-        jr c, L_F4AD
-        cp $04
-        jr nc, L_F4AD
+        jr c, L_F4AD            ; illegal
+        cp $04                  ; 1-4 are legal
+        jr nc, L_F4AD           ; illegal
         ld c, $30
         jr L_F47B
 
@@ -722,8 +724,8 @@ L_F56C: xor a
         ld hl, MSG18            ; SIMON banner
         call PRS
         ld a, $0F
-        out ($E5), a
-        in a, ($E5)
+        out (SCSCTL), a
+        in a, (SCSCTL)
         rlca
         ld hl, MSG11            ; Detected GM849 disk controller
         jr nc, L_F584
@@ -766,7 +768,7 @@ MSG12:  defm "  -What?"
         defb $0D, $00
 
 
-CMD_B:  ld a, ($00EF)
+CMD_B:  ld a, ($00EF)           ; get drive
         jp L_F063
 
 
