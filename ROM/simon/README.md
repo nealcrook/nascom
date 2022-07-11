@@ -1,17 +1,23 @@
 # Sources
 
 This is not a NASCOM monitor ROM, rather it is the SIMON (SImple MON) ROM for
-the Gemini CPU cards (GM811 and GM813).
+the Gemini CPU cards (GM811 and GM813 and ??).
 
-I know of 2 released versions: 4.1 and 4.2, (probably?) both written by Richard
-Beal (the author of all but the earliest NASCOM ROM monitor programs). Unlike
-the NASCOM monitors, the source code was not published for SIMON.
+I know of 3 released versions: 4.1 and 4.2 and 5.0. The first 2 are (probably?)
+both written by Richard Beal (the author of all but the earliest NASCOM ROM
+monitor programs). I'm not sure about version 5.0. Unlike the NASCOM monitors,
+the source code was not published for SIMON.
 
 I have disassembled 4.2 and have not (yet) investigated differences between 4.1
 and 4.2.
 
-The source code here has been created by disassembly of the 4.2 code; the
+I have disassembled 5.0, which was for a Hitachi HD64180 and will not function
+on GM811/GM813 boards.
+
+The source code here has been created by disassembly of the 4.2/5.0 code; the
 comments are the result of code inspection.
+
+# Version 4,2
 
 The binary file:
 
@@ -32,9 +38,39 @@ compares the resultant binary with the golden binary:
     # rebuild from source and check that the binary matches the golden version
     
     z80asm -i simon42.asm -lsimon42.lst -osimon42.bin
+    z80asm -i simon50.asm -lsimon50.lst -osimon50.bin
     
     # check
     diff simon42.bin simon42.bin_golden
+    diff simon50.bin simon50.bin_golden
+
+# Version 5.0
+
+The binary file:
+
+    simon50.bin_golden
+
+is 8192 bytes in size (but with 2 large empty sections) and was supplied by
+Richard Espley
+
+The recreated source code is:
+
+    simon50.asm
+
+To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
+effective). The script check_rebuild builds the binary/listings from source and
+compares the resultant binaries with the golden binaries:
+
+    #!/bin/sh
+    #
+    # rebuild from source and check that the binary matches the golden version
+    
+    z80asm -i simon42.asm -lsimon42.lst -osimon42.bin
+    z80asm -i simon50.asm -lsimon50.lst -osimon50.bin
+    
+    # check
+    diff simon42.bin simon42.bin_golden
+    diff simon50.bin simon50.bin_golden
 
 This script should run "instantly" and produces no terminal output if the
 binary is generated correctly.
@@ -44,6 +80,8 @@ binary is generated correctly.
 The script dis_rom operates on simon42.bin_golden to create simon42_dis.txt and
 simon42_dis.asm. simon42_dis.asm was the starting-point for simon42.asm but the
 latter has been hand-edited to add more comments and to change the formatting.
+
+Likewise, dis_rom50 operates on simon50.bin_golden.
 
 # WANTED
 

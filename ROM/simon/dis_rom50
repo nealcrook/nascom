@@ -359,17 +359,23 @@ msg_by_len(0x045b, 24, "MSG7");
 msg_by_len(0x0473, 41, "MSG8");
 msg_by_len(0x049c, 13, "MSG9");
 msg_by_len(0x04d9, 29, "MSG10");
-msg_by_len(0x04f6, 27, "MSG11");
+msg_by_len(0x04f6, 30, "MSG11");
 msg_by_len(0x0583, 10, "MSG12");
 msg_by_len(0x034b, 3,  "MSG13");
 msg_by_len(0x034e, 2,  "MSG14");
-##msg_by_len(0x00fd, 27, "MSG15");
-##msg_by_len(0x0118, 3,  "MSG16");
+msg_by_len(0x0115, 29, "MSG15");
+msg_by_len(0x0132, 3,  "MSG16");
 msg_by_len(0x01a5, 47, "MSG17");
 msg_by_len(0x04a9, 48, "MSG18");
 msg_by_len(0x002f, 4,  "MSG19");
 msg_by_len(0x0025, 10,  "MSG20");
 msg_by_len(0x061f, 69,  "MSG21");
+
+msg_by_len(0x118e, 31,  "MSG22");
+msg_by_len(0x11ad, 11,  "MSG23");
+msg_by_len(0x1278, 11,  "MSG24");
+msg_by_len(0x1283, 8,  "MSG25");
+msg_by_len(0x128b, 7,  "MSG26");
 
 dis_lab(0x006b);
 #$dis->code(0x00f4);
@@ -457,9 +463,9 @@ dis_lab(0x02c5);
 dis_lab(0x00f0);
 dis_lab(0x010c);
 dis_lab(0x0113);
-dis_lab(0x0115);
-dis_lab(0x011d);
-dis_lab(0x0129);
+#dis_lab(0x0115);
+#dis_lab(0x011d);
+#dis_lab(0x0129);
 dis_lab(0x0154);
 dis_lab(0x0157);
 dis_lab(0x0173);
@@ -494,7 +500,6 @@ dis_lab(0x03d6);
 
 
 
-dis_lab(0x0511, "XF511");
 dis_lab(0x1087, "PRS");
 dis_lab(0x051d, "CMDLOP");
 dis_lab(0x0537);
@@ -537,20 +542,19 @@ dis_lab();
 
 # Unused (FF)
 $dis->defb(0x0718,8);
-$dis->defb(0x0720,16);
-$dis->defb(0x0730,16);
-$dis->defb(0x0740,16);
-$dis->defb(0x0750,16);
-$dis->defb(0x0760,16);
-$dis->defb(0x0770,16);
-$dis->defb(0x0780,16);
-$dis->defb(0x0790,16);
-$dis->defb(0x07a0,16);
-$dis->defb(0x07b0,16);
-$dis->defb(0x07c0,16);
-$dis->defb(0x07d0,16);
-$dis->defb(0x07e0,16);
-$dis->defb(0x07f0,16);
+for (my $a=0x720; $a<0x1000; $a=$a+16) {
+    $dis->defb($a,16);
+}
+
+
+dis_lab(0x1000);
+
+# Unused (FF and EF)
+$dis->defb(0x12b6,10);
+for (my $a=0x12c0; $a<0x2000; $a=$a+16) {
+    $dis->defb($a,16);
+}
+
 
 
 

@@ -18,9 +18,9 @@
 ;;; 8                - ?? boot 8" disk
 
 L_0002: equ $0002               ; entry point of loaded boot sector
-L_00E6: equ $00E6               ; 1st entry in JPTAB1 or JPTAB2
-L_00E9: equ $00E9               ; 2nd entry in JPTAB1 or JPTAB2
-L_00EC: equ $00EC               ; 3rd entry in JPTAB1 or JPTAB2
+L_00E6: equ $00E6               ; 1st entry in JPTAB1 or JPTAB2 POLL STATUS
+L_00E9: equ $00E9               ; 2nd entry in JPTAB1 or JPTAB2 GET CHAR
+L_00EC: equ $00EC               ; 3rd entry in JPTAB1 or JPTAB2 PUT CHAR
 
 ;;; Ports for GM811/GM813 CPU board
 
@@ -106,14 +106,14 @@ CLOP2:  out (c), e              ; initialise memory mapper
                                 ; stack at $000E6 can be used??
         ld a, i                 ; 
         ld a, $01               ; 
-        push af                 ; wot?? could this be some kind of warm/cold check?
+        push af                 ; TODO wot's appenin? could this be some kind of warm/cold check?
         ld i, a                 ; 
         pop af                  ; 
         jr z, L_F063            ; 
-        ld a, ($00EF)           ; boot drive code
+        ld a, ($00EF)           ; drive select value for boot drive
 L_F063: ld ($00EF), a           ; comes here from A and B commands
-        push af                 ; 
-        ld a, $F3               ; 
+        push af
+        ld a, $F3
         out (SCSCTL), a
         ld a, $09
 L_F06D: dec a
@@ -164,7 +164,7 @@ MSG15:  defb $1B, $2A           ; delete to end of line
         defm "<"
         defb $09, $80, $C9, $EE, $F3, $E5, $F2, $F4, $80, $C4, $E9, $F3, $EB, $80, $E9, $EE, $80, $E4, $F2, $E9, $F6, $E5, $80, $00
 
-MSG16:  defb $A0                ;TODO no reference. 
+MSG16:  defb $A0                ;TODO no reference
         defm "<"
         defb $00
 
@@ -181,7 +181,7 @@ L_F126: inc b
         jr z, L_F131
         sub $10
 L_F131: call XCHROUT
-        jp PRS
+        jp PRS                  ; print and return (tail-recurse)
 
 
 L_F137: call L_F11B
@@ -202,11 +202,11 @@ L_F14B: ld sp, L_00E6
 
 L_F15B: in a, (FDCSTA)
         bit 0, a
-        jr nz, L_F15B
+        jr nz, L_F15B           ; wait until done?
         ld a, $5B
-        call CMD2FDC
+        call CMD2FDC            ; STEP IN?
         ld a, $0B
-        call CMD2FDC
+        call CMD2FDC            ; RESTORE
         call L_F1BA
 L_F16E: or a
         jp nz, L_F0D8
@@ -230,7 +230,7 @@ MSG17:  defb $09, $80, $C0, $CE, $EF, $80, $F2, $E5, $E3, $EF, $E7, $EE, $E9, $F
 
 
 L_F1BA: ld a, $0B
-        call CMD2FDC
+        call CMD2FDC            ; RESTORE
         ld a, ($00EF)           ; get drive
         and $20
         jr z, L_F1C8
@@ -239,9 +239,9 @@ L_F1C8: out (FDCSEC), a
         ld hl, $0000
         ld c, FDCDRV            ; ?fast access to FDC data available?
         ld a, $88
-        out (FDCCMD), a
+        out (FDCCMD), a         ; READ SECTOR
         ld b, $80
-        jr L_F1D7               ; why not fall through? need slight delay?
+        jr L_F1D7               ; why not fall through? Bug, or need need slight delay?
 
 
 L_F1D7: in a, (c)               ; data?
@@ -366,12 +366,12 @@ L_F2A1: ld a, ($00F0)           ; says what type of I/O is in use??
         ret
 
 
-L_F2A6: ld a, $D0
+L_F2A6: ld a, $D0               ; FORCE INTERRUPT
         call CMD2FDC
         ld a, ($00EF)           ; get drive
         out (FDCDRV), a
         ld a, $0B
-        out (FDCCMD), a
+        out (FDCCMD), a         ; RESTORE
         ld b, $28
 L_F2B6: djnz L_F2B6
         ld hl, $D000
@@ -727,9 +727,9 @@ L_F56C: xor a
         out (SCSCTL), a
         in a, (SCSCTL)
         rlca
-        ld hl, MSG11            ; Detected GM849 disk controller
+        ld hl, MSG11            ; detected GM849 disk controller
         jr nc, L_F584
-        ld hl, MSG10            ; Detected GM809/829 disk controller
+        ld hl, MSG10            ; detected GM809/829 disk controller
 L_F584: call PRS
 CMDLOP: ld sp, L_00E6
         ld a, ">"               ; prompt
@@ -761,7 +761,7 @@ CMDLOP: ld sp, L_00E6
         cp $38
         jp z, CMD_8
 CMDERR: ld hl, MSG12
-        jp PRS
+        jp PRS                  ; print and return (tail-recurse)
 
 
 MSG12:  defm "  -What?"
@@ -772,7 +772,7 @@ CMD_B:  ld a, ($00EF)           ; get drive
         jp L_F063
 
 
-        cp $30
+        cp $30                  ; TODO what is this for and how does it get executed?
         ret c
         cp $3A
         jr c, L_F5F6
@@ -889,19 +889,19 @@ CMD_C:  call GET16              ; from address
 
 
 ;;; go (execute) at address
-CMD_G:  call GET16F            ; get 16-bit value in hl
+CMD_G:  call GET16F            ; get address in HL terminated by end-of-line
         jp (hl)
 
 
 ;;; fill from length byte
-CMD_F:  call GET16
+CMD_F:  call GET16              ; get from address in HL
         ex de, hl
-        call GET16
+        call GET16              ; get length in HL
         sbc hl, de
         ret c
         ld b, h
         ld c, l
-        call GET16F
+        call GET16F             ; get fill-value in HL terminated by end-of-line
         ex de, hl
         ld (hl), e
         ld d, h
@@ -911,8 +911,8 @@ CMD_F:  call GET16
         ret
 
 
-;;; inspect and modify memory
-CMD_S:  call GET16F             ; get address
+;;; Inspect and modify memory
+CMD_S:  call GET16F             ; get address in HL terminated by end-of-line
 SLOP:   call XP4HEX             ; print it
         ld a, "-"
         call XCHROUT
@@ -948,7 +948,7 @@ L_F6C6: ld a, d
 
 
 ;;; Output (write) to I/O port
-CMD_O:  call GET16             ; get port address in HL?
+CMD_O:  call GET16              ; get port address in HL
         ld a, h
         or a
         jp nz, CMDERR           ; error: expect port 0-ff therefore H should be 0
@@ -962,7 +962,7 @@ CMD_O:  call GET16             ; get port address in HL?
 
 
 ;;; Query (read from) I/O port
-CMD_Q:  call GET16F             ; get port address in HL
+CMD_Q:  call GET16F             ; get port address in HL terminated in end-of-line
         ld a, h
         or a
         jp nz, CMDERR           ; error: expect port 0-ff therefore H should be 0
