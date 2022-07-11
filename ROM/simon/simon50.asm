@@ -95,9 +95,9 @@ L_003A: dec hl
         cp h
         jr nz, L_003A           ; wait until delay loop has decremented from $ffff to $00ff
         ld a, $83
-        ld c, $36               ; port $36: refresh control
+        ld c, $36
         ld b, $00
-        out (c), a
+        out (c), a              ; port $36: refresh control
         xor a
         ld c, $32
         out (c), a              ; port $32: DMA/wait control
@@ -332,13 +332,13 @@ L_025B: ld e, (hl)
         or e
         jr z, L_0258
         ld a, $83
-        out (c), a
+        out (c), a              ; allow access to UART baud rate divisor registers
         ld a, e
-        out (UARTDAT), a
+        out (UARTDAT), a        ; set baud rate divisor lo
         ld a, d
-        out (UARTIE), a
+        out (UARTIE), a         ; set baud rate divisor hi
         ld a, $03
-        out (c), a
+        out (c), a              ; restore access to UART data/interrupt registers
         call L_90E9
         cp $0D
         jr nz, L_025B
@@ -1209,7 +1209,7 @@ L_10CA: in a, ($B2)
         rrca
         jr c, L_10CA
         pop af
-        out ($B1), a
+        out (IVCDAT), a
         ret
 
 
@@ -1268,7 +1268,7 @@ CMD_M:  ld hl, $0000             ; copy 16Kbytes from ROM to RAM?
         ldir
         ld a, $01
         ld bc, $0114
-        out (c), a              ; ??turn off the ROM??
+        out (c), a              ; port $14
         ld b, $00
 L_1132: djnz L_1132             ; pause
         call XCRLF
@@ -1278,12 +1278,12 @@ L_113C: push hl
         push bc
         ld bc, $003A
         ld a, $10
-        out (c), a
+        out (c), a              ; port $3a
         pop bc
         push bc
         ld a, b
         ld bc, $0039
-        out (c), a
+        out (c), a              ; port $39
         ld hl, $00FF
         ld a, (hl)
         ld e, a
@@ -1303,7 +1303,7 @@ L_113C: push hl
         push bc
         xor a
         ld bc, $0039
-        out (c), a
+        out (c), a              ; port $39
         ld de, $0004
         add hl, de
         push hl
@@ -1340,10 +1340,10 @@ L_11B8: ld a, ($11D1)
         ld ($11D1), a
         ld bc, $003A
         ld a, $10
-        out (c), a
+        out (c), a              ; port $3A
         xor a
         ld bc, $0039
-        out (c), a
+        out (c), a              ; port $39
         ld b, $00
 L_11CE: push bc
         ld a, b
@@ -1354,7 +1354,7 @@ L_11CE: push bc
         jr nz, L_11DA
         inc b
 L_11DA: push bc
-        ld bc, $003A
+        ld bc, $003A            ; port 3A
         ld a, $10
         out (c), a
         pop bc
@@ -1362,11 +1362,11 @@ L_11DA: push bc
         ld a, b
         ld ($1292), a
         ld bc, $0039
-        out (c), a
+        out (c), a              ; port $39
         call L_120A
         xor a
         ld bc, $0039
-        out (c), a
+        out (c), a              ; port $39
         pop bc
         inc b
         jr L_11CE
@@ -1377,7 +1377,7 @@ L_11FA: call X06C1
         call PRS
         xor a
         ld bc, $0114
-        out (c), a
+        out (c), a              ; port $14
         ret
 
 

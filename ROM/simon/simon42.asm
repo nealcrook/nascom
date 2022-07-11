@@ -315,13 +315,13 @@ L_F246: ld e, (hl)
         or e
         jr z, L_F243
         ld a, $83
-        out (c), a
+        out (c), a              ; allow access to UART baud rate divisor registers
         ld a, e
-        out (UARTDAT), a
+        out (UARTDAT), a        ; set baud rate divisor lo
         ld a, d
-        out (UARTIE), a
+        out (UARTIE), a         ; set baud rate divisor hi
         ld a, $03
-        out (c), a
+        out (c), a              ; restore access to UART data/interruot registers
         call L_00E9
         cp $0D
         jr nz, L_F246
