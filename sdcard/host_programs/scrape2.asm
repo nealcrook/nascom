@@ -599,6 +599,8 @@ RW1:	OUT	(SECREG),A	;Output sector number
 	CALL	MOTON		;Keep motors running
 	INC	C		;Write sector?
 	JR	NZ,RW4		;No => skip
+
+        ;; WRITE SECTOR COMMAND/DATA FLOW
 	LD	C,STPORT	;Point to STPORT
 	LD	A,CWRSEC	;Get command
 	OR	B		;Include side
@@ -610,6 +612,8 @@ RW3:	IN	B,(C)		;Read status
 	JP	P,RW6		;Jump on INTRQ
 	OUT	(DATREG),A	;Output byte
 	JR	RW2		;Go get next
+
+        ;; READ SECTOR/READ ADDRESS COMMAND/DATA FLOW
 RW4:	DEC	C		;Read sector?
 	LD	A,CRDSEC	;(Read sector command)
 	JR	Z,RW7		;Yes => skip
@@ -624,6 +628,8 @@ RW5:	IN	B,(C)		;Read status
 	LD	(HL),A		;Save it
 	INC	HL		;Point to next
 	JR	RW5
+
+        ;; COMMON END
 RW6:	IN	A,(STSREG)	;Read status
 	OR	A		;Status to Z flag
 	POP	HL		;Restore
