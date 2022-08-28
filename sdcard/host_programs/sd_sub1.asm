@@ -47,10 +47,10 @@ pvx:    xor     2               ;toggle H2T
         ;; corrupts A,F
 waitm:  in      a, (PIOBD)      ;get status
         and     3               ;look at handshakes
-        jr      z, wdone        ;both 0 => done
-        cp      3               ;both 1
-        jr      nz, waitm       ;not both 1 => wait
-wdone:  ret			;done
+        ret     z               ;both 0 => done
+        cp      3
+        ret     z               ;both 1 => done
+        jr      waitm		;test again..
 
 
 ;;; assume: currently in OUTPUT. Go to INPUT
