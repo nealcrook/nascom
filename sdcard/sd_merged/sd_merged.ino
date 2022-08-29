@@ -1,9 +1,9 @@
-// NAScas                             -*- c -*-
+// NASCOM SDcard control software              -*- c -*-
 // https://github.com/nealcrook/nascom
 //
-// ARDUINO Uno/Nano (ATMEGA328) connected to NASCOM 2 as mass-storage device
+// Arduino Uno/Nano (ATMEGA328) connected to NASCOM 2 as mass-storage device
 //
-// Connect through UART for the purpose of providing a "virtual cassette
+// * Connect through UART for the purpose of providing a "virtual cassette
 // interface" in which the NAS-SYS R and W commands (and the equivalent from
 // within BASIC and other applications) are directed to files on SDcard.
 //
@@ -13,9 +13,19 @@
 // automatically bootstrap-loaded through the serial port when the Arduino
 // is reset.
 //
-// ** This software relies on the SdFat implementation. Download it
-// ** into your Arduino/libraries area and then edit SdFat/src/SdFatConfig.h
-// ** to change "#define USE_LONG_FILE_NAMES" from 1 to 0.
+// * Connect through PIO for the purpose of providing a "virtual disk
+// interface" to run PolyDos or as a fast load mechanism for files on SDcard.
+//
+// * Connect through Arduino USB port for a console interface to pipe
+// files directly from a host PC to the NASCOM.
+//
+// For more details, refer to "NASCOM SDcard Interface" document.
+//
+// ** This software relies on the SdFat implementation. Download version
+// ** 1.1.4 (NOT the latest version) from https://github.com/greiman/SdFat
+// ** into your Arduino/libraries area, then edit SdFatConfig.h to set
+// ** USE_LONG_FILENAMES to 0 (code here does not allow use of long filenames
+// ** and this change reduces the code size from 30862 to 29024).
 //
 // ** By default the Nano ships with a larger boot loader than the Uno and
 // ** this code may not fit. Best solution is to reprogram the Nano with
@@ -25,24 +35,26 @@
 ////////////////////////////////////////////////////////////////////////////////
 // WIRING (assumes Arduino Uno/Nano)
 //
+// - simplest way to handle this is to contact me and buy a £5 PCB.
+//
 // ANA6/ANA7 ARE INPUT ONLY *AND* YOU CANNOT USE
 // digitalRead ON THEM - ONLY analogRead.
 //
 //
 // 1/ connection to uSDcard adaptor
 //
-// uSD                     ARDUINO
+// uSD                     Arduino
 // -------------------------------
 // 1  GND                  GND
 // 2  VCC                  5V
 // 3  MISO                 DIG12
 // 4  MOSI                 DIG11
-// 5  SCK                  DIG13  (also ARDUINO's on-board LED)
+// 5  SCK                  DIG13  (also Arduino's on-board LED)
 // 6  CS_N                 DIG10
 //
 // 2/ connection to NASCOM 2 serial interface PL2 via 16-way ribbon
 //
-// Name   Direction   ARDUINO   NASCOM 2
+// Name   Direction   Arduino   NASCOM 2
 // ---------------------------------------------------------------
 // NAS_DRIVE  IN       ANA6     pin 1       DRIVE OUT
 // NAS_TXD    IN       DIG7     pin 12      20mA OUT
@@ -58,7 +70,7 @@
 //
 // 3/ connection to LED (optional)
 //
-// Name   Direction   ARDUINO   Notes
+// Name   Direction   Arduino   Notes
 // -----------------------------------
 // DRIVE  OUT         ANA2      To LED. Copies state of DRIVE
 //
@@ -224,11 +236,13 @@
 // command could be changed to allow optional load and execution address
 // to be specified. The existing number parser could be used to check for
 // these; it needs no modification for this task.
-
+//
 // TODO
 // "erase" could use the command-line buffer instead of parsing into a new buffer.
 // currently 31880 bytes rom 1112 bytes ram
 //           31404           1054           after change to FatFile etc.
+//           29024           1351           SdFat 1.1.4 Jan2022
+//           31346           1351           SdFat 1.1.4 Jan2022, add PIRANHA 
 //
 // Make it work with serial comms faster than 2400bd. At one point I thought
 // the "softserial" library was the limiting factor but I read that it should
@@ -254,12 +268,13 @@
 // Define to use with NASBUG T4, comment out for use with NAS-SYS
 // - uses a different version of the serboot code
 // - uses different line-endings (T4 uses 0x1f for CR)
+// NOT CURRENTLY WORKING - SEE ALTERNATIVE CODE TREE: sd_merged_t4
 //#define NASBUGT4
 
 // Define which ROMS to include in the Flash filesystem; you may need
 // to omit some to make the code fit (especially if you enable CONSOLE)
 //#define ROM_INVADERS
-//#define ROM_PIRANHA
+#define ROM_PIRANHA
 #define ROM_LOLLIPOP
 #define ROM_ZEAP2
 //#define ROM_NASDIS
@@ -345,6 +360,11 @@
 #define PIN_XD0 2
 
 
+/////////////////////////////////////////////////////
+// Size of buffer big enough to hold null-terminated MSDOS 8.3
+// name (including the ".")
+#define BUFFER (8+1+3+1)
+
 
 // EEPROM holds a "profile record" consisting of a header followed by
 // 4 profiles. Each profile defines 4 virtual disk images and the disk
@@ -360,7 +380,7 @@
 //
 #define SECTOR_CHUNK (128)
 typedef struct PROFILE {
-    char fnam_fext[4][8+1+3+1]; // Null-terminated MSDOS 8.3 names including dot
+    char fnam_fext[4][BUFFER]; // Null-terminated MSDOS 8.3 names including dot
     uint8_t nsect_per_track;    // sectors per track
     uint8_t ntrack;             // tracks TODO not used.. could be used to detect illegal seek.
     uint8_t first_sect;         // number associated with first sector
@@ -423,17 +443,8 @@ UPROFILE profile {
 #define CMD_PRESTORE (0x78)
 
 
-/////////////////////////////////////////////////////
-
-// Size of buffer big enough to hold null-terminated MSDOS 8.3
-// name (including the ".")
-#define BUFFER (8+1+3+1)
-
-
-
-
 // *not* the standard Arduino library (which has some bugs and performance
-// problems). Download from https://github.com/greiman/SdFat
+// problems) - see notes above.
 #define SPI_SPEED SD_SCK_MHZ(50)
 #include <SdFat.h>
 
@@ -538,13 +549,9 @@ int train_count;
 char direction;
 
 
-
-// Maintained by open_sdcard()
-FatFile *working_dir;
-
 // Only ever have 1 file open at a time
 // FatFile takes ~12 bytes less data but only File supports size() needed for console code.
-File handle;
+FatFile handle;
 
 
 // Boot ROM and some applications/games - stored in FLASH to save resources.
@@ -633,7 +640,7 @@ unsigned long drive_on = 0;
 unsigned int pause_delay = 10; // in seconds
 unsigned int nulls_delay = 100; // in milliseconds
 
-// arduino clock is 16MHz
+// Arduino clock is 16MHz
 SoftwareSerial mySerial(PIN_NTXD, PIN_NRXD, SOFTSERIAL_INVERT); // RX, TX, control INVERSE_LOGIC on pin
 
 SdFat SD;
@@ -673,7 +680,6 @@ int rd_drive(void) {
 
 void setup()   {
     pinMode(PIN_LED, OUTPUT);
-//    pinMode(PIN_DRV, INPUT);
 
     // The PIN_DRV and PIN_H2T are input-only analog pins that can only be
     // read by doing an ADC conversion (do NOT call pinMode on them; it can
@@ -728,8 +734,7 @@ void setup()   {
     next_file = 0;
     direction = INPUT;
 
-    // H2T, T2H, CMD have fixed direction
-//    pinMode(PIN_H2T, INPUT);
+    // H2T, T2H, CMD have fixed direction. H2T is in-only pin (see notes above)
     pinMode(PIN_T2H, OUTPUT);
     pinMode(PIN_CMD, INPUT);
     pinMode(PIN_ERROR, OUTPUT);
@@ -780,7 +785,7 @@ void setup()   {
 }
 
 
-// This routine is invoked repeatedly by the arduino "scheduler" and so there is
+// This routine is invoked repeatedly by the Arduino "scheduler" and so there is
 // no loop inside here; do one pass of polling and drop through the bottom. If
 // anything needs doing it will be invoked from here. Any state must be global.
 void loop() {
@@ -1014,7 +1019,7 @@ int foreach_flash_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
 //         >=0 the iterator aborted. The return value is the iteration number
 //         which is the directory index of the entry that aborted.
 int foreach_vdisk_dir(int (*fn)(UDIRENT *d, char * buf2), char * fname) {
-    if ( (working_dir->exists(cas_vdisk_name)) && (handle.open(cas_vdisk_name, FILE_READ)) ) {
+    if ( (SD.exists(cas_vdisk_name)) && (handle.open(cas_vdisk_name, FILE_READ)) ) {
         UDIRENT dirent;
 
         pr_freeRAM();
@@ -1071,7 +1076,6 @@ void open_sdcard(void) {
         cas_flags |= FM_SD_FOUND;
         // move to NASCOM directory, if it exists.
         SD.chdir("NASCOM", 1);
-        working_dir = SD.vwd();
 
         // the very first write after initialising a card takes significantly
         // longer than other writes, and it can cause the first blocks of write
@@ -1092,11 +1096,13 @@ void open_sdcard(void) {
 // "SD.ls(&NASSERIAL, LS_SIZE)" but this hand-cranked version has the advantage
 // that it can use the pager at the NASCOM end.
 void dir_sdcard(void) {
-    char txtbuf[8+1+3+1]; // 8.3 name with terminating 0
+    FatFile *working_dir;
+    char txtbuf[BUFFER]; // 8.3 name with terminating 0
     char * txt = txtbuf;
 
     NASSERIAL.write((byte)0xff); // tell host: a message is coming
 
+    working_dir = SD.vwd();
     working_dir->rewind();
     while (handle.openNext(working_dir, O_RDONLY)) {
         int len;
@@ -1151,9 +1157,10 @@ void dir_sdcard(void) {
 // into a buffer and process it to completion -- for example, by setting up
 // state that will be used subsequently.
 void cmd_cass(void) {
+    FatFile * working_dir;
     char buf[40]; // TODO I think the maximum incoming line is 40 + NUL. May need to make this 1 byte larger. Test.
     char * pbuf = &buf[0];
-    char erase_name[13]; // 8 + 1 + 3 + 1 bytes for null-terminated FAT file name
+    char erase_name[BUFFER]; // 8 + 1 + 3 + 1 bytes for null-terminated FAT file name
     int index = 0;
     int cmd = 0;
     unsigned long tmp_long;
@@ -1192,6 +1199,7 @@ void cmd_cass(void) {
         pr_hex4((uint16_t)cas_flags, 1, 1);
 
         // report current working directory (/ or NASCOM)
+        working_dir = SD.vwd();
         working_dir->getSFN(pbuf);
         NASSERIAL.print(F("Directory:  "));
         NASSERIAL.println(pbuf);
@@ -1269,7 +1277,7 @@ void cmd_cass(void) {
         if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, cas_vdisk_name)) {
                 // Don't want to create a file, so check existence first
-                if ( (working_dir->exists(cas_vdisk_name)) && handle.open(cas_vdisk_name, FILE_READ) ) {
+                if ( (SD.exists(cas_vdisk_name)) && handle.open(cas_vdisk_name, FILE_READ) ) {
                     handle.close();
                     cas_flags |= FM_VDISK_MOUNT;
                 }
@@ -1318,9 +1326,7 @@ void cmd_cass(void) {
     case ('E'<<8 | 'S'):      // ES <8.3> - Erase file from FAT file-system
         if (cas_flags & FM_SD_FOUND) {
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, erase_name)) {
-                // "handle" is undefined; it's just needed to allow the
-                // method to be called. SD.remove() is actually slightly smaller..
-                if (!handle.remove(working_dir, erase_name)) {
+                if (!SD.remove(erase_name)) {
                     pr_msg(msg_err_fname_missing, F_MSG_RESPONSE + F_MSG_ERROR + F_MSG_CR);
                 }
             }
@@ -1342,7 +1348,7 @@ void cmd_cass(void) {
                     cas_flags |= FM_RD_AI;
                 }
 
-                if (!working_dir->exists(cas_rd_name)) {
+                if (!SD.exists(cas_rd_name)) {
                     pr_msg(msg_warn_fname_missing, F_MSG_RESPONSE + F_MSG_CR);
                 }
 
@@ -1420,7 +1426,7 @@ void cmd_cass(void) {
                     cas_flags |= FM_WR_AI;
                 }
 
-                if (working_dir->exists(cas_wr_name)) {
+                if (SD.exists(cas_wr_name)) {
                     pr_msg(msg_info_2bdeleted, F_MSG_RESPONSE + F_MSG_CR);
                 }
 
@@ -1942,9 +1948,11 @@ void cmd_disk() {
     default:
         // Not a command or not a recognised command.
         // Light the ERROR LED.
+        Serial.println(F("ERROR"));
         digitalWrite(PIN_ERROR, 1);
         break;
     }
+    Serial.println(F("Finished OK"));
 }
 
 
@@ -1997,8 +2005,8 @@ void set_hs_match(void) {
 }
 
 
-// set outgoing handshake as inverse of incoming handshake. This is how WOT
-// the Target (us) initiates a transfer
+// set outgoing handshake as inverse of incoming handshake. This is how
+// the Target (that's this code) initiates a transfer
 // theoretically we don't need to read the other handshake, we can rely
 // on our own copy. However, it seems more robust to do it like this.
 void set_hs_differ(void) {
@@ -2080,7 +2088,7 @@ void auto_name(char *buffer) {
             buffer[4] = '0' + ((int(next_file/10)) %10);
             buffer[5] = '0' + (next_file %10);
             next_file++;
-            if (! working_dir->exists(buffer)) {
+            if (! SD.exists(buffer)) {
                 // does not exist; just what we're looking for
                 return;
             }
@@ -2215,9 +2223,10 @@ void cmd_loop(void) {
 //
 // RESPONSE: NUL-terminated string. Does not update global status
 void cmd_dir(void) {
-    FatFile handle;
+    FatFile * working_dir;
     char name[BUFFER];
 
+    working_dir = SD.vwd();
     working_dir->rewind();
     while (handle.openNext(working_dir, O_RDONLY)) {
         char * pname = name;
@@ -2557,7 +2566,6 @@ void cmd_pboot(char pid) {
     // data is all-0. n_rd updates the global status so that the final
     // response byte indicates whether the whole process has been successful
     n_rd(0, (long)(profile.f.sect_chunks * SECTOR_CHUNK));
-    put_value(status, INPUT);
 }
 
 
@@ -2574,9 +2582,11 @@ void cmd_pboot(char pid) {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 void console_dir_sdcard(void) {
+    FatFile * working_dir;
     char txtbuf[13];
     char * txt = txtbuf;
 
+    working_dir = SD.vwd();
     working_dir->rewind();
     while (handle.openNext(working_dir, O_RDONLY)) {
         int len;
@@ -2655,9 +2665,7 @@ void cmd_console(void) {
 
         case 'E':    // ERASE
             if (parse_leading(&pbuf) && parse_fname_msdos(&pbuf, file_name)) {
-                // "handle" is undefined; it's just needed to allow the
-                // method to be called. SD.remove() is actually slightly smaller..
-                if (handle.remove(working_dir, file_name)) {
+                if (SD.remove(file_name)) {
                     console_ack(2); // Erase Success.
                     break;
                 }
@@ -2706,7 +2714,7 @@ void cmd_console(void) {
 
                 // need to report the file size so that the console knows how many bytes
                 // to expect. Otherwise, no way to signal EOF while using a binary format.
-                file_length = handle.size();
+                file_length = handle.fileSize();
                 DEBSERIAL.println(file_length);
 
                 // send the file
@@ -2740,8 +2748,8 @@ void cmd_console(void) {
             else {
                 file_length = 0;
             }
-            console_ack(12); // EEPROM read success (even if it wasn't)
             DEBSERIAL.print((unsigned char)file_length, HEX);
+            console_ack(12); // EEPROM read success (even if it wasn't)
             break;
 
         default:
