@@ -157,9 +157,10 @@ exit:   SCAL    ZMRET           ;go back to command-line
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; replacement R routine
-;;; ARG1 has a load offset, which we ignore. Everything we need is in the
-;;; directory entry from the write.
-;;; The filename and drive are taken from workspace at the end of this program.
+;;; If invoked with ARG1, this is a load offset. Everything else
+;;; we need is in the directory entry from the write.
+;;; The filename and drive are taken from workspace at the end of
+;;; this program.
 nrd:    ld      hl,myfcb        ;copy file name from here
         ld      de,S1FCB        ;to here
         ld      bc,10
@@ -201,7 +202,15 @@ found:  ld      hl, (S1FCB+FNSC) ;sector count
 ;;; Data transfer part 1: transfer whole sectors (if any)
         ld      b, l            ;number of sectors to transfer
         ld      hl,(S1FCB+FLDA) ;where to put it
-        ld      de,(S1FCB+FSEC) ;1st sector to read
+
+        ld      a, (ARGN)       ;offset from R command?
+        or      a
+        jr      z, nooff        ;no
+
+        ld      de, (ARG1)      ;yes - add it
+        add     hl,de
+
+nooff:  ld      de,(S1FCB+FSEC) ;1st sector to read
         SCAL    ZDRD            ;read it
         SCAL    ZCKER           ;Check for error
 
