@@ -183,6 +183,7 @@ UPROFILE profile {
 // *not* the standard Arduino library (which has some bugs and performance
 // problems). Download from https://github.com/greiman/SdFat
 #define SPI_SPEED SD_SCK_MHZ(50)
+#define USE_LONG_FILE_NAMES 0
 #include <SdFat.h>
 
 #include <EEPROM.h>
