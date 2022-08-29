@@ -1282,22 +1282,42 @@ rs2t:   call    getval          ;status
 ;;; device attached to the NASCOM PIO.
 ;;; https://github.com/nealcrook/nascom
 ;;;
-;;; Assemble at address xxx0, (optionally) burn to EPROM.
-;;;
 ;;; Provides 5 different utilites, all invoked from NAS-SYS at
-;;; different offsets from the start address.
+;;; different offsets from the ROM end address.
 ;;;
-;;; 1) CHECKSUM
+;;; 1) DSKBOOT
 ;;;
-;;; E dff4 ssss eeee
+;;; E DFF1            - use settings in the SDBOOT0 binary
+;;; E DFF1 aaaa       - load bitmap aaaa and return to NAS-SYS
+;;; E DFF1 aaaa bbbb  - load bitmap aaaa and execute at bbbb
+;;;
+;;; This is a simple bootstrap program. It contains the
+;;; minimum code needed to talk to the NAScas parallel
+;;; interface and can bootstrap load code across that
+;;; interface using the CMD_PBOOT command.
+;;;
+;;; It requires a "profile record" to be stored in the
+;;; NAScas Arduino's EEPROM and loads profile 3 for which
+;;; the default images are SDBOOT0.DSK, SDBOOT1.DSK,
+;;; SDBOOT2.DSK, SDBOOT3.DSK -- only the first one is
+;;; important; the other three should be 0-sized files.
+;;; This program will load the first "sector" from
+;;; SDBOOT0.DSK into RAM at 0D00 and jump to it.
+;;;
+;;; Refer to SDBOOT0.asm for a description of the
+;;; command-line arguments.
+;;;
+;;; 2) CHECKSUM
+;;;
+;;; E DFF4 ssss eeee
 ;;;
 ;;; Compute checksum of memory from ssss to eeee inclusive.
 ;;; Checksum is the sum of all bytes and is reported as a
 ;;; 16-bit value. Carry off the MSB is lost/ignored.
 ;;;
-;;; 2) READ FILE
+;;; 3) READ FILE
 ;;;
-;;; E dff7 ssss nnn
+;;; E DFF7 ssss nnn
 ;;;
 ;;; Where nnn are exactly 3 decimal digits (000..999).
 ;;;
@@ -1305,9 +1325,9 @@ rs2t:   call    getval          ;status
 ;;; - Load it to memory starting at address ssss
 ;;; - Report the file size
 ;;;
-;;; 3) WRITE FILE
+;;; 4) WRITE FILE
 ;;;
-;;; E dffa ssss eeee [nnn]<-optional
+;;; E DFFA ssss eeee [nnn]<-optional
 ;;;
 ;;; If nnn - exactly 3 decimal digits (000..999):
 ;;; - Create file NASnnn.BIN
@@ -1317,9 +1337,9 @@ rs2t:   call    getval          ;status
 ;;; - Auto-pick next free file name in the form NASnnn.BIN
 ;;; - Save memory from ssss to eeee inclusive to the file
 ;;;
-;;; 4) SCRAPE DISK
+;;; 5) SCRAPE DISK
 ;;;
-;;; E dffd [nnn]<-optional
+;;; E DFFD [nnn]<-optional
 ;;;
 ;;; If nnn - exactly 3 decimal digits (000..999).
 ;;; - Create file NASnnn.BIN
@@ -1329,7 +1349,7 @@ rs2t:   call    getval          ;status
 ;;; - Auto-pick next free file name in the form NASnnn.BIN
 ;;; - Read all sectors of drive 0 and write them to the file
 ;;;
-;;; This will ONLY work if the system has been booted into
+;;; This will ONLY work if/after the system has been booted into
 ;;; DISK Polydos, so that the Polydos SCAL table is available.
 ;;;
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1443,8 +1463,38 @@ e2len:  ld      de,(ARG2)       ;start address
         ret
 
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; DSKBOOT
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+loadat: EQU     $0d00
+
+;;; initialise the PIO and train the interface
+dskboot:  call    hwinit
+
+;;; issue the command, select profile 3
+        ld      a, CPBOOT + 3
+        call    putcmd
+        call    gorx
+        ld      hl, loadat      ;where to put the data
+        ld      bc, 512         ;sector size
+dnext:  call    getval
+        ld      (hl), a
+        inc     hl
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz, dnext
+
+        call    getval          ;get status
+        call    gotx            ;does not affect A
+        or      a               ;update flags
+        jp      nz, loadat      ;enter loaded program
+
+        SCAL    ZMRET           ;fatal error - back to NAS-SYS
+
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; CSUM
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 csum:   ld      a,(ARGN)
         cp      3               ;expect 3 arguments
         jp      nz, mexit
@@ -1598,7 +1648,6 @@ report: rst     ROUT
         ;; hl, bc unchanged
         ;; bc = $a00 - the number of bytes to write out to SD
         ;; need to fix c if using drive 1 etc.
-
         ld      a, CNWR         ;write
         call    putcmd
         ld      a, c            ;length in bytes, LS first
@@ -1622,17 +1671,8 @@ snext:  ld      a, (hl)
         ;; get status, return if OK, msg/exit on error
         call    ft2rs2t
 
-        inc     de              ;increment sector count by
-        inc     de              ;the number we've just copied
-        inc     de
-        inc     de
-        inc     de
-
-        inc     de
-        inc     de
-        inc     de
-        inc     de
-        inc     de              ;crude but effective!
+        call    deadd10         ;increment sector count by
+                                ;the number we've just copied
 
         ;; we're done if hl=de
         pop     hl
@@ -1644,31 +1684,34 @@ snext:  ld      a, (hl)
         jr      nz, nxt1
         SCAL    ZMRET
 
-nxt1:   inc     de              ;increment sector count
-        inc     de              ;by the number we've copied
-        inc     de
-        inc     de
-        inc     de
-
-        inc     de
-        inc     de
-        inc     de
-        inc     de
-        inc     de              ;crude but effective!
+nxt1:   call    deadd10         ;increment sector count
+                                ;by the number we've copied
 
         jr      nxtblk
 
-
-
+;;; crude but effective: add 10 to de, mess with no other register
+deadd10:inc     de
+        inc     de
+        inc     de
+        inc     de
+        inc     de
+        ;;
+        inc     de
+        inc     de
+        inc     de
+        inc     de
+        inc     de
+        ret
 
 ;;; pad ROM to 2Kbytes.
 SIZE:   EQU $ - PDCROM
 PAD1:   EQU 800h - SIZE
-;;; 12 is the size of the jump table
-PAD2:   EQU PAD1 - 12
+;;; 15 is the size of the jump table
+PAD2:   EQU PAD1 - 15
         DS  PAD2, 0ffh
 
 ;;; Jump table to keep consistent entry points
+        jp      dskboot
         jp      csum
         jp      rdfile
         jp      wrfile

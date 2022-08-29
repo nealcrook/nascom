@@ -1405,41 +1405,13 @@ bd41			;	35 tracks/side, 256 byte per sector.
 bd41			; 
 bd41			;---------------------------------------------- 
 bd41			 
-bd41			; Commands for the SDcard interface 
-bd41			FID:          EQU     $0        ;0, 1, 2, 3 or 4 
-bd41			CNOP:         EQU     $80       ;no-operation 
-bd41			CRES:         EQU     $81       ;restore state 
-bd41			CSAV:         EQU     $82       ;save state 
-bd41			CLOOP:        EQU     $83       ;loopback 
-bd41			CDIR:         EQU     $84       ;directory 
-bd41			CSTAT:        EQU     $85       ;command status 
-bd41			 
-bd41			COPEN:        EQU     $10 + FID 
-bd41			COPENR:       EQU     $18 + FID 
-bd41			CSEEK:        EQU     $20 + FID ;seek by byte offset 
-bd41			CTSEEK:       EQU     $28 + FID ;seek by track/sector offset 
-bd41			CSRD:         EQU     $30 + FID 
-bd41			CNRD:         EQU     $38 + FID 
-bd41			CSWR:         EQU     $40 + FID 
-bd41			CNWR:         EQU     $48 + FID 
-bd41			CSZRD:        EQU     $60 + FID 
-bd41			CCLOSE:       EQU     $68 + FID 
-bd41			 
 bd41			;;; The geometry may be different between CP/M and Polydos; looks as 
 bd41			;;; though Polydos starts tracks and sectors at 0 but CP/M starts tracks at 1 
-bd41			;;; (like FLEX does - I think this is "normal") 
-bd41			 
-bd41			; Equates for NASCOM I/O -- the Z80 PIO registers 
-bd41			PIOAD:        EQU      $4 
-bd41			PIOBD:        EQU      $5 
-bd41			PIOAC:        EQU      $6 
-bd41			PIOBC:        EQU      $7 
-bd41			 
 bd41			 
 bd41			; Initialize disk drivers and select drive C 
 bd41			;;; This is called during the ROM init 
 bd41			 
-bd41 cd 2c be		INIT:   call    hwinit		;Set up PIO etc. 
+bd41 cd 2b be		INIT:   call    hwinit		;Set up PIO etc. 
 bd44 cd be bd			CALL	CNVCOD		;Convert drive code 
 bd47 c3 c5 bd			JP	TSTDSK		;Test for disk 
 bd4a			 
@@ -1485,7 +1457,7 @@ bd6f cd f0 bd		        call    putval          ;next byte of count
 bd72 af			        xor     a 
 bd73 cd f0 bd		        call    putval          ;MS byte of count 
 bd76			 
-bd76 cd 47 be		        call    t2rs2t          ;Get status in A 
+bd76 cd 46 be		        call    t2rs2t          ;Get status in A 
 bd79			        ;; 0 = error so Z => error 
 bd79			 
 bd79 28 3e		        jr      z,RWS2A         ;[NAC HACK 2018Apr22] error code?? 
@@ -1510,7 +1482,7 @@ bd8d 23			        inc     hl
 bd8e 10 f9		        djnz    wd              ;write data loop for 1 sector 
 bd90 c1			        pop     bc 
 bd91			 
-bd91 cd 47 be		        call    t2rs2t          ;Get status in A 
+bd91 cd 46 be		        call    t2rs2t          ;Get status in A 
 bd94			        ;; 0 = error so Z => error 
 bd94			 
 bd94 28 23		        jr      z,RWS2A         ;[NAC HACK 2018Apr22] error code?? 
@@ -1526,17 +1498,17 @@ bd9b
 bd9b 79			rs:     ld      a,c             ;FID 
 bd9c f6 30		        or      CSRD            ;sector read: 256 bytes 
 bd9e cd e8 bd		        call    putcmd 
-bda1 cd 05 be		        call    gorx 
+bda1 cd 04 be		        call    gorx 
 bda4			 
 bda4 c5			        push    bc 
 bda5 06 00		        ld      b,0             ;counts as 256 
-bda7 cd 1e be		rd:     call    getval          ;read data for 1 sector 
+bda7 cd 1d be		rd:     call    getval          ;read data for 1 sector 
 bdaa 77			        ld      (hl),a 
 bdab 23			        inc     hl 
 bdac 10 f9		        djnz    rd              ;read data loop for 1 sector 
 bdae c1			        pop     bc 
 bdaf			 
-bdaf cd 4a be		        CALL    rs2t            ;Get status in A 
+bdaf cd 49 be		        CALL    rs2t            ;Get status in A 
 bdb2			        ;; 0 = error so Z => error 
 bdb2			 
 bdb2 28 05		        jr      z,RWS2A         ;[NAC HACK 2018Apr22] error code?? 
@@ -1590,7 +1562,7 @@ bdcf cd f0 bd		        CALL    putval          ;Track 0
 bdd2 3e 01		        LD      A,1 
 bdd4 cd f0 bd		        CALL    putval          ;Sector 1 
 bdd7			 
-bdd7 cd 47 be		        call    t2rs2t          ;Get status in A 
+bdd7 cd 46 be		        call    t2rs2t          ;Get status in A 
 bdda			        ;; 0 = error so Z => error 
 bdda			;;; [NAC HACK 2018Apr22] maybe I should change that all the 
 bdda			;;; way back to the Arduino command set. Much nicer to say 0=success 
@@ -1610,16 +1582,68 @@ bde7 c9				RET
 bde8			 
 bde8			 
 bde8			 
-bde8			;;; Low-level subroutines 
+bde8			;;; Defines and low-level subroutines 
+bde8			        include "sd_sub_defs.asm" 
+bde8			;;; Z80 assembler defines for use with nascom_sdcard 
+bde8			;;; https://github.com/nealcrook/nascom 
+bde8			;;; 
+bde8			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bde8			 
+bde8			; Commands for the SDcard interface 
+bde8			FID:          EQU     $0        ;0, 1, 2, 3 or 4 
+bde8			CNOP:         EQU     $80       ;no-operation 
+bde8			CRES:         EQU     $81       ;restore state (deprecated; use PRES) 
+bde8			 
+bde8			CLOOP:        EQU     $83       ;loopback 
+bde8			CDIR:         EQU     $84       ;directory 
+bde8			CSTAT:        EQU     $85       ;command status 
+bde8			CINFO:        EQU     $86       ;info on mounted drives 
+bde8			CSTOP:        EQU     $87       ;stop interface (require reset) 
+bde8			 
+bde8			COPEN:        EQU     $10 + FID 
+bde8			COPENR:       EQU     $18 + FID 
+bde8			CSEEK:        EQU     $20 + FID ;seek by byte offset 
+bde8			CTSEEK:       EQU     $28 + FID ;seek by track/sector offset 
+bde8			CSRD:         EQU     $30 + FID 
+bde8			CNRD:         EQU     $38 + FID 
+bde8			CSWR:         EQU     $40 + FID 
+bde8			CNWR:         EQU     $48 + FID 
+bde8			CSZRD:        EQU     $60 + FID 
+bde8			CCLOSE:       EQU     $68 + FID 
+bde8			 
+bde8			PID:          EQU     $0        ;0, 1, 2, 3 (Profile) 
+bde8			CPBOOT:       EQU     $70 + PID 
+bde8			CPRES:        EQU     $78 + PID 
+bde8			 
+bde8			; Equates for NASCOM I/O -- the Z80 PIO registers 
+bde8			PIOAD:        EQU      $4 
+bde8			PIOBD:        EQU      $5 
+bde8			PIOAC:        EQU      $6 
+bde8			PIOBC:        EQU      $7 
+bde8			 
+bde8			;;; end 
+# End of file sd_sub_defs.asm
 bde8			        include "sd_sub1.asm" 
 bde8			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
 bde8			;;; subroutines for low-level access to nascom_sdcard 
 bde8			;;; https://github.com/nealcrook/nascom 
 bde8			;;; 
-bde8			;;; putting them at the start means that the start of each test 
+bde8			;;; Putting them at the start means that the start of each test 
 bde8			;;; program is identical - useful if you are hand-typing the hex 
 bde8			;;; in (as I did when testing) 
+bde8			;;; 
+bde8			;;; PIO port A is used for data and is switched between in and out 
+bde8			;;; PIO port B is used for control (3 bits) 
+bde8			;;; 
+bde8			;;; portB[2] - CMD Input  "Command"         mask 4 
+bde8			;;; portB[1] - H2T Output "Host to Target"  mask 2 
+bde8			;;; portB[0] - T2H Input  "Target to host"  mask 1 
+bde8			;;; 
+bde8			;;; The behaviour of the handshakes is illustrated here: 
+bde8			;;; https://github.com/nealcrook/nascom/blob/master/sdcard/doc/protocol.pdf 
+bde8			;;; 
 bde8			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bde8			 
 bde8			 
 bde8			;;; assume: currently in OUTPUT 
 bde8			;;; command is in A 
@@ -1649,542 +1673,618 @@ bdfa			        ;; wait until handshakes match
 bdfa			        ;; corrupts A,F 
 bdfa db 05		waitm:  in      a, (PIOBD)      ;get status 
 bdfc e6 03		        and     3               ;look at handshakes 
-bdfe 28 04		        jr      z, wdone        ;both 0 => done 
-be00 fe 03		        cp      3               ;both 1 
-be02 20 f6		        jr      nz, waitm       ;not both 1 => wait 
-be04 c9			wdone:  ret			;done 
-be05			 
-be05			 
-be05			;;; assume: currently in OUTPUT. Go to INPUT 
-be05			;;; leave CMD=0 (but irrelevant) 
-be05			;;; corrupts: A,F 
-be05 3e cf		gorx:   ld      a, $cf          ;"control" mode 
-be07 d3 06		        out     (PIOAC), a 
-be09 3e ff		        ld      a, $ff 
-be0b d3 06		        out     (PIOAC), a      ;port A all input 
-be0d 18 14		        jr      getend 
-be0f			 
-be0f			 
-be0f			;;; assume: currently in INPUT. Go to OUTPUT 
-be0f			;;; leave CMD bit unchanged 
-be0f			;;; corrupts: NOTHING 
-be0f f5			gotx:   push    af 
-be10 cd fa bd		        call    waitm           ;wait for hs to match 
-be13 f1			        pop     af 
-be14			 
-be14			        ;; fall-through and subroutine 
-be14			        ;; set port A to output 
-be14			        ;; corrupts nothing 
-be14 f5			a2out:  push    af 
-be15 3e cf		        ld      a, $cf          ;"control" mode 
-be17 d3 06		        out     (PIOAC), a 
-be19 af			        xor     a               ;A=0 
-be1a d3 06		        out     (PIOAC), a      ;port A all output 
-be1c f1			        pop     af 
-be1d c9			        ret 
-be1e			 
-be1e			 
-be1e			;;; assume: currently in INPUT 
-be1e			;;; get a byte; return it in A 
-be1e			;;; corrupts: A,F 
-be1e cd fa bd		getval: call    waitm           ;wait for hs to match 
-be21 db 04		        in      a, (PIOAD)      ;get data byte 
-be23			 
-be23			        ;; fall-through and subroutine 
-be23			        ;; toggle H2T. 
-be23 f5			getend: push    af 
-be24 db 05		        in      a, (PIOBD) 
-be26 ee 02		        xor     2               ;toggle H2T 
-be28 d3 05		        out     (PIOBD), a 
-be2a f1			        pop     af 
-be2b c9			        ret 
-be2c			 
-be2c			;;; end 
+bdfe c8			        ret     z               ;both 0 => done 
+bdff fe 03		        cp      3 
+be01 c8			        ret     z               ;both 1 => done 
+be02 18 f6		        jr      waitm		;test again.. 
+be04			 
+be04			 
+be04			;;; assume: currently in OUTPUT. Go to INPUT 
+be04			;;; leave CMD=0 (but irrelevant) 
+be04			;;; corrupts: A,F 
+be04 3e cf		gorx:   ld      a, $cf          ;"control" mode 
+be06 d3 06		        out     (PIOAC), a 
+be08 3e ff		        ld      a, $ff 
+be0a d3 06		        out     (PIOAC), a      ;port A all input 
+be0c 18 14		        jr      getend 
+be0e			 
+be0e			 
+be0e			;;; assume: currently in INPUT. Go to OUTPUT 
+be0e			;;; leave CMD bit unchanged 
+be0e			;;; corrupts: NOTHING 
+be0e f5			gotx:   push    af 
+be0f cd fa bd		        call    waitm           ;wait for hs to match 
+be12 f1			        pop     af 
+be13			 
+be13			        ;; fall-through and subroutine 
+be13			        ;; set port A to output 
+be13			        ;; corrupts nothing 
+be13 f5			a2out:  push    af 
+be14 3e cf		        ld      a, $cf          ;"control" mode 
+be16 d3 06		        out     (PIOAC), a 
+be18 af			        xor     a               ;A=0 
+be19 d3 06		        out     (PIOAC), a      ;port A all output 
+be1b f1			        pop     af 
+be1c c9			        ret 
+be1d			 
+be1d			 
+be1d			;;; assume: currently in INPUT 
+be1d			;;; get a byte; return it in A 
+be1d			;;; corrupts: A,F 
+be1d cd fa bd		getval: call    waitm           ;wait for hs to match 
+be20 db 04		        in      a, (PIOAD)      ;get data byte 
+be22			 
+be22			        ;; fall-through and subroutine 
+be22			        ;; toggle H2T. 
+be22 f5			getend: push    af 
+be23 db 05		        in      a, (PIOBD) 
+be25 ee 02		        xor     2               ;toggle H2T 
+be27 d3 05		        out     (PIOBD), a 
+be29 f1			        pop     af 
+be2a c9			        ret 
+be2b			 
+be2b			;;; end 
 # End of file sd_sub1.asm
-be2c			 
-be2c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-be2c			;;; more subroutines, just for the polydos SD support 
-be2c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-be2c			 
-be2c			;;; setup: initialise the PIO and the interface. 
-be2c			;;; By experiment, the output word has to be the next thing 
-be2c			;;; written, not simply the next thing written to that port. 
-be2c cd 14 be		hwinit: call    a2out           ;port A to outputs 
-be2f 3e cf		        ld      a, $cf          ;"control" mode 
-be31 d3 07		        out     (PIOBC), a 
-be33 3e 01		        ld	a,1 
-be35 d3 07		        out     (PIOBC), a      ;port B LSB is input 
-be37 d3 05		        out     (PIOBD), a      ;init outputs H2T=0, CMD=0 
-be39			 
-be39			;;; Training sequence gets the protocol to a known state and enables 
-be39			;;; processing of NASdsk commands in the Arduino command loop. 
-be39 06 08		        ld      b, 8            ;number of times to do it 
-be3b 3e 80		train:	ld      a, CNOP 
-be3d cd e8 bd			call    putcmd 
-be40 10 f9		        djnz    train 
-be42			 
-be42			;;; restore the default drives 
-be42 3e 81		        ld      a, CRES 
-be44 cd e8 bd		        call    putcmd          ;fall-through - ignore status 
-be47			 
-be47			 
-be47			;;; FALL-THROUGH and subroutine 
-be47			;;; go from tx to rx, get status then go to tx. 
-be47			;;; Set flags based on status byte 
-be47			;;; corrupts: AF 
-be47 cd 05 be		t2rs2t: call    gorx 
-be4a			 
-be4a			;;; FALL-THROUGH and subroutine 
-be4a			;;; get status then go to tx. 
-be4a			;;; Set flags based on status byte 
-be4a			;;; corrupts: AF 
-be4a cd 1e be		rs2t:   call    getval          ;status 
-be4d cd 0f be		        call    gotx            ;does not affect A 
-be50 b7			        or      a               ;update flags 
-be51 c9			        ret 
-be52			 
-be52			 
-be52			 
-be52			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-be52			;;; ROMable utilities for accessing an arduino-based nascom_sdcard 
-be52			;;; device attached to the NASCOM PIO. 
-be52			;;; https://github.com/nealcrook/nascom 
-be52			;;; 
-be52			;;; Assemble at address xxx0, (optionally) burn to EPROM. 
-be52			;;; 
-be52			;;; Provides 5 different utilites, all invoked from NAS-SYS at 
-be52			;;; different offsets from the start address. 
-be52			;;; 
-be52			;;; 1) CHECKSUM 
-be52			;;; 
-be52			;;; E dff4 ssss eeee 
-be52			;;; 
-be52			;;; Compute checksum of memory from ssss to eeee inclusive. 
-be52			;;; Checksum is the sum of all bytes and is reported as a 
-be52			;;; 16-bit value. Carry off the MSB is lost/ignored. 
-be52			;;; 
-be52			;;; 2) READ FILE 
-be52			;;; 
-be52			;;; E dff7 ssss nnn 
-be52			;;; 
-be52			;;; Where nnn are exactly 3 decimal digits (000..999). 
-be52			;;; 
-be52			;;; - Locate file NASnnn.BIN 
-be52			;;; - Load it to memory starting at address ssss 
-be52			;;; - Report the file size 
-be52			;;; 
-be52			;;; 3) WRITE FILE 
-be52			;;; 
-be52			;;; E dffa ssss eeee [nnn]<-optional 
-be52			;;; 
-be52			;;; If nnn - exactly 3 decimal digits (000..999): 
-be52			;;; - Create file NASnnn.BIN 
-be52			;;; - Save memory from ssss to eeee inclusive to the file 
-be52			;;; 
-be52			;;; Without nnn: 
-be52			;;; - Auto-pick next free file name in the form NASnnn.BIN 
-be52			;;; - Save memory from ssss to eeee inclusive to the file 
-be52			;;; 
-be52			;;; 4) SCRAPE DISK 
-be52			;;; 
-be52			;;; E dffd [nnn]<-optional 
-be52			;;; 
-be52			;;; If nnn - exactly 3 decimal digits (000..999). 
-be52			;;; - Create file NASnnn.BIN 
-be52			;;; - Read all sectors of drive 0 and write them to the file 
-be52			;;; 
-be52			;;; Without nnn: 
-be52			;;; - Auto-pick next free file name in the form NASnnn.BIN 
-be52			;;; - Read all sectors of drive 0 and write them to the file 
-be52			;;; 
-be52			;;; This will ONLY work if the system has been booted into 
-be52			;;; DISK Polydos, so that the Polydos SCAL table is available. 
-be52			;;; 
-be52			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-be52			 
-be52			 
-be52			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-be52			;;; more subroutines, just for these utilities. 
-be52			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-be52			 
-be52			;;; open a file for READ. Fatal error on fail, return on 
-be52			;;; success. 
-be52			;;; filename is NASxxx.BIN where xxx comes from low 
-be52			;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII 
-be52			;;; corrupts: HL, AF, DE 
-be52 3e 18		fopenr: ld      a, COPENR 
-be54 cd e8 bd		        call    putcmd 
-be57 18 09		        jr      fman 
-be59			 
-be59			;;; open a file. Fatal error on fail, return on success. 
-be59			;;; Carry=0 -> auto-pick filename 
-be59			;;; Carry=1 -> filename is NASxxx.BIN where xxx comes from low 
-be59			;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII 
-be59			;;; corrupts: HL, AF, DE 
-be59 f5			fopen:  push    af              ;preserve C 
-be5a 3e 10		        ld      a, COPEN 
-be5c cd e8 bd		        call    putcmd 
-be5f			 
-be5f f1			        pop     af 
-be60 30 3f		        jr      nc,fauto 
-be62			 
-be62 3e 4e		fman:   ld      a,'N' 
-be64 cd f0 bd		        call    putval 
-be67 3e 41		        ld      a,'A' 
-be69 cd f0 bd		        call    putval 
-be6c 3e 53		        ld      a,'S' 
-be6e cd f0 bd		        call    putval 
-be71			 
-be71			;;; number in HL used as xxx part of file name 
-be71 7c			        ld      a,h 
-be72 e6 0f		        and     0fh             ;ms digit 
-be74 c6 30		        add     30h             ;convert to ASCII 
-be76 cd f0 bd		        call    putval 
-be79 7d			        ld      a,l 
-be7a 1f			        rra                     ;shift nibble down 
+be2b			 
+be2b			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+be2b			;;; more subroutines, just for the polydos SD support 
+be2b			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+be2b			 
+be2b			hwinit: include "sd_sub2.asm"   ;Set up PIO etc. and train interface 
+be2b			;;; Z80 assembler routine for nascom_sdcard HW setup and train 
+be2b			;;; https://github.com/nealcrook/nascom 
+be2b			;;; 
+be2b			;;; Common code to be included like this: 
+be2b			;;;          jp entry 
+be2b			;;;          include "sd_sub_defs.asm" 
+be2b			;;;          include "sd_sub1.asm" 
+be2b			;;; 
+be2b			;;; entry: 
+be2b			;;;          include "sd_sub2.asm" 
+be2b			;;;          <continues> 
+be2b			;;; 
+be2b			;;; or like this: 
+be2b			;;; 
+be2b			;;; Common code to be included like this: 
+be2b			;;;          jp entry 
+be2b			;;;          include "sd_sub_defs.asm" 
+be2b			;;;          include "sd_sub1.asm" 
+be2b			;;; hwinit: 
+be2b			;;;          include "sd_sub2.asm" 
+be2b			;;;          ret 
+be2b			;;; 
+be2b			;;; entry:   call hwinit 
+be2b			;;; 
+be2b			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+be2b			 
+be2b			;;; setup: initialise the PIO and the interface. 
+be2b			;;; By experiment, the output word has to be the next thing 
+be2b			;;; written, not simply the next thing written to that port. 
+be2b cd 13 be		        call    a2out           ;port A to outputs 
+be2e 3e cf		        ld      a, $cf          ;"control" mode 
+be30 d3 07		        out     (PIOBC), a 
+be32 3e 01		        ld	a,1 
+be34 d3 07		        out     (PIOBC), a      ;port B LSB is input 
+be36 d3 05		        out     (PIOBD), a      ;init outputs H2T=0, CMD=0 
+be38			 
+be38			;;; Training sequence gets the protocol to a known state and enables 
+be38			;;; processing of NASdsk commands in the Arduino command loop. 
+be38 06 08		        ld      b, 8            ;number of times to do it 
+be3a 3e 80		train:	ld      a, CNOP 
+be3c cd e8 bd			call    putcmd 
+be3f 10 f9		        djnz    train 
+be41			;;; FALL-THROUGH 
+be41			 
+be41			;;; end 
+# End of file sd_sub2.asm
+be41 3e 81		        ld      a, CRES         ;Restore the default drives 
+be43 cd e8 bd		        call    putcmd          ;fall-through - ignore status 
+be46			 
+be46			 
+be46			;;; FALL-THROUGH and subroutine 
+be46			;;; go from tx to rx, get status then go to tx. 
+be46			;;; Set flags based on status byte 
+be46			;;; corrupts: AF 
+be46 cd 04 be		t2rs2t: call    gorx 
+be49			 
+be49			;;; FALL-THROUGH and subroutine 
+be49			;;; get status then go to tx. 
+be49			;;; Set flags based on status byte 
+be49			;;; corrupts: AF 
+be49 cd 1d be		rs2t:   call    getval          ;status 
+be4c cd 0e be		        call    gotx            ;does not affect A 
+be4f b7			        or      a               ;update flags 
+be50 c9			        ret 
+be51			 
+be51			 
+be51			 
+be51			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+be51			;;; ROMable utilities for accessing an arduino-based nascom_sdcard 
+be51			;;; device attached to the NASCOM PIO. 
+be51			;;; https://github.com/nealcrook/nascom 
+be51			;;; 
+be51			;;; Provides 5 different utilites, all invoked from NAS-SYS at 
+be51			;;; different offsets from the ROM end address. 
+be51			;;; 
+be51			;;; 1) DSKBOOT 
+be51			;;; 
+be51			;;; E DFF1            - use settings in the SDBOOT0 binary 
+be51			;;; E DFF1 aaaa       - load bitmap aaaa and return to NAS-SYS 
+be51			;;; E DFF1 aaaa bbbb  - load bitmap aaaa and execute at bbbb 
+be51			;;; 
+be51			;;; This is a simple bootstrap program. It contains the 
+be51			;;; minimum code needed to talk to the NAScas parallel 
+be51			;;; interface and can bootstrap load code across that 
+be51			;;; interface using the CMD_PBOOT command. 
+be51			;;; 
+be51			;;; It requires a "profile record" to be stored in the 
+be51			;;; NAScas Arduino's EEPROM and loads profile 3 for which 
+be51			;;; the default images are SDBOOT0.DSK, SDBOOT1.DSK, 
+be51			;;; SDBOOT2.DSK, SDBOOT3.DSK -- only the first one is 
+be51			;;; important; the other three should be 0-sized files. 
+be51			;;; This program will load the first "sector" from 
+be51			;;; SDBOOT0.DSK into RAM at 0D00 and jump to it. 
+be51			;;; 
+be51			;;; Refer to SDBOOT0.asm for a description of the 
+be51			;;; command-line arguments. 
+be51			;;; 
+be51			;;; 2) CHECKSUM 
+be51			;;; 
+be51			;;; E DFF4 ssss eeee 
+be51			;;; 
+be51			;;; Compute checksum of memory from ssss to eeee inclusive. 
+be51			;;; Checksum is the sum of all bytes and is reported as a 
+be51			;;; 16-bit value. Carry off the MSB is lost/ignored. 
+be51			;;; 
+be51			;;; 3) READ FILE 
+be51			;;; 
+be51			;;; E DFF7 ssss nnn 
+be51			;;; 
+be51			;;; Where nnn are exactly 3 decimal digits (000..999). 
+be51			;;; 
+be51			;;; - Locate file NASnnn.BIN 
+be51			;;; - Load it to memory starting at address ssss 
+be51			;;; - Report the file size 
+be51			;;; 
+be51			;;; 4) WRITE FILE 
+be51			;;; 
+be51			;;; E DFFA ssss eeee [nnn]<-optional 
+be51			;;; 
+be51			;;; If nnn - exactly 3 decimal digits (000..999): 
+be51			;;; - Create file NASnnn.BIN 
+be51			;;; - Save memory from ssss to eeee inclusive to the file 
+be51			;;; 
+be51			;;; Without nnn: 
+be51			;;; - Auto-pick next free file name in the form NASnnn.BIN 
+be51			;;; - Save memory from ssss to eeee inclusive to the file 
+be51			;;; 
+be51			;;; 5) SCRAPE DISK 
+be51			;;; 
+be51			;;; E DFFD [nnn]<-optional 
+be51			;;; 
+be51			;;; If nnn - exactly 3 decimal digits (000..999). 
+be51			;;; - Create file NASnnn.BIN 
+be51			;;; - Read all sectors of drive 0 and write them to the file 
+be51			;;; 
+be51			;;; Without nnn: 
+be51			;;; - Auto-pick next free file name in the form NASnnn.BIN 
+be51			;;; - Read all sectors of drive 0 and write them to the file 
+be51			;;; 
+be51			;;; This will ONLY work if/after the system has been booted into 
+be51			;;; DISK Polydos, so that the Polydos SCAL table is available. 
+be51			;;; 
+be51			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+be51			 
+be51			 
+be51			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+be51			;;; more subroutines, just for these utilities. 
+be51			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+be51			 
+be51			;;; open a file for READ. Fatal error on fail, return on 
+be51			;;; success. 
+be51			;;; filename is NASxxx.BIN where xxx comes from low 
+be51			;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII 
+be51			;;; corrupts: HL, AF, DE 
+be51 3e 18		fopenr: ld      a, COPENR 
+be53 cd e8 bd		        call    putcmd 
+be56 18 09		        jr      fman 
+be58			 
+be58			;;; open a file. Fatal error on fail, return on success. 
+be58			;;; Carry=0 -> auto-pick filename 
+be58			;;; Carry=1 -> filename is NASxxx.BIN where xxx comes from low 
+be58			;;; 12 bits of (HL) and (HL+1) converted from bin to ASCII 
+be58			;;; corrupts: HL, AF, DE 
+be58 f5			fopen:  push    af              ;preserve C 
+be59 3e 10		        ld      a, COPEN 
+be5b cd e8 bd		        call    putcmd 
+be5e			 
+be5e f1			        pop     af 
+be5f 30 3f		        jr      nc,fauto 
+be61			 
+be61 3e 4e		fman:   ld      a,'N' 
+be63 cd f0 bd		        call    putval 
+be66 3e 41		        ld      a,'A' 
+be68 cd f0 bd		        call    putval 
+be6b 3e 53		        ld      a,'S' 
+be6d cd f0 bd		        call    putval 
+be70			 
+be70			;;; number in HL used as xxx part of file name 
+be70 7c			        ld      a,h 
+be71 e6 0f		        and     0fh             ;ms digit 
+be73 c6 30		        add     30h             ;convert to ASCII 
+be75 cd f0 bd		        call    putval 
+be78 7d			        ld      a,l 
+be79 1f			        rra                     ;shift nibble down 
+be7a 1f			        rra 
 be7b 1f			        rra 
 be7c 1f			        rra 
-be7d 1f			        rra 
-be7e e6 0f		        and     0fh             ;mid digit 
-be80 c6 30		        add     30h             ;convert to ASCII 
-be82 cd f0 bd		        call    putval 
-be85 7d			        ld      a,l 
-be86 e6 0f		        and     0fh             ;ls digit 
-be88 c6 30		        add     30h             ;convert to ASCII 
-be8a cd f0 bd		        call    putval 
-be8d			 
-be8d			;;; extension 
-be8d 3e 2e		        ld      a,'.' 
-be8f cd f0 bd		        call    putval 
-be92 3e 42		        ld      a,'B' 
-be94 cd f0 bd		        call    putval 
-be97 3e 49		        ld      a,'I' 
-be99 cd f0 bd		        call    putval 
-be9c 3e 4e		        ld      a,'N' 
-be9e cd f0 bd		        call    putval 
-bea1			 
-bea1 af			fauto:  xor     a 
-bea2 cd f0 bd		        call    putval          ;0-length/end of filename 
-bea5			        ;; get status, return if OK, msg/exit on error 
-bea5			 
-bea5			 
-bea5			;;; FALL-THROUGH and subroutine 
-bea5			;;; THESE ARE FATAL-EXIT VERSIONS OF t2rs2t, rs2t USED IN THE 
-bea5			;;; POLYDOS ROM CODE 
-bea5			;;; go from tx to rx, get status then go to tx. 
-bea5			;;; Interpret status byte; on error, print message at (DE) 
-bea5			;;; then exit. On success, return. 
-bea5			;;; corrupts: AF 
-bea5 cd 05 be		ft2rs2t:call    gorx 
-bea8			 
-bea8			;;; FALL-THROUGH and subroutine 
-bea8			;;; get status then go to tx. 
-bea8			;;; Interpret status byte; on error, print message at (DE) 
-bea8			;;; then exit. On success, return. 
-bea8			;;; corrupts: AF 
-bea8 cd 1e be		frs2t:  call    getval          ;status 
-beab cd 0f be		        call    gotx            ;does not affect A 
-beae b7			        or      a               ;update flags 
-beaf 28 01		        jr      z,mexit 
-beb1 c9			        ret 
-beb2			 
-beb2			;;; Exit with Error message. Used for error/fatal exit. 
-beb2			;;; "Error" then return to NAS-SYS. 
-beb2			;;; Come here by CALL or JP/JR -- NAS-SYS will clean up the 
-beb2			;;; stack if necessary. 
-beb2			mexit:  SCAL    ZERRM 
-beb2 df			        RST 18H 
-beb3 6b			        DB ZERRM 
-beb4			        ENDM 
+be7d e6 0f		        and     0fh             ;mid digit 
+be7f c6 30		        add     30h             ;convert to ASCII 
+be81 cd f0 bd		        call    putval 
+be84 7d			        ld      a,l 
+be85 e6 0f		        and     0fh             ;ls digit 
+be87 c6 30		        add     30h             ;convert to ASCII 
+be89 cd f0 bd		        call    putval 
+be8c			 
+be8c			;;; extension 
+be8c 3e 2e		        ld      a,'.' 
+be8e cd f0 bd		        call    putval 
+be91 3e 42		        ld      a,'B' 
+be93 cd f0 bd		        call    putval 
+be96 3e 49		        ld      a,'I' 
+be98 cd f0 bd		        call    putval 
+be9b 3e 4e		        ld      a,'N' 
+be9d cd f0 bd		        call    putval 
+bea0			 
+bea0 af			fauto:  xor     a 
+bea1 cd f0 bd		        call    putval          ;0-length/end of filename 
+bea4			        ;; get status, return if OK, msg/exit on error 
+bea4			 
+bea4			 
+bea4			;;; FALL-THROUGH and subroutine 
+bea4			;;; THESE ARE FATAL-EXIT VERSIONS OF t2rs2t, rs2t USED IN THE 
+bea4			;;; POLYDOS ROM CODE 
+bea4			;;; go from tx to rx, get status then go to tx. 
+bea4			;;; Interpret status byte; on error, print message at (DE) 
+bea4			;;; then exit. On success, return. 
+bea4			;;; corrupts: AF 
+bea4 cd 04 be		ft2rs2t:call    gorx 
+bea7			 
+bea7			;;; FALL-THROUGH and subroutine 
+bea7			;;; get status then go to tx. 
+bea7			;;; Interpret status byte; on error, print message at (DE) 
+bea7			;;; then exit. On success, return. 
+bea7			;;; corrupts: AF 
+bea7 cd 1d be		frs2t:  call    getval          ;status 
+beaa cd 0e be		        call    gotx            ;does not affect A 
+bead b7			        or      a               ;update flags 
+beae 28 01		        jr      z,mexit 
+beb0 c9			        ret 
+beb1			 
+beb1			;;; Exit with Error message. Used for error/fatal exit. 
+beb1			;;; "Error" then return to NAS-SYS. 
+beb1			;;; Come here by CALL or JP/JR -- NAS-SYS will clean up the 
+beb1			;;; stack if necessary. 
+beb1			mexit:  SCAL    ZERRM 
+beb1 df			        RST 18H 
+beb2 6b			        DB ZERRM 
+beb3			        ENDM 
 # End of macro SCAL
-beb4			        SCAL    ZMRET 
-beb4 df			        RST 18H 
-beb5 5b			        DB ZMRET 
-beb6			        ENDM 
+beb3			        SCAL    ZMRET 
+beb3 df			        RST 18H 
+beb4 5b			        DB ZMRET 
+beb5			        ENDM 
 # End of macro SCAL
-beb6			 
-beb6			;;; Start address in (ARG2), end address in (ARG3). Exit with 
-beb6			;;; HL=start, BC=byte count. 
-beb6			;;; corrupts: AF 
-beb6 ed 5b 0e 0c	e2len:  ld      de,(ARG2)       ;start address 
-beba 2a 10 0c		        ld      hl,(ARG3)       ;end address 
-bebd			        ;; compute end - start + 1 
-bebd b7			        or      a               ;clear carry flag 
-bebe ed 52		        sbc     hl,de 
-bec0 23			        inc     hl              ;byte count in hl 
-bec1 44			        ld      b,h 
-bec2 4d			        ld      c,l             ;byte count in bc 
-bec3			 
-bec3 2a 0e 0c		        ld      hl,(ARG2)       ;start address in hl 
-bec6 c9			        ret 
-bec7			 
-bec7			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-bec7			;;; CSUM 
-bec7			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-bec7 3a 0b 0c		csum:   ld      a,(ARGN) 
-beca fe 03		        cp      3               ;expect 3 arguments 
-becc c2 b2 be		        jp      nz, mexit 
-becf			 
-becf cd b6 be		        call    e2len           ;hl=start, bc=count 
-bed2 16 00		        ld      d,0 
-bed4 5a			        ld      e,d             ;accumulate in de 
-bed5			 
-bed5 78			c1:     ld      a,b             ;is byte count zero? 
-bed6 b1			        or      c 
-bed7 28 0a		        jr      z,cdone         ;if so, we're done 
-bed9			 
-bed9 7b			        ld      a,e             ;get lo accumulator 
-beda 86			        add     a,(hl)          ;add next byte 
-bedb 30 01		        jr      nc,c2 
-bedd 14			        inc     d               ;carry to hi accumlator 
-bede 5f			c2:     ld      e,a             ;store lo accumulator 
-bedf 23			        inc     hl              ;next byte 
-bee0 0b			        dec     bc 
-bee1 18 f2		        jr      c1              ;loop 
-bee3			 
-bee3 62			cdone:  ld      h,d             ;move sum from de to hl 
-bee4 6b			        ld      l,e 
-bee5			 
-bee5			        SCAL    ZTBCD3          ;print hl 
-bee5 df			        RST 18H 
-bee6 66			        DB ZTBCD3 
-bee7			        ENDM 
-# End of macro SCAL
-bee7			        SCAL    ZCRLF 
-bee7 df			        RST 18H 
-bee8 6a			        DB ZCRLF 
-bee9			        ENDM 
-# End of macro SCAL
-bee9			        SCAL    ZMRET           ;done. 
-bee9 df			        RST 18H 
-beea 5b			        DB ZMRET 
-beeb			        ENDM 
-# End of macro SCAL
+beb5			 
+beb5			;;; Start address in (ARG2), end address in (ARG3). Exit with 
+beb5			;;; HL=start, BC=byte count. 
+beb5			;;; corrupts: AF 
+beb5 ed 5b 0e 0c	e2len:  ld      de,(ARG2)       ;start address 
+beb9 2a 10 0c		        ld      hl,(ARG3)       ;end address 
+bebc			        ;; compute end - start + 1 
+bebc b7			        or      a               ;clear carry flag 
+bebd ed 52		        sbc     hl,de 
+bebf 23			        inc     hl              ;byte count in hl 
+bec0 44			        ld      b,h 
+bec1 4d			        ld      c,l             ;byte count in bc 
+bec2			 
+bec2 2a 0e 0c		        ld      hl,(ARG2)       ;start address in hl 
+bec5 c9			        ret 
+bec6			 
+bec6			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bec6			;;; DSKBOOT 
+bec6			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bec6			loadat: EQU     $0d00 
+bec6			 
+bec6			;;; initialise the PIO and train the interface 
+bec6 cd 2b be		dskboot:  call    hwinit 
+bec9			 
+bec9			;;; issue the command, select profile 3 
+bec9 3e 73		        ld      a, CPBOOT + 3 
+becb cd e8 bd		        call    putcmd 
+bece cd 04 be		        call    gorx 
+bed1 21 00 0d		        ld      hl, loadat      ;where to put the data 
+bed4 01 00 02		        ld      bc, 512         ;sector size 
+bed7 cd 1d be		dnext:  call    getval 
+beda 77			        ld      (hl), a 
+bedb 23			        inc     hl 
+bedc 0b			        dec     bc 
+bedd 78			        ld      a,b 
+bede b1			        or      c 
+bedf 20 f6		        jr      nz, dnext 
+bee1			 
+bee1 cd 1d be		        call    getval          ;get status 
+bee4 cd 0e be		        call    gotx            ;does not affect A 
+bee7 b7			        or      a               ;update flags 
+bee8 c2 00 0d		        jp      nz, loadat      ;enter loaded program 
 beeb			 
-beeb			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-beeb			;;; WRFILE 
-beeb			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-beeb			 
-beeb cd 2c be		wrfile: call    hwinit 
-beee			 
-beee 3a 0b 0c		        ld      a,(ARGN) 
-bef1 fe 03		        cp      3               ;expect 3 or 4 arguments 
-bef3 28 09		        jr      z,wopen         ;3 arguments, C=0 -> autopick 
-bef5 fe 04		        cp      4               ;4 arguments? 
-bef7 c2 b2 be		        jp      nz, mexit       ;no, so fail 
-befa 2a 12 0c		        ld      hl, (ARG4)      ;hl is number for file name 
-befd 37			        scf                     ;C=1 -> use hl for file name 
-befe			 
-befe cd 59 be		wopen:  call    fopen 
-bf01 cd b6 be		        call    e2len           ;hl=start, bc=count 
-bf04			 
-bf04 3e 48		        ld      a, CNWR         ;write 
-bf06 cd e8 bd		        call    putcmd 
-bf09 79			        ld      a, c            ;length in bytes, LS first 
-bf0a cd f0 bd		        call    putval 
-bf0d 78			        ld      a, b 
-bf0e cd f0 bd		        call    putval 
-bf11 af			        xor     a 
-bf12 cd f0 bd		        call    putval 
-bf15 af			        xor     a 
-bf16 cd f0 bd		        call    putval 
-bf19			 
-bf19			        ;; data transfer 
-bf19 7e			wnext:  ld      a, (hl) 
-bf1a cd f0 bd		        call    putval 
-bf1d 23			        inc     hl 
-bf1e 0b			        dec     bc 
-bf1f 78			        ld      a,b 
-bf20 b1			        or      c 
-bf21 20 f6		        jr      nz, wnext 
-bf23			 
-bf23			        ;; get status, return if OK, msg/exit on error 
-bf23 cd a5 be		        call    ft2rs2t 
-bf26			        SCAL    ZMRET 
-bf26 df			        RST 18H 
-bf27 5b			        DB ZMRET 
-bf28			        ENDM 
+beeb			        SCAL    ZMRET           ;fatal error - back to NAS-SYS 
+beeb df			        RST 18H 
+beec 5b			        DB ZMRET 
+beed			        ENDM 
 # End of macro SCAL
-bf28			 
-bf28			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-bf28			;;; RDFILE 
-bf28			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-bf28			 
-bf28 cd 2c be		rdfile: call    hwinit 
-bf2b			 
-bf2b 3a 0b 0c		        ld      a,(ARGN) 
-bf2e fe 03		        cp      3               ;expect 3 arguments 
-bf30 c2 b2 be		        jp      nz, mexit 
-bf33			 
-bf33 2a 10 0c		        ld      hl,(ARG3) 
-bf36 cd 52 be		        call    fopenr          ;open file by name 
-bf39			 
-bf39			;;; get the file size and read it all 
-bf39 3e 60		        ld      a, CSZRD        ;read size and data 
-bf3b cd e8 bd		        call    putcmd 
-bf3e cd 05 be		        call    gorx 
-bf41 cd 1e be		        call    getval 
-bf44 4f			        ld      c, a            ;length, LS byte 
-bf45 cd 1e be		        call    getval 
-bf48 47			        ld      b, a            ;length 
-bf49			        ;; require the next two to be zero 
-bf49 cd 1e be		        call    getval 
-bf4c 67			        ld      h, a 
-bf4d cd 1e be		        call    getval 
-bf50 b4			        or      h 
-bf51 c2 b2 be		        jp      nz, mexit 
-bf54			 
-bf54 c5			        push    bc              ;save file size 
-bf55 2a 0e 0c		        ld      hl, (ARG2)      ;destination 
-bf58			 
-bf58			        ;; data transfer - maybe 0 bytes 
-bf58 78			rnext:  ld      a,b 
-bf59 b1			        or      c 
-bf5a 28 08		        jr      z, rdone 
-bf5c			 
-bf5c cd 1e be		        call    getval          ;data byte 
-bf5f 77			        ld      (hl), a         ;store it 
-bf60 23			        inc     hl 
-bf61 0b			        dec     bc 
-bf62 18 f4		        jr      rnext 
-bf64			 
-bf64			        ;; get status or die 
-bf64 cd a8 be		rdone:  call    frs2t 
-bf67			 
-bf67 e1			        pop     hl              ;file size 
-bf68			        SCAL    ZTBCD3          ;display file size 
-bf68 df			        RST 18H 
-bf69 66			        DB ZTBCD3 
-bf6a			        ENDM 
+beed			 
+beed			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+beed			;;; CSUM 
+beed			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+beed			 
+beed 3a 0b 0c		csum:   ld      a,(ARGN) 
+bef0 fe 03		        cp      3               ;expect 3 arguments 
+bef2 c2 b1 be		        jp      nz, mexit 
+bef5			 
+bef5 cd b5 be		        call    e2len           ;hl=start, bc=count 
+bef8 16 00		        ld      d,0 
+befa 5a			        ld      e,d             ;accumulate in de 
+befb			 
+befb 78			c1:     ld      a,b             ;is byte count zero? 
+befc b1			        or      c 
+befd 28 0a		        jr      z,cdone         ;if so, we're done 
+beff			 
+beff 7b			        ld      a,e             ;get lo accumulator 
+bf00 86			        add     a,(hl)          ;add next byte 
+bf01 30 01		        jr      nc,c2 
+bf03 14			        inc     d               ;carry to hi accumlator 
+bf04 5f			c2:     ld      e,a             ;store lo accumulator 
+bf05 23			        inc     hl              ;next byte 
+bf06 0b			        dec     bc 
+bf07 18 f2		        jr      c1              ;loop 
+bf09			 
+bf09 62			cdone:  ld      h,d             ;move sum from de to hl 
+bf0a 6b			        ld      l,e 
+bf0b			 
+bf0b			        SCAL    ZTBCD3          ;print hl 
+bf0b df			        RST 18H 
+bf0c 66			        DB ZTBCD3 
+bf0d			        ENDM 
 # End of macro SCAL
-bf6a			        SCAL    ZMRET 
-bf6a df			        RST 18H 
-bf6b 5b			        DB ZMRET 
-bf6c			        ENDM 
+bf0d			        SCAL    ZCRLF 
+bf0d df			        RST 18H 
+bf0e 6a			        DB ZCRLF 
+bf0f			        ENDM 
 # End of macro SCAL
-bf6c			 
-bf6c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-bf6c			;;; SCRAPE 
-bf6c			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-bf6c			 
-bf6c cd 2c be		scrape: call    hwinit 
-bf6f			 
-bf6f b7			        or      a               ;C=0 
-bf70 cd 59 be		        call    fopen           ;open new file, auto-pick the name 
-bf73			 
-bf73 0e 00		        ld      c,0 
-bf75			        SCAL    ZDSIZE 
-bf75 df			        RST 18H 
-bf76 80			        DB ZDSIZE 
-bf77			        ENDM 
+bf0f			        SCAL    ZMRET           ;done. 
+bf0f df			        RST 18H 
+bf10 5b			        DB ZMRET 
+bf11			        ENDM 
 # End of macro SCAL
-bf77			;;; hl = number of sectors on drive 0 
-bf77			 
-bf77			;;; sectors are 256 bytes (0x100) each. Tried reading 8 at a time 
-bf77			;;; but the whole disk is NOT a xple of 8, leading to a messy 
-bf77			;;; end condition. Overall, easier to just read 2 at a time (all 
-bf77			;;; disks have an even number of sectors..) 
-bf77			;;; and buffer them in RAM at $1000. However, to be fast I'll 
-bf77			;;; do 10 (0xa) at a time. 
-bf77			 
-bf77 11 00 00		        ld      de,0            ;start at 1st sector 
+bf11			 
+bf11			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bf11			;;; WRFILE 
+bf11			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bf11			 
+bf11 cd 2b be		wrfile: call    hwinit 
+bf14			 
+bf14 3a 0b 0c		        ld      a,(ARGN) 
+bf17 fe 03		        cp      3               ;expect 3 or 4 arguments 
+bf19 28 09		        jr      z,wopen         ;3 arguments, C=0 -> autopick 
+bf1b fe 04		        cp      4               ;4 arguments? 
+bf1d c2 b1 be		        jp      nz, mexit       ;no, so fail 
+bf20 2a 12 0c		        ld      hl, (ARG4)      ;hl is number for file name 
+bf23 37			        scf                     ;C=1 -> use hl for file name 
+bf24			 
+bf24 cd 58 be		wopen:  call    fopen 
+bf27 cd b5 be		        call    e2len           ;hl=start, bc=count 
+bf2a			 
+bf2a 3e 48		        ld      a, CNWR         ;write 
+bf2c cd e8 bd		        call    putcmd 
+bf2f 79			        ld      a, c            ;length in bytes, LS first 
+bf30 cd f0 bd		        call    putval 
+bf33 78			        ld      a, b 
+bf34 cd f0 bd		        call    putval 
+bf37 af			        xor     a 
+bf38 cd f0 bd		        call    putval 
+bf3b af			        xor     a 
+bf3c cd f0 bd		        call    putval 
+bf3f			 
+bf3f			        ;; data transfer 
+bf3f 7e			wnext:  ld      a, (hl) 
+bf40 cd f0 bd		        call    putval 
+bf43 23			        inc     hl 
+bf44 0b			        dec     bc 
+bf45 78			        ld      a,b 
+bf46 b1			        or      c 
+bf47 20 f6		        jr      nz, wnext 
+bf49			 
+bf49			        ;; get status, return if OK, msg/exit on error 
+bf49 cd a4 be		        call    ft2rs2t 
+bf4c			        SCAL    ZMRET 
+bf4c df			        RST 18H 
+bf4d 5b			        DB ZMRET 
+bf4e			        ENDM 
+# End of macro SCAL
+bf4e			 
+bf4e			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bf4e			;;; RDFILE 
+bf4e			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bf4e			 
+bf4e cd 2b be		rdfile: call    hwinit 
+bf51			 
+bf51 3a 0b 0c		        ld      a,(ARGN) 
+bf54 fe 03		        cp      3               ;expect 3 arguments 
+bf56 c2 b1 be		        jp      nz, mexit 
+bf59			 
+bf59 2a 10 0c		        ld      hl,(ARG3) 
+bf5c cd 51 be		        call    fopenr          ;open file by name 
+bf5f			 
+bf5f			;;; get the file size and read it all 
+bf5f 3e 60		        ld      a, CSZRD        ;read size and data 
+bf61 cd e8 bd		        call    putcmd 
+bf64 cd 04 be		        call    gorx 
+bf67 cd 1d be		        call    getval 
+bf6a 4f			        ld      c, a            ;length, LS byte 
+bf6b cd 1d be		        call    getval 
+bf6e 47			        ld      b, a            ;length 
+bf6f			        ;; require the next two to be zero 
+bf6f cd 1d be		        call    getval 
+bf72 67			        ld      h, a 
+bf73 cd 1d be		        call    getval 
+bf76 b4			        or      h 
+bf77 c2 b1 be		        jp      nz, mexit 
 bf7a			 
-bf7a e5			nxtblk: push    hl              ;total #sectors 
-bf7b 01 00 0a		        ld      bc,$a00         ;a is #sectors, 0 is drive number 
-bf7e 21 00 10		        ld      hl,$1000        ;where to put it 
-bf81			 
-bf81			        SCAL    ZDRD 
-bf81 df			        RST 18H 
-bf82 81			        DB ZDRD 
-bf83			        ENDM 
-# End of macro SCAL
-bf83 3e 2a		        ld      a,'*'           ;BAD reads 
-bf85 20 02		        jr      nz, report 
-bf87 3e 2e		        ld      a,'.'           ;GOOD reads 
-bf89 f7			report: rst     ROUT 
+bf7a c5			        push    bc              ;save file size 
+bf7b 2a 0e 0c		        ld      hl, (ARG2)      ;destination 
+bf7e			 
+bf7e			        ;; data transfer - maybe 0 bytes 
+bf7e 78			rnext:  ld      a,b 
+bf7f b1			        or      c 
+bf80 28 08		        jr      z, rdone 
+bf82			 
+bf82 cd 1d be		        call    getval          ;data byte 
+bf85 77			        ld      (hl), a         ;store it 
+bf86 23			        inc     hl 
+bf87 0b			        dec     bc 
+bf88 18 f4		        jr      rnext 
 bf8a			 
-bf8a			        ;; hl, bc unchanged 
-bf8a			        ;; bc = $a00 - the number of bytes to write out to SD 
-bf8a			        ;; need to fix c if using drive 1 etc. 
-bf8a			 
-bf8a 3e 48		        ld      a, CNWR         ;write 
-bf8c cd e8 bd		        call    putcmd 
-bf8f 79			        ld      a, c            ;length in bytes, LS first 
-bf90 cd f0 bd		        call    putval 
-bf93 78			        ld      a, b 
-bf94 cd f0 bd		        call    putval 
-bf97 af			        xor     a 
-bf98 cd f0 bd		        call    putval 
-bf9b af			        xor     a 
-bf9c cd f0 bd		        call    putval 
-bf9f			 
-bf9f			        ;; data transfer 
-bf9f 7e			snext:  ld      a, (hl) 
-bfa0 cd f0 bd		        call    putval 
-bfa3 23			        inc     hl 
-bfa4 0b			        dec     bc 
-bfa5 78			        ld      a,b 
-bfa6 b1			        or      c 
-bfa7 20 f6		        jr      nz, snext 
-bfa9			 
-bfa9			        ;; get status, return if OK, msg/exit on error 
-bfa9 cd a5 be		        call    ft2rs2t 
-bfac			 
-bfac 13			        inc     de              ;increment sector count by 
-bfad 13			        inc     de              ;the number we've just copied 
-bfae 13			        inc     de 
-bfaf 13			        inc     de 
-bfb0 13			        inc     de 
-bfb1			 
-bfb1 13			        inc     de 
-bfb2 13			        inc     de 
-bfb3 13			        inc     de 
-bfb4 13			        inc     de 
-bfb5 13			        inc     de              ;crude but effective! 
-bfb6			 
-bfb6			        ;; we're done if hl=de 
-bfb6 e1			        pop     hl 
-bfb7 7c			        ld      a,h 
-bfb8 ba			        cp      d 
-bfb9 20 06		        jr      nz, nxt1 
-bfbb 7d			        ld      a,l 
-bfbc bb			        cp      e 
-bfbd 20 02		        jr      nz, nxt1 
-bfbf			        SCAL    ZMRET 
-bfbf df			        RST 18H 
-bfc0 5b			        DB ZMRET 
-bfc1			        ENDM 
+bf8a			        ;; get status or die 
+bf8a cd a7 be		rdone:  call    frs2t 
+bf8d			 
+bf8d e1			        pop     hl              ;file size 
+bf8e			        SCAL    ZTBCD3          ;display file size 
+bf8e df			        RST 18H 
+bf8f 66			        DB ZTBCD3 
+bf90			        ENDM 
 # End of macro SCAL
-bfc1			 
-bfc1 13			nxt1:   inc     de              ;increment sector count 
-bfc2 13			        inc     de              ;by the number we've copied 
-bfc3 13			        inc     de 
-bfc4 13			        inc     de 
-bfc5 13			        inc     de 
-bfc6			 
-bfc6 13			        inc     de 
-bfc7 13			        inc     de 
-bfc8 13			        inc     de 
-bfc9 13			        inc     de 
-bfca 13			        inc     de              ;crude but effective! 
-bfcb			 
-bfcb 18 ad		        jr      nxtblk 
-bfcd			 
-bfcd			 
-bfcd			 
-bfcd			 
-bfcd			;;; pad ROM to 2Kbytes. 
-bfcd			SIZE:   EQU $ - PDCROM 
-bfcd			PAD1:   EQU 800h - SIZE 
-bfcd			;;; 12 is the size of the jump table 
-bfcd			PAD2:   EQU PAD1 - 12 
-bfcd 0xff...		        DS  PAD2, 0ffh 
-bff4			 
-bff4			;;; Jump table to keep consistent entry points 
-bff4 c3 c7 be		        jp      csum 
-bff7 c3 28 bf		        jp      rdfile 
-bffa c3 eb be		        jp      wrfile 
-bffd c3 6c bf		        jp      scrape 
+bf90			        SCAL    ZMRET 
+bf90 df			        RST 18H 
+bf91 5b			        DB ZMRET 
+bf92			        ENDM 
+# End of macro SCAL
+bf92			 
+bf92			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bf92			;;; SCRAPE 
+bf92			;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+bf92			 
+bf92 cd 2b be		scrape: call    hwinit 
+bf95			 
+bf95 b7			        or      a               ;C=0 
+bf96 cd 58 be		        call    fopen           ;open new file, auto-pick the name 
+bf99			 
+bf99 0e 00		        ld      c,0 
+bf9b			        SCAL    ZDSIZE 
+bf9b df			        RST 18H 
+bf9c 80			        DB ZDSIZE 
+bf9d			        ENDM 
+# End of macro SCAL
+bf9d			;;; hl = number of sectors on drive 0 
+bf9d			 
+bf9d			;;; sectors are 256 bytes (0x100) each. Tried reading 8 at a time 
+bf9d			;;; but the whole disk is NOT a xple of 8, leading to a messy 
+bf9d			;;; end condition. Overall, easier to just read 2 at a time (all 
+bf9d			;;; disks have an even number of sectors..) 
+bf9d			;;; and buffer them in RAM at $1000. However, to be fast I'll 
+bf9d			;;; do 10 (0xa) at a time. 
+bf9d			 
+bf9d 11 00 00		        ld      de,0            ;start at 1st sector 
+bfa0			 
+bfa0 e5			nxtblk: push    hl              ;total #sectors 
+bfa1 01 00 0a		        ld      bc,$a00         ;a is #sectors, 0 is drive number 
+bfa4 21 00 10		        ld      hl,$1000        ;where to put it 
+bfa7			 
+bfa7			        SCAL    ZDRD 
+bfa7 df			        RST 18H 
+bfa8 81			        DB ZDRD 
+bfa9			        ENDM 
+# End of macro SCAL
+bfa9 3e 2a		        ld      a,'*'           ;BAD reads 
+bfab 20 02		        jr      nz, report 
+bfad 3e 2e		        ld      a,'.'           ;GOOD reads 
+bfaf f7			report: rst     ROUT 
+bfb0			 
+bfb0			        ;; hl, bc unchanged 
+bfb0			        ;; bc = $a00 - the number of bytes to write out to SD 
+bfb0			        ;; need to fix c if using drive 1 etc. 
+bfb0 3e 48		        ld      a, CNWR         ;write 
+bfb2 cd e8 bd		        call    putcmd 
+bfb5 79			        ld      a, c            ;length in bytes, LS first 
+bfb6 cd f0 bd		        call    putval 
+bfb9 78			        ld      a, b 
+bfba cd f0 bd		        call    putval 
+bfbd af			        xor     a 
+bfbe cd f0 bd		        call    putval 
+bfc1 af			        xor     a 
+bfc2 cd f0 bd		        call    putval 
+bfc5			 
+bfc5			        ;; data transfer 
+bfc5 7e			snext:  ld      a, (hl) 
+bfc6 cd f0 bd		        call    putval 
+bfc9 23			        inc     hl 
+bfca 0b			        dec     bc 
+bfcb 78			        ld      a,b 
+bfcc b1			        or      c 
+bfcd 20 f6		        jr      nz, snext 
+bfcf			 
+bfcf			        ;; get status, return if OK, msg/exit on error 
+bfcf cd a4 be		        call    ft2rs2t 
+bfd2			 
+bfd2 cd e5 bf		        call    deadd10         ;increment sector count by 
+bfd5			                                ;the number we've just copied 
+bfd5			 
+bfd5			        ;; we're done if hl=de 
+bfd5 e1			        pop     hl 
+bfd6 7c			        ld      a,h 
+bfd7 ba			        cp      d 
+bfd8 20 06		        jr      nz, nxt1 
+bfda 7d			        ld      a,l 
+bfdb bb			        cp      e 
+bfdc 20 02		        jr      nz, nxt1 
+bfde			        SCAL    ZMRET 
+bfde df			        RST 18H 
+bfdf 5b			        DB ZMRET 
+bfe0			        ENDM 
+# End of macro SCAL
+bfe0			 
+bfe0 cd e5 bf		nxt1:   call    deadd10         ;increment sector count 
+bfe3			                                ;by the number we've copied 
+bfe3			 
+bfe3 18 bb		        jr      nxtblk 
+bfe5			 
+bfe5			;;; crude but effective: add 10 to de, mess with no other register 
+bfe5 13			deadd10:inc     de 
+bfe6 13			        inc     de 
+bfe7 13			        inc     de 
+bfe8 13			        inc     de 
+bfe9 13			        inc     de 
+bfea			        ;; 
+bfea 13			        inc     de 
+bfeb 13			        inc     de 
+bfec 13			        inc     de 
+bfed 13			        inc     de 
+bfee 13			        inc     de 
+bfef c9			        ret 
+bff0			 
+bff0			;;; pad ROM to 2Kbytes. 
+bff0			SIZE:   EQU $ - PDCROM 
+bff0			PAD1:   EQU 800h - SIZE 
+bff0			;;; 15 is the size of the jump table 
+bff0			PAD2:   EQU PAD1 - 15 
+bff0 0xff...		        DS  PAD2, 0ffh 
+bff1			 
+bff1			;;; Jump table to keep consistent entry points 
+bff1 c3 c6 be		        jp      dskboot 
+bff4 c3 ed be		        jp      csum 
+bff7 c3 4e bf		        jp      rdfile 
+bffa c3 11 bf		        jp      wrfile 
+bffd c3 92 bf		        jp      scrape 
 c000			 
 c000			$END:	END 
 # End of file polydos_util_rom.asm
