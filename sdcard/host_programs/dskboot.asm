@@ -22,7 +22,7 @@
 ;;; Only the first one is important; the other three
 ;;; should be 0-sized files.
 ;;; This program will load the first "sector" from
-;;; SDBOOT0.DSK into RAM at 1000 and jump to it.
+;;; SDBOOT0.DSK into RAM at 0D00 and jump to it.
 ;;;
 ;;; In its current form this is just proof-of-concept.
 ;;; Here are 2 evolutions:
@@ -53,7 +53,8 @@
 ;;; putval which is part of the common subroutines
 ;;; but which is not needed here.
 
-START:        EQU     $0c80
+START:  EQU     $0c80
+LOADAT: EQU     $0d00
 
 ;;; Macros for using NAS-SYS routines
 SCAL:   MACRO FOO
@@ -83,7 +84,7 @@ entry:  include "sd_sub2.asm"
         ld      a, CPBOOT + 3
         call    putcmd
         call    gorx
-        ld      hl, $1000       ;where to put the data
+        ld      hl, LOADAT      ;where to put the data
         ld      bc, 512         ;sector size
 next:   call    getval
         ld      (hl), a
@@ -96,7 +97,7 @@ next:   call    getval
         call    getval          ;get status
         call    gotx            ;does not affect A
         or      a               ;update flags
-        jp      nz, $1000       ;enter loaded program
+        jp      nz, LOADAT      ;enter loaded program
 
         ;; fatal error - back to NAS-SYS
         SCAL    ZMRET
