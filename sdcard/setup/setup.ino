@@ -15,11 +15,29 @@
 #define PIN_LED A2
 #include <EEPROM.h>
 
+// Pin mapping for PIO port A bits[7:0]
+#define PIN_XD7 A0
+#define PIN_XD6 6
+#define PIN_XD5 A5
+#define PIN_XD4 A4
+#define PIN_XD3 5
+#define PIN_XD2 4
+#define PIN_XD1 3
+#define PIN_XD0 2
+
+// Pin mapping for PIO port B bits[2:0]
+// A7 is input-only and can only be sampled through the ADC
+#define PIN_YD2 A7
+#define PIN_YD1 A1
+#define PIN_YD0 A3
+
+// bit set and clear macros
+#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+
+
 // Prototypes for stuff in this file
 void program_profile_record(void);
-
-// Global variables
-int state = 0;
 
 
 // Data structures
@@ -97,17 +115,65 @@ void setup()   {
 
     program_profile_record();
 
-    Serial.println("Setup complete. Now program code from sd_merged");
-    Serial.println("LED is flashing..");
+    Serial.println("EEPROM programmed: setup complete. Now program code from sd_merged");
+
+    Serial.println("Monitoring PIO signals:");
+
+    // Pins connected to PIO port A
+    pinMode(PIN_XD7, INPUT);
+    pinMode(PIN_XD6, INPUT);
+    pinMode(PIN_XD5, INPUT);
+    pinMode(PIN_XD4, INPUT);
+    pinMode(PIN_XD3, INPUT);
+    pinMode(PIN_XD2, INPUT);
+    pinMode(PIN_XD1, INPUT);
+    pinMode(PIN_XD0, INPUT);
+
+    // Pins connected to PIO port B
+    pinMode(PIN_YD1, INPUT);
+    pinMode(PIN_YD0, INPUT);
+
+    // The PIN_YD2 is an input-only analog pin that can only be
+    // read by doing an ADC conversion (do NOT call pinMode on it; it can
+    // do weird stuff)
+    // Speed up ADC conversion by changing prescaler from /128 to /16
+    sbi(ADCSRA, ADPS2);
+    cbi(ADCSRA, ADPS1);
+    cbi(ADCSRA, ADPS0);
+
+    int porta;
+    int portb;
+    int old_porta = 0xabcd; // impossible previous values
+    int old_portb = 0xabcd;
+    for (;;) {
+        porta =
+            (digitalRead(PIN_XD7) << 7) | (digitalRead(PIN_XD6) << 6) | (digitalRead(PIN_XD5) << 5) | (digitalRead(PIN_XD4) << 4) |
+            (digitalRead(PIN_XD3) << 3) | (digitalRead(PIN_XD2) << 2) | (digitalRead(PIN_XD1) << 1) | (digitalRead(PIN_XD0));
+
+        portb =
+            (digitalRead(PIN_YD1) << 1) | (digitalRead(PIN_YD0));
+        if (analogRead(PIN_YD2) > 500) {
+            portb = portb | (1 << 2);
+        }
+
+        if (porta != old_porta) {
+            Serial.print("Port A: ");
+            Serial.println(porta,HEX);
+            old_porta = porta;
+        }
+        if (portb != old_portb) {
+            Serial.print("Port B: ");
+            Serial.println(portb,HEX);
+            old_portb = portb;
+        }
+    }
 }
 
 
 // This routine is invoked repeatedly by the arduino "scheduler"
-// but does nothing except flash the LED
+// but, since setup() is an endless loop, it is never executed
 void loop() {
-    delay(100);
-    digitalWrite(PIN_LED, state & 1);
-    state = state ^ 1;
+    Serial.println("Never get here");
 }
 
 
