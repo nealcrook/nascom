@@ -16,9 +16,9 @@ then type the following port (O and Q) commands into NAS-SYS -- the stuff after
     Q 4               # PIO test.. expect AA
     O 4 55            # 01010101 to port A  -- Arduino should report 55 on port A
     Q 4               # PIO test.. expect 55
-    O 5 AA            # 10101010 to port B  -- Arduino should report AA on port B (bits [])
+    O 5 AA            # 10101010 to port B  -- Arduino should report 2 on port B (bits [2:0])
     Q 5               # PIO test.. expect AA
-    O 5 55            # 01010101 to port B  -- Arduino should report 55 on port B (bits [])
+    O 5 55            # 01010101 to port B  -- Arduino should report 5 on port B (bits [2:0])
     Q 5               # PIO test.. expect 55
 
 
