@@ -27,9 +27,9 @@
 
 // Pin mapping for PIO port B bits[2:0]
 // A7 is input-only and can only be sampled through the ADC
-#define PIN_YD2 A7
-#define PIN_YD1 A1
-#define PIN_YD0 A3
+#define PIN_YD2 A3
+#define PIN_YD1 A7
+#define PIN_YD0 A1
 
 // bit set and clear macros
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -130,10 +130,10 @@ void setup()   {
     pinMode(PIN_XD0, INPUT);
 
     // Pins connected to PIO port B
-    pinMode(PIN_YD1, INPUT);
+    pinMode(PIN_YD2, INPUT);
     pinMode(PIN_YD0, INPUT);
 
-    // The PIN_YD2 is an input-only analog pin that can only be
+    // The PIN_YD1 is an input-only analog pin that can only be
     // read by doing an ADC conversion (do NOT call pinMode on it; it can
     // do weird stuff)
     // Speed up ADC conversion by changing prescaler from /128 to /16
@@ -151,9 +151,9 @@ void setup()   {
             (digitalRead(PIN_XD3) << 3) | (digitalRead(PIN_XD2) << 2) | (digitalRead(PIN_XD1) << 1) | (digitalRead(PIN_XD0));
 
         portb =
-            (digitalRead(PIN_YD1) << 1) | (digitalRead(PIN_YD0));
-        if (analogRead(PIN_YD2) > 500) {
-            portb = portb | (1 << 2);
+            (digitalRead(PIN_YD2) << 2) | (digitalRead(PIN_YD0));
+        if (analogRead(PIN_YD1) > 500) {
+            portb = portb | (1 << 1);
         }
 
         if (porta != old_porta) {

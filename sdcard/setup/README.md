@@ -21,6 +21,8 @@ then type the following port (O and Q) commands into NAS-SYS -- the stuff after
     O 5 55            # 01010101 to port B  -- Arduino should report 5 on port B (bits [2:0])
     Q 5               # PIO test.. expect 55
 
-
+.. the output reported by the Arduino console may update twice in rapid
+succession to get the stable value shown; that's due to the asynchronous
+relationship between the Arduino and the NASCOM.
 
 After you have run this program successfully, load the code from sd_merged.
