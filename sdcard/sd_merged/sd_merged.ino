@@ -1830,7 +1830,7 @@ void cmd_disk() {
     // Turn off the ERROR LED in anticipation
     digitalWrite(PIN_ERROR, 0);
 
-    Serial.print(F("Command "));
+    Serial.print(F("Cmd "));
     Serial.println(cmd_data,HEX);
 
     switch (cmd_data) {
@@ -1952,7 +1952,7 @@ void cmd_disk() {
         digitalWrite(PIN_ERROR, 1);
         break;
     }
-    Serial.println(F("Finished OK"));
+    //Serial.println(F("Finished OK"));
 }
 
 
@@ -2487,6 +2487,7 @@ void n_rd(char fid, long count) {
         for (long i = 0L; i< count; i++) {
             put_value(0, OUTPUT);
         }
+        Serial.println("Read error");
     }
     put_value(status, INPUT);
 }
