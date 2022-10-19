@@ -1,13 +1,42 @@
 #!/bin/bash
 
+echo
+echo Building bootstrap code from SDBOOT0.asm
 ./build SDBOOT0
+
 NASDOS=../../../nascom_other/nascom_nasdos/NASDOS/nasdos.rom
 NASDOSSD=../../../nascom_other/nascom_nasdos/NASDOS/nasdos_sd.rom
 POLY2=../../PolyDos/rom/PolyDos_2_Boot_ROM.bin
 POLYSD=polydos_util_rom_d800.bin
 ZEAP=../../ROM/zeap/zeap_d000.bin
-NASPEN=../../ROM/naspen/naspen_b800.bin
-BASIC=../../ROM/basic/basic.bin
+BASIC=../../ROM/basic/basic.nas
+../../converters/nascon $BASIC BASIC.bin
 PASCAL=../../ROM/pascal/bls_pascal2_d000.bin
+NASPEN=../../ROM/naspen/naspen_b800.bin
+DISDEBUG=../../ROM/dis_debug/dis_debug.bin
 
-cat SDBOOT0.bin $NASDOS $NASDOSSD $POLY2 $POLYSD $ZEAP $BASIC $PASCAL $NASPEN > SDBOOT0.DSK
+# NOT a nice power-of-2 size
+echo
+echo Pad FORTH
+FORTH=../../../nascom_other/NASFORTH.NAS
+../../converters/nascon $FORTH FORTH.bin
+truncate -s 10k FORTH.bin
+
+# NOT a nice power-of-2 size
+# Pad executable to $2800-$1000 representing the symbol table space so
+# that the source can be appended
+echo
+echo Pad ZEN executable and append source
+ZENE=../../ZEN_assembler/ZENNS.NAS
+ZENS=../../ZEN_assembler/ZENNSSRC.NAS
+../../converters/nascon $ZENE ZE.bin
+../../converters/nascon $ZENS ZS.bin
+truncate -s 6144 ZE.bin
+cat ZE.bin ZS.bin > ZEN.bin
+truncate -s 27k ZEN.bin
+
+echo
+echo Concatenating to make SDBOOT0.DSK
+
+cat SDBOOT0.bin $NASDOS $NASDOSSD $POLY2 $POLYSD $ZEAP BASIC.bin $PASCAL $NASPEN $DISDEBUG FORTH.bin ZEN.bin > SDBOOT0.DSK
+rm -f FORTH.bin ZE.bin ZS.bin ZEN.bin BASIC.bin
