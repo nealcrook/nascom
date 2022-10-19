@@ -45,13 +45,16 @@ $PortObj->read_const_time(1000); # 1 second per unfulfilled "read" call
 # for reading data from NAScas.
 #
 # 0: line-based echo
-# 1: expect file read
+# 1: command startup (file read or EEROM write or EEPROM read)
 # 2: in read, line-based, get length
+#    ^- serial_in_thread does transition from 1 to 2 in response to Ack 6
 # 3: in read, character-based, save data to file.
 # 4: in write, flow-controlling write data from console
-# 5: in EEPROM programming cycle
+# 5: in EEPROM write (programming) cycle
 my $state        :shared;
 $state = 0;
+# read data byte coming back from serial thread
+my $rdbyte       :shared;
 # file name in local filesystem -- used by thread in state=2
 my $local_name   :shared;
 # increment each time NAScas requests 512 bytes during a write command
@@ -61,6 +64,8 @@ $gimme512=0;
 # remote (SDcard) file name
 my $remote_name;
 
+# Size of profile record: 5 bytes + 4 profile entries of 56 bytes each
+my $PRECSIZE = 5 + 4*56;
 
 # Handle Rx from NAScas
 threads->create(\&serial_in_thread);
@@ -188,21 +193,16 @@ while (1) {
             sleep(1);
         }
     }
-    elsif ($bit[0] =~ /^PUT/) { # put address data (values in hex) TODO not yet documented!!
-        # this raw access is just for testing. It will be wrapped in a mechanism for defining the
-        # profiles properly.
+    elsif ($bit[0] =~ /^PUT/) { # put address data (values in hex)
+        # this raw access is just for testing/hacking. Use WRPROFILE
+        $state = 1;
         $PortObj->write("P $bit[1] $bit[2] \r");
     }
-    elsif ($bit[0] =~ /^GET/) { # get address (value in hex) TODO not yet documented!!
-        # this raw access is just for testing. It will be wrapped in a mechanism for defining the
-        # profiles properly.
-        $PortObj->write("G $bit[1] \r");
-    }
-    elsif ($bit[0] =~ /^PROFILE/) { # TODO not yet documented!!
+    elsif ($bit[0] =~ /^WRPROFILE/) {
         # Create and program (to EEPROM) the default profile settings
         my $pref = gen_default_profile();
         foreach my $addr (0..$#$pref) {
-            $state = 5;
+            $state = 1;
             my $cmd = sprintf("P %x %x \r", $addr, $pref->[$addr]);
             $PortObj->write($cmd);
             while ($state != 0) {
@@ -211,7 +211,30 @@ while (1) {
         }
         print "\n";
     }
+    elsif ($bit[0] =~ /^GET/) { # get address (value in hex)
+        # this raw access is just for testing/hacking. Use RDPROFILE
+        # tell thread to expect incoming data then issue command
+        $state = 1;
+        $PortObj->write("G $bit[1] \r");
+        while ($state != 0) {
+        }
+        printf "0x%02x\n", $rdbyte;
+    }
+    elsif ($bit[0] =~ /^RDPROFILE/) {
+        # Read the profile from EEPROM and  report it
+        my @prof;
 
+        foreach my $addr (0..$PRECSIZE-1) {
+            # tell thread to expect incoming data then issue command
+            $state = 1;
+            my $cmd = sprintf("G %x \r", $addr);
+            $PortObj->write($cmd);
+            while ($state != 0) {
+            }
+            push @prof, $rdbyte;
+        }
+        report_profile(\@prof);
+    }
 
     elsif ($bit[0] =~ /^QUIT/) {
         foreach my $thr ( threads->list ) {
@@ -251,6 +274,8 @@ sub serial_in_thread {
         'Ack 7' => 'ERROR Read failed: bad filename or file not found',
         'Ack 8' =>  'INFO Write completed successfully',
         'Ack 9' => 'ERROR Command not recognised',
+        'Ack 10'=>  'INFO EEPROM write completed successfully',
+        'Ack 12' => 'INFO EEPROM read completed successfully',
         );
 
     my $STALL_DEFAULT=10; # how many seconds to wait for new input
@@ -308,12 +333,17 @@ sub serial_in_thread {
                 if ($buffer =~ /\r\n$/) {
                     # Found complete line
                     if ($buffer =~ /^Ack 6\r\n$/) {
-                        # Start of Read. Expect to be in state 1 TODO should I check?
+                        # Start of Read.
                         open RFILE, ">$local_name";
                         $state = 2;
                     }
                     elsif ($buffer =~ /^Ack 10\r\n$/) {
                         # EEPROM program done.
+                        $state = 0;
+                    }
+                    elsif ($buffer =~ /^([0-9A-f]{1,2})Ack 12\r\n$/) {
+                        # EEPROM Byte read. Can be 1 or 2 hex characters
+                        $rdbyte = hex($1);
                         $state = 0;
                     }
                     elsif ($buffer =~ /^Ack 4\r\n$/) {
@@ -428,6 +458,55 @@ sub add_profile {
 }
 
 
+# report profile record represented by the array of numeric byte values in @{$_[0]}
+sub report_profile {
+    my $ref = $_[0];
+
+    my $magic = ($ref->[0] == ord('N')) && ($ref->[1] == ord('A')) && ($ref->[2] == ord('S'));
+    my $csum = 0;
+    foreach my $char (@$ref) {
+        $csum = $csum + $char;
+    }
+
+    if ((($csum & 0xff) == 0) && $magic) {
+        for my $prof (0..3) {
+            if ($ref->[3] == $prof) {
+                print "* Profile $prof: "; # active profile
+            }
+            else {
+                print "  Profile $prof: ";
+            }
+            for my $file (0..3) {
+                for my $i (0..12) {
+                    my $val = $ref->[5 + 56*$prof + 13*$file + $i];
+                    if ($val == 0) {
+                        print " ";
+                    }
+                    else {
+                        print chr($val);
+                    }
+                }
+                print "  ";
+            }
+            my $i = 5 + 56*$prof + 13*4;
+            printf "Tracks/Sector: %2d  Tracks: %2d  First track: %d  Sector size: %3d\n",
+                $ref->[$i], $ref->[$i+1], $ref->[$i+2], $ref->[$i+3]*128;
+        }
+    }
+    else {
+        print "Profile not found or invalid. Hex dump follows:\n";
+        for my $i (0..$PRECSIZE-1) {
+            if ($i % 8 == 0) {
+                if ($i !=0) {
+                    printf "\n";
+                }
+                printf "%04x ", $i;
+            }
+            printf "%02x ", $ref->[$i];
+        }
+        printf "\n";
+    }
+}
 
 sub help_msg {
     print <<EOF
@@ -467,6 +546,14 @@ read filename lfilename  - read file filename from SDcard and save locally as lf
                            Error if SDcard not present
                            Error if filename is not a MSDOS 8.3 name
                            Error if filename does not exist on SDcard
+
+wrprofile                - write default profile to EEPROM
+
+rdprofile                - read and report profile stored in EEPROM
+
+put a d                  - write to EEPROM location a with byte value d (a and d are in hex)
+
+get a                    - read EEPROM location a and report byte value (a is in hex)
 
 help                     - this is it
 
