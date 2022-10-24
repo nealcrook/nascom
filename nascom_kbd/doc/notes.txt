@@ -1,0 +1,175 @@
+2nd attempt.. see notes on previous, never completed version, in ps2kbd directory.
+
+
+I thought more about the arduino idea, and my impression is that it will be too
+slow. However, I think an alternative solution would be to use a raspberry pi
+pico (almost as cheap as an arduino). There is already code to do the PS/2
+control and the rest of it should be easy (well, I've done it already in
+hardware on the NASCOM 4 so the algorithm is proven)
+
+Here's the core part of the NAS-SYS code that scans the keyboard:
+
+call fflp              [17
+inc hl                 [6
+; get row status
+in a,(0) <--- this is where the row is read  [11
+
+
+; set,  reset bit in P0
+fflp: push hl                 [11
+ld hl,port0                  [10
+xor (hl)                     [7
+out (0),a                    [11
+ld a,(hl)                    [7
+ff2: out (0),a <--- this is where the column is selected   [11
+pop hl                       [10
+ret                          [10
+
+Instruction timing is shown [thus
+
+So, the time from selecting a column to reading the row is 11+10+10+6
+
+BUT although the nascom hardware selects the column on the falling edge (ff2 in
+the code above) the sw implementation could do it on the rising edge, giving a
+bit more time: ~additional 11+7
+
+(just to make thing fun, what the code refers to as row/column corresponds to
+column/row on the keyboard schematic)
+
+That gives a total allowable response time of 55 clocks. At 4MHz (assuming 0
+wait states) that's 13.7us. This article:
+
+https://forums.raspberrypi.com/viewtopic.php?t=306132
+
+experiments with tight polling loop and interrupts, and achieves 60-80ns with a
+polling loop (which would be an OK solution because, cruel though it sounds, I
+could dedicate the whole of core 1 to doing this!) and as little as 200ns using
+interrupts (when programmed in C, not in Python!) I need to grab some scope
+pictures and measure the polling speed to confirm those calculations.
+
+PS/2 on pi pico: https://forums.raspberrypi.com/viewtopic.php?t=329630
+
+
+I propose a small board with an attached pi pico that can connect to a PS/2
+keyboard and can act as any of these:
+
+ * NASCOM 1 or 2 keyboard; 16-pin IDC connector - draws power at 5V, level
+   shifter between raspberry pi and NASCOM connector. 2 Keyboard keys will also
+   be decoded to provide RESET and NMI buttons (NMI was wired on NASCOM
+   keyboards but there was no wiring or footprint for a key)
+
+   2 inputs (clk, reset)
+   7 outputs (row info)
+   2 outputs (cpu_reset_n, cpu_nmi_n)
+
+ * GEMINI serial keyboard - draws power at 12V, regulated to 5V. Level shifter
+   between raspberry pi and serial clock/data pins
+
+   2 outputs (clk, data)
+   spec. is in the GM813 SVC manual, appendix A
+   at powerup, generate 9 clock edges with the data at 0
+   each key is represented by a 1 followed by 8 bits of data, MSB first
+   data setup/hold is 5ns-20ns around rising clock edge
+   no actual spec. on the clock frequency!
+
+ * GEMINI parallel keyboard - draws power at 5V, Level shifter between raspberry
+   pi and 8-bit parallel data, strobe. 16-pin IDC connector; can I share the
+   connector with the NASCOM??
+
+   TODO spec. for strobe width and for setup/hold times
+
+ * MAP80 VFC parallel keyboard - draws power at 5V, Level shifter between
+   raspberry pi and 8-bit parallel data, strobe. 16-pin IDC connector; can I
+   share the connector with the NASCOM??
+
+   Can accept +ve or -ve strobe. No spec. for setup/hold times
+
+   ONLY difference in pinout between MAP80 and GEMINI is pins 3, 9, 14, 16
+
+   pin   Gemini                            MAP80
+   14    +5v via 220R (?to show that       D7
+         kbd is fitted? Check schematic)
+   16    D7                                No connect.
+   3,9   Gnd                               No connect
+
+..also:
+
+ * connect to the NASCOM serial port also (another 16-pin IDC) with TTL levels
+   and squirt files down on demand, and bridge to the host via USB/CDC
+
+ * connect to the GEMINI serial port (real RS232 levels, using Maxim device?)
+   with handshakes for terminal emulation via via USB/CDC
+
+ * connections to 2nd board remote debugger.
+
+The GPIO count on the Pi module is 26 (excludes the 2 dedicated debug pins and 4
+GPIO used for dedicated functions on the Pi module) so these functions will share
+pins (and level shifters) on the Pi.
+
+I can test the NASCOM keyboard on my N1/N2/N4 and the GEMINI keyboards on my
+"new" SVC board.
+
+
+direction wrt pi
+
+PS/2 kbd
+========
+
+io  1 clk for PS/2
+io  1 data for PS/2
+
+zener diode clamps and pullups
+
+
+Nascom kbd
+==========
+
+in  1 clk
+in  1 reset
+out 7 data
+out 2 reset/nmi
+
+16-pin IDC socket
+
+
+Gemini serial
+=============
+
+out 1 clock
+out 1 data
+
+12v to 5v regulator
+
+
+Gemini parallel
+===============
+
+in 8 data
+in 1 strobe
+
+might need option to control the polarity of the strobe
+
+
+Config
+======
+
+in 2 config?
+
+
+Debug
+=====
+
+io 2 serial debug -- these are dedicated pins and don't count towards
+                     the 26 GPIO
+
+
+Misc
+====
+
+2 level-shifter chips, one powered at 3.3 for 3v3 outputs, one powered at
+5v.. count up how many in each direction.
+
+how much power can the board supply at 3v3?
+
+
+
