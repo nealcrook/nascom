@@ -6,4 +6,4 @@
 * photos - the assembled board
 * bin - software images to load onto the Raspberry Pi Pico
 
-~~If anyone is interested in a PCB, the price is £5 including postage.~~
+If anyone is interested in a PCB, the price is £5 including postage.
