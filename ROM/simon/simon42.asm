@@ -17,10 +17,11 @@
 ;;; V                - print SIMON version number
 ;;; 8                - ?? boot 8" disk
 
-L_0002: equ $0002               ; entry point of loaded boot sector
-L_00E6: equ $00E6               ; 1st entry in JPTAB1 or JPTAB2 POLL STATUS
-L_00E9: equ $00E9               ; 2nd entry in JPTAB1 or JPTAB2 GET CHAR
-L_00EC: equ $00EC               ; 3rd entry in JPTAB1 or JPTAB2 PUT CHAR
+BOOTGO: equ $0002               ; entry point of loaded boot sector
+STACK:  equ $00E6               ; stack grows down from here
+IOPOLL: equ $00E6               ; 1st entry in JPTAB1 or JPTAB2 POLL STATUS
+IOGET:  equ $00E9               ; 2nd entry in JPTAB1 or JPTAB2 GET CHAR
+IOPUT:  equ $00EC               ; 3rd entry in JPTAB1 or JPTAB2 PUT CHAR
 
 ;;; Ports for GM811/GM813 CPU board
 
@@ -99,8 +100,8 @@ CLOP2:  out (c), e              ; initialise memory mapper
         jr nz, CLOP1            ; 0x64 = 40
         ld a, $11               ; value?
         out (PMOD), a           ; page-mode register
-        ld sp, L_00E6
-        call L_F1ED             ; Will execute at FXXX instead of 0XXX
+        ld sp, STACK
+        call INITIO             ; Will execute at FXXX instead of 0XXX
                                 ; BUT: how does the ROM get disabled so that the
                                 ; stack at $000E6 can be used??
         ld a, i                 ; 
@@ -148,7 +149,7 @@ L_F0E0: push hl
         call PRS
         ld hl, MSG5             ; - Press any key to repeat<
 L_F0EE: call PRS
-L_F0F1: call L_F2A6
+L_F0F1: call CLEAN
         jr z, L_F0F8
         jr nc, L_F0F1
 L_F0F8: call L_F2DF
@@ -181,13 +182,13 @@ L_F131: call XCHROUT
 
 L_F137: call L_F11B
 L_F13A: call WOTIO
-        call z, L_F11B
-        call L_F2A6
+        call z, L_F11B          ; if IVC
+        call CLEAN
         call L_F2DF
-        call L_F2A6
+        call CLEAN
         jr z, L_F13A
-L_F14B: ld sp, L_00E6
-        call L_F2A6
+L_F14B: ld sp, STACK
+        call CLEAN
         jr z, L_F137
         inc a
         jr z, L_F15B
@@ -202,7 +203,7 @@ L_F15B: in a, (FDCSTA)
         call CMD2FDC            ; STEP IN?
         ld a, $0B
         call CMD2FDC            ; RESTORE
-        call L_F1BA
+        call RDSEC0             ; load sector 0 to RAM at 0
 L_F16E: or a
         jp nz, L_F0D8
         ld hl, ($0000)          ; get first 2 bytes from boot sector
@@ -211,7 +212,7 @@ L_F16E: or a
         sbc hl, de
         call z, L_F2E2          ; if good disk??
         ld a, ($00EF)           ; get drive
-        jp z, L_0002            ; enter code loaded from boot sector (first 2 bytes is "magic" eg GG for Gemini)
+        jp z, BOOTGO            ; enter code loaded from boot sector (first 2 bytes is "magic" eg GG for Gemini)
         ld hl, MSG17            ; ??wot??
         jp L_F0EE
 
@@ -224,27 +225,27 @@ MSG17:  defb $09, $80, $C0, $CE, $EF, $80, $F2, $E5, $E3, $EF, $E7, $EE, $E9, $F
         defb $00
 
 
-L_F1BA: ld a, $0B
+RDSEC0: ld a, $0B
         call CMD2FDC            ; RESTORE
         ld a, ($00EF)           ; get drive
         and $20
-        jr z, L_F1C8
-        ld a, $01
+        jr z, L_F1C8            ; drive selected (how is this flagged??)
+        ld a, $01               ; no drive selected, use default
 L_F1C8: out (FDCSEC), a
         ld hl, $0000
         ld c, FDCDRV            ; ?fast access to FDC data-available flag?
         ld a, $88
         out (FDCCMD), a         ; READ SECTOR
         ld b, $80
-        jr L_F1D7               ; why not fall through? Bug, or need need slight delay?
+        jr LDSEC                ; why not fall through? Bug, or need need slight delay?
 
 
-L_F1D7: in a, (c)               ; data?
-        jr z, L_F1D7            ; no data
+LDSEC:  in a, (c)               ; data byte available?
+        jr z, LDSEC             ; not yet
         in a, (FDCDAT)          ; get data
         ld (hl), a              ; store
         inc hl                  ; next location
-        djnz L_F1D7             ; total of $80 (128) bytes
+        djnz LDSEC              ; total of $80 (128) bytes
 L_F1E1: in a, (c)               ; read and discard remaining bytes, if any
         jr z, L_F1E1
         in a, (FDCDAT)
@@ -253,10 +254,11 @@ L_F1E1: in a, (c)               ; read and discard remaining bytes, if any
         ret
 
 
-L_F1ED: in a, (UARTMS)
+;;; Initialise I/O: serial or IVC
+INITIO: in a, (UARTMS)
         and $40                 ; ??check board link??
         ld ($00F0), a           ; record what I/O is in use
-        jr nz, L_F233
+        jr nz, SERIO
         ld hl, JPTAB1           ; use IVC for kbd/display
         call CP92E6
         in a, (IVCDAT)
@@ -294,7 +296,7 @@ L_F225: dec hl
         ret
 
 
-L_F233: ld hl, JPTAB2           ; use UART for kbd/display
+SERIO:  ld hl, JPTAB2           ; use UART for kbd/display
         call CP92E6
         ld a, $03
         out (UARTLC), a
@@ -317,10 +319,10 @@ L_F246: ld e, (hl)
         out (UARTIE), a         ; set baud rate divisor hi
         ld a, $03
         out (c), a              ; restore access to UART data/interrupt registers
-        call L_00E9
+        call IOGET
         cp $0D
         jr nz, L_F246
-        call L_00E9
+        call IOGET
         cp $0D
         jr nz, L_F246
         or a
@@ -342,7 +344,7 @@ BAUDTAB:defw $000D              ;9600bd
         defw $0000              ; mark end of table
 
 
-CP92E6: ld de, L_00E6           ; copy 9 bytes (3 x JP XXXX) to $00E6
+CP92E6: ld de, IOPOLL           ; copy 9 bytes (3 x JP XXXX) to $00E6
         ld bc, $0009
         ldir
         ret
@@ -356,12 +358,13 @@ JPTAB2: jp POLSER               ; vectored I/O using UART
         jp PUTSER
 
 
-WOTIO:  ld a, ($00F0)           ; says what type of I/O is in use??
+WOTIO:  ld a, ($00F0)           ; return Z if IVC in use, NZ for serial
         or a
         ret
 
 
-L_F2A6: ld a, $D0               ; FORCE INTERRUPT
+;;; clean up: abort any command in progress, restore the drive. ???what else
+CLEAN:  ld a, $D0               ; FORCE INTERRUPT
         call CMD2FDC
         ld a, ($00EF)           ; get drive
         out (FDCDRV), a
@@ -399,9 +402,9 @@ L_F2DD: xor a
 
 
 L_F2DF: call L_F2FE
-L_F2E2: call L_00E6
+L_F2E2: call IOPOLL
         or a
-        ret z
+        ret z                   ; no key pressed
         and $1F
         cp $01
         jp z, CMD_A
@@ -416,9 +419,9 @@ L_F2E2: call L_00E6
 
 L_F2FE: call WOTIO
         ld hl, MSG13            ; delete to end of line
-        jp z, PRS
+        jp z, PRS               ; for IVC, tail-recurse to print MSG13
         ld hl, MSG14            ; "<"
-        jp PRS                  ; print and return (tail-recurse)
+        jp PRS                  ; for serial, tail-recurse to print MSG14
 
 
 MSG13:  defb $1B, $2A, $00      ; delete to end of line
@@ -587,31 +590,31 @@ PRS2:   ld a, c                 ; print character in C, B times
         jr PRS
 
 
-XCHRIN: call L_00E9
+XCHRIN: call IOGET              ; get character and fall-through to echo
 XCHROUT:cp $3C
         jr z, L_F40D
         cp $0D
-        jp nz, L_00EC
+        jp nz, IOPUT
         ld a, $0A
-        call L_00EC
+        call IOPUT
 L_F40D: ld a, $0D
-        call L_00EC
+        call IOPUT
         ret
 
 
 PUTIVC: push af
-L_F414: in a, (IVCSTA)
+PUTI1:  in a, (IVCSTA)
         rrca
-        jr c, L_F414
+        jr c, PUTI1
         pop af
         out (IVCDAT), a
         ret
 
 
 PUTSER: push af
-L_F41E: in a, (UARTLS)
+PUTS1:  in a, (UARTLS)
         and $20
-        jr z, L_F41E
+        jr z, PUTS1
         pop af
         and $7F
         out (UARTDAT), a
@@ -658,7 +661,7 @@ GETSER: in a, (UARTLS)          ; block, waiting for character from serial
 
 CMD_A:  ld hl, MSG6             ; select master drive
         call PRS
-L_F46E: call L_00E9             ; get character
+L_F46E: call IOGET              ; get character
         sub $31
         jr c, L_F46E            ; illegal
         cp $04                  ; 1-4 are legal (not 1-2 per message)
@@ -682,7 +685,7 @@ MSG6:   defb $0D
 
 CMD_8:  ld hl, MSG7             ; select 8" drive..
         call PRS
-CMD81:  call L_00E9             ; get character
+CMD81:  call IOGET              ; get character
         sub $31
         jr c, CMD81             ; illegal
         cp $04                  ; 1-4 are legal
@@ -726,7 +729,7 @@ L_F56C: xor a
         jr nc, L_F584
         ld hl, MSG10            ; detected GM809/829 disk controller
 L_F584: call PRS
-CMDLOP: ld sp, L_00E6
+CMDLOP: ld sp, STACK
         ld a, ">"               ; prompt
         call XCHROUT
         call XCHROUT
