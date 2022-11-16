@@ -1,4 +1,4 @@
-;;; SIMON version 4.2
+;;; SIMON version 4.5s
 ;;;
 ;;; Source recreated by disassembly; all comments inferred from code inspection
 ;;;
@@ -78,9 +78,9 @@ CRLF:   jp XCRLF
 MSG1:   defm "(C) dci software" ; TODO never referenced
 
 MSG20:  defb $0D                ; printed by V (version) command
-        defm "10-06-86 "        ; (falls through to print the GG CR also)
+        defm "10-03-87 "        ; (falls through to print the mG CR also)
 
-MSG19:  defm "GG"               ; magic compared with first 2 bytes of boot sector
+MSG19:  defm "mG"               ; magic compared with first 2 bytes of boot sector
         defb $0D, $00
 
 XCOLD:  in a, (IVCRST)          ; reset IVC
@@ -100,7 +100,7 @@ CLOP2:  out (c), e              ; initialise memory mapper
         ld a, $11               ; value?
         out (PMOD), a           ; page-mode register
         ld sp, L_00E6
-        call L_F1ED             ; Will execute at FXXX instead of 0XXX
+        call L_F1E7             ; Will execute at FXXX instead of 0XXX
                                 ; BUT: how does the ROM get disabled so that the
                                 ; stack at $000E6 can be used??
         ld a, i                 ; 
@@ -123,7 +123,7 @@ L_F06D: dec a
         call PRS
         pop af
         jr nz, L_F0DD
-        jp L_F14B
+        jp L_F14D
 
 MSG2:   defm " while loading Boot sector"
         defb $00
@@ -148,68 +148,71 @@ L_F0E0: push hl
         call PRS
         ld hl, MSG5             ; - Press any key to repeat<
 L_F0EE: call PRS
-L_F0F1: call L_F2A6
+L_F0F1: call L_F27C
         jr z, L_F0F8
         jr nc, L_F0F1
-L_F0F8: call L_F2DF
-        jr L_F14B
+L_F0F8: call L_F2B5
+        jr L_F14D
 
 
 ;;; TODO how is this used?
-MSG15:  defb $1B, $2A           ; delete to end of line
+MSG15:  defm "<"
+        defb $09, $09, $09
         defm "<"
-        defb $09, $80, $C9, $EE, $F3, $E5, $F2, $F4, $80, $C4, $E9, $F3, $EB, $80, $E9, $EE, $80, $E4, $F2, $E9, $F6, $E5, $80, $00
+        defb $09, $80, $C9, $EE, $F3, $E5, $F2, $F4, $80, $C4, $E9, $F3, $EB, $80, $E9, $EE, $00
+
+MSG15A: defb $E4, $F2, $E9, $F6, $E5, $80, $00 ;TODO no reference
 
 MSG16:  defb $A0                ;TODO no reference
         defm "<"
         defb $00
 
-L_F11B: ld hl, MSG15
+L_F11D: ld hl, MSG15
         call PRS
         ld a, ($00EF)           ; get drive
         ld b, $C0
-L_F126: inc b
+L_F128: inc b
         rrca
-        jr nc, L_F126
+        jr nc, L_F128
         ld a, b
         cp $C1
-        jr z, L_F131
+        jr z, L_F133
         sub $10
-L_F131: call XCHROUT
+L_F133: call XCHROUT
         jp PRS                  ; print and return (tail-recurse)
 
 
-L_F137: call L_F11B
-L_F13A: call WOTIO
-        call z, L_F11B
-        call L_F2A6
-        call L_F2DF
-        call L_F2A6
-        jr z, L_F13A
-L_F14B: ld sp, L_00E6
-        call L_F2A6
-        jr z, L_F137
+L_F139: call L_F11D
+L_F13C: call WOTIO
+        call z, L_F11D
+        call L_F27C
+        call L_F2B5
+        call L_F27C
+        jr z, L_F13C
+L_F14D: ld sp, L_00E6
+        call L_F27C
+        jr z, L_F139
         inc a
-        jr z, L_F15B
-        call L_F3A0
-        jr L_F16E
+        jr z, L_F15D
+        call L_F36E
+        jr L_F170
 
 
-L_F15B: in a, (FDCSTA)
+L_F15D: in a, (FDCSTA)
         bit 0, a
-        jr nz, L_F15B           ; wait until done?
+        jr nz, L_F15D           ; wait until done?
         ld a, $5B
         call CMD2FDC            ; STEP IN?
         ld a, $0B
         call CMD2FDC            ; RESTORE
-        call L_F1BA
-L_F16E: or a
+        call L_F1B4
+L_F170: or a
         jp nz, L_F0D8
         ld hl, ($0000)          ; get first 2 bytes from boot sector
-        ld de, (MSG19)          ; "GG"
+        ld de, (MSG19)          ; "mG"
         or a
         sbc hl, de
-        call z, L_F2E2          ; if good disk??
+        call z, L_F2B8          ; if good disk??
         ld a, ($00EF)           ; get drive
         jp z, L_0002            ; enter code loaded from boot sector (first 2 bytes is "magic" eg GG for Gemini)
         ld hl, MSG17            ; ??wot??
@@ -217,46 +220,46 @@ L_F16E: or a
 
 
 ;;; TODO how is this used?
-MSG17:  defb $09, $80, $C0, $CE, $EF, $80, $F2, $E5, $E3, $EF, $E7, $EE, $E9, $F3, $E1, $E2
-        defb $EC, $E5, $80, $C3, $D0, $AF, $CD, $80, $F3, $F9, $F3, $F4, $E5, $ED, $80, $EF
-        defb $EE, $80, $F4, $E8, $E9, $F3, $80, $E4, $E9, $F3, $EB, $C0, $80
+MSG17:  defb $09, $80, $C0, $CE, $EF, $80, $C4, $D8, $80, $B3, $80, $C3, $D0, $AF, $CD, $80
+        defb $F3, $F9, $F3, $F4, $E5, $ED, $80, $EF, $EE, $80, $F4, $E8, $E9, $F3, $80, $E4
+        defb $E9, $F3, $EB, $C0, $80
         defm "<"
         defb $00
 
 
-L_F1BA: ld a, $0B
+L_F1B4: ld a, $0B
         call CMD2FDC            ; RESTORE
         ld a, ($00EF)           ; get drive
         and $20
-        jr z, L_F1C8
+        jr z, L_F1C2
         ld a, $01
-L_F1C8: out (FDCSEC), a
+L_F1C2: out (FDCSEC), a
         ld hl, $0000
         ld c, FDCDRV            ; ?fast access to FDC data-available flag?
         ld a, $88
         out (FDCCMD), a         ; READ SECTOR
         ld b, $80
-        jr L_F1D7               ; why not fall through? Bug, or need need slight delay?
+        jr L_F1D1               ; why not fall through? Bug, or need need slight delay?
 
 
-L_F1D7: in a, (c)               ; data?
-        jr z, L_F1D7            ; no data
+L_F1D1: in a, (c)               ; data?
+        jr z, L_F1D1            ; no data
         in a, (FDCDAT)          ; get data
         ld (hl), a              ; store
         inc hl                  ; next location
-        djnz L_F1D7             ; total of $80 (128) bytes
-L_F1E1: in a, (c)               ; read and discard remaining bytes, if any
-        jr z, L_F1E1
+        djnz L_F1D1             ; total of $80 (128) bytes
+L_F1DB: in a, (c)               ; read and discard remaining bytes, if any
+        jr z, L_F1DB
         in a, (FDCDAT)
-        jp m, L_F1E1
+        jp m, L_F1DB
         in a, (FDCSTA)
         ret
 
 
-L_F1ED: in a, (UARTMS)
+L_F1E7: in a, ($BE)
         and $40                 ; ??check board link??
         ld ($00F0), a           ; record what I/O is in use
-        jr nz, L_F233
+        jr nz, L_F22D
         ld hl, JPTAB1           ; use IVC for kbd/display
         call CP92E6
         in a, (IVCDAT)
@@ -268,7 +271,7 @@ L_F1ED: in a, (UARTMS)
         ld a, $FF
         ret c
         ld hl, $0000
-L_F20C: dec hl
+L_F206: dec hl
         ld a, h
         or l
         scf
@@ -276,71 +279,44 @@ L_F20C: dec hl
         ret z                   ; timeout waiting - maybe no IVC?
         in a, (IVCSTA)
         rrca
-        jr c, L_F20C
-L_F218: ld hl, $0000
+        jr c, L_F206
+L_F212: ld hl, $0000
         ld a, $1B
         call PUTIVC
         ld a, $76               ; get version number of IVC software
         call PUTIVC
-L_F225: dec hl
+L_F21F: dec hl
         ld a, h
         or l
-        jr z, L_F218            ; timeout; try again
+        jr z, L_F212            ; timeout; try again
         in a, (IVCSTA)
         rlca
-        jr c, L_F225            ; wait
+        jr c, L_F21F            ; wait
         xor a
         in a, (IVCDAT)          ; version number in A
         ret
 
 
-L_F233: ld hl, JPTAB2           ; use UART for kbd/display
+L_F22D: ld l, $06
+L_F22F: ld bc, $0000
+L_F232: dec bc
+        ld a, b
+        or c
+        jr nz, L_F232
+        dec l
+        jr nz, L_F22F
+        ld hl, JPTAB2           ; use UART for kbd/display
         call CP92E6
-        ld a, $03
-        out (UARTLC), a
-        ld a, $07
-        out (UARTMC), a
-        ld c, UARTLC
-L_F243: ld hl, BAUDTAB
-L_F246: ld e, (hl)
-        inc hl
-        ld d, (hl)
-        inc hl
-        ld a, d
-        or e
-        jr z, L_F243
-        ld a, $83
-        out (c), a              ; allow access to UART baud rate divisor registers
-        ld a, e
-        out (UARTDAT), a        ; set baud rate divisor lo
-        ld a, d
-        out (UARTIE), a         ; set baud rate divisor hi
-        ld a, $03
-        out (c), a              ; restore access to UART data/interrupt registers
-        call L_00E9
-        cp $0D
-        jr nz, L_F246
-        call L_00E9
-        cp $0D
-        jr nz, L_F246
+        ld a, $66
+        out ($48), a
+        ld hl, XXXTAB
+        ld bc, $0E42
+        otir                    ; send $0E bytes to port $42 from XXXTAB
         or a
         ret
 
 
-BAUDTAB:defw $000D              ;9600bd
-        defw $0011              ;7200bd
-        defw $001A              ;4800bd
-        defw $0023              ;3600bd
-        defw $0034              ;2400bd
-        defw $003F              ;2000bd
-        defw $0045              ;1800bd
-        defw $0068              ;1200bd
-        defw $00D0              ; 600bd
-        defw $01A1              ; 300bd
-        defw $0341              ; 150bd
-        defw $0470              ; 110bd
-        defw $0000              ; mark end of table
-
+XXXTAB: defb $00, $18, $04, $44, $03, $C0, $05, $60, $01, $00, $03, $C1, $05, $68
 
 CP92E6: ld de, L_00E6           ; copy 9 bytes (3 x JP XXXX) to $00E6
         ld bc, $0009
@@ -361,45 +337,45 @@ WOTIO:  ld a, ($00F0)           ; says what type of I/O is in use??
         ret
 
 
-L_F2A6: ld a, $D0               ; FORCE INTERRUPT
+L_F27C: ld a, $D0               ; FORCE INTERRUPT
         call CMD2FDC
         ld a, ($00EF)           ; get drive
         out (FDCDRV), a
         ld a, $0B
         out (FDCCMD), a         ; RESTORE
         ld b, $28
-L_F2B6: djnz L_F2B6
+L_F28C: djnz L_F28C
         ld hl, $D000
         in a, (FDCSTA)
         ld c, a
-L_F2BE: in a, (FDCSTA)
+L_F294: in a, (FDCSTA)
         xor c
         and $02
-        jr z, L_F2C7
+        jr z, L_F29D
         ld b, $FF
-L_F2C7: dec l
-        jr nz, L_F2BE
-        call L_F2E2
+L_F29D: dec l
+        jr nz, L_F294
+        call L_F2B8
         or a
         scf
         ret nz
         dec h
-        jr nz, L_F2BE
+        jr nz, L_F294
         ld a, b
         or a
         ret nz
-        call L_F320
-        jr nz, L_F2DD
+        call L_F2F6
+        jr nz, L_F2B3
         inc a
         ret
 
 
-L_F2DD: xor a
+L_F2B3: xor a
         ret
 
 
-L_F2DF: call L_F2FE
-L_F2E2: call L_00E6
+L_F2B5: call L_F2D4
+L_F2B8: call L_00E6
         or a
         ret z
         and $1F
@@ -410,11 +386,11 @@ L_F2E2: call L_00E6
         cp $13
         ld a, $01
         ret nz
-        call L_F2FE
-        jp L_F56C               ; ?did not autoboot: continue to command loop
+        call L_F2D4
+        jp L_F53C               ; ?did not autoboot: continue to command loop
 
 
-L_F2FE: call WOTIO
+L_F2D4: call WOTIO
         ld hl, MSG13            ; delete to end of line
         jp z, PRS
         ld hl, MSG14            ; "<"
@@ -429,104 +405,100 @@ MSG14:  defm "<"
 
 CMD2FDC:out (FDCCMD), a         ; send command in A to FDC then wait then poll status (for completion?)
         ld a, $0A               ; delay loop count for command acceptance
-L_F316: dec a
-        jr nz, L_F316           ; wait a little while
-L_F319: in a, (FDCSTA)          ; read status
+L_F2EC: dec a
+        jr nz, L_F2EC           ; wait a little while
+L_F2EF: in a, (FDCSTA)          ; read status
         bit 0, a                ; completion?
-        jr nz, L_F319           ; not yet.. loop
+        jr nz, L_F2EF           ; not yet.. loop
         ret                     ; done
 
 
-L_F320: ld a, $55
-        out (SCSDAT), a
-        in a, (SCSDAT)
-        cpl
-        out (SCSDAT), a
-        ld b, a
-        in a, (SCSDAT)
-        xor b
-        ret nz
-        call L_F369
+L_F2F6: call L_F331
         nop
         nop
         nop
         nop
         nop
         nop
-        jp L_F3AC
+        jp L_F37A
 
 
-L_F33A: xor a
-L_F33B: push af
+L_F302: xor a
+L_F303: push af
         in a, (SCSCTL)
         and $10
-        jr z, L_F348
+        jr z, L_F310
         pop af
         dec a
-        jr nz, L_F33B
-        jr L_F349
+        jr nz, L_F303
+        jr L_F311
 
 
-L_F348: pop af
-L_F349: ld a, $F7
+L_F310: pop af
+L_F311: ld a, $F7
         out (SCSCTL), a
         ret
 
 
-L_F34E: in a, (SCSCTL)
+L_F316: in a, (SCSCTL)
         and $10
         ld a, $01
         ret nz
-L_F355: in a, (SCSCTL)
+L_F31D: in a, (SCSCTL)
         rrca
-        jr c, L_F355
+        jr c, L_F31D
         ret
 
 
-L_F35B: ld a, $FF
+L_F323: ld a, $FF
         out (SCSDAT), a
         ld b, $00
-L_F361: in a, (SCSDAT)
-        djnz L_F361
+L_F329: in a, (SCSDAT)
+        djnz L_F329
         ld a, $04
-        or a
+        and a
         ret
 
 
-L_F369: in a, (SCSCTL)
+L_F331: ld b, $00
+L_F333: in a, (SCSCTL)
         or $E0
         inc a
-        jr nz, L_F35B
-        ld a, $FE
+        jr z, L_F33E
+        djnz L_F333
+        jr L_F323
+
+
+L_F33E: ld a, $FE
         out (SCSDAT), a
         ld a, $F5
         out (SCSCTL), a
-        call L_F33A
+        call L_F302
         pop hl
-        call L_F34E
-        ld a, (hl)
-L_F380: cpl
-        out (SCSDAT), a
-        inc hl
-        inc hl
-        call L_F34E
-        ld a, ($00EF)           ; get drive
-        dec a
-        jr z, L_F390
-        ld a, $20
-L_F390: cpl
-        out (SCSDAT), a
-        ld b, $04
-L_F395: call L_F34E
+        call L_F316
         ld a, (hl)
         cpl
         out (SCSDAT), a
         inc hl
-        djnz L_F395
+        inc hl
+        call L_F316
+        ld a, ($00EF)           ; get drive
+        dec a
+        jr z, L_F35E
+        ld a, $20
+L_F35E: cpl
+        out (SCSDAT), a
+        ld b, $04
+L_F363: call L_F316
+        ld a, (hl)
+        cpl
+        out (SCSDAT), a
+        inc hl
+        djnz L_F363
         jp (hl)
 
 
-L_F3A0: call L_F369
+L_F36E: call L_F331
         ex af, af'
         nop
         nop
@@ -534,34 +506,35 @@ L_F3A0: call L_F369
         ld bc, $2100
         nop
         nop
-L_F3AC: call L_F34E
+L_F37A: call L_F316
         rrca
-        jr c, L_F35B
+        jr c, L_F323
         rrca
-        jr nc, L_F3C1
+        jr nc, L_F38F
         in a, (SCSDAT)
         cpl
         ld (hl), a
         ld a, l
         cp $7F
-        jr z, L_F3AC
+        jr z, L_F37A
         inc hl
-        jr L_F3AC
+        ex af, af'
+        ex de, hl
 
-
-L_F3C1: in a, (SCSDAT)
+L_F38F:
+        set 4, (hl)
         cpl
         ld b, a
-        call L_F34E
+        call L_F316
         rrca
-        jr c, L_F35B
+        jr c, L_F323
         in a, (SCSDAT)
         ld a, b
         and $0F
         ret
 
 
-PRS:    ld a, (hl)              ; print 0-terminated string at (HL)
+PRS:    ld l, (hl)              ; print 0-terminated string at (HL)
         inc hl                  ; ??with special treatment of 0x80 and others?
         or a
         ret z
@@ -589,32 +562,37 @@ PRS2:   ld a, c                 ; print character in C, B times
 
 XCHRIN: call L_00E9
 XCHROUT:cp $3C
-        jr z, L_F40D
+        jr z, L_F3DB
         cp $0D
         jp nz, L_00EC
         ld a, $0A
         call L_00EC
-L_F40D: ld a, $0D
+L_F3DB: ld a, $0D
         call L_00EC
         ret
 
 
 PUTIVC: push af
-L_F414: in a, (IVCSTA)
+L_F3E2: in a, (IVCSTA)
         rrca
-        jr c, L_F414
+        jr c, L_F3E2
         pop af
         out (IVCDAT), a
         ret
 
 
 PUTSER: push af
-L_F41E: in a, (UARTLS)
+L_F3EC: in a, ($42)
+        and $04
+        jr z, L_F3EC
+L_F3F2: ld a, $10
+        out ($42), a
+        in a, ($42)
         and $20
-        jr z, L_F41E
+        jr z, L_F3F2
         pop af
         and $7F
-        out (UARTDAT), a
+        out ($40), a
         ret
 
 
@@ -630,7 +608,7 @@ GETIVC: ld a, $1B               ; get character from IVC kbd (wait if necessary)
         ld a, $4B               ; get character
         call PUTIVC
         call INIVC
-L_F446: cp $61                  ; "a"
+L_F41E: cp $61                  ; "a"
         ret c
         cp $7B                  ; "z" + 1
         ret nc
@@ -645,31 +623,31 @@ INIVC:  in a, (IVCSTA)          ; wait for byte from IVC
         ret
 
 
-POLSER: in a, (UARTLS)          ; check for character from serial
+POLSER: in a, ($42)             ; check for character from serial
         and $01
         ret z
-GETSER: in a, (UARTLS)          ; block, waiting for character from serial
+GETSER: in a, ($42)             ; block, waiting for character from serial
         and $01
         jr z, GETSER
-        in a, (UARTDAT)
+        in a, ($40)
         and $7F
-        jr L_F446
+        jr L_F41E
 
 
 CMD_A:  ld hl, MSG6             ; select master drive
         call PRS
-L_F46E: call L_00E9             ; get character
+L_F446: call L_00E9             ; get character
         sub $31
-        jr c, L_F46E            ; illegal
+        jr c, L_F446            ; illegal
         cp $04                  ; 1-4 are legal (not 1-2 per message)
-        jr nc, L_F46E           ; illegal
+        jr nc, L_F446           ; illegal
         ld c, $00
-L_F47B: ld b, a                 ; common path for CMD_A, CMD_8; C differs
+L_F453: ld b, a                 ; common path for CMD_A, CMD_8; C differs
         inc b
         xor a
         scf
-L_F47F: rla
-        djnz L_F47F
+L_F457: rla
+        djnz L_F457
         or c
         bit 7, a
         jp L_F063
@@ -688,7 +666,7 @@ CMD81:  call L_00E9             ; get character
         cp $04                  ; 1-4 are legal
         jr nc, CMD81            ; illegal
         ld c, $30
-        jr L_F47B
+        jr L_F453
 
 
 MSG7:   defb $0D
@@ -696,25 +674,24 @@ MSG7:   defb $0D
         defb $00
 
 MSG8:   defm "  "
-        defb $1A, $1B, $44      ; home/clear screen then turn off cursor
-        defb $0A, $0A, $0A, $09 ; CR CR CR TAB
-        defm "@ MultiBoard Computer System @"
+        defb $1A, $0A, $0A, $0A, $09
+        defm "Timeclaim DX3 System @"
         defb $0D, $0A, $0A, $00
 
 MSG9:   defm "This is spare"    ; never referenced
 
-MSG18:  defb $0D, $0A, $1B, $45 ; turn on cursor
-        defm "       SImple MONitor Version 4.2"
+MSG18:  defb $0D, $0A
+        defm "       SImple MONitor Version 4.5S"
         defb $0D, $0A, $00
 
 MSG10:  defm "         GM809/829 present"
         defb $0D, $0A, $00
 
-MSG11:  defm "           GM849 present"
+MSG11:  defm "         GM849/849A present"
         defb $0D, $0A, $00
 
 
-L_F56C: xor a
+L_F53C: xor a
         out (FDCDRV), a         ; turn off all the drives
         ld hl, MSG18            ; SIMON banner
         call PRS
@@ -723,9 +700,9 @@ L_F56C: xor a
         in a, (SCSCTL)
         rlca
         ld hl, MSG11            ; detected GM849 disk controller
-        jr nc, L_F584
+        jr nc, L_F554
         ld hl, MSG10            ; detected GM809/829 disk controller
-L_F584: call PRS
+L_F554: call PRS
 CMDLOP: ld sp, L_00E6
         ld a, ">"               ; prompt
         call XCHROUT
@@ -770,14 +747,14 @@ CMD_B:  ld a, ($00EF)           ; get drive
         cp $30                  ; TODO what is this for and how does it get executed?
         ret c
         cp $3A
-        jr c, L_F5F6
+        jr c, L_F5C6
         cp $41
         ret c
         cp $47
         ccf
         ret c
         sub $07
-L_F5F6: and $0F
+L_F5C6: and $0F
         ret
 
 
@@ -789,9 +766,9 @@ XP2HEX: push af
         rrca
         rrca
         rrca
-        call L_F607
+        call L_F5D7
         pop af
-L_F607: and $0F
+L_F5D7: and $0F
         add a, $90
         daa
         adc a, $40
@@ -809,31 +786,31 @@ XSPACE: ld a, $20
 
 ;;; Get ASCII character "0"-"9", "A"-"F" and return as hex value 0-f
 ;;; Return value in A. C set if bad character
-L_F61C: call XCHRIN
+L_F5EC: call XCHRIN
         cp $30
         ret c
         cp $3A
-        jr c, L_F62F
+        jr c, L_F5FF
         cp $41
         ret c
         cp $47
         ccf
         ret c
         sub $07
-L_F62F: and $0F
+L_F5FF: and $0F
         ret
 
 
-L_F632: ld hl, $0000
-        call L_F61C
-        jr nc, L_F640
+L_F602: ld hl, $0000
+        call L_F5EC
+        jr nc, L_F610
         cp $20
-        jr z, L_F632
+        jr z, L_F602
         scf
         ret
 
 
-L_F640: add hl, hl
+L_F610: add hl, hl
         ret c
         add hl, hl
         ret c
@@ -843,8 +820,8 @@ L_F640: add hl, hl
         ret c
         add a, l
         ld l, a
-        call L_F61C
-        jr nc, L_F640
+        call L_F5EC
+        jr nc, L_F610
         cp $20
         ret z
         cp $0D
@@ -853,19 +830,19 @@ L_F640: add hl, hl
         ret
 
 
-GET16:  call L_F632             ; get 16-bit value in HL (not at end of line)
-        jr c, L_F65F
+GET16: call L_F602              ; get 16-bit value in HL (not at end of line)
+        jr c, L_F62F
         cp $20
         ret z
-L_F65F: pop hl
+L_F62F: pop hl
         jp CMDERR
 
 
-GET16F: call L_F632             ; get final 16-bit value to HL (expect end-of-line else error)
-        jr c, L_F65F
+GET16F: call L_F602             ; get final 16-bit value to HL (expect end-of-line else error)
+        jr c, L_F62F
         cp $0D
         ret z
-        jr L_F65F
+        jr L_F62F
 
 
 ;;; copy from to length (not intelligent so can overwrite source)
@@ -915,23 +892,23 @@ SLOP:   call XP4HEX             ; print it
         call XP2HEX             ; report byte value at address
         call XSPACE
         ex de, hl
-        call L_F632             ; enter new value or <return> to go to next or - to go back or space to exit?
+        call L_F602             ; enter new value or <return> to go to next or - to go back or space to exit?
         ex de, hl
         push af
         cp $0D
         call nz, XCRLF
         pop af
-        jr nc, L_F6C6
+        jr nc, L_F696
         cp $0D
-        jr z, L_F6C5
+        jr z, L_F695
         cp "-"
         ret nz
         dec hl                  ; previous memory location
         jr SLOP                 ; loop
 
 
-L_F6C5: ld e, (hl)
-L_F6C6: ld a, d
+L_F695: ld e, (hl)
+L_F696: ld a, d
         or a
         jp nz, CMDERR
         ld (hl), e
@@ -981,12 +958,12 @@ DDATA:  call XSPACE
         inc hl                  ; next address
         ld a, $09
         cp b
-        jr nz, L_F71C
+        jr nz, L_F6EC
         call XSPACE
         ld a, "-"               ; " - " between first 8 and second 8 bytes
         call XCHROUT
-L_F71C: djnz DDATA
-L_F71E: call XCRLF
+L_F6EC: djnz DDATA
+L_F6EE: call XCRLF
         dec c                   ; line count
         jr nz, DADDR
         ret
@@ -1000,23 +977,24 @@ CMD_V:  ld hl, MSG20
 ;;; The rest of the ROM image is unreachable code. It looks like a "high tide mark" of older assembly runs
 ;;; that have been left in memory and which ended up in the ROM.
 
-;;; This looks like a fragment of the end of CMD_S
+;;; TODO unreachable code. This looks like a fragment of the end of CMD_S
         defb $FF, $FF, $FF, $FF, $FF, $FF, $FF
         push af
         cp $0D
         call nz, XCRLF
         pop af
-        jr nc, L_F746
+        jr nc, L_F716
         cp $0D
-        jr z, L_F745
-        cp "-"
+        jr z, L_F715
+        cp $2D
         ret nz
         dec hl
-        jr L_F71E
+        jr L_F6EE
 
-;;; more of CMD_S
-L_F745: ld e, (hl)
-L_F746: ld a, d
+
+;;; TODO unreachable code - more of CMD_S
+L_F715: ld e, (hl)
+L_F716: ld a, d
         or a
         jp nz, CMDERR
         ld (hl), e
@@ -1024,9 +1002,8 @@ L_F746: ld a, d
         cp e
         jp nz, CMDERR
         inc hl
-        jr L_F71E
+        jr L_F6EE
 
-;;; looks like a copy of CMD_O
         call GET16
         ld a, h
         or a
@@ -1039,7 +1016,7 @@ L_F746: ld a, d
         out (c), l
         ret
 
-;;; looks like a copy of CMD_Q
+;;; looks like a copy of CMD_O
         call GET16F
         ld a, h
         or a
@@ -1049,11 +1026,35 @@ L_F746: ld a, d
         call XP2HEX
         jp XCRLF
 
-;;; looks like a copy of the start of CMD_D
+;;; looks like a copy of CMD_D
         call GET16
         ex de, hl
         call GET16F
+        ld c, l
+        ex de, hl
+L_F752: call XP4HEX
+        ld b, $10
+L_F757: call XSPACE
+        ld a, (hl)
+        call XP2HEX
+        inc hl
+        ld a, $09
+        cp b
+        jr nz, L_F76C
+        call XSPACE
+        ld a, $2D
+        call XCHROUT
+L_F76C: djnz L_F757
+        call XCRLF
+        dec c
+        jr nz, L_F752
+        ret
 
+;;; looks like a copy of the start of CMD_V
+        ld hl, MSG20
+        jp PRS
+
+        defb $FF, $FF, $FF, $FF, $FF
         defb $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
         defb $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
         defb $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF

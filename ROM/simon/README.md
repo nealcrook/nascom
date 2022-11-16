@@ -3,10 +3,10 @@
 This is not a NASCOM monitor ROM, rather it is the SIMON (SImple MON) ROM for
 the Gemini CPU cards (GM811 and GM813 and ??).
 
-I know of 3 released versions: 4.1 and 4.2 and 5.0. The first 2 are (probably?)
-both written by Richard Beal (the author of all but the earliest NASCOM ROM
-monitor programs). I'm not sure about version 5.0. Unlike the NASCOM monitors,
-the source code was not published for SIMON.
+I know of 3 released versions: 4.1, 4.2, 4.5s and 5.0. The first 2 are
+(probably?)  both written by Richard Beal (the author of all but the earliest
+NASCOM ROM monitor programs). I'm not sure about 4.5s or 5.0. Unlike the NASCOM
+monitors, the source code was not published for SIMON.
 
 I have disassembled 4.2 and have not (yet) investigated differences between 4.1
 and 4.2.
@@ -17,7 +17,7 @@ on GM811/GM813 boards.
 The source code here has been created by disassembly of the 4.2/5.0 code; the
 comments are the result of code inspection.
 
-# Version 4,2
+# Version 4.2
 
 The binary file:
 
@@ -38,11 +38,34 @@ compares the resultant binary with the golden binary:
     # rebuild from source and check that the binary matches the golden version
     
     z80asm -i simon42.asm -lsimon42.lst -osimon42.bin
-    z80asm -i simon50.asm -lsimon50.lst -osimon50.bin
     
     # check
     diff simon42.bin simon42.bin_golden
-    diff simon50.bin simon50.bin_golden
+
+# Version 4.5s
+
+The binary file:
+
+    simon45s.bin_golden
+
+is 2048 bytes in size and was supplied by Paul, M0EYT. It came from his TimeClaim DX3 Gemini system.
+
+The recreated source code is:
+
+    simon45s.asm
+
+To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
+effective). The script check_rebuild builds the binary/listing from source and
+compares the resultant binary with the golden binary:
+
+    #!/bin/sh
+    #
+    # rebuild from source and check that the binary matches the golden version
+    
+    z80asm -i simon45s.asm -lsimon45s.lst -osimon45s.bin
+    
+    # check
+    diff simon45s.bin simon45s.bin_golden
 
 # Version 5.0
 
@@ -65,11 +88,9 @@ compares the resultant binaries with the golden binaries:
     #
     # rebuild from source and check that the binary matches the golden version
     
-    z80asm -i simon42.asm -lsimon42.lst -osimon42.bin
     z80asm -i simon50.asm -lsimon50.lst -osimon50.bin
     
     # check
-    diff simon42.bin simon42.bin_golden
     diff simon50.bin simon50.bin_golden
 
 This script should run "instantly" and produces no terminal output if the
