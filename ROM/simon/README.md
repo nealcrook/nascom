@@ -17,6 +17,15 @@ on GM811/GM813 boards.
 The source code here has been created by disassembly of the 4.2/5.0 code; the
 comments are the result of code inspection.
 
+# Version 4.1 MFB
+
+TODO - from John Newcombe's site, https://glasstty.com/gemini-80-bus-resource/
+
+
+
+
+
+
 # Version 4.2
 
 The binary file:
@@ -41,6 +50,33 @@ compares the resultant binary with the golden binary:
     
     # check
     diff simon42.bin simon42.bin_golden
+
+
+# Version 4.4
+
+The binary file:
+
+    simon44.bin_golden
+
+is 1920 bytes in size and came from John Newcombe's web site https://glasstty.com/gemini-80-bus-resource/
+
+The recreated source code is:
+
+    simon44.asm
+
+To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
+effective). The script check_rebuild builds the binary/listing from source and
+compares the resultant binary with the golden binary:
+
+    #!/bin/sh
+    #
+    # rebuild from source and check that the binary matches the golden version
+    
+    z80asm -i simon44.asm -lsimon44.lst -osimon44.bin
+    
+    # check
+    diff simon44.bin simon44.bin_golden
+
 
 # Version 4.5s
 

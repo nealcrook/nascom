@@ -376,7 +376,7 @@ $dis->code(0xf0f4);
 code_com(0xf2e8,"CMD2FDC", @comments);
 
 $dis->code(0xf3e1,"PUTIVC");
-$dis->code(0xf427,"GETIVC");
+$dis->code(0xf427,"INIVC");
 
 $dis->code(0xf265);
 $dis->code(0xf268);
