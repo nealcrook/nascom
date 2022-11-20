@@ -19,11 +19,28 @@ comments are the result of code inspection.
 
 # Version 4.1 MFB
 
-TODO - from John Newcombe's site, https://glasstty.com/gemini-80-bus-resource/
+The binary file:
 
+    simon41mbf.bin_golden
 
+is 2048 bytes in size and came from John Newcombe's web site https://glasstty.com/gemini-80-bus-resource/
 
+The recreated source code is:
 
+    simon41mbf.asm
+
+To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
+effective). The script check_rebuild builds the binary/listing from source and
+compares the resultant binary with the golden binary:
+
+    #!/bin/sh
+    #
+    # rebuild from source and check that the binary matches the golden version
+    
+    z80asm -i simon41mbf.asm -lsimon41mbf.lst -osimon41mbf.bin
+    
+    # check
+    diff simon41mbf.bin simon41mbf.bin_golden
 
 
 # Version 4.2
