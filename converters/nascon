@@ -166,6 +166,21 @@ my $sub = "read_as_$args{-in}";
 &$sub();
 
 ################################################################################
+# Report checksum formed by summing all the bytes. Usually only the low byte of
+# the checksum is considered but I report the whole sum because my checksum
+# utility reports a 16-bit value allowing you to take heed of the low byte only
+# or of both bytes as you please.
+my $sum = 0;
+foreach my $rec_ref (@records) {
+    foreach my $x (0..$rec_ref->{len}-1) {
+        my $chr = ord(substr $rec_ref->{data}, $x, 1);
+        $sum = $sum + $chr;
+    }
+}
+printf "Sum of all input data bytes (usually a checkum would be the low 8 bits of this): 0x%04x\n", $sum;
+
+
+################################################################################
 # Pad file size (if required) by adding bytes of 0 to the last record
 my $total_bytes = 0;
 foreach my $rec_ref (@records) {
@@ -288,11 +303,7 @@ sub read_as_cas {
 # Error when reading block header/data/footer
 sub err_blk {
     my $msg = $_[0];
-    my $blk = $_[1]; ## TODO HOW??
-    close IN;        ## TODO WTF
-    close OUT;       ## TODO WTF
-    printf "ERROR reached end of file while trying to read $msg for block $blk\n";
-    exit 1;
+    printf "ERROR reached end of file while trying to read $msg\n";
 }
 
 
@@ -357,6 +368,7 @@ sub process_cas_blk {
     # 1 byte  header checksum
     # The checksum is the low 8-bits of the sum of the other 4 bytes (NOT, as
     # would be usual, a value that makes the 5 bytes sum to 0)
+    print "Look for block header..\n";
     my $blkaddr = get_byte(\&err_blk, "block address") + (get_byte(\&err_blk, "block address") << 8);
     my $blklen = get_byte(\&err_blk, "block length");
     my $blknum = get_byte(\&err_blk, "block number");
