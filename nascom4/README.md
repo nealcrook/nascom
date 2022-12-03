@@ -16,7 +16,9 @@ The pre-built files for programming the FPGA are here: https://github.com/nealcr
 Current releases:
 
 * Rev1.0 - first release (NASCOM4_rev1p0.pof/NASCOM4_rev1p0.sof)
-* Rev1.1 - revisons to video control: (1) both VGA outputs are now active simultaneously. (2) The character generator is now programmable from the Z80 (details in the Handbook) (NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof)
+* Rev1.1 - revisions to video control: (1) both VGA outputs are now active simultaneously. (2) The character generator is now programmable from the Z80 (details in the Handbook) (NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof)
+* Rev1.2 - Add support for the INVVIDEO bit. Now wordstar displays corrrectly. Associated menu release adds nasForth.
+* Rev1.3 - Modify .qsf file to add pullups to some FPGA inputs so that a Stage 2 system (minimal system + SDcard + Memory) works correctly.
 
 Here are some videos of its evolution:
 
@@ -33,8 +35,8 @@ Here are some videos of its evolution:
 * [Part 11 - Programmable char gen demo, running WordStar, NAS-DIS/DEBUG, screen-swapping](https://www.youtube.com/watch?v=_7C4XY207Gc)
 
 
-~~If anyone is interested in a PCB (note the need for some cuts and wires - refer to the handbook) the price is £10 and includes a couple of components that I bought in bulk (the SDcard adaptor and the FPGA sockets). I priced up the total parts cost at about £70 but there are multiple build options (again, refer to the handbook). If anyone wants a more complete kit, or an assembled board, let me know and I will work out prices (but there will be a lead time on those because of various parts coming from China).~~
+~~ If anyone is interested in a REV A PCB (note the need for some cuts and wires - refer to the handbook) the price is £10 and includes a couple of components that I bought in bulk (the SDcard adaptor and the FPGA sockets). I priced up the total parts cost at about £70 but there are multiple build options (again, refer to the handbook). If anyone wants a more complete kit, or an assembled board, let me know and I will work out prices (but there will be a lead time on those because of various parts coming from China).~~
 
-^-- The REV A PCBs have all been sold. If there's interest, I'll order another batch (they will be REV B and require no rework!)
+^-- The REV A PCBs have all been sold.
 
-
+~~ October 2022: If anyone is interested in a REV B PCB (no cuts and wires required) the price is £10 and includes a couple of components that I bought in bulk (the SDcard adaptor and the FPGA sockets). I priced up the total parts cost at about £70 but there are multiple build options (again, refer to the handbook). If anyone wants a more complete kit, or an assembled board, let me know and I will work out prices (but there will be a lead time on those because of various parts coming from China).~~
