@@ -1,0 +1,713 @@
+# File NASBUGT2.asm
+0000			;	title	'Nascom monitor NASBUG T2'  
+0000			; **********************************  
+0000			; *** Nascom 1 monitor NASBUG T2 ***  
+0000			; **********************************  
+0000			; published version 15.02.1978  
+0000			; modified for common kbd & serial input July 1978  
+0000			; converted to Z80ASM syntax in February 2000  
+0000			; 2 lines corrected 2008 (DW)  
+0000			  
+0000				org	0  
+0000			crtram: equ	0800h	; start of video ram  
+0000			bs:	equ	1dh  
+0000			ff:	equ	1eh  
+0000			cr:	equ	1fh  
+0000			cur:	equ	5fh  
+0000			line:	equ	0b4ah  
+0000			curlin: equ	0b8ah  
+0000			  
+0000			; initialise stack pointer and RAM  
+0000 31 33 0c		start:	ld	sp,stack  
+0003 21 00 0c			ld	hl,ramz  
+0006 06 15			ld	b,rame-ramz  
+0008 36 00		l1:     ld	(hl),0  
+000a 23				inc	hl  
+000b 10 fb			djnz	l1  
+000d			  
+000d			; set reflections  
+000d 21 28 01			ld	hl,initt  
+0010 11 3d 0c			ld	de,initr  
+0013 01 13 00			ld	bc,inite-initt  
+0016 ed b0			ldir  
+0018			  
+0018			; initialise CRT  
+0018 3e 1e			ld	a,ff  
+001a cd 3b 01			call	crt  
+001d c3 59 03			jp	strt0  
+0020			  
+0020			; breakpoint restart  
+0020 f5				push	af  
+0021 e5				push	hl  
+0022 d5				push	de  
+0023 c3 26 03			jp	bpt1  
+0026 00				nop  
+0027 00				nop  
+0028			  
+0028			; RST 5 = print following string, terminated by 00  
+0028 e3			prs:	ex	(sp),hl  
+0029 7e			prs1:	ld	a,(hl)  
+002a 23				inc	hl  
+002b b7				or	a  
+002c 28 05			jr	z,l2  
+002e cd 4a 0c			call	_crt  
+0031 18 f6			jr	prs1  
+0033 e3			l2:	ex	(sp),hl  
+0034 c9				ret  
+0035			  
+0035			; keyboard debounce delay routine  
+0035 af			kdel:	xor	a  
+0036 f5			kdel1:	push	af  
+0037 f1				pop	af  
+0038 f5				push	af  
+0039 f1				pop	af  
+003a 3d				dec	a  
+003b 20 f9			jr	nz,kdel1  
+003d c9				ret  
+003e			  
+003e			; read a char from keyboard or uart (first come first served)  
+003e cd 4d 0c		chin:	call	_kbd  
+0041 d8				ret	c  
+0042 db 02			in	a,(2)  
+0044 17				rla  
+0045 30 f7			jr	nc,chin  
+0047 db 01			in	a,(1)  
+0049 c9				ret  
+004a			  
+004a			; set & reset a bit in I/O port 0  
+004a f5			flpflp:	push	af  
+004b cd 53 00			call	flip  
+004e f1				pop	af  
+004f 18 02			jr	flip  
+0051			  
+0051			; start or stop motor  
+0051 3e 10		motflp:	ld	a,10h	; bit 4  
+0053			  
+0053			; flip a bit in port 0  
+0053 e5			flip:	push	hl  
+0054 21 00 0c			ld	hl,port0  
+0057 ae				xor	(hl)  
+0058 d3 00			out	(0),a  
+005a 77				ld	(hl),a  
+005b e1				pop	hl  
+005c c9				ret  
+005d			  
+005d			; put character out thru UART, and wait till sent  
+005d d3 01		slrout:	out	(1),a  
+005f db 02		l3:	in	a,(2)  
+0061 87				add	a,a  
+0062 f8				ret	m  
+0063 18 fa			jr	l3  
+0065			  
+0065 00				nop  
+0066			  
+0066			; NMI vector  
+0066 c3 47 0c			jp	_nmi  
+0069			  
+0069			; routine to read from keyboard  
+0069			;	carry is set if a char. is available  
+0069			;	the standard ASCII code for the char is returned in A  
+0069			;	EXCEPT for the following chars  
+0069			;		BS= 1DH	 backspace  
+0069			;		CR= 1EH	 carriage return (=newline)  
+0069			;		FF= 1FH	 form feed =clear screen  
+0069 c5			kbd:	push	bc  
+006a d5				push	de  
+006b e5				push	hl  
+006c 3e 02			ld	a,2	; bit 1  
+006e cd 4a 00			call	flpflp  
+0071 21 01 0c			ld	hl,kmap  
+0074 db 00			in	a,(0)  
+0076 2f				cpl  
+0077 77				ld	(hl),a  
+0078 06 08			ld	b,8  
+007a 3e 01		ksc1:	ld	a,1	; bit 0  
+007c cd 4a 00			call	flpflp  
+007f 23				inc	hl  
+0080 db 00			in	a,(0)  
+0082 2f				cpl  
+0083 57				ld	d,a  
+0084 ae				xor	(hl)  
+0085 20 07			jr	nz,ksc2  
+0087 10 f1		ksc1a:	djnz	ksc1  
+0089 b7			ksc8:	or	a  
+008a e1			ksc9:	pop	hl  
+008b d1				pop	de  
+008c c1				pop	bc  
+008d c9				ret  
+008e cd 35 00		ksc2:	call	kdel  
+0091 db 00			in	a,(0)  
+0093 2f				cpl  
+0094 5f				ld	e,a  
+0095 7a				ld	a,d  
+0096 ae				xor	(hl)  
+0097 0e ff			ld	c,-1  
+0099 16 00			ld	d,0  
+009b 37				scf  
+009c cb 12		l4:	rl	d  
+009e 0c				inc	c  
+009f 1f				rra  
+00a0 30 fa			jr	nc,l4  
+00a2 7a				ld	a,d  
+00a3 a3				and	e  
+00a4 5f				ld	e,a  
+00a5 7e				ld	a,(hl)  
+00a6 a2				and	d  
+00a7 bb				cp	e  
+00a8 28 dd			jr	z,ksc1a  
+00aa 7e				ld	a,(hl)  
+00ab aa				xor	d  
+00ac 77				ld	(hl),a  
+00ad 7b				ld	a,e  
+00ae b7				or	a  
+00af 28 d6			jr	z,ksc1a  
+00b1 3a 01 0c			ld	a,(kmap)  
+00b4 e6 10			and	10h	; bit 4  
+00b6 b0				or	b  
+00b7 87				add	a  
+00b8 87				add	a  
+00b9 87				add	a  
+00ba b1				or	c  
+00bb ed 4b 3f 0c		ld	bc,(_ktabl)  
+00bf 2a 43 0c			ld	hl,(_ktab)  
+00c2 ed b1			cpir  
+00c4			  
+00c4			; check again for unshifted character  
+00c4 28 0b			jr	z,l5  
+00c6 2a 43 0c			ld	hl,(_ktab)  
+00c9 ed 4b 3f 0c		ld	bc,(_ktabl)  
+00cd e6 7f			and	7fh  
+00cf ed b1			cpir  
+00d1 20 b6		l5:	jr	nz,ksc8  
+00d3 ed 4b 43 0c		ld	bc,(_ktab)  
+00d7 37				scf  
+00d8 ed 42			sbc	hl,bc  
+00da ed 4b 41 0c		ld	bc,(_ktab0)  
+00de 09				add	hl,bc  
+00df 7d				ld	a,l  
+00e0 37			ksc3:	scf  
+00e1 18 a7			jr	ksc9  
+00e3			  
+00e3			; set breakpoint address  
+00e3 2a 0c 0c		break:	ld	hl,(arg1)  
+00e6 22 15 0c			ld	(brkadr),hl  
+00e9 c9				ret  
+00ea			  
+00ea			; table entries represent key number for each ASCII code  
+00ea			;	appearing in ASCII order starting at code 1DH  
+00ea			;	Each entry is in the format SRRRRCCC  
+00ea			;	where S=1 implies that shift key must be down  
+00ea			;	RRRR=8-row number (number in counter)  
+00ea			;	CCC=column number (bit number)  
+00ea			; Setting all ones (0FFH) implies that there is no key  
+00ea			;	for this code  
+00ea			; If the shift key is down and no code is found  
+00ea			;	then the table is searched again if  
+00ea			;	the shift key were uo.  
+00ea 08 88 09		ktab:	defb	08h,88h,09h  
+00ed 14 9c 9b a3 92 c2 ba b2		defb	14h,9ch,9bh,0a3h,92h,0c2h,0bah,0b2h  
+00f5 aa a2 98 a0 29 0a 21 19		defb	0aah,0a2h,98h,0a0h,29h,0ah,21h,19h  
+00fd 1a 1c 1b 23 12 42 3a 32		defb	1ah,1ch,1bh,23h,12h,42h,3Ah,32h  
+0105 2a 22 18 20 b1 8a b9 99		defb	2ah,22h,18h,20h,0b1h,8ah,0b9h,99h  
+010d 0d 2c 41 13 3b 33 43 10		defb	0dh,2ch,41h,13h,3bh,33h,43h,10h  
+0115 40 2d 38 30 28 31 39 25		defb	40h,2dh,38h,30h,28h,31h,39h,25h  
+011d 1d 24 15 34 45 35 11 2b		defb	1dh,24h,15h,34h,45h,35h,11h,2bh  
+0125 44 3d 3c			defb	44h,3dh,3ch  
+0128			  
+0128			; reflection initialisation table  
+0128 00 10		initt:	defw	1000h  
+012a 3e 00			defw	64+3-5  
+012c 1d 00			defw	32-3  
+012e ea 00			defw	ktab  
+0130 63 03			defw	ctab  
+0132 c3 05 03			jp	trap  
+0135 c3 3b 01			jp	crt  
+0138 c3 69 00			jp	kbd  
+013b			inite:  
+013b			  
+013b b7			crt:	or	a  
+013c c8				ret	z  
+013d f5				push	af  
+013e c5				push	bc  
+013f d5				push	de  
+0140 e5				push	hl  
+0141 fe 1e			cp	ff  
+0143 20 2f			jr	nz,l6  
+0145 21 09 08			ld	hl,crtram+9  
+0148 36 ff			ld	(hl),-1  
+014a 23				inc	hl  
+014b 06 30			ld	b,48  
+014d 36 20		l7:	ld	(hl),' '  
+014f 23				inc	hl  
+0150 10 fb			djnz	l7  
+0152 06 10			ld	b,16  
+0154 36 00		l8:	ld	(hl),0  
+0156 23				inc	hl  
+0157 10 fb			djnz	l8  
+0159 eb				ex	de,hl  
+015a 21 0a 08			ld	hl,crtram+10  
+015d 01 b0 03			ld	bc,15*64-16  
+0160 ed b0			ldir  
+0162 3e ff			ld	a,-1  
+0164 32 ba 0b			ld	(crtram+14*64+58),a  
+0167 21 8a 0b		crt0:	ld	hl,curlin  
+016a 36 5f		crt1:	ld	(hl),cur  
+016c 22 18 0c			ld	(cursor),hl  
+016f e1			crt2:	pop	hl  
+0170 d1				pop	de  
+0171 c1				pop	bc  
+0172 f1				pop	af  
+0173 c9				ret  
+0174			  
+0174			  
+0174			; remove cursor  
+0174 2a 18 0c		l6:	ld	hl,(cursor)  
+0177 36 20			ld	(hl),' '  
+0179 fe 1d			cp	bs  
+017b 20 0b			jr	nz,l9  
+017d			  
+017d			; backspace (thru margins if necessary)  
+017d 2b			l10:	dec	hl  
+017e 7e				ld	a,(hl)  
+017f b7				or	a  
+0180 28 fb			jr	z,l10  
+0182 3c				inc	a  
+0183 20 e5			jr	nz,crt1  
+0185 23				inc	hl  
+0186 18 e2			jr	crt1  
+0188			  
+0188 fe 1f		l9:	cp	cr  
+018a 28 09			jr	z,crt3  
+018c			  
+018c			; put on screen, scroll if necessary  
+018c 77				ld	(hl),a  
+018d 23			l11:	inc	hl  
+018e 7e				ld	a,(hl)  
+018f b7				or	a  
+0190 28 fb			jr	z,l11  
+0192 3c				inc	a  
+0193 20 d5			jr	nz,crt1  
+0195			  
+0195			; scroll  
+0195 11 0a 08		crt3:	ld	de,crtram+10  
+0198 21 4a 08			ld	hl,crtram+10+64  
+019b 01 70 03			ld	bc,14*64-16  
+019e ed b0			ldir  
+01a0 21 10 00			ld	hl,16  
+01a3 19				add	hl,de  
+01a4 06 30			ld	b,48  
+01a6 36 20		l12:	ld	(hl),' '  
+01a8 23				inc	hl  
+01a9 10 fb			djnz	l12  
+01ab 18 ba			jr	crt0  
+01ad			  
+01ad			; memory modify, arg1=address  
+01ad 2a 0c 0c		modify:	ld	hl,(arg1)  
+01b0 cd 32 02		mod1:	call	tbcd3  
+01b3 7e				ld	a,(hl)  
+01b4 cd 44 02			call	b2hex  
+01b7 cd db 01			call	inline  
+01ba 11 52 0b			ld	de,line+8  
+01bd 06 00			ld	b,0  
+01bf			  
+01bf			; note that line starts at line+8  
+01bf e5			mod2:	push	hl  
+01c0 cd 5a 02			call	nexnum  
+01c3 7e				ld	a,(hl)  
+01c4 b7				or	a  
+01c5 28 08			jr	z,mod3  
+01c7 23				inc	hl  
+01c8 7e				ld	a,(hl)  
+01c9 e1				pop	hl  
+01ca 77				ld	(hl),a  
+01cb 04				inc	b  
+01cc 23				inc	hl  
+01cd 18 f0			jr	mod2  
+01cf			  
+01cf e1			mod3:	pop	hl  
+01d0 1a				ld	a,(de)  
+01d1 fe 2e			cp	'.'  
+01d3 c8				ret	z  
+01d4 78				ld	a,b  
+01d5 b7				or	a  
+01d6 20 01			jr	nz,l13  
+01d8 23				inc	hl  
+01d9 18 d5		l13:	jr	mod1  
+01db			  
+01db			; print system prompt and read a line  
+01db ef			inline:	rst	28h  
+01dc .. 00			defb	'>',0  
+01de cd 3e 00		inl0:	call	chin  
+01e1 fe 1d			cp	bs  
+01e3 28 09			jr	z,inl2  
+01e5			  
+01e5			; return on cr  
+01e5 fe 1f			cp	cr  
+01e7 28 57			jr	z,crlf  
+01e9			  
+01e9			; put out char and continue  
+01e9 cd 4a 0c		inl1:	call	_crt  
+01ec 18 f0			jr	inl0  
+01ee			  
+01ee			; handle backspace; dont allow backspace over prompt  
+01ee ed 5b 18 0c	inl2:	ld	de,(cursor)  
+01f2 1b				dec	de  
+01f3 1a				ld	a,(de)  
+01f4 fe 3e			cp	'>'  
+01f6 28 e6			jr	z,inl0  
+01f8 3e 1d			ld	a,bs  
+01fa 18 ed			jr	inl1  
+01fc			  
+01fc			; tabulate code, arg1=start addr, arg2=end  
+01fc			;	routine is used by dump command  
+01fc 2a 0c 0c		tabcde:	ld	hl,(arg1)  
+01ff ed 5b 0e 0c	tbcd1:	ld	de,(arg2)  
+0203 e5				push	hl  
+0204 b7				or	a  
+0205 ed 52			sbc	hl,de  
+0207 e1				pop	hl  
+0208 38 05			jr	c,l14  
+020a ef				rst	28h  
+020b .. 1f 00			defb	'.',cr,00  
+020e c9				ret  
+020f 0e 00		l14:	ld	c,0  
+0211 cd 32 02			call	tbcd3  
+0214 06 08			ld	b,8  
+0216 7e			tbcd1a:	ld	a,(hl)  
+0217 cd 2b 02			call	tbcd2  
+021a 23				inc	hl  
+021b cd 3c 02			call	space  
+021e 10 f6			djnz	tbcd1a  
+0220			; put put checksum and backspace over it so it doesnt show  
+0220 79				ld	a,c  
+0221 cd 44 02			call	b2hex  
+0224 ef				rst	28h  
+0225 1d 1d 1f 00		defb	1dh,1dh,1fh,0  
+0229 18 d4			jr	tbcd1  
+022b 57			tbcd2:	ld	d,a  
+022c 81				add	c  
+022d 4f				ld	c,a  
+022e 7a				ld	a,d  
+022f c3 44 02			jp	b2hex  
+0232 7c			tbcd3:	ld	a,h  
+0233 cd 2b 02			call	tbcd2  
+0236 7d				ld	a,l  
+0237 cd 2b 02			call	tbcd2  
+023a 18 00			jr	space  
+023c			  
+023c 3e 20		space:	ld	a,' '  
+023e 18 17			jr	jcrt  
+0240 3e 1f		crlf:	ld	a,1fh  
+0242 18 13			jr	jcrt  
+0244			  
+0244			; print A in hex  
+0244 f5			b2hex:	push	af  
+0245 1f				rra  
+0246 1f				rra  
+0247 1f				rra  
+0248 1f				rra  
+0249 cd 4d 02			call	b2hex1  
+024c f1				pop	af  
+024d e6 0f		b2hex1:	and	0fh  
+024f c6 30			add	30h  
+0251 fe 3a			cp	'9'+1  
+0253 38 02			jr	c,jcrt  
+0255 c6 07			add	7  
+0257 c3 4a 0c		jcrt:	jp	_crt  
+025a			  
+025a			; read in a hex number, DE being used as pointer to line  
+025a			;	NUM+1, NUM+2 contain the number  
+025a			;	NUM set non zero if there is a number there at all  
+025a 1a			nexnum:	ld	a,(de)  
+025b fe 20			cp	' '  
+025d 13				inc	de  
+025e 28 fa			jr	z,nexnum  
+0260 1b				dec	de  
+0261 af				xor	a  
+0262 21 12 0c			ld	hl,num  
+0265 77				ld	(hl),a  
+0266 23				inc	hl  
+0267 77				ld	(hl),a  
+0268 23				inc	hl  
+0269 77				ld	(hl),a  
+026a 1a			nn1:	ld	a,(de)  
+026b 2b				dec	hl  
+026c 2b				dec	hl  
+026d d6 30			sub	'0'  
+026f f8				ret	m  
+0270 fe 0a			cp	10  
+0272 38 08			jr	c,nn2  
+0274 d6 07			sub	7  
+0276 fe 0a			cp	10  
+0278 f8				ret	m  
+0279 fe 10			cp	10h  
+027b f0				ret	p  
+027c 13			nn2:	inc	de  
+027d 34				inc	(hl)  
+027e 23				inc	hl  
+027f ed 6f			rld  
+0281 23				inc	hl  
+0282 ed 6f			rld  
+0284 18 e4			jr	nn1  
+0286			  
+0286			; main monitor loop; read a line and obey it  
+0286 cd db 01		parse:	call 	inline  
+0289 11 4b 0b			ld	de,line+1  
+028c 01 0a 0c			ld	bc,args  
+028f 1a				ld	a,(de)  
+0290 fe 20			cp	' '  
+0292 20 05			jr	nz,l16  
+0294 0a				ld	a,(bc)  
+0295 fe 53			cp	'S'  
+0297 20 ed			jr	nz,parse  
+0299 02			l16:	ld	(bc),a  
+029a 03				inc	bc  
+029b 13				inc	de  
+029c af				xor	a  
+029d 02				ld	(bc),a  
+029e			; get the arguments  
+029e 03			ploop:	inc	bc  
+029f cd 5a 02			call	nexnum  
+02a2 7e				ld	a,(hl)  
+02a3 b7				or	a  
+02a4 28 0d			jr	z,pend  
+02a6 23				inc	hl  
+02a7 7e				ld	a,(hl)  
+02a8 02				ld	(bc),a  
+02a9 23				inc	hl  
+02aa 03				inc	bc  
+02ab 7e				ld	a,(hl)  
+02ac 02				ld	(bc),a  
+02ad 21 0b 0c			ld	hl,args+1  
+02b0 34				inc	(hl)  
+02b1 18 eb			jr	ploop  
+02b3 ed 4b 0a 0c	pend:	ld	bc,(args)  
+02b7 2a 45 0c			ld	hl,(_ctab)  
+02ba 7e			pend1:	ld	a,(hl)  
+02bb b7				or	a  
+02bc 28 c8			jr	z,parse  
+02be 23				inc	hl  
+02bf b9				cp	c  
+02c0 28 05			jr	z,l17  
+02c2 00				nop  
+02c3 23				inc	hl  
+02c4 23				inc	hl  
+02c5 18 f3			jr	pend1  
+02c7 5e			l17:	ld	e,(hl)  
+02c8 23				inc	hl  
+02c9 56				ld	d,(hl)  
+02ca 21 86 02			ld	hl,parse  
+02cd e5				push	hl  
+02ce eb				ex	de,hl  
+02cf e9				jp	(hl)  
+02d0			  
+02d0 3e ff		exec:	ld	a,0ffh  
+02d2 32 1a 0c			ld	(conflg),a  
+02d5			; common to E and S, config tells which  
+02d5			;	set NMI for end of instr  
+02d5 21 05 03		exec1:	ld	hl,trap  
+02d8 22 48 0c			ld	(_nmi+1),hl  
+02db e1				pop	hl  
+02dc 3a 0b 0c			ld	a,(args+1)  
+02df b7				or	a  
+02e0 28 06			jr	z,l18  
+02e2 2a 0c 0c			ld	hl,(arg1)  
+02e5 22 3b 0c			ld	(_pc),hl  
+02e8 c1			l18:	pop	bc  
+02e9 d1				pop	de  
+02ea f1				pop	af  
+02eb f1				pop	af  
+02ec 2a 3d 0c			ld	hl,(_sp)  
+02ef f9				ld	sp,hl  
+02f0 2a 3b 0c			ld	hl,(_pc)  
+02f3 e5				push	hl  
+02f4 2a 37 0c			ld	hl,(_hl) ; line corrected  
+02f7 f5				push	af  
+02f8 3e 08			ld	a,8  
+02fa d3 00			out	(0),a  
+02fc f1				pop	af  
+02fd ed 45			retn  
+02ff			  
+02ff			; step, if arg supplied then is address  
+02ff af			step:	xor	a  
+0300 32 1a 0c			ld	(conflg),a  
+0303 18 d0			jr	exec1  
+0305			  
+0305 e3			trap:	ex	(sp),hl  
+0306 23				inc	hl  
+0307 e3				ex	(sp),hl  
+0308 f5				push	af  
+0309 e5				push	hl  
+030a 3a 00 0c			ld	a,(port0)  
+030d d3 00			out	(0),a  
+030f 3a 1a 0c			ld	a,(conflg)  
+0312 b7				or	a  
+0313 28 10			jr	z,l19  
+0315 2a 15 0c			ld	hl,(brkadr)  
+0318 7e				ld	a,(hl)  
+0319 32 17 0c			ld	(brkval),a  
+031c 36 e7			ld	(hl),0e7h	; rst4  
+031e e1				pop	hl  
+031f f1				pop	af  
+0320 e3				ex	(sp),hl  
+0321 2b				dec	hl  
+0322 e3				ex	(sp),hl  
+0323 ed 45			retn  
+0325 d5			l19:	push	de  
+0326 c5			bpt1:	push	bc  
+0327 21 00 00			ld	hl,0  
+032a 39				add	hl,sp  
+032b 11 33 0c			ld	de,stack  
+032e 31 33 0c			ld	sp,stack  
+0331 01 08 00			ld	bc,8  
+0334 ed b0			ldir  
+0336 5e				ld	e,(hl)  
+0337 23				inc	hl  
+0338 56				ld	d,(hl)  
+0339 23				inc	hl  
+033a 1b				dec	de  
+033b ed 53 3b 0c		ld	(_pc),de  
+033f 22 3d 0c			ld	(_sp),hl  
+0342			  
+0342			; print out regs SP PC AF HL DE BC  
+0342 21 3f 0c			ld	hl,_sp+2  
+0345 06 06			ld	b,6  
+0347 2b			regs1:	dec	hl  
+0348 7e				ld	a,(hl)  
+0349 cd 44 02			call	b2hex  
+034c 2b				dec	hl  
+034d 7e				ld	a,(hl)  
+034e cd 44 02			call	b2hex  
+0351 cd 3c 02			call	space  
+0354 10 f1			djnz	regs1  
+0356 cd 40 02			call	crlf  
+0359 2a 15 0c		strt0:	ld	hl,(brkadr)  
+035c 3a 17 0c			ld	a,(brkval)  
+035f 77				ld	(hl),a	; restore breakpoint  
+0360 c3 86 02			jp	parse  
+0363			  
+0363			; commant table  
+0363			;	format: character, address of subroutine  
+0363 ..			ctab:	defb	'M'  
+0364 ad 01			defw	modify  
+0366 ..				defb	'C'  
+0367 ef 03			defw	copy  
+0369 ..				defb	'E'  
+036a d0 02			defw	exec  
+036c ..				defb	'S'  
+036d ff 02			defw	step  
+036f ..				defb	'T'  
+0370 fc 01			defw	tabcde  
+0372 ..				defb	'B'  
+0373 e3 00			defw	break  
+0375 ..				defb	'L'  
+0376 7c 03			defw	load  
+0378 ..				defb	'D'  
+0379 d1 03			defw	dump  
+037b 00				nop  
+037c			  
+037c			; load command  
+037c cd 51 00		load:	call	motflp  
+037f 21 8a 0b		lod1:	ld	hl,curlin  
+0382 22 18 0c			ld	(cursor),hl  
+0385 cd 3e 00		lod1b:	call	chin  
+0388 fe 1d			cp	bs  
+038a 28 f9			jr	z,lod1b  
+038c fe 1f			cp	cr  
+038e 28 05			jr	z,lod1a  
+0390 cd 4a 0c			call	_crt  
+0393 20 f0			jr	nz,lod1b  
+0395 11 8a 0b		lod1a:	ld	de,curlin  
+0398 06 08			ld	b,8  
+039a 1a				ld	a,(de)  
+039b fe 2e			cp	'.'  
+039d ca 51 00			jp	z,motflp  
+03a0 cd 5a 02			call	nexnum  
+03a3 2a 13 0c			ld	hl,(num+1) ;line corrected  
+03a6 7d				ld	a,l  
+03a7 84				add	a,h  
+03a8 4f				ld	c,a  
+03a9 e5				push	hl  
+03aa 21 00 08			ld	hl,crtram  
+03ad e5				push	hl  
+03ae e5			lod2:	push	hl  
+03af cd 5a 02			call	nexnum  
+03b2 23				inc	hl  
+03b3 7e				ld	a,(hl)  
+03b4 e1				pop	hl  
+03b5 77				ld	(hl),a  
+03b6 23				inc	hl  
+03b7 81				add	a,c  
+03b8 4f				ld	c,a  
+03b9 10 f3			djnz	lod2  
+03bb cd 5a 02			call	nexnum  
+03be 23				inc	hl  
+03bf 7e				ld	a,(hl)  
+03c0 b9				cp	c  
+03c1 e1				pop	hl  
+03c2 d1				pop	de  
+03c3 20 07			jr	nz,l20  
+03c5 01 08 00			ld	bc,8  
+03c8 ed b0			ldir  
+03ca 18 b3			jr	lod1  
+03cc cd 40 02		l20:	call	crlf  
+03cf 18 ae			jr	lod1  
+03d1			  
+03d1			  
+03d1			; dump, uses same code as tabulate  
+03d1 cd 51 00		dump:	call	motflp  
+03d4 06 00			ld	b,0  
+03d6 cd 35 00		l21:	call	kdel  
+03d9 10 fb			djnz	l21  
+03db 2a 4b 0c			ld	hl,(_crt+1)  
+03de e5				push	hl  
+03df 21 5d 00			ld	hl,slrout  
+03e2 22 4b 0c			ld	(_crt+1),hl  
+03e5 cd fc 01			call	tabcde  
+03e8 e1				pop	hl  
+03e9 22 4b 0c			ld	(_crt+1),hl  
+03ec c3 51 00			jp	motflp  
+03ef			  
+03ef			; copy, arguments: from, to, length  
+03ef 2a 0c 0c		copy:	ld	hl,(arg1)  
+03f2 ed 5b 0e 0c		ld	de,(arg2)  
+03f6 ed 4b 10 0c		ld	bc,(arg3)  
+03fa ed b0			ldir  
+03fc c9				ret  
+03fd 00				nop  
+03fe 00				nop  
+03ff 00				nop  
+0400			; ----------------- end of nasbug t2 ------------------------------------  
+0400			  
+0400				org	0c00h  
+0c00			ramz:	equ	$  
+0c00 00...		port0:	defs	1  
+0c01 00...		kmap:	defs	9  
+0c0a 00...		args:	defs	2  
+0c0c 00...		arg1:	defs	2  
+0c0e 00...		arg2:	defs	2  
+0c10 00...		arg3:	defs	2  
+0c12 00...		num:	defs	3  
+0c15			rame:	equ	$  
+0c15 00...		brkadr:	defs	2  
+0c17 00...		brkval:	defs	1  
+0c18 00...		cursor:	defs	2  
+0c1a 00...		conflg:	defs	1  
+0c1b 00...			defs	18h  
+0c33 00...		stack:	defs	2  
+0c35 00...			defs	2  
+0c37 00...		_hl:	defs	2  
+0c39 00...		_af:	defs	2  
+0c3b 00...		_pc:	defs	2  
+0c3d			initr:  
+0c3d 00...		_sp:	defs	2  
+0c3f			; reflections  
+0c3f 00...		_ktabl:	defs	2  
+0c41 00...		_ktab0:	defs	2  
+0c43 00...		_ktab:	defs	2  
+0c45 00...		_ctab:	defs	2  
+0c47 00...		_nmi:	defs	3  
+0c4a 00...		_crt:	defs	3  
+0c4d 00...		_kbd:	defs	3  
+# End of file NASBUGT2.asm
+0c50

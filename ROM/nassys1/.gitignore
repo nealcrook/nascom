@@ -1,5 +1,4 @@
 *.bin
-*.lst
 *_dis.asm
 *_dis.txt
 *.bin_trim
