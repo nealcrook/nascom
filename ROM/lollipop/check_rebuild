@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# rebuild from source and check that the binary matches the golden versions
+
+z80asm -i lollipop.asm -llollipop.lst -olollipop.bin
+
+# check
+diff lollipop.bin lollipop.bin_golden

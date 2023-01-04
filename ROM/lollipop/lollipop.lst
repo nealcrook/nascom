@@ -1,0 +1,491 @@
+# File lollipop.asm
+0000			;;; Lollipop lady trainer 
+0000			;;; for NAS-SYS3 
+0000			;;; Deconstructed from the binary; AFAIK, the source was never published, 
+0000			;;; but I think that versions existed for both T4 and NAS-SYS3; for reasons 
+0000			;;; I don't (yet) understand, it doesn't work under NAS-SYS1. 
+0000			 
+0000			        org $1000 
+1000			 
+1000			;;; VDU layout 
+1000			L16:    equ $0BCA               ;top line (not scrolled) 
+1000			L01:    equ $080A 
+1000			L07:    equ $098A 
+1000			L08:    equ $09CA 
+1000			L15:    equ $0B8A               ;bottom line 
+1000			 
+1000			 
+1000 3e aa		START:  ld a, $AA 
+1002 32 ea 12		        ld (X_12EA), a 
+1005 af			        xor a 
+1006 32 ec 12		        ld (X_12EC), a 
+1009 01 05 0d		        ld bc, $0D05 
+100c 21 aa 0b		        ld hl, L15 + 32 
+100f 11 19 60		        ld de, $6019 
+1012 d9			        exx 
+1013 cd 64 10		        call SETUP 
+1016 cd 15 11		X_1016: call L_1115 
+1019 11 7a 08		        ld de, $087A 
+101c cd 73 10		        call L_1073 
+101f 11 fa 09		        ld de, $09FA 
+1022 cd 73 10		        call L_1073 
+1025 cd c2 10		        call L_10C2 
+1028 cd 96 10		L_1028: call L_1096 
+102b cd 8a 10		        call L_108A 
+102e cd a2 10		        call L_10A2 
+1031 cd 2a 11		        call L_112A 
+1034 3a ea 12		        ld a, (X_12EA) 
+1037 fe 96		        cp $96 
+1039 cc 94 11		        call z, L_1194 
+103c cd d6 10		        call L_10D6 
+103f fe 11		        cp $11 
+1041 28 06		        jr z, L_1049 
+1043 fe 03		        cp $03 
+1045 28 07		        jr z, L_104E 
+1047 18 18		        jr L_1061 
+1049			 
+1049			 
+1049 11 7a 08		L_1049: ld de, $087A 
+104c 18 03		        jr L_1051 
+104e			 
+104e			 
+104e 11 fa 09		L_104E: ld de, $09FA 
+1051 cd 73 10		L_1051: call L_1073 
+1054 3e 20		        ld a, $20 
+1056 32 89 0a		        ld ($0A89), a 
+1059 3e 20		        ld a, $20 
+105b 32 fa 08		        ld ($08FA), a 
+105e cd c2 10		        call L_10C2 
+1061 c3 28 10		L_1061: jp L_1028 
+1064			 
+1064			 
+1064			;;; Clear screen and display title on top line. Also called at L_106A 
+1064 ef			SETUP:  rst $28                 ; PRS - clear screen 
+1065 0c			        defb $0C 
+1066 00			        defb $00 
+1067 21 b6 12		L_1067: ld hl, TITLE 
+106a 11 d5 0b		L_106A: ld de, L16 + 11         ; 11 + 26 + 11 = 48, line width, so it's centred. 
+106d 01 1a 00		        ld bc, $001A 
+1070 ed b0		        ldir                    ; copy title to top line 
+1072 c9			        ret 
+1073			 
+1073			 
+1073 21 5d 12		L_1073: ld hl, CAR1 
+1076 0e 05		        ld c, $05 
+1078 c5			L_1078: push bc 
+1079 01 10 00		        ld bc, $0010 
+107c ed b0		        ldir 
+107e e5			        push hl 
+107f 21 30 00		        ld hl, $0030 
+1082 19			        add hl, de 
+1083 eb			        ex de, hl 
+1084 e1			        pop hl 
+1085 c1			        pop bc 
+1086 0d			        dec c 
+1087 20 ef		        jr nz, L_1078 
+1089 c9			        ret 
+108a			 
+108a			 
+108a 21 c9 09		L_108A: ld hl, L08 - 1 
+108d 11 c8 09		        ld de, L08 - 2 
+1090 01 42 01		        ld bc, $0142            ;322 
+1093 ed b0		        ldir 
+1095 c9			        ret 
+1096			 
+1096			 
+1096 21 b8 09		L_1096: ld hl, L07 + 46         ;$09B8 
+1099 11 b9 09		        ld de, L07 + 47         ;$09B9 
+109c 01 40 01		        ld bc, $0140            ;320 
+109f ed b8		        lddr 
+10a1 c9			        ret 
+10a2			 
+10a2			 
+10a2 21 7a 08		L_10A2: ld hl, $087A 
+10a5 01 05 00		L_10A5: ld bc, $0005 
+10a8 3e 20		L_10A8: ld a, $20 
+10aa 77			        ld (hl), a 
+10ab 11 40 00		        ld de, $0040 
+10ae 19			        add hl, de 
+10af 0d			        dec c 
+10b0 20 f6		        jr nz, L_10A8 
+10b2 3e 0b		        ld a, $0B 
+10b4 bc			        cp h 
+10b5 c8			        ret z 
+10b6 21 c9 09		        ld hl, $09C9 
+10b9 18 ea		        jr L_10A5 
+10bb			 
+10bb			 
+10bb 0e 0c		WAIT:   ld c, $0C 
+10bd ff			L_10BD: rst $38                 ;wait for period in A 
+10be 0d			        dec c 
+10bf 20 fc		        jr nz, L_10BD 
+10c1 c9			        ret 
+10c2			 
+10c2			 
+10c2 0e 13		L_10C2: ld c, $13 
+10c4 c5			L_10C4: push bc 
+10c5 cd 96 10		        call L_1096 
+10c8 cd 8a 10		        call L_108A 
+10cb cd 2a 11		        call L_112A 
+10ce cd a2 10		X_10CE: call L_10A2 
+10d1 c1			        pop bc 
+10d2 0d			        dec c 
+10d3 20 ef		        jr nz, L_10C4 
+10d5 c9			        ret 
+10d6			 
+10d6			 
+10d6 c5			L_10D6: push bc 
+10d7 3e 20		        ld a, $20 
+10d9 21 ed 12		        ld hl, X_12ED 
+10dc 47			        ld b, a 
+10dd ed 5f		        ld a, r                 ;sort-of 7-bit random number 
+10df 86			        add a, (hl) 
+10e0 38 01		        jr c, L_10E3 
+10e2 3d			        dec a 
+10e3 77			L_10E3: ld (hl), a 
+10e4 90			L_10E4: sub b 
+10e5 30 fd		        jr nc, L_10E4 
+10e7 80			        add a, b 
+10e8 3c			        inc a 
+10e9 c1			        pop bc 
+10ea c9			        ret 
+10eb			 
+10eb			 
+10eb e5			L_10EB: push hl 
+10ec d5			        push de 
+10ed c5			        push bc 
+10ee 7b			        ld a, e 
+10ef 77			        ld (hl), a 
+10f0 2b			        dec hl 
+10f1 7a			        ld a, d 
+10f2 77			        ld (hl), a 
+10f3 cd 00 11		        call L_1100 
+10f6 3e 28		        ld a, $28 
+10f8 77			        ld (hl), a 
+10f9 23			        inc hl 
+10fa 3c			        inc a 
+10fb 77			        ld (hl), a 
+10fc c1			        pop bc 
+10fd d1			        pop de 
+10fe e1			        pop hl 
+10ff c9			        ret 
+1100			 
+1100			 
+1100 0e 40		L_1100: ld c, $40 
+1102 2b			L_1102: dec hl 
+1103 0d			        dec c 
+1104 20 fc		        jr nz, L_1102 
+1106 c9			        ret 
+1107			 
+1107			 
+1107 e5			L_1107: push hl 
+1108 3e 20		        ld a, $20 
+110a 77			        ld (hl), a 
+110b 2b			        dec hl 
+110c 77			        ld (hl), a 
+110d cd 00 11		        call L_1100 
+1110 77			        ld (hl), a 
+1111 23			        inc hl 
+1112 77			        ld (hl), a 
+1113 e1			        pop hl 
+1114 c9			        ret 
+1115			 
+1115			 
+1115 21 aa 0b		L_1115: ld hl, $0BAA 
+1118 0e 05		        ld c, $05 
+111a 11 19 19		L_111A: ld de, $1919 
+111d e5			        push hl 
+111e cd eb 10		        call L_10EB 
+1121 e1			        pop hl 
+1122 2b			        dec hl 
+1123 2b			        dec hl 
+1124 2b			        dec hl 
+1125 2b			        dec hl 
+1126 0d			        dec c 
+1127 20 f1		        jr nz, L_111A 
+1129 c9			        ret 
+112a			 
+112a			 
+112a 3a ec 12		L_112A: ld a, (X_12EC) 
+112d b7			        or a 
+112e 20 16		        jr nz, L_1146 
+1130 cd 38 12		        call L_1238 
+1133 fe 1b		X_1133: cp $1B                  ;ESCape key? 
+1135 20 02		        jr nz, L_1139 
+1137 df			        rst $18 
+1138 5b			        defb $5B                ;MRET - return to NAS-SYS 
+1139 fe 20		L_1139: cp $20                  ;Space key? (move??) 
+113b 28 04		        jr z, L_1141 
+113d cd bb 10		        call WAIT 
+1140 c9			X_1140: ret 
+1141			 
+1141			 
+1141 3e ff		L_1141: ld a, $FF 
+1143 32 ec 12		        ld (X_12EC), a 
+1146 d9			L_1146: exx 
+1147 cd eb 10		        call L_10EB 
+114a c5			        push bc 
+114b cd 2e 12		        call L_122E 
+114e cd bb 10		        call WAIT 
+1151 cd 07 11		        call L_1107 
+1154 c1			        pop bc 
+1155 0d			        dec c 
+1156 d9			        exx 
+1157 c0			        ret nz 
+1158 d9			        exx 
+1159 0e 05		        ld c, $05 
+115b c5			        push bc 
+115c cd 00 11		        call L_1100 
+115f cd d9 11		        call L_11D9 
+1162 c1			        pop bc 
+1163 fe aa		        cp $AA 
+1165 28 17		        jr z, L_117E 
+1167 00			        nop 
+1168 3e 19		        ld a, $19 
+116a bb			        cp e 
+116b 11 27 19		        ld de, $1927 
+116e 28 03		        jr z, L_1173 
+1170 11 19 60		        ld de, $6019 
+1173 05			L_1173: dec b 
+1174 28 02		        jr z, L_1178 
+1176 d9			        exx 
+1177 c9			        ret 
+1178			 
+1178			 
+1178 11 19 19		L_1178: ld de, $1919 
+117b cd eb 10		        call L_10EB 
+117e 11 19 19		L_117E: ld de, $1919 
+1181 3e 00		        ld a, $00 
+1183 32 ec 12		        ld (X_12EC), a 
+1186 06 0d		        ld b, $0D 
+1188 2a ea 12		        ld hl, (X_12EA) 
+118b 2b			        dec hl 
+118c 2b			        dec hl 
+118d 2b			        dec hl 
+118e 2b			        dec hl 
+118f 22 ea 12		        ld (X_12EA), hl 
+1192 d9			        exx 
+1193 c9			        ret 
+1194			 
+1194			 
+1194 3e aa		L_1194: ld a, $AA 
+1196 32 ea 12		        ld (X_12EA), a 
+1199 21 d0 12		        ld hl, CONT             ;Press space to continue 
+119c cd 6a 10		        call L_106A             ;Copy to top line 
+119f 21 10 27		        ld hl, $2710 
+11a2 22 ef 12		        ld (X_12EF), hl 
+11a5 df			L_11A5: rst $18 
+11a6 7d			        defb $7D                ;scan keyboard and provide repeat key feature (does not exist on NAS-SYS1.. use 61?) 
+11a7 38 0d		        jr c, L_11B6 
+11a9 2a ef 12		        ld hl, (X_12EF) 
+11ac 2b			        dec hl 
+11ad 22 ef 12		        ld (X_12EF), hl 
+11b0 7c			        ld a, h 
+11b1 b5			        or l 
+11b2 28 08		        jr z, L_11BC 
+11b4 18 ef		        jr L_11A5 
+11b6			 
+11b6			 
+11b6 fe 1b		L_11B6: cp $1B                  ;ESCape key? 
+11b8 20 02		        jr nz, L_11BC 
+11ba df			        rst $18 
+11bb 5b			        defb $5B                ;MRET - return to NAS-SYS 
+11bc cd 15 11		L_11BC: call L_1115 
+11bf 21 90 01		        ld hl, $0190 
+11c2 22 ef 12		        ld (X_12EF), hl 
+11c5 21 0a 08		        ld hl, L01 
+11c8 11 0b 08		        ld de, L01 + 1 
+11cb 01 80 00		        ld bc, $0080            ;2 lines 
+11ce ed b0		        ldir 
+11d0 cd 67 10		        call L_1067 
+11d3 d9			        exx 
+11d4 21 aa 0b		        ld hl, $0BAA 
+11d7 d9			        exx 
+11d8 c9			        ret 
+11d9			 
+11d9			 
+11d9 e5			L_11D9: push hl 
+11da 3e 20		        ld a, $20 
+11dc 23			        inc hl 
+11dd be			        cp (hl) 
+11de 20 1a		        jr nz, L_11FA 
+11e0 2b			        dec hl 
+11e1 2b			        dec hl 
+11e2 2b			        dec hl 
+11e3 be			        cp (hl) 
+11e4 20 14		        jr nz, L_11FA 
+11e6 cd 00 11		        call L_1100 
+11e9 be			        cp (hl) 
+11ea 20 0e		        jr nz, L_11FA 
+11ec 23			        inc hl 
+11ed be			        cp (hl) 
+11ee 20 0a		        jr nz, L_11FA 
+11f0 23			        inc hl 
+11f1 be			        cp (hl) 
+11f2 20 06		        jr nz, L_11FA 
+11f4 23			        inc hl 
+11f5 be			        cp (hl) 
+11f6 20 02		        jr nz, L_11FA 
+11f8 e1			        pop hl 
+11f9 c9			        ret 
+11fa			 
+11fa			 
+11fa e1			L_11FA: pop hl 
+11fb cd a2 10		        call L_10A2 
+11fe cd c2 10		        call L_10C2 
+1201 11 fa 09		        ld de, $09FA 
+1204 cd 73 10		        call L_1073 
+1207 11 80 0a		        ld de, $0A80 
+120a 21 ad 12		        ld hl, CAR3             ;"AMBULANCE" - been run over 
+120d 01 09 00		        ld bc, $0009 
+1210 ed b0		        ldir 
+1212 11 40 0a		        ld de, $0A40 
+1215 21 7d 12		        ld hl, CAR4 
+1218 01 0a 00		        ld bc, $000A 
+121b ed b0		        ldir 
+121d 21 7d 12		        ld hl, CAR4 
+1220 11 fe 09		        ld de, $09FE 
+1223 01 0c 00		        ld bc, $000C 
+1226 ed b0		        ldir 
+1228 cd c2 10		        call L_10C2 
+122b 3e aa		        ld a, $AA 
+122d c9			        ret 
+122e			 
+122e			 
+122e 3a 0a 0b		L_122E: ld a, ($0B0A) 
+1231 fe 20		        cp $20 
+1233 c8			        ret z 
+1234 cd 07 11		        call L_1107 
+1237 c9			        ret 
+1238			 
+1238			 
+1238 e5			L_1238: push hl 
+1239 d5			        push de 
+123a c5			        push bc 
+123b df			        rst $18 
+123c 7d			        defb $7D                ;scan keyboard and provide repeat key feature (does not exist on NAS-SYS1.. use 61?) 
+123d 38 14		        jr c, L_1253 
+123f 2a ef 12		        ld hl, (X_12EF) 
+1242 2b			        dec hl 
+1243 7c			        ld a, h 
+1244 b5			        or l 
+1245 3e 00		        ld a, $00 
+1247 20 05		        jr nz, L_124E 
+1249 3e 20		        ld a, $20 
+124b 21 90 01		        ld hl, $0190 
+124e 22 ef 12		L_124E: ld (X_12EF), hl 
+1251 18 06		        jr L_1259 
+1253			 
+1253			 
+1253 21 90 01		L_1253: ld hl, $0190 
+1256 22 ef 12		        ld (X_12EF), hl 
+1259 c1			L_1259: pop bc 
+125a d1			        pop de 
+125b e1			        pop hl 
+125c c9			        ret 
+125d			 
+125d			 
+125d ..			CAR1:   defm "     ______     " 
+126d			 
+126d ..			CAR2:   defm "    /  ()      " ;NOT REFERENCED 
+127d			 
+127d 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f	CAR4:   defb $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F 
+1287 7f 7f		        defb $7F, $7F 
+1289			 
+1289 7f 7f 7f 7f	CAR5:   defb $7F, $7F, $7F, $7F ;NOT REFERENCED 
+128d 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f 7f	        defb $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F, $7F 
+129d			 
+129d ..			CAR6:   defm "              " ;NOT REFERENCED 
+12ad			 
+12ad ..			CAR3:   defm "AMBULANCE" 
+12b6			 
+12b6 ..			TITLE:  defm "* LOLLYPOP LADY TRAINER * " 
+12d0			 
+12d0 ..			CONT:   defm "press space to continue   " 
+12ea			 
+12ea aa 0b		X_12EA: defb $AA, $0B 
+12ec 00			X_12EC: defb $00 
+12ed f3 00		X_12ED: defb $F3, $00 
+12ef fb 1b		X_12EF: defb $FB, $1B 
+12f1 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00	        defb $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00 
+1300			        ; End of unknown area $12E8 to $12FF 
+1300			 
+1300			 
+1300			 
+1300			; $1000 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+1300			; $1040 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+1300			; $1090 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+1300			; $10E0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+1300			; $1130 CCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+1300			; $1180 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCC 
+1300			; $11D0 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+1300			; $1220 CCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBB 
+1300			; $1270 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB 
+1300			; $12C0 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB----------------------- 
+1300			 
+1300			; Labels 
+1300			; 
+1300			; $0018 => L_0018        CAR1   => $125D 
+1300			; $0028 => L_0028        CAR2   => $126D 
+1300			; $0038 => L_0038        CAR3   => $12AD 
+1300			; $1000 => START         CAR4   => $127D 
+1300			; $1016 => X_1016        CAR5   => $128D 
+1300			; $1028 => L_1028        CAR6   => $129D 
+1300			; $1049 => L_1049        CONT   => $12CF 
+1300			; $104E => L_104E        L_0018 => $0018 
+1300			; $1051 => L_1051        L_0028 => $0028 
+1300			; $1061 => L_1061        L_0038 => $0038 
+1300			; $1064 => L_1064        L_1028 => $1028 
+1300			; $1067 => L_1067        L_1049 => $1049 
+1300			; $106A => L_106A        L_104E => $104E 
+1300			; $1073 => L_1073        L_1051 => $1051 
+1300			; $1078 => L_1078        L_1061 => $1061 
+1300			; $108A => L_108A        L_1064 => $1064 
+1300			; $1096 => L_1096        L_1067 => $1067 
+1300			; $10A2 => L_10A2        L_106A => $106A 
+1300			; $10A5 => L_10A5        L_1073 => $1073 
+1300			; $10A8 => L_10A8        L_1078 => $1078 
+1300			; $10BB => X_10BB        L_108A => $108A 
+1300			; $10BD => L_10BD        L_1096 => $1096 
+1300			; $10C2 => L_10C2        L_10A2 => $10A2 
+1300			; $10C4 => L_10C4        L_10A5 => $10A5 
+1300			; $10CE => X_10CE        L_10A8 => $10A8 
+1300			; $10D6 => L_10D6        L_10BD => $10BD 
+1300			; $10E3 => L_10E3        L_10C2 => $10C2 
+1300			; $10E4 => L_10E4        L_10C4 => $10C4 
+1300			; $10EB => L_10EB        L_10D6 => $10D6 
+1300			; $1100 => L_1100        L_10E3 => $10E3 
+1300			; $1102 => L_1102        L_10E4 => $10E4 
+1300			; $1107 => L_1107        L_10EB => $10EB 
+1300			; $1115 => L_1115        L_1100 => $1100 
+1300			; $111A => L_111A        L_1102 => $1102 
+1300			; $112A => L_112A        L_1107 => $1107 
+1300			; $1133 => X_1133        L_1115 => $1115 
+1300			; $1139 => L_1139        L_111A => $111A 
+1300			; $1140 => X_1140        L_112A => $112A 
+1300			; $1141 => L_1141        L_1139 => $1139 
+1300			; $1146 => L_1146        L_1141 => $1141 
+1300			; $1173 => L_1173        L_1146 => $1146 
+1300			; $1178 => L_1178        L_1173 => $1173 
+1300			; $117E => L_117E        L_1178 => $1178 
+1300			; $1194 => L_1194        L_117E => $117E 
+1300			; $11A5 => L_11A5        L_1194 => $1194 
+1300			; $11B6 => L_11B6        L_11A5 => $11A5 
+1300			; $11BC => L_11BC        L_11B6 => $11B6 
+1300			; $11D9 => L_11D9        L_11BC => $11BC 
+1300			; $11FA => L_11FA        L_11D9 => $11D9 
+1300			; $122E => L_122E        L_11FA => $11FA 
+1300			; $1238 => L_1238        L_122E => $122E 
+1300			; $124E => L_124E        L_1238 => $1238 
+1300			; $1253 => L_1253        L_124E => $124E 
+1300			; $1259 => L_1259        L_1253 => $1253 
+1300			; $125D => CAR1          L_1259 => $1259 
+1300			; $126D => CAR2          START  => $1000 
+1300			; $127D => CAR4          TITLE  => $12B6 
+1300			; $128D => CAR5          X_1016 => $1016 
+1300			; $129D => CAR6          X_10BB => $10BB 
+1300			; $12AD => CAR3          X_10CE => $10CE 
+1300			; $12B6 => TITLE         X_1133 => $1133 
+1300			; $12CF => CONT          X_1140 => $1140 
+# End of file lollipop.asm
+1300
