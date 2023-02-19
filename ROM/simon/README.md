@@ -28,6 +28,30 @@ Version 5.0 was for a Hitachi HD64180 which has an extended capability compared
 with a Z80, so this version will not function on GM811/GM813 boards.
 
 
+# Rebuilding from source
+
+For each version XX there is a binary file simonXX.bin_golden whose origin is
+described below. There is a corresponding recreated source file simonXX.asm
+
+I use the GNU Z80 assembler (which is somewhat crude, but effective). The
+check_rebuild script reassembles all the versions from source, compares each
+generated binary with its corresponding bin_golden file, and reports any
+differences. For example:
+
+    #!/bin/sh
+    #
+    # rebuild from source and check that the binary matches the golden version
+
+    z80asm -i simon31mp.asm -lsimon31mp.lst -osimon31mp.bin
+
+    # check
+    diff simon31mp.bin simon31mp.bin_golden
+
+check_rebuild should run "instantly" and produces no terminal output if every
+.bin file matches its corresponding bin_golden file.
+
+
+
 # Version 3.1 MP
 
 The binary file:
@@ -35,8 +59,6 @@ The binary file:
     simon31mp.bin_golden
 
 is 2048 bytes in size and came from Paul, M0EYT. It came with (but was not in) his TimeClaim DX3 Gemini system.
-
-The recreated source code is: TBD
 
 
 # Version 4.1 MFB
@@ -47,23 +69,6 @@ The binary file:
 
 is 2048 bytes in size and came from John Newcombe's web site https://glasstty.com/gemini-80-bus-resource/
 
-The recreated source code is:
-
-    simon41mbf.asm
-
-To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
-effective). The script check_rebuild builds the binary/listing from source and
-compares the resultant binary with the golden binary:
-
-    #!/bin/sh
-    #
-    # rebuild from source and check that the binary matches the golden version
-    
-    z80asm -i simon41mbf.asm -lsimon41mbf.lst -osimon41mbf.bin
-    
-    # check
-    diff simon41mbf.bin simon41mbf.bin_golden
-
 
 # Version 4.2
 
@@ -72,23 +77,6 @@ The binary file:
     simon42.bin_golden
 
 is 2048 bytes in size and came from John Newcombe's web site https://glasstty.com/gemini-80-bus-resource/
-
-The recreated source code is:
-
-    simon42.asm
-
-To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
-effective). The script check_rebuild builds the binary/listing from source and
-compares the resultant binary with the golden binary:
-
-    #!/bin/sh
-    #
-    # rebuild from source and check that the binary matches the golden version
-    
-    z80asm -i simon42.asm -lsimon42.lst -osimon42.bin
-    
-    # check
-    diff simon42.bin simon42.bin_golden
 
 
 # Version 4.3
@@ -110,23 +98,6 @@ The binary file:
 
 is 1920 bytes in size and came from John Newcombe's web site https://glasstty.com/gemini-80-bus-resource/
 
-The recreated source code is:
-
-    simon44.asm
-
-To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
-effective). The script check_rebuild builds the binary/listing from source and
-compares the resultant binary with the golden binary:
-
-    #!/bin/sh
-    #
-    # rebuild from source and check that the binary matches the golden version
-    
-    z80asm -i simon44.asm -lsimon44.lst -osimon44.bin
-    
-    # check
-    diff simon44.bin simon44.bin_golden
-
 
 # Version 4.5s
 
@@ -139,19 +110,6 @@ is 2048 bytes in size and was supplied by Paul, M0EYT. It came from his TimeClai
 The recreated source code is:
 
     simon45s.asm
-
-To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
-effective). The script check_rebuild builds the binary/listing from source and
-compares the resultant binary with the golden binary:
-
-    #!/bin/sh
-    #
-    # rebuild from source and check that the binary matches the golden version
-    
-    z80asm -i simon45s.asm -lsimon45s.lst -osimon45s.bin
-    
-    # check
-    diff simon45s.bin simon45s.bin_golden
 
 Note: There seems to be an error in the binary dump of this ROM. In the source code, the PRS routine
 starts like this:
@@ -177,25 +135,6 @@ The binary file:
 is 8192 bytes in size (but with 2 large empty sections) and was supplied by
 Richard Espley
 
-The recreated source code is:
-
-    simon50.asm
-
-To assemble it, I use the GNU Z80 assembler (which is somewhat crude, but
-effective). The script check_rebuild builds the binary/listings from source and
-compares the resultant binaries with the golden binaries:
-
-    #!/bin/sh
-    #
-    # rebuild from source and check that the binary matches the golden version
-    
-    z80asm -i simon50.asm -lsimon50.lst -osimon50.bin
-    
-    # check
-    diff simon50.bin simon50.bin_golden
-
-This script should run "instantly" and produces no terminal output if the
-binary is generated correctly.
 
 # Guided disassembly
 
@@ -203,7 +142,7 @@ The script dis_rom operates on simon42.bin_golden to create simon42_dis.txt and
 simon42_dis.asm. simon42_dis.asm was the starting-point for simon42.asm but the
 latter has been hand-edited to add more comments and to change the formatting.
 
-Likewise, dis_rom50 operates on simon50.bin_golden.
+Likewise, dis_rom50 operates on simon50.bin_golden (etc)
 
 # WANTED
 
