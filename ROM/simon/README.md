@@ -3,19 +3,41 @@
 This is not a NASCOM monitor ROM, rather it is the SIMON (SImple MON) ROM for
 the Gemini CPU cards (GM811 and GM813 and ??).
 
-I know of 3 released versions: 4.1, 4.2, 4.5s and 5.0. The first 2 are
-(probably?)  both written by Richard Beal (the author of all but the earliest
-NASCOM ROM monitor programs). I'm not sure about 4.5s or 5.0. Unlike the NASCOM
-monitors, the source code was not published for SIMON.
+I know of these released versions: 3.1MP, 4.1MFB, 4.2, 4.3, 4.4, 4.5s and 5.0.
+Unlike the NASCOM monitors, the source code was not published for SIMON. RP/M
+and all but the earliest NASCOM ROM monitor programs were written by Richard
+Beal, but I don't know whether he was also responsible for SIMON.
 
-I have disassembled 4.2 and have not (yet) investigated differences between 4.1
-and 4.2.
+The source code here has been created by disassembly of some versions of the
+code; the comments and labels are the result of code inspection.
 
-I have disassembled 5.0, which was for a Hitachi HD64180 and will not function
-on GM811/GM813 boards.
+The MFB version is for the "Multi-format BIOS" machine (maybe MP and S is also
+for a MFB machine). These versions expect a different magic number in the CP/M
+disk's boot sector and ?do some kind of protection by running a blob of code on
+the intelligent video card?
 
-The source code here has been created by disassembly of the 4.2/5.0 code; the
-comments are the result of code inspection.
+    3.1MP  -- magic is GG     Copyright message: (C) dci software 26-10-82
+    4.1MFB -- magic is mG     Copyright message: (C) dci software 17-06-85
+    4.2    -- magic is GG     Copyright message: (C) dci software 10-06-86
+    4.3    -- magic is mG     Copyright message: (C) dci software 10-06-86
+    4.4    -- magic is GG     Copyright message: (C) dci software 10-03-87
+    4.5s   -- magic is mG     Copyright message: (C) dci software 10-03-87
+    5.0    -- magic is GG     Copyright message: (C) dci software 29-01-88
+
+Version 5.0 was for a Hitachi HD64180 which has an extended capability compared
+with a Z80, so this version will not function on GM811/GM813 boards.
+
+
+# Version 3.1 MP
+
+The binary file:
+
+    simon31mp.bin_golden
+
+is 2048 bytes in size and came from Paul, M0EYT. It came with (but was not in) his TimeClaim DX3 Gemini system.
+
+The recreated source code is: TBD
+
 
 # Version 4.1 MFB
 
@@ -69,6 +91,17 @@ compares the resultant binary with the golden binary:
     diff simon42.bin simon42.bin_golden
 
 
+# Version 4.3
+
+The binary file:
+
+    simon43.bin_golden
+
+is 2048 bytes in size and came from Paul, M0EYT. It came with (but was not in) his TimeClaim DX3 Gemini system.
+
+The recreated source code is: TBD
+
+
 # Version 4.4
 
 The binary file:
@@ -119,6 +152,21 @@ compares the resultant binary with the golden binary:
     
     # check
     diff simon45s.bin simon45s.bin_golden
+
+Note: There seems to be an error in the binary dump of this ROM. In the source code, the PRS routine
+starts like this:
+
+    f39f 6e                 PRS:    ld l, (hl)      ; SURELY this should be ld a, (hl)
+    f3a0 23                         inc hl
+    f3a1 b7                         or a
+    f3a2 c8                         ret z
+
+In all other versions (eg, 4.4), the code looks like this:
+
+    f3cb 7e                 PRS:    ld a, (hl)
+    f3cc 23                         inc hl
+    f3cd b7                         or a
+    f3ce c8                         ret z
 
 # Version 5.0
 
