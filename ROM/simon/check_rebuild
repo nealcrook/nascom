@@ -5,6 +5,7 @@
 z80asm -i simon31mp.asm   -lsimon31mp.lst   -osimon31mp.bin
 z80asm -i simon41mfb.asm  -lsimon41mfb.lst  -osimon41mfb.bin
 z80asm -i simon42.asm  -lsimon42.lst  -osimon42.bin
+z80asm -i simon43.asm  -lsimon43.lst  -osimon43.bin
 z80asm -i simon44.asm  -lsimon44.lst  -osimon44.bin
 z80asm -i simon45s.asm -lsimon45s.lst -osimon45s.bin
 z80asm -i simon50.asm  -lsimon50.lst  -osimon50.bin
@@ -13,6 +14,7 @@ z80asm -i simon50.asm  -lsimon50.lst  -osimon50.bin
 diff simon31mp.bin simon31mp.bin_golden
 diff simon41mfb.bin simon41mfb.bin_golden
 diff simon42.bin simon42.bin_golden
+diff simon43.bin simon43.bin_golden
 diff simon44.bin simon44.bin_golden
 diff simon45s.bin simon45s.bin_golden
 diff simon50.bin simon50.bin_golden

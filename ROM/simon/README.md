@@ -87,8 +87,6 @@ The binary file:
 
 is 2048 bytes in size and came from Paul, M0EYT. It came with (but was not in) his TimeClaim DX3 Gemini system.
 
-The recreated source code is: TBD
-
 
 # Version 4.4
 
