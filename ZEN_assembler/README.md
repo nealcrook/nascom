@@ -206,6 +206,12 @@ Some simple PERL scripts for messing with assembler source code.
 * A portable version for easy porting to retro systems
 * Abstraction of the assembler core as a assemble-engine
 
+### ZEN Elsewhere
+
+* Phil_G ported this code to Grant Searle's "32K Simple Z80": http://www.mccrash-racing.co.uk/philg/retro/retro.htm
+* Phillip Green ported Phil_G's code to RC2014: https://github.com/feilipu/NASCOM_BASIC_4.7/tree/master/rc2014_Zen
+
+
 ### Feedback
 
 If you find any errors or bugs or you decode some more of ZEN's inner workings, please let me know (email me or raise a github ticket)
