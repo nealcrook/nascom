@@ -167,7 +167,7 @@ info1:  rst     PRS             ;print 1 entry
         add     a, $30          ;0->'0'
         cp      $3a             ;greater than 9?
         jr      c, ascok        ;no
-        add     a, $11          ;a-f -> 'A'-'F'
+        add     a, $7           ;a-f -> 'A'-'F'
 ascok:  rst     ROUT
         SCAL    ZCRLF
 
