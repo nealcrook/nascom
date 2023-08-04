@@ -208,8 +208,8 @@ Some simple PERL scripts for messing with assembler source code.
 
 ### ZEN Elsewhere
 
-* Phil_G ported this code to Grant Searle's "32K Simple Z80": http://www.mccrash-racing.co.uk/philg/retro/retro.htm
-* Phillip Green ported Phil_G's code to RC2014: https://github.com/feilipu/NASCOM_BASIC_4.7/tree/master/rc2014_Zen
+* Phil_G ported this code to Grant Searle's "32K Simple Z80" and the RC2014: http://www.mccrash-racing.co.uk/philg/retro/retro.htm
+* Phillip Stevens ported Phil_G's code to assemble with z88dk: https://github.com/feilipu/NASCOM_BASIC_4.7/tree/master/rc2014_Zen
 
 
 ### Feedback
