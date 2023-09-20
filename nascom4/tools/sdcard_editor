@@ -46,6 +46,7 @@ if (defined $ARGV[0]) {
     }
     elsif (-e $cmds[0]) {
         open IMG, "+<", $cmds[0] or die "FATAL could not open $cmds[0]";
+        binmode IMG; # needed for Windows
     }
     else {
         cmd_usage();
@@ -190,6 +191,7 @@ sub extract {
 
     if (seek IMG, $offset, 0) {
         if (open OUT, ">", $name) {
+            binmode OUT; # needed for Windows
             my $data;
             my $got = read IMG, $data, $size;
             if ($got == $size) {
@@ -255,6 +257,7 @@ sub insert {
     my $is_poly = $_[3];
 
     if (open IN, "<", $name) {
+        binmode IN; # needed for Windows
         my @bits = stat IN;
         my $size = $bits[7];
         if ($size <= $limit) {
