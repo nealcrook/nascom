@@ -1,0 +1,968 @@
+#!/usr/bin/perl
+#
+# script to use the z80 disassembler to reverse the 3 MCS-II ROM
+# images.
+
+use warnings;
+use CPU::Z80::Disassembler;
+
+my $mon_file_name = "MCS-II_MON_V3.bin_golden";
+my $mon_addr = 0x0000;
+my $midi1_file_name = "MCS-II_MIDI_1.bin_golden";
+my $midi1_addr = 0xc000;
+my $midi2_file_name = "MCS-II_MIDI_2.bin_golden";
+my $midi2_addr = 0xd000;
+my $file = "mcs_dis.txt";
+my $asm_file = "mcs_dis.asm";
+
+
+$dis = CPU::Z80::Disassembler->new;
+$dis->memory->load_file($mon_file_name, $mon_addr);
+$dis->memory->load_file($midi1_file_name, $midi1_addr);
+$dis->memory->load_file($midi2_file_name, $midi2_addr);
+$dis->write_dump($file);
+
+# mock up stuff for NAS-SYS RST codes
+
+###########################################
+# RST 0 - START
+
+###########################################
+# RST 8 - RIN
+$dis->set_call(0x8, \&handle_rin);
+
+sub handle_rin {
+    my $addr = $_[1];
+    return $addr;
+}
+
+###########################################
+# RST 10 - RCAL
+## TODO put the actual code thread in here so that it can be followed.
+$dis->set_call(0x10, \&handle_rcal);
+
+# advance return PC past in-line subroutine code
+sub handle_rcal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 18 - SCAL
+$dis->set_call(0x18, \&handle_scal);
+
+# advance return PC past in-line subroutine code
+sub handle_scal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 20 - BRKPT
+
+###########################################
+# RST 28 - PRS
+##  $dis->memory->poke(0x28, 0xc9);
+##  $dis->code(0x28);
+$dis->set_call(0x28, \&handle_prs);
+
+# advance return PC past in-line null-terminated string
+sub handle_prs {
+    my $ref = $_[0];
+    my $addr = $_[1];
+
+    my $start = $addr;
+    my $len = 0;
+    my $is_string;
+    while (1) {
+        my $byte = $dis->memory->peek($addr);
+        if (($byte > 31) and ($byte < 128)) {
+            # printable
+            if (($len == 0) or ($is_string==1)) {
+                # string, new section, first of section OR
+                # string continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 1;
+            }
+            else {
+                # byte -> string change
+                if ($gen_label) {
+                    $dis->defb($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defb($start, $len);
+                }
+                $len = 1;
+                $is_string = 1;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        else {
+            # not printable
+            if (($len == 0) or ($is_string==0)) {
+                # byte, new section, first of section OR
+                # byte continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 0;
+            }
+            else {
+                # string -> byte change
+                if ($gen_label) {
+                    $dis->defm($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defm($start, $len);
+                }
+                $len = 1;
+                $is_string = 0;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        last if ($byte==0);
+    }
+
+    # emit the final section
+    if ($len != 0) {
+        if ($is_string) {
+            if ($gen_label) {
+                $dis->defm($start, $len, $label);
+            }
+            else {
+                $dis->defm($start, $len);
+            }
+        }
+        else {
+            if ($gen_label) {
+                $dis->defb($start, $len, $label);
+            }
+            else {
+                $dis->defb($start, $len);
+            }
+        }
+    }
+    return $addr;
+}
+
+
+# Create a message of length $len starting at address $addr and
+# using label $label.
+# Use defm and defb to report the bytes of the message
+# Return the next address
+sub msg_by_len {
+    my $addr = $_[0];
+    my $len = $_[1];
+    my $label = $_[2];
+
+    my $start = $addr;
+    my $end = $addr + $len; # loop while < $end
+    my $gen_label = 1;  # flag
+    $len = 0;
+    my $is_string;
+
+    # byte new section, first of section
+    # byte continue existing section
+    # string -> byte change
+
+    while ($addr < $end) {
+        my $byte = $dis->memory->peek($addr);
+        if (($byte > 31) and ($byte < 128)) {
+            # printable
+            if (($len == 0) or ($is_string==1)) {
+                # string, new section, first of section OR
+                # string continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 1;
+            }
+            else {
+                # byte -> string change
+                if ($gen_label) {
+                    $dis->defb($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defb($start, $len);
+                }
+                $len = 1;
+                $is_string = 1;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        else {
+            # not printable
+            if (($len == 0) or ($is_string==0)) {
+                # byte, new section, first of section OR
+                # byte continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 0;
+            }
+            else {
+                # string -> byte change
+                if ($gen_label) {
+                    $dis->defm($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defm($start, $len);
+                }
+                $len = 1;
+                $is_string = 0;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+    }
+    # emit the final section
+    if ($len != 0) {
+        if ($is_string) {
+            if ($gen_label) {
+                $dis->defm($start, $len, $label);
+            }
+            else {
+                $dis->defm($start, $len);
+            }
+        }
+        else {
+            if ($gen_label) {
+                $dis->defb($start, $len, $label);
+            }
+            else {
+                $dis->defb($start, $len);
+            }
+        }
+    }
+    return $end;
+}
+
+# Create a 0-terminated message starting at address $addr and
+# using label $label.
+# Use defm and defb to report the bytes of the message
+# Return the next address
+sub msg_by_null {
+    my $addr = $_[0];
+    my $label = $_[1];
+
+    my $start = $addr;
+    my $gen_label = 1;  # flag
+    $len = 0;
+    my $is_string;
+
+    # byte new section, first of section
+    # byte continue existing section
+    # string -> byte change
+
+    while (1) {
+        my $byte = $dis->memory->peek($addr);
+        if (($byte > 31) and ($byte < 128)) {
+            # printable
+            if (($len == 0) or ($is_string==1)) {
+                # string, new section, first of section OR
+                # string continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 1;
+            }
+            else {
+                # byte -> string change
+                if ($gen_label) {
+                    $dis->defb($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defb($start, $len);
+                }
+                $len = 1;
+                $is_string = 1;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        else {
+            # not printable
+            if (($len == 0) or ($is_string==0)) {
+                # byte, new section, first of section OR
+                # byte continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 0;
+            }
+            else {
+                # string -> byte change
+                if ($gen_label) {
+                    $dis->defm($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defm($start, $len);
+                }
+                $len = 1;
+                $is_string = 0;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        last if ($byte==0);
+    }
+    # emit the final section
+    if ($len != 0) {
+        if ($is_string) {
+            if ($gen_label) {
+                $dis->defm($start, $len, $label);
+            }
+            else {
+                $dis->defm($start, $len);
+            }
+        }
+        else {
+            if ($gen_label) {
+                $dis->defb($start, $len, $label);
+            }
+            else {
+                $dis->defb($start, $len);
+            }
+        }
+    }
+    return $addr;
+}
+
+###########################################
+# RST 30 - ROUT
+##$dis->memory->poke(0x30, 0xc9);
+##$dis->code(0x30);
+
+###########################################
+# RST 38 - RDEL
+##$dis->memory->poke(0x38, 0xc9);
+##$dis->code(0x38);
+
+###########################################
+# NAS-SYS initialisation routine
+##$dis->memory->poke(0xd, 0xc9);
+##$dis->code(0xd,"STMON");
+
+###########################################
+# NAS-SYS entry point
+# Never actually come back from here, but
+# model it as "ret"
+##$dis->memory->poke(0x5, 0xc9);
+##$dis->code(0x5,"NAS");
+
+# given a list of addresses, do a $dis->code on each
+# of them, with a label of the form X_<addr> where
+# <addr> is a 4-digit hex address with leading zeros
+sub dis_here {
+    while (my $addr = shift @_) {
+        my $label = sprintf("X_%04X", $addr);
+        $dis->code($addr,$label);
+    }
+}
+
+# given an address, declare the first as a byte and the next two as a word
+# with a label
+# and return the next address
+# $prefix is the prefix of the label, and $use_addr defines the format
+sub dis_tab1 {
+    my $prefix = $_[0];
+    my $addr = $_[1];
+    my $use_addr = $_[2];
+    $dis->defb($addr,1);
+    $dis->defw($addr+1,1);
+    my $ascii = $dis->memory->peek($addr);
+    my $val = $dis->memory->peek16u($addr+1);
+    my $label;
+    if ($use_addr) {
+        $label = sprintf("%s_%04X", $prefix, $val);
+    }
+    else {
+        $label = sprintf("%s_CHR%02X", $prefix, $ascii);
+    }
+    $dis->code($val,$label);
+    return $addr+3;
+}
+
+# @comments = ("foo", "bar");
+# code_com(0x1234, "label", @comments);
+#
+# gotcha: need all the subsequent commented lines to be marked as code BEFORE this is called
+sub code_com {
+    my $addr = shift @_;
+    my $label = shift @_;
+
+    $dis->code($addr, $label);
+    $dis->line_comments($addr, @_);
+}
+
+
+###########################################
+# Stuff specific to the code being disassembled
+
+# There is a PIO
+# There is a UART
+# There might be an output latch??
+# There is a (programmable??) baud rate controller
+# There should be an area of ROM dedicated to dot matrix character generator
+#
+# See I/O out to port 0x30, 0x31, 0x32, 0x33
+# See I/O in  to port 0x18, 0x28, 0x30
+# Guess 0x18 0x28 is UART RXD/status
+
+# workspace
+$dis->memory->poke(0xc00, 0);
+$dis->defb(0x0c00,1,"initz");
+
+$dis->memory->poke(0xc0b, 0);
+$dis->defb(0x0c0b,1,"argn");
+
+$dis->memory->poke(0xc29, 0);
+$dis->memory->poke(0xc2a, 0);
+$dis->defw(0x0c29,1,"cursor");
+
+$dis->memory->poke(0xc20, 0);
+$dis->defb(0x0c20,1,"numn");
+
+$dis->memory->poke(0xc21, 0);
+$dis->memory->poke(0xc22, 0);
+$dis->defw(0x0c21,1,"numv");
+
+$dis->memory->poke(0xc23, 0);
+$dis->memory->poke(0xc24, 0);
+$dis->defw(0x0c23,1,"brkadr");
+
+$dis->memory->poke(0xc25, 0);
+$dis->defb(0x0c25,1,"brkval");
+
+$dis->memory->poke(0xc26, 0);
+$dis->defb(0x0c26,1,"conflg");
+
+$dis->memory->poke(0xc27, 0);
+$dis->defb(0x0c27,1,"kopt");
+
+$dis->memory->poke(0xc71, 0);
+$dis->memory->poke(0xc72, 0);
+$dis->defw(0x0c71,1,"_stab");
+$dis->memory->poke(0xc71, 0);
+$dis->memory->poke(0xc72, 0);
+$dis->defw(0x0c71,1,"_stab");
+
+##########################
+# main program workspace
+##########################
+
+# Rhythm number
+$dis->memory->poke(0x2822, 0);
+$dis->memory->poke(0x2823, 0);
+$dis->defw(0x2822,1,"DPAGE");
+
+# previous state of port A[0]
+$dis->memory->poke(0x2820, 0);
+$dis->defb(0x2820,1,"PTIME");
+
+
+
+
+# Entry points
+$dis->code(0x0000,"COLD");
+$dis->code(0x04c2,"args");
+$dis->code(0x04c5,"args2");
+$dis->code(0x04c9,"args3");
+$dis->code(0x04ce,"write");
+$dis->code(0x04d7,"w3");
+$dis->code(0x051b,"X_051B");
+$dis->code(0x0522,"X_0522");
+$dis->code(0x0527,"X_0527");
+$dis->code(0x0570,"rcalb");
+$dis->code(0x0587,"RCAL4");
+$dis->code(0x058b,"SCAL2");
+$dis->code(0x058c,"SCAL3");
+$dis->code(0x0599,"SCALJ");
+$dis->code(0x05a1,"scali");
+
+foreach my $i (0..23) {
+    if ($i == 0) {
+        $dis->defb(0x05a6 + 4*$i, 4, "ktab");
+    }
+    else {
+        $dis->defb(0x05a6 + 4*$i, 4);
+    }
+}
+
+
+
+$dis->code(0x0008,"rst_rin");
+$dis->code(0x0010,"rst_rcal");
+$dis->code(0x0018,"rst_scal");
+$dis->code(0x0020,"L_RST20");
+#$dis->code(0x0028,"L_RST28");
+$dis->code(0x0030,"L_RST30");
+$dis->code(0x0038,"rst_rdel"); # this is also mode 1 ISR
+$dis->code(0x0066,"L_NMI");
+$dis->code(0x00f2,"_NMI");
+
+$dis->code(0x0069,"BIN");
+$dis->code(0x006d,"BIN2");
+$dis->code(0x0076,"BIN8");
+$dis->code(0x0078,"blink");
+$dis->code(0x0087,"srlin");
+$dis->code(0x008e,"rkbd");
+$dis->code(0x0099,"RK2");
+$dis->code(0x00a9,"RK3");
+$dis->code(0x00b2,"RK5");
+$dis->code(0x00b8,"RK6");
+$dis->code(0x00c2,"RK7");
+$dis->code(0x00dc,"KBD");
+$dis->code(0x00ec,"KSC1A");
+$dis->code(0x00ee,"KSC8");
+$dis->code(0x010e,"ksc2");
+$dis->code(0x011d,"ksc4");
+$dis->code(0x0146,"ksc5");
+$dis->code(0x0157,"k7");
+$dis->code(0x0160,"k8");
+$dis->code(0x0164,"k20");
+$dis->code(0x016e,"k30");
+$dis->code(0x0174,"k35");
+$dis->code(0x017a,"k40");
+$dis->code(0x0183,"k55");
+$dis->code(0x018c,"k60");
+$dis->code(0x018e,"kse");
+$dis->code(0x000d,"X_000D");
+$dis->code(0x001a,"X_001A");
+$dis->code(0x003e,"X_003E");
+$dis->code(0x0051,"X_0051");
+$dis->code(0x005b,"X_005B");
+$dis->defw(0x0198,1, "initt");
+$dis->defw(0x019a,1);
+$dis->defw(0x019c,1);
+$dis->defw(0x019e,1);
+$dis->defw(0x01a0,1);
+$dis->defb(0x01a2,3);
+$dis->defb(0x01a5,3);
+$dis->defb(0x01a8,1);
+$dis->code(0x002f,"dret");
+$dis->code(0x01a9,"crt");
+$dis->code(0x01ba,"cr1");
+$dis->code(0x01c1,"cr3");
+$dis->code(0x01cf,"crt0");
+$dis->code(0x01d1,"crt1");
+$dis->code(0x01d4,"crt2");
+$dis->code(0x01d6,"X_LINE16");
+$dis->code(0x01e4,"X_01E4");
+$dis->code(0x0207,"crt6");
+$dis->code(0x020e,"crt8");
+$dis->code(0x020f,"crt10");
+$dis->code(0x021b,"crt12");
+$dis->code(0x021f,"crt14");
+$dis->code(0x022f,"crt18");
+$dis->code(0x0236,"crt20");
+$dis->code(0x024a,"crt25");
+$dis->code(0x0251,"crt26");
+$dis->code(0x0257,"crt28");
+$dis->code(0x0260,"crt29");
+$dis->code(0x0264,"crt30");
+$dis->code(0x026f,"crt31");
+$dis->code(0x0273,"crt32");
+$dis->code(0x0279,"crt33");
+$dis->code(0x0283,"ctst");
+$dis->code(0x0294,"ct8");
+$dis->code(0x0297,"crt34");
+$dis->code(0x029c,"crt36");
+$dis->code(0x02aa,"crt38");
+$dis->code(0x02bf,"crt50");
+$dis->code(0x02c6,"cpos");
+$dis->code(0x02f4,"inlin");
+$dis->code(0x02f5,"inl2");
+
+
+$dis->code(0x03c0,"MRET");
+
+
+@comments = ("where 1 character would be",
+             "get it",
+             "space (no command)?",
+             "no, might be command",
+             "clear line and try again",
+             "B",
+             "blah",
+             "[",
+             "blah",
+             "P",
+             "blah",
+             "Y",
+             "blah",
+             "C",
+             "blah",
+             "W",
+             "blah",
+             "G",
+             "blah",
+             "J",
+             "blah",
+             "S",
+             "blah",
+             "Q",
+             "blah",
+             "T",
+             "blah",
+    );
+$dis->code(0x0436,"X_0436");
+$dis->line_comments(0x436,@comments);
+
+
+
+$dis->code(0x0483,"X_0483");
+$dis->code(0x0489,"X_0489");
+$dis->code(0x04a7,"X_04a7");
+$dis->code(0x04bd,"X_04BD");
+$dis->code(0x0306,"brst0");
+$dis->code(0x0312,"X_0312");
+$dis->code(0x0316,"X_0316");
+$dis->code(0x031e,"X_031E");
+$dis->code(0x031a,"space");
+$dis->code(0x0323,"errm");
+$dis->code(0x0339,"crlf");
+$dis->code(0x0353,"num");
+$dis->code(0x0365,"nn1");
+$dis->code(0x037d,"nn2");
+$dis->code(0x038c,"rlin");
+$dis->code(0x0391,"rl2");
+$dis->code(0x0567,"X_0567");
+$dis->code(0x0606,"kop");
+$dis->code(0x060b,"break");
+$dis->code(0x060f,"g");
+$dis->code(0x063f,"sout");
+$dis->code(0x064a,"read");
+$dis->code(0x074f);
+$dis->defb(0x0639,6,"gds");
+$dis->block_comment(0x03aa,";;; point to workspace\n;;; zero-out \$6d bytes");
+$dis->code(0x03aa,"strtb");
+#$dis->code(0x0758,"X_0758");
+
+my $staba = 0x76d;
+$dis->block_comment(0x076d,";;; first is for \"A\" (0x41)\n;;; next is for \"B\" etc.\n;;; 0x5B is MRET\n;;;");
+#unfortunately, cannot add comments on data
+#@comments = ("aha ",
+#             "vas ",
+#    );
+#$dis->line_comments($staba,@comments);
+
+
+foreach my $i (0..62) {
+    if ($i == 0) {
+        $dis->defw($staba + 2*$i, 1, "staba");
+    }
+    $dis->defw($staba + 2*$i, 1);
+}
+
+
+
+##??? Where is L_00F0 created?? NMI RETN seems to be in the wrong place.
+# by experiment on NASCOM4, NMI just does a kind-of reset.
+
+
+msg_by_len(0x2cd, 39, "M_LINE16");
+
+
+# MIDI_1 ROM
+$dis->code(0xc000,"drum");
+msg_by_len(0xc003, 9, "M_BPM");
+msg_by_len(0xc00c, 13, "M_RUN");
+msg_by_len(0xc019, 22, "M_XFER");
+msg_by_len(0xc02F, 22, "M_PLAY");
+msg_by_len(0xc045, 22, "M_ERAS");
+msg_by_len(0xc05b, 22, "M_SAVE");
+msg_by_len(0xc071, 22, "M_SPACE");
+msg_by_len(0xc087, 16, "M_SEQ");
+msg_by_len(0xc097, 11, "M_FULL");
+msg_by_len(0xc0a2, 16, "M_INFO");
+msg_by_len(0xc0b2, 36, "M_INFO2");
+
+msg_by_null(0xc0ed, "M_MENU");
+
+$dis->code(0xc354,"CLS");
+$dis->code(0xc55c,"X_C55C");
+
+$dis->code(0xc160,"X_C160");
+
+@comments = ("wait for character",
+             "clear MSB",
+             "C",
+             "continue",
+             "c",
+             "??",
+             "S",
+             "shuffle start",
+             "H",
+             "high start",
+             "N",
+             "normal start",
+             "???",
+             "???T",
+             "Illegal.. go round again",
+    );
+$dis->code(0xc160,"X_C160");
+$dis->line_comments(0xc160,@comments);
+$dis->code(0xc181,"CONT");
+$dis->code(0xc35f,"WOT1");
+$dis->code(0xc1a9,"START");
+$dis->code(0xc352,"WOT2");
+
+$dis->code(0xc18f,"X_C18F");
+$dis->code(0xc19a,"X_C19A");
+$dis->code(0xc1a5,"X_C1A5");
+$dis->code(0xc280,"X_C280");
+$dis->code(0xc332,"X_C332");
+$dis->code(0xc358,"X_C358");
+$dis->code(0xc36c,"X_C36c");
+$dis->code(0xc3a3,"X_C3A3");
+$dis->code(0xc3af,"X_C3AF");
+
+$dis->code(0xc651,"X_C651");
+#$dis->code(0xc7a3,"X_C7A3");
+$dis->code(0xc7b1,"X_C7B1");
+$dis->code(0xc7ec,"X_C7EC");
+$dis->code(0xc89f,"X_C89F");
+$dis->code(0xce13,"X_CE13");
+
+# MIDI_2 ROM
+$dis->code(0xd06b,"X_D06B");
+$dis->code(0xd181,"X_D181");
+#$dis->code(0xd6f8,"X_D6F8");
+
+$dis->defb(0xd708, 8);
+for (my $i = 0; $i< 143; $i=$i+1) {
+    $dis->defb(0xd710 + 16*$i,16);
+}
+
+
+@comments = ("check port A",
+             "bit[0]",
+             "previous value",
+             "",
+             "has not changed",
+             "update",
+             "",
+             "send to UART",
+    );
+$dis->code(0xcc70, TIME);
+$dis->line_comments(0xcc70,@comments);
+
+
+@comments = ("",
+             "",
+             "",
+             "",
+             "port B control mode",
+             "",
+             "",
+             "define which bits are outputs",
+             "",
+             "data B: set all outputs high"
+    );
+$dis->line_comments(0xc773,@comments);
+
+@comments = ("",
+             "",
+             "port A control mode",
+             "",
+             "",
+             "define which bits are output",
+             "",
+             "data A: set [7:1] high, [0] low"
+    );
+$dis->line_comments(0xc794,@comments);
+
+@comments = ("",
+             "port B input mode",
+             "port A input mode",
+             "",
+             "port A control mode",
+             "",
+             "",
+             "define which bits are output",
+             "",
+             "port B control mode",
+             "",
+             "",
+             "define which bits are output",
+             "",
+             "data A: set all outputs high",
+             "data B: set all outputs high",
+             "",
+             "",
+             "data A: set all outputs low",
+             "data B: set all outputs low",
+    );
+$dis->line_comments(0xc830,@comments);
+
+@comments = ("",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "port B output mode",
+             "",
+             "port A input mode",
+             "",
+             "port A control mode",
+             "",
+             "",
+             "port A[0] output, all others inputs",
+    );
+$dis->line_comments(0xc86c,@comments);
+
+@comments = ("",
+             "port A input mode",
+             "port B input mode",
+             "",
+             "port A control mode",
+             "",
+             "port A all inputs",
+             "",
+             "port B control mode",
+             "",
+             "port B all inputs",
+    );
+$dis->line_comments(0xd437,@comments);
+
+$dis->code(0xd44e,"D_LINE");
+@comments = ("Draw horizontal line at (HL); count of 48",
+             "full-width - character",
+             "SCAL O -> call to X_04BD",
+             "store B copies of A starting at HL",
+             "",
+             "",
+             "ROUT -> print CR",
+    );
+$dis->line_comments(0xd44e,@comments);
+
+@comments = ("scal",
+             "in - scan the keyboard",
+             "no character",
+             "clear MSB (no need..)",
+             "ESC",
+             "",
+             "",
+             "",
+             "X",
+             "Toggle Int/Midi",
+             "x",
+             "Select channel",
+             "E",
+             "Erase",
+             "C",
+             "Compose",
+             "P",
+             "Play,modify",
+             "R",
+             "Run chain",
+             "A",
+             "Assemble chain",
+             "T",
+             "Transfer",
+             "H",
+             "Help",
+             "I",
+             "Info page",
+             "S",
+             "Save on tape",
+             "Number?",
+             "",
+             "",
+             "",
+             "",
+             "",
+             "Store number 0-9 as Page Number",
+             "",
+             "Start again",
+    );
+$dis->line_comments(0xc416,@comments);
+
+
+@comments = ("poll for timing signal transition",
+             "scal",
+             "in - scan the keyboard",
+             "no character",
+             "clear MSB (no need..)",
+             "ESC",
+             "Back to menu",
+             "X",
+             "Int/Midi",
+             "M",
+             "Multiply bars",
+             "D",
+             "Clear drums",
+             "C",
+             "Clear cymbals",
+             "K",
+             "Kill metro",
+             "I",
+             "Insert metro",
+             "SPACE",
+             "Continue",
+             "No match; go round again",
+    );
+$dis->line_comments(0xcc7f,@comments);
+
+
+
+
+# RST 18 --> scal
+# See these values used:
+# $41 A
+# $43 C
+# $47 G
+# $4A J
+# $4F O
+# $53 S
+# $54 T
+# $5B MRET
+# $5C SCALJ
+# $60 ARGS
+# $61 KBD
+# $62 IN
+# $64 NUM
+# $66 TBCD3??
+# $6B ERRM
+# $79 RLIN
+# $7B BLINK
+# $7C CPOS
+
+# RAM from 2800 - 2834 is some kind of data structures; various addresses
+# are hard-coded and checked/cleared.
+# 2803 has flags, messed with at L_CFD6
+
+# ports
+# in 00 01 02 04 05 (01, 02, 04, 05 in drum stuff)
+
+# out 00 01 04 05 06 07 (01 04 05 06 07 in drum stuff)
+
+# 00 out: kbd, LED, sstep control. in: kbd scan
+# 01 is UART
+# 04 is PIO A data
+# 05 is PIO B data
+# 06 is PIO A control
+# 07 is PIO B control
+
+# values sent to UART, MIDI command bytes:
+# $F8 = Timing Clock
+# $FA = Start
+# $FB = Continue
+# $FC = Stop
+
+
+# This can optimise code and so it may prevent 100% match
+# on re-assembly.
+##$dis->analyse;
+
+$dis->write_asm($asm_file);
