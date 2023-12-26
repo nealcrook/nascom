@@ -1,0 +1,5924 @@
+0000 310010     ld sp, $1000
+0003 D7         rst $10
+0004 08         ex af, af'
+0005 C3C003     jp $03C0
+0008 DF         rst $18
+0009 62         ld h, d
+000A D8         ret c
+000B 18FB       jr $0008
+000D C3AA03     jp $03AA
+0010 E3         ex (sp), hl
+0011 23         inc hl
+0012 E3         ex (sp), hl
+0013 E5         push hl
+0014 F5         push af
+0015 C37005     jp $0570
+0018 18F6       jr $0010
+001A D7         rst $10
+001B 00         nop
+001C DF         rst $18
+001D 66         ld h, (hl)
+001E EB         ex de, hl
+001F C9         ret
+0020 E3         ex (sp), hl
+0021 2B         dec hl
+0022 E3         ex (sp), hl
+0023 C3F200     jp $00F2
+0026 00         nop
+0027 00         nop
+0028 E3         ex (sp), hl
+0029 7E         ld a, (hl)
+002A 23         inc hl
+002B B7         or a
+002C 2006       jr nz, $0034
+002E E3         ex (sp), hl
+002F C9         ret
+0030 E5         push hl
+0031 C33907     jp $0739
+0034 F7         rst $30
+0035 18F2       jr $0029
+0037 00         nop
+0038 3D         dec a
+0039 C8         ret z
+003A F5         push af
+003B F1         pop af
+003C 18FA       jr $0038
+003E AF         xor a
+003F 47         ld b, a
+0040 FF         rst $38
+0041 FF         rst $38
+0042 10FC       djnz $0040
+0044 C9         ret
+0045 E5         push hl
+0046 21000C     ld hl, $0C00
+0049 AE         xor (hl)
+004A D300       out ($00), a
+004C 7E         ld a, (hl)
+004D D300       out ($00), a
+004F E1         pop hl
+0050 C9         ret
+0051 3E10       ld a, $10
+0053 E5         push hl
+0054 21000C     ld hl, $0C00
+0057 AE         xor (hl)
+0058 77         ld (hl), a
+0059 18F2       jr $004D
+005B F5         push af
+005C D301       out ($01), a
+005E DB02       in a, ($02)
+0060 CB77       bit 6, a
+0062 28FA       jr z, $005E
+0064 F1         pop af
+0065 C9         ret
+0066 C3F200     jp $00F2
+0069 E5         push hl
+006A 219001     ld hl, $0190
+006D DF         rst $18
+006E 62         ld h, d
+006F 3805       jr c, $0076
+0071 2B         dec hl
+0072 7C         ld a, h
+0073 B5         or l
+0074 20F7       jr nz, $006D
+0076 E1         pop hl
+0077 C9         ret
+0078 2A290C     ld hl, ($0C29)
+007B 56         ld d, (hl)
+007C 365F       ld (hl), $5F
+007E D7         rst $10
+007F E9         jp (hl)
+0080 72         ld (hl), d
+0081 D8         ret c
+0082 D7         rst $10
+0083 E5         push hl
+0084 30F2       jr nc, $0078
+0086 C9         ret
+0087 DB02       in a, ($02)
+0089 17         rla
+008A D0         ret nc
+008B DB01       in a, ($01)
+008D C9         ret
+008E DF         rst $18
+008F 61         ld h, c
+0090 3007       jr nc, $0099
+0092 215002     ld hl, $0250
+0095 222C0C     ld ($0C2C), hl
+0098 C9         ret
+0099 2A2C0C     ld hl, ($0C2C)
+009C 2B         dec hl
+009D 222C0C     ld ($0C2C), hl
+00A0 7C         ld a, h
+00A1 B5         or l
+00A2 C0         ret nz
+00A3 21020C     ld hl, $0C02
+00A6 010008     ld bc, $0800
+00A9 16FF       ld d, $FF
+00AB 7D         ld a, l
+00AC FE06       cp $06
+00AE 2002       jr nz, $00B2
+00B0 16BF       ld d, $BF
+00B2 FE09       cp $09
+00B4 2002       jr nz, $00B8
+00B6 16C7       ld d, $C7
+00B8 7E         ld a, (hl)
+00B9 A2         and d
+00BA 2806       jr z, $00C2
+00BC 0E01       ld c, $01
+00BE 7A         ld a, d
+00BF 2F         cpl
+00C0 A6         and (hl)
+00C1 77         ld (hl), a
+00C2 23         inc hl
+00C3 10E4       djnz $00A9
+00C5 79         ld a, c
+00C6 B7         or a
+00C7 C8         ret z
+00C8 212500     ld hl, $0025
+00CB 222C0C     ld ($0C2C), hl
+00CE 3E02       ld a, $02
+00D0 CD4500     call $0045
+00D3 21010C     ld hl, $0C01
+00D6 DB00       in a, ($00)
+00D8 2F         cpl
+00D9 77         ld (hl), a
+00DA 0608       ld b, $08
+00DC 3E01       ld a, $01
+00DE CD4500     call $0045
+00E1 23         inc hl
+00E2 DB00       in a, ($00)
+00E4 2F         cpl
+00E5 E67F       and $7F
+00E7 57         ld d, a
+00E8 AE         xor (hl)
+00E9 C20E01     jp nz, $010E
+00EC 10EE       djnz $00DC
+00EE B7         or a
+00EF C9         ret
+00F0 ED45       retn
+00F2 3A000C     ld a, ($0C00)
+00F5 D300       out ($00), a
+00F7 CDF000     call $00F0
+00FA DF         rst $18
+00FB 5B         ld e, e
+00FC DF         rst $18
+00FD 7B         ld a, e
+00FE FE1B       cp $1B
+0100 C8         ret z
+0101 D630       sub $30
+0103 FAFC00     jp m, $00FC
+0106 D60A       sub $0A
+0108 F2FC00     jp p, $00FC
+010B C63A       add a, $3A
+010D C9         ret
+010E AF         xor a
+010F FF         rst $38
+0110 DB00       in a, ($00)
+0112 2F         cpl
+0113 E67F       and $7F
+0115 5F         ld e, a
+0116 7A         ld a, d
+0117 AE         xor (hl)
+0118 0EFF       ld c, $FF
+011A 1600       ld d, $00
+011C 37         scf
+011D CB12       rl d
+011F 0C         inc c
+0120 1F         rra
+0121 30FA       jr nc, $011D
+0123 7A         ld a, d
+0124 A3         and e
+0125 5F         ld e, a
+0126 7E         ld a, (hl)
+0127 A2         and d
+0128 BB         cp e
+0129 28C1       jr z, $00EC
+012B 7E         ld a, (hl)
+012C AA         xor d
+012D 77         ld (hl), a
+012E 7B         ld a, e
+012F B7         or a
+0130 28BA       jr z, $00EC
+0132 3A010C     ld a, ($0C01)
+0135 E610       and $10
+0137 B0         or b
+0138 87         add a, a
+0139 87         add a, a
+013A 87         add a, a
+013B B1         or c
+013C D7         rst $10
+013D 50         ld d, b
+013E 2806       jr z, $0146
+0140 E67F       and $7F
+0142 D7         rst $10
+0143 4A         ld c, d
+0144 20A8       jr nz, $00EE
+0146 79         ld a, c
+0147 21010C     ld hl, $0C01
+014A FE41       cp $41
+014C 3816       jr c, $0164
+014E FE5B       cp $5B
+0150 3012       jr nc, $0164
+0152 CB66       bit 4, (hl)
+0154 2801       jr z, $0157
+0156 3F         ccf
+0157 3A270C     ld a, ($0C27)
+015A CB47       bit 0, a
+015C 79         ld a, c
+015D 2801       jr z, $0160
+015F 3F         ccf
+0160 3802       jr c, $0164
+0162 C620       add a, $20
+0164 FE40       cp $40
+0166 2006       jr nz, $016E
+0168 CB66       bit 4, (hl)
+016A 2882       jr z, $00EE
+016C 1806       jr $0174
+016E CB6E       bit 5, (hl)
+0170 2802       jr z, $0174
+0172 EE40       xor $40
+0174 CB5E       bit 3, (hl)
+0176 2802       jr z, $017A
+0178 EE40       xor $40
+017A 21060C     ld hl, $0C06
+017D CB76       bit 6, (hl)
+017F 2802       jr z, $0183
+0181 EE80       xor $80
+0183 21270C     ld hl, $0C27
+0186 CB56       bit 2, (hl)
+0188 2802       jr z, $018C
+018A EE80       xor $80
+018C 37         scf
+018D C9         ret
+018E 2A6F0C     ld hl, ($0C6F)
+0191 ED4B6D0C   ld bc, ($0C6D)
+0195 EDB9       cpdr
+0197 C9         ret
+0198 60         ld h, b
+0199 00         nop
+019A 05         dec b
+019B 06EB       ld b, $EB
+019D 0664       ld b, $64
+019F 07         rlca
+01A0 67         ld h, a
+01A1 07         rlca
+01A2 C32F00     jp $002F
+01A5 C32F00     jp $002F
+01A8 00         nop
+01A9 B7         or a
+01AA C8         ret z
+01AB F5         push af
+01AC FE0A       cp $0A
+01AE 2824       jr z, $01D4
+01B0 FE0C       cp $0C
+01B2 2053       jr nz, $0207
+01B4 210A08     ld hl, $080A
+01B7 E5         push hl
+01B8 0630       ld b, $30
+01BA 3620       ld (hl), $20
+01BC 23         inc hl
+01BD 10FB       djnz $01BA
+01BF 0610       ld b, $10
+01C1 3600       ld (hl), $00
+01C3 23         inc hl
+01C4 10FB       djnz $01C1
+01C6 EB         ex de, hl
+01C7 E1         pop hl
+01C8 E5         push hl
+01C9 01B003     ld bc, $03B0
+01CC EDB0       ldir
+01CE E1         pop hl
+01CF DF         rst $18
+01D0 7C         ld a, h
+01D1 22290C     ld ($0C29), hl
+01D4 F1         pop af
+01D5 C9         ret
+01D6 21CD02     ld hl, $02CD
+01D9 D5         push de
+01DA 11CE0B     ld de, $0BCE
+01DD 012700     ld bc, $0027
+01E0 EDB0       ldir
+01E2 D1         pop de
+01E3 C9         ret
+01E4 D5         push de
+01E5 110000     ld de, $0000
+01E8 DE0A       sbc a, $0A
+01EA 3808       jr c, $01F4
+01EC 14         inc d
+01ED DE0A       sbc a, $0A
+01EF 380B       jr c, $01FC
+01F1 14         inc d
+01F2 18F9       jr $01ED
+01F4 C63A       add a, $3A
+01F6 F7         rst $30
+01F7 3E20       ld a, $20
+01F9 F7         rst $30
+01FA D1         pop de
+01FB C9         ret
+01FC 5F         ld e, a
+01FD 7A         ld a, d
+01FE C630       add a, $30
+0200 F7         rst $30
+0201 7B         ld a, e
+0202 C63A       add a, $3A
+0204 F7         rst $30
+0205 D1         pop de
+0206 C9         ret
+0207 2A290C     ld hl, ($0C29)
+020A FE08       cp $08
+020C 2011       jr nz, $021F
+020E F5         push af
+020F 2B         dec hl
+0210 7E         ld a, (hl)
+0211 B7         or a
+0212 28FB       jr z, $020F
+0214 F1         pop af
+0215 FE11       cp $11
+0217 2802       jr z, $021B
+0219 3620       ld (hl), $20
+021B D7         rst $10
+021C 66         ld h, (hl)
+021D 18B5       jr $01D4
+021F FE11       cp $11
+0221 28EB       jr z, $020E
+0223 FE17       cp $17
+0225 28A8       jr z, $01CF
+0227 FE1B       cp $1B
+0229 200B       jr nz, $0236
+022B DF         rst $18
+022C 7C         ld a, h
+022D 0630       ld b, $30
+022F 3620       ld (hl), $20
+0231 23         inc hl
+0232 10FB       djnz $022F
+0234 1899       jr $01CF
+0236 FE0D       cp $0D
+0238 2870       jr z, $02AA
+023A FE18       cp $18
+023C 200C       jr nz, $024A
+023E E5         push hl
+023F DF         rst $18
+0240 7C         ld a, h
+0241 D1         pop de
+0242 B7         or a
+0243 ED52       sbc hl, de
+0245 19         add hl, de
+0246 2889       jr z, $01D1
+0248 1860       jr $02AA
+024A FE13       cp $13
+024C 2009       jr nz, $0257
+024E 11C0FF     ld de, $FFC0
+0251 19         add hl, de
+0252 D7         rst $10
+0253 2F         cpl
+0254 C3D401     jp $01D4
+0257 FE14       cp $14
+0259 2005       jr nz, $0260
+025B 114000     ld de, $0040
+025E 18F1       jr $0251
+0260 FE15       cp $15
+0262 200F       jr nz, $0273
+0264 23         inc hl
+0265 7E         ld a, (hl)
+0266 2B         dec hl
+0267 B7         or a
+0268 2005       jr nz, $026F
+026A 3620       ld (hl), $20
+026C C3D401     jp $01D4
+026F 77         ld (hl), a
+0270 23         inc hl
+0271 18F1       jr $0264
+0273 FE16       cp $16
+0275 2020       jr nz, $0297
+0277 0620       ld b, $20
+0279 7E         ld a, (hl)
+027A B7         or a
+027B CAD401     jp z, $01D4
+027E 70         ld (hl), b
+027F 47         ld b, a
+0280 23         inc hl
+0281 18F6       jr $0279
+0283 110A08     ld de, $080A
+0286 B7         or a
+0287 ED52       sbc hl, de
+0289 19         add hl, de
+028A D8         ret c
+028B 11BA0B     ld de, $0BBA
+028E B7         or a
+028F ED52       sbc hl, de
+0291 19         add hl, de
+0292 D0         ret nc
+0293 F1         pop af
+0294 C3D101     jp $01D1
+0297 FE12       cp $12
+0299 2801       jr z, $029C
+029B 77         ld (hl), a
+029C 23         inc hl
+029D 7E         ld a, (hl)
+029E B7         or a
+029F 28FB       jr z, $029C
+02A1 11CA0B     ld de, $0BCA
+02A4 B7         or a
+02A5 ED52       sbc hl, de
+02A7 19         add hl, de
+02A8 20EA       jr nz, $0294
+02AA DF         rst $18
+02AB 7C         ld a, h
+02AC 114000     ld de, $0040
+02AF 19         add hl, de
+02B0 D7         rst $10
+02B1 D1         pop de
+02B2 110A08     ld de, $080A
+02B5 214A08     ld hl, $084A
+02B8 017003     ld bc, $0370
+02BB EDB0       ldir
+02BD 0630       ld b, $30
+02BF 2B         dec hl
+02C0 3620       ld (hl), $20
+02C2 10FB       djnz $02BF
+02C4 18CE       jr $0294
+02C6 7D         ld a, l
+02C7 E6C0       and $C0
+02C9 C60A       add a, $0A
+02CB 6F         ld l, a
+02CC C9         ret
+02CD A8         xor b
+02CE A6         and (hl)
+02CF 2020       jr nz, $02F1
+02D1 204D       jr nz, $0320
+02D3 4F         ld c, a
+02D4 56         ld d, (hl)
+02D5 45         ld b, l
+02D6 4D         ld c, l
+02D7 45         ld b, l
+02D8 4E         ld c, (hl)
+02D9 54         ld d, h
+02DA 2043       jr nz, $031F
+02DC 4F         ld c, a
+02DD 4D         ld c, l
+02DE 50         ld d, b
+02DF 55         ld d, l
+02E0 54         ld d, h
+02E1 45         ld b, l
+02E2 52         ld d, d
+02E3 2053       jr nz, $0338
+02E5 59         ld e, c
+02E6 53         ld d, e
+02E7 54         ld d, h
+02E8 45         ld b, l
+02E9 4D         ld c, l
+02EA 53         ld d, e
+02EB 2049       jr nz, $0336
+02ED 49         ld c, c
+02EE 2E20       ld l, $20
+02F0 2020       jr nz, $0312
+02F2 A8         xor b
+02F3 A6         and (hl)
+02F4 E5         push hl
+02F5 DF         rst $18
+02F6 7B         ld a, e
+02F7 F7         rst $30
+02F8 FE0D       cp $0D
+02FA 20F9       jr nz, $02F5
+02FC 2A290C     ld hl, ($0C29)
+02FF 11C0FF     ld de, $FFC0
+0302 19         add hl, de
+0303 EB         ex de, hl
+0304 E1         pop hl
+0305 C9         ret
+0306 AF         xor a
+0307 32260C     ld ($0C26), a
+030A 2A230C     ld hl, ($0C23)
+030D 7E         ld a, (hl)
+030E 32250C     ld ($0C25), a
+0311 C9         ret
+0312 7C         ld a, h
+0313 CD3D03     call $033D
+0316 7D         ld a, l
+0317 CD3D03     call $033D
+031A 3E20       ld a, $20
+031C F7         rst $30
+031D C9         ret
+031E CD1A03     call $031A
+0321 18F7       jr $031A
+0323 EF         rst $28
+0324 2049       jr nz, $036F
+0326 6E         ld l, (hl)
+0327 63         ld h, e
+0328 6F         ld l, a
+0329 72         ld (hl), d
+032A 72         ld (hl), d
+032B 65         ld h, l
+032C 63         ld h, e
+032D 74         ld (hl), h
+032E 2063       jr nz, $0393
+0330 6F         ld l, a
+0331 6D         ld l, l
+0332 6D         ld l, l
+0333 61         ld h, c
+0334 6E         ld l, (hl)
+0335 64         ld h, h
+0336 2E20       ld l, $20
+0338 00         nop
+0339 3E0D       ld a, $0D
+033B F7         rst $30
+033C C9         ret
+033D F5         push af
+033E 81         add a, c
+033F 4F         ld c, a
+0340 F1         pop af
+0341 F5         push af
+0342 1F         rra
+0343 1F         rra
+0344 1F         rra
+0345 1F         rra
+0346 D7         rst $10
+0347 01F1E6     ld bc, $E6F1
+034A 0F         rrca
+034B C690       add a, $90
+034D 27         daa
+034E CE40       adc a, $40
+0350 27         daa
+0351 F7         rst $30
+0352 C9         ret
+0353 1A         ld a, (de)
+0354 FE20       cp $20
+0356 13         inc de
+0357 28FA       jr z, $0353
+0359 1B         dec de
+035A 210000     ld hl, $0000
+035D 22210C     ld ($0C21), hl
+0360 AF         xor a
+0361 21200C     ld hl, $0C20
+0364 77         ld (hl), a
+0365 1A         ld a, (de)
+0366 B7         or a
+0367 C8         ret z
+0368 FE20       cp $20
+036A C8         ret z
+036B D630       sub $30
+036D D8         ret c
+036E FE0A       cp $0A
+0370 380B       jr c, $037D
+0372 D607       sub $07
+0374 FE0A       cp $0A
+0376 D8         ret c
+0377 FE10       cp $10
+0379 3802       jr c, $037D
+037B 37         scf
+037C C9         ret
+037D 13         inc de
+037E 34         inc (hl)
+037F 23         inc hl
+0380 ED6F       rld
+0382 23         inc hl
+0383 ED6F       rld
+0385 2B         dec hl
+0386 2B         dec hl
+0387 28DC       jr z, $0365
+0389 1B         dec de
+038A 37         scf
+038B C9         ret
+038C 010B0C     ld bc, $0C0B
+038F AF         xor a
+0390 02         ld (bc), a
+0391 DF         rst $18
+0392 64         ld h, h
+0393 D8         ret c
+0394 7E         ld a, (hl)
+0395 B7         or a
+0396 C8         ret z
+0397 23         inc hl
+0398 03         inc bc
+0399 7E         ld a, (hl)
+039A 02         ld (bc), a
+039B 23         inc hl
+039C 03         inc bc
+039D 7E         ld a, (hl)
+039E 02         ld (bc), a
+039F 210B0C     ld hl, $0C0B
+03A2 34         inc (hl)
+03A3 7E         ld a, (hl)
+03A4 FE0B       cp $0B
+03A6 38E9       jr c, $0391
+03A8 37         scf
+03A9 C9         ret
+03AA 11000C     ld de, $0C00
+03AD 066D       ld b, $6D
+03AF AF         xor a
+03B0 12         ld (de), a
+03B1 13         inc de
+03B2 10FC       djnz $03B0
+03B4 219801     ld hl, $0198
+03B7 011100     ld bc, $0011
+03BA EDB0       ldir
+03BC EF         rst $28
+03BD 0C         inc c
+03BE 00         nop
+03BF C9         ret
+03C0 31610C     ld sp, $0C61
+03C3 210010     ld hl, $1000
+03C6 226B0C     ld ($0C6B), hl
+03C9 EF         rst $28
+03CA 0C         inc c
+03CB 0D         dec c
+03CC 0D         dec c
+03CD 0D         dec c
+03CE 0D         dec c
+03CF 44         ld b, h
+03D0 202D       jr nz, $03FF
+03D2 2044       jr nz, $0418
+03D4 72         ld (hl), d
+03D5 75         ld (hl), l
+03D6 6D         ld l, l
+03D7 2063       jr nz, $043C
+03D9 6F         ld l, a
+03DA 6D         ld l, l
+03DB 70         ld (hl), b
+03DC 75         ld (hl), l
+03DD 74         ld (hl), h
+03DE 65         ld h, l
+03DF 72         ld (hl), d
+03E0 0D         dec c
+03E1 0D         dec c
+03E2 54         ld d, h
+03E3 202D       jr nz, $0412
+03E5 2054       jr nz, $043B
+03E7 72         ld (hl), d
+03E8 61         ld h, c
+03E9 63         ld h, e
+03EA 6B         ld l, e
+03EB 2073       jr nz, $0460
+03ED 68         ld l, b
+03EE 65         ld h, l
+03EF 65         ld h, l
+03F0 74         ld (hl), h
+03F1 2E0D       ld l, $0D
+03F3 0D         dec c
+03F4 56         ld d, (hl)
+03F5 202D       jr nz, $0424
+03F7 2056       jr nz, $044F
+03F9 65         ld h, l
+03FA 72         ld (hl), d
+03FB 69         ld l, c
+03FC 66         ld h, (hl)
+03FD 79         ld a, c
+03FE 203A       jr nz, $043A
+0400 2052       jr nz, $0454
+0402 202D       jr nz, $0431
+0404 2052       jr nz, $0458
+0406 65         ld h, l
+0407 61         ld h, c
+0408 64         ld h, h
+0409 2074       jr nz, $047F
+040B 61         ld h, c
+040C 70         ld (hl), b
+040D 65         ld h, l
+040E 0D         dec c
+040F 0D         dec c
+0410 5A         ld e, d
+0411 202D       jr nz, $0440
+0413 2042       jr nz, $0457
+0415 61         ld h, c
+0416 73         ld (hl), e
+0417 69         ld l, c
+0418 63         ld h, e
+0419 2073       jr nz, $048E
+041B 74         ld (hl), h
+041C 61         ld h, c
+041D 72         ld (hl), d
+041E 74         ld (hl), h
+041F 203A       jr nz, $045B
+0421 2042       jr nz, $0465
+0423 202D       jr nz, $0452
+0425 2042       jr nz, $0469
+0427 61         ld h, c
+0428 73         ld (hl), e
+0429 69         ld l, c
+042A 63         ld h, e
+042B 2E0D       ld l, $0D
+042D 0D         dec c
+042E 0D         dec c
+042F 0D         dec c
+0430 00         nop
+0431 DF         rst $18
+0432 54         ld d, h
+0433 CDF402     call $02F4
+0436 012B0C     ld bc, $0C2B
+0439 1A         ld a, (de)
+043A FE20       cp $20
+043C 2002       jr nz, $0440
+043E 18F3       jr $0433
+0440 FE42       cp $42
+0442 3832       jr c, $0476
+0444 FE5B       cp $5B
+0446 302E       jr nc, $0476
+0448 FE50       cp $50
+044A 282A       jr z, $0476
+044C FE59       cp $59
+044E 2826       jr z, $0476
+0450 FE43       cp $43
+0452 2822       jr z, $0476
+0454 FE57       cp $57
+0456 281E       jr z, $0476
+0458 FE47       cp $47
+045A 281A       jr z, $0476
+045C FE4A       cp $4A
+045E 2816       jr z, $0476
+0460 FE53       cp $53
+0462 2812       jr z, $0476
+0464 FE51       cp $51
+0466 280E       jr z, $0476
+0468 FE54       cp $54
+046A CC8004     call z, $0480
+046D 02         ld (bc), a
+046E 320A0C     ld ($0C0A), a
+0471 13         inc de
+0472 DF         rst $18
+0473 79         ld a, c
+0474 3004       jr nc, $047A
+0476 DF         rst $18
+0477 6B         ld l, e
+0478 18B9       jr $0433
+047A DF         rst $18
+047B 60         ld h, b
+047C DF         rst $18
+047D 5C         ld e, h
+047E 18B3       jr $0433
+0480 3E51       ld a, $51
+0482 C9         ret
+0483 C8         ret z
+0484 3A250C     ld a, ($0C25)
+0487 77         ld (hl), a
+0488 C9         ret
+0489 3EFF       ld a, $FF
+048B 32260C     ld ($0C26), a
+048E F1         pop af
+048F 3A0B0C     ld a, ($0C0B)
+0492 B7         or a
+0493 2803       jr z, $0498
+0495 22690C     ld ($0C69), hl
+0498 C1         pop bc
+0499 D1         pop de
+049A E1         pop hl
+049B F1         pop af
+049C ED7B6B0C   ld sp, ($0C6B)
+04A0 E5         push hl
+04A1 2A690C     ld hl, ($0C69)
+04A4 E3         ex (sp), hl
+04A5 ED45       retn
+04A7 D5         push de
+04A8 C5         push bc
+04A9 210000     ld hl, $0000
+04AC 39         add hl, sp
+04AD 31610C     ld sp, $0C61
+04B0 11610C     ld de, $0C61
+04B3 010A00     ld bc, $000A
+04B6 EDB0       ldir
+04B8 226B0C     ld ($0C6B), hl
+04BB 18C1       jr $047E
+04BD 77         ld (hl), a
+04BE 23         inc hl
+04BF 10FC       djnz $04BD
+04C1 C9         ret
+04C2 2A0C0C     ld hl, ($0C0C)
+04C5 ED5B0E0C   ld de, ($0C0E)
+04C9 ED4B100C   ld bc, ($0C10)
+04CD C9         ret
+04CE DF         rst $18
+04CF 5F         ld e, a
+04D0 DF         rst $18
+04D1 5D         ld e, l
+04D2 DF         rst $18
+04D3 77         ld (hl), a
+04D4 E5         push hl
+04D5 AF         xor a
+04D6 47         ld b, a
+04D7 DF         rst $18
+04D8 6F         ld l, a
+04D9 10FC       djnz $04D7
+04DB DF         rst $18
+04DC 60         ld h, b
+04DD D7         rst $10
+04DE E6EB       and $EB
+04E0 37         scf
+04E1 ED52       sbc hl, de
+04E3 DA6906     jp c, $0669
+04E6 EB         ex de, hl
+04E7 AF         xor a
+04E8 FF         rst $38
+04E9 0605       ld b, $05
+04EB DF         rst $18
+04EC 6F         ld l, a
+04ED 3EFF       ld a, $FF
+04EF 10FA       djnz $04EB
+04F1 AF         xor a
+04F2 BA         cp d
+04F3 2002       jr nz, $04F7
+04F5 43         ld b, e
+04F6 04         inc b
+04F7 58         ld e, b
+04F8 7D         ld a, l
+04F9 DF         rst $18
+04FA 6F         ld l, a
+04FB 7C         ld a, h
+04FC DF         rst $18
+04FD 6F         ld l, a
+04FE 7B         ld a, e
+04FF DF         rst $18
+0500 6F         ld l, a
+0501 7A         ld a, d
+0502 DF         rst $18
+0503 6F         ld l, a
+0504 0E00       ld c, $00
+0506 DF         rst $18
+0507 6C         ld l, h
+0508 79         ld a, c
+0509 DF         rst $18
+050A 6F         ld l, a
+050B DF         rst $18
+050C 6D         ld l, l
+050D 060B       ld b, $0B
+050F 79         ld a, c
+0510 DF         rst $18
+0511 6F         ld l, a
+0512 AF         xor a
+0513 10FB       djnz $0510
+0515 EF         rst $28
+0516 2E20       ld l, $20
+0518 00         nop
+0519 18C2       jr $04DD
+051B 77         ld (hl), a
+051C E5         push hl
+051D D1         pop de
+051E 13         inc de
+051F EDB0       ldir
+0521 C9         ret
+0522 3E11       ld a, $11
+0524 F7         rst $30
+0525 1803       jr $052A
+0527 C5         push bc
+0528 D5         push de
+0529 E5         push hl
+052A AF         xor a
+052B DF         rst $18
+052C 7B         ld a, e
+052D CD6005     call $0560
+0530 38F8       jr c, $052A
+0532 320C0C     ld ($0C0C), a
+0535 C630       add a, $30
+0537 F7         rst $30
+0538 DF         rst $18
+0539 7B         ld a, e
+053A E67F       and $7F
+053C FE08       cp $08
+053E 28E2       jr z, $0522
+0540 47         ld b, a
+0541 FE0D       cp $0D
+0543 3A0C0C     ld a, ($0C0C)
+0546 2814       jr z, $055C
+0548 78         ld a, b
+0549 CD6005     call $0560
+054C 38EA       jr c, $0538
+054E 57         ld d, a
+054F C630       add a, $30
+0551 F7         rst $30
+0552 3A0C0C     ld a, ($0C0C)
+0555 5F         ld e, a
+0556 0609       ld b, $09
+0558 83         add a, e
+0559 10FD       djnz $0558
+055B 82         add a, d
+055C E1         pop hl
+055D D1         pop de
+055E C1         pop bc
+055F C9         ret
+0560 D630       sub $30
+0562 D8         ret c
+0563 FE0A       cp $0A
+0565 3F         ccf
+0566 C9         ret
+0567 7D         ld a, l
+0568 0F         rrca
+0569 DF         rst $18
+056A 68         ld l, b
+056B C33903     jp $0339
+056E 00         nop
+056F C9         ret
+0570 D5         push de
+0571 210600     ld hl, $0006
+0574 39         add hl, sp
+0575 5E         ld e, (hl)
+0576 23         inc hl
+0577 56         ld d, (hl)
+0578 EB         ex de, hl
+0579 2B         dec hl
+057A 2B         dec hl
+057B CB5E       bit 3, (hl)
+057D 23         inc hl
+057E 200B       jr nz, $058B
+0580 5E         ld e, (hl)
+0581 7B         ld a, e
+0582 17         rla
+0583 9F         sbc a, a
+0584 57         ld d, a
+0585 23         inc hl
+0586 19         add hl, de
+0587 D1         pop de
+0588 F1         pop af
+0589 E3         ex (sp), hl
+058A C9         ret
+058B 5E         ld e, (hl)
+058C 1600       ld d, $00
+058E 2A710C     ld hl, ($0C71)
+0591 19         add hl, de
+0592 19         add hl, de
+0593 5E         ld e, (hl)
+0594 23         inc hl
+0595 56         ld d, (hl)
+0596 EB         ex de, hl
+0597 18EE       jr $0587
+0599 E5         push hl
+059A F5         push af
+059B D5         push de
+059C 210A0C     ld hl, $0C0A
+059F 18EA       jr $058B
+05A1 E5         push hl
+05A2 F5         push af
+05A3 D5         push de
+05A4 18E6       jr $058C
+05A6 FF         rst $38
+05A7 FF         rst $38
+05A8 FF         rst $38
+05A9 FF         rst $38
+05AA FF         rst $38
+05AB FF         rst $38
+05AC FF         rst $38
+05AD FF         rst $38
+05AE 08         ex af, af'
+05AF FF         rst $38
+05B0 8E         adc a, (hl)
+05B1 FF         rst $38
+05B2 88         adc a, b
+05B3 09         add hl, bc
+05B4 FF         rst $38
+05B5 FF         rst $38
+05B6 FF         rst $38
+05B7 3E2E       ld a, $2E
+05B9 46         ld b, (hl)
+05BA 36BE       ld (hl), $BE
+05BC AE         xor (hl)
+05BD 0EFF       ld c, $FF
+05BF FF         rst $38
+05C0 FF         rst $38
+05C1 89         adc a, c
+05C2 FF         rst $38
+05C3 FF         rst $38
+05C4 FF         rst $38
+05C5 FF         rst $38
+05C6 14         inc d
+05C7 9C         sbc a, h
+05C8 9B         sbc a, e
+05C9 A3         and e
+05CA 92         sub d
+05CB C2BAB2     jp nz, $B2BA
+05CE AA         xor d
+05CF A2         and d
+05D0 98         sbc a, b
+05D1 A0         and b
+05D2 29         add hl, hl
+05D3 0A         ld a, (bc)
+05D4 21191A     ld hl, $1A19
+05D7 1C         inc e
+05D8 1B         dec de
+05D9 23         inc hl
+05DA 12         ld (de), a
+05DB 42         ld b, d
+05DC 3A322A     ld a, ($2A32)
+05DF 221820     ld ($2018), hl
+05E2 A9         xor c
+05E3 8A         adc a, d
+05E4 A1         and c
+05E5 99         sbc a, c
+05E6 0D         dec c
+05E7 2C         inc l
+05E8 41         ld b, c
+05E9 13         inc de
+05EA 3B         dec sp
+05EB 33         inc sp
+05EC 43         ld b, e
+05ED 1040       djnz $062F
+05EF 2D         dec l
+05F0 3830       jr c, $0622
+05F2 2831       jr z, $0625
+05F4 39         add hl, sp
+05F5 25         dec h
+05F6 1D         dec e
+05F7 24         inc h
+05F8 15         dec d
+05F9 34         inc (hl)
+05FA 45         ld b, l
+05FB 35         dec (hl)
+05FC 112B44     ld de, $442B
+05FF 3D         dec a
+0600 3C         inc a
+0601 1E9E       ld e, $9E
+0603 169A       ld d, $9A
+0605 96         sub (hl)
+0606 7D         ld a, l
+0607 32270C     ld ($0C27), a
+060A C9         ret
+060B 22230C     ld ($0C23), hl
+060E C9         ret
+060F 215F07     ld hl, $075F
+0612 DF         rst $18
+0613 71         ld (hl), c
+0614 E5         push hl
+0615 213906     ld hl, $0639
+0618 0606       ld b, $06
+061A 7E         ld a, (hl)
+061B F7         rst $30
+061C 0E14       ld c, $14
+061E AF         xor a
+061F FF         rst $38
+0620 0D         dec c
+0621 20FC       jr nz, $061F
+0623 23         inc hl
+0624 10F4       djnz $061A
+0626 DF         rst $18
+0627 57         ld d, a
+0628 AF         xor a
+0629 FF         rst $38
+062A 3E45       ld a, $45
+062C F7         rst $30
+062D 2A100C     ld hl, ($0C10)
+0630 DF         rst $18
+0631 66         ld h, (hl)
+0632 3E0D       ld a, $0D
+0634 F7         rst $30
+0635 E1         pop hl
+0636 DF         rst $18
+0637 71         ld (hl), c
+0638 C9         ret
+0639 0D         dec c
+063A 45         ld b, l
+063B 300D       jr nc, $064A
+063D 52         ld d, d
+063E 0D         dec c
+063F 0E00       ld c, $00
+0641 7E         ld a, (hl)
+0642 DF         rst $18
+0643 6F         ld l, a
+0644 81         add a, c
+0645 4F         ld c, a
+0646 23         inc hl
+0647 10F8       djnz $0641
+0649 C9         ret
+064A DF         rst $18
+064B 5F         ld e, a
+064C DF         rst $18
+064D 77         ld (hl), a
+064E E5         push hl
+064F DF         rst $18
+0650 78         ld a, b
+0651 E5         push hl
+0652 0603       ld b, $03
+0654 4F         ld c, a
+0655 CF         rst $08
+0656 B9         cp c
+0657 20F9       jr nz, $0652
+0659 10FA       djnz $0655
+065B FEFF       cp $FF
+065D 2813       jr z, $0672
+065F FE1B       cp $1B
+0661 20EF       jr nz, $0652
+0663 EF         rst $28
+0664 1800       jr $0666
+0666 E1         pop hl
+0667 DF         rst $18
+0668 72         ld (hl), d
+0669 EF         rst $28
+066A 1800       jr $066C
+066C E1         pop hl
+066D DF         rst $18
+066E 71         ld (hl), c
+066F C35100     jp $0051
+0672 CF         rst $08
+0673 6F         ld l, a
+0674 CF         rst $08
+0675 67         ld h, a
+0676 CF         rst $08
+0677 5F         ld e, a
+0678 CF         rst $08
+0679 57         ld d, a
+067A 0E00       ld c, $00
+067C DF         rst $18
+067D 6C         ld l, h
+067E CF         rst $08
+067F B9         cp c
+0680 201E       jr nz, $06A0
+0682 43         ld b, e
+0683 0E00       ld c, $00
+0685 3A2B0C     ld a, ($0C2B)
+0688 FE52       cp $52
+068A 2803       jr z, $068F
+068C CF         rst $08
+068D 1802       jr $0691
+068F CF         rst $08
+0690 77         ld (hl), a
+0691 E5         push hl
+0692 2A290C     ld hl, ($0C29)
+0695 77         ld (hl), a
+0696 E1         pop hl
+0697 81         add a, c
+0698 4F         ld c, a
+0699 23         inc hl
+069A 10E9       djnz $0685
+069C CF         rst $08
+069D B9         cp c
+069E 2806       jr z, $06A6
+06A0 EF         rst $28
+06A1 3F         ccf
+06A2 2000       jr nz, $06A4
+06A4 18AC       jr $0652
+06A6 EF         rst $28
+06A7 0620       ld b, $20
+06A9 00         nop
+06AA AF         xor a
+06AB BA         cp d
+06AC 20A4       jr nz, $0652
+06AE 18B3       jr $0663
+06B0 216607     ld hl, $0766
+06B3 DF         rst $18
+06B4 72         ld (hl), d
+06B5 216307     ld hl, $0763
+06B8 DF         rst $18
+06B9 71         ld (hl), c
+06BA C9         ret
+06BB 7D         ld a, l
+06BC 32280C     ld ($0C28), a
+06BF 216A07     ld hl, $076A
+06C2 DF         rst $18
+06C3 72         ld (hl), d
+06C4 216207     ld hl, $0762
+06C7 DF         rst $18
+06C8 71         ld (hl), c
+06C9 C9         ret
+06CA DF         rst $18
+06CB 70         ld (hl), b
+06CC D0         ret nc
+06CD E67F       and $7F
+06CF 21280C     ld hl, $0C28
+06D2 CB6E       bit 5, (hl)
+06D4 CC0107     call z, $0701
+06D7 CB4E       bit 1, (hl)
+06D9 200D       jr nz, $06E8
+06DB F5         push af
+06DC D7         rst $10
+06DD 1B         dec de
+06DE F1         pop af
+06DF B7         or a
+06E0 2806       jr z, $06E8
+06E2 FE1B       cp $1B
+06E4 2802       jr z, $06E8
+06E6 CBFE       set 7, (hl)
+06E8 37         scf
+06E9 C9         ret
+06EA F5         push af
+06EB 21280C     ld hl, $0C28
+06EE CB7E       bit 7, (hl)
+06F0 CCF706     call z, $06F7
+06F3 CBBE       res 7, (hl)
+06F5 F1         pop af
+06F6 C9         ret
+06F7 D7         rst $10
+06F8 08         ex af, af'
+06F9 FE0D       cp $0D
+06FB C0         ret nz
+06FC CB66       bit 4, (hl)
+06FE C0         ret nz
+06FF 3E0A       ld a, $0A
+0701 B7         or a
+0702 F5         push af
+0703 EA0807     jp pe, $0708
+0706 EE80       xor $80
+0708 CB46       bit 0, (hl)
+070A 2802       jr z, $070E
+070C EE80       xor $80
+070E CD5B00     call $005B
+0711 F1         pop af
+0712 C9         ret
+0713 DF         rst $18
+0714 63         ld h, e
+0715 18FC       jr $0713
+0717 DF         rst $18
+0718 78         ld a, b
+0719 216407     ld hl, $0764
+071C E5         push hl
+071D 2A730C     ld hl, ($0C73)
+0720 E3         ex (sp), hl
+0721 22730C     ld ($0C73), hl
+0724 E1         pop hl
+0725 C9         ret
+0726 216707     ld hl, $0767
+0729 E5         push hl
+072A 2A750C     ld hl, ($0C75)
+072D E3         ex (sp), hl
+072E 22750C     ld ($0C75), hl
+0731 E1         pop hl
+0732 C9         ret
+0733 E5         push hl
+0734 21750C     ld hl, $0C75
+0737 1803       jr $073C
+0739 21730C     ld hl, $0C73
+073C D5         push de
+073D C5         push bc
+073E 5E         ld e, (hl)
+073F 23         inc hl
+0740 56         ld d, (hl)
+0741 F5         push af
+0742 1A         ld a, (de)
+0743 13         inc de
+0744 B7         or a
+0745 280C       jr z, $0753
+0747 6F         ld l, a
+0748 F1         pop af
+0749 D5         push de
+074A B7         or a
+074B 5D         ld e, l
+074C CDA105     call $05A1
+074F D1         pop de
+0750 30EF       jr nc, $0741
+0752 F5         push af
+0753 F1         pop af
+0754 C1         pop bc
+0755 D1         pop de
+0756 E1         pop hl
+0757 C9         ret
+0758 6F         ld l, a
+0759 00         nop
+075A 00         nop
+075B 70         ld (hl), b
+075C 00         nop
+075D 7D         ld a, l
+075E 00         nop
+075F 65         ld h, l
+0760 6F         ld l, a
+0761 00         nop
+0762 6E         ld l, (hl)
+0763 75         ld (hl), l
+0764 65         ld h, l
+0765 00         nop
+0766 76         halt
+0767 7D         ld a, l
+0768 70         ld (hl), b
+0769 00         nop
+076A 74         ld (hl), h
+076B 7D         ld a, l
+076C 00         nop
+076D 27         daa
+076E 05         dec b
+076F FD         defb $FD
+0770 FF         rst $38
+0771 1B         dec de
+0772 05         dec b
+0773 00         nop
+0774 C0         ret nz
+0775 89         adc a, c
+0776 04         inc b
+0777 23         inc hl
+0778 03         inc bc
+0779 0F         rrca
+077A 0613       ld b, $13
+077C 07         rlca
+077D 6E         ld l, (hl)
+077E 05         dec b
+077F E40106     call po, $0601
+0782 0623       ld b, $23
+0784 03         inc bc
+0785 00         nop
+0786 00         nop
+0787 17         rla
+0788 07         rlca
+0789 BD         cp l
+078A 04         inc b
+078B 06B8       ld b, $B8
+078D 00         nop
+078E D8         ret c
+078F 4A         ld c, d
+0790 06FC       ld b, $FC
+0792 00         nop
+0793 D601       sub $01
+0795 B0         or b
+0796 064A       ld b, $4A
+0798 06CE       ld b, $CE
+079A 04         inc b
+079B BB         cp e
+079C 0600       ld b, $00
+079E B8         cp b
+079F FAFFC0     jp m, $C0FF
+07A2 03         inc bc
+07A3 99         sbc a, c
+07A4 05         dec b
+07A5 3E00       ld a, $00
+07A7 45         ld b, l
+07A8 00         nop
+07A9 51         ld d, c
+07AA 00         nop
+07AB C204CE     jp nz, $CE04
+07AE 00         nop
+07AF 33         inc sp
+07B0 07         rlca
+07B1 F40253     call p, $5302
+07B4 03         inc bc
+07B5 A9         xor c
+07B6 011203     ld bc, $0312
+07B9 3D         dec a
+07BA 03         inc bc
+07BB 41         ld b, c
+07BC 03         inc bc
+07BD 1A         ld a, (de)
+07BE 03         inc bc
+07BF 39         add hl, sp
+07C0 03         inc bc
+07C1 23         inc hl
+07C2 03         inc bc
+07C3 1A         ld a, (de)
+07C4 00         nop
+07C5 3F         ccf
+07C6 06EA       ld b, $EA
+07C8 065B       ld b, $5B
+07CA 00         nop
+07CB 87         add a, a
+07CC 00         nop
+07CD 1C         inc e
+07CE 07         rlca
+07CF 29         add hl, hl
+07D0 07         rlca
+07D1 3C         inc a
+07D2 07         rlca
+07D3 CA0677     jp z, $7706
+07D6 0C         inc c
+07D7 7A         ld a, d
+07D8 0C         inc c
+07D9 19         add hl, de
+07DA 07         rlca
+07DB 2607       ld h, $07
+07DD 8C         adc a, h
+07DE 03         inc bc
+07DF 49         ld c, c
+07E0 03         inc bc
+07E1 78         ld a, b
+07E2 00         nop
+07E3 C602       add a, $02
+07E5 8E         adc a, (hl)
+07E6 00         nop
+07E7 1E03       ld e, $03
+07E9 A1         and c
+07EA 05         dec b
+07EB 00         nop
+07EC 00         nop
+07ED 00         nop
+07EE 00         nop
+07EF 00         nop
+07F0 00         nop
+07F1 00         nop
+07F2 00         nop
+07F3 00         nop
+07F4 00         nop
+07F5 00         nop
+07F6 00         nop
+07F7 00         nop
+07F8 00         nop
+07F9 00         nop
+07FA 00         nop
+07FB 00         nop
+07FC 00         nop
+07FD 00         nop
+07FE 00         nop
+07FF 00         nop
+C000 C3D6C0     jp $C0D6
+C003 C35FC3     jp $C35F
+C006 42         ld b, d
+C007 2E50       ld l, $50
+C009 2E4D       ld l, $4D
+C00B 2E3E       ld l, $3E
+C00D 3E20       ld a, $20
+C00F 52         ld d, d
+C010 55         ld d, l
+C011 4E         ld c, (hl)
+C012 4E         ld c, (hl)
+C013 49         ld c, c
+C014 4E         ld c, (hl)
+C015 47         ld b, a
+C016 203C       jr nz, $C054
+C018 3C         inc a
+C019 3E3E       ld a, $3E
+C01B 2054       jr nz, $C071
+C01D 52         ld d, d
+C01E 41         ld b, c
+C01F 4E         ld c, (hl)
+C020 53         ld d, e
+C021 46         ld b, (hl)
+C022 45         ld b, l
+C023 52         ld d, d
+C024 2052       jr nz, $C078
+C026 48         ld c, b
+C027 59         ld e, c
+C028 54         ld d, h
+C029 48         ld c, b
+C02A 4D         ld c, l
+C02B 53         ld d, e
+C02C 203C       jr nz, $C06A
+C02E 3C         inc a
+C02F 3E3E       ld a, $3E
+C031 2050       jr nz, $C083
+C033 4C         ld c, h
+C034 41         ld b, c
+C035 59         ld e, c
+C036 49         ld c, c
+C037 4E         ld c, (hl)
+C038 47         ld b, a
+C039 2020       jr nz, $C05B
+C03B 52         ld d, d
+C03C 48         ld c, b
+C03D 59         ld e, c
+C03E 54         ld d, h
+C03F 48         ld c, b
+C040 4D         ld c, l
+C041 53         ld d, e
+C042 203C       jr nz, $C080
+C044 3C         inc a
+C045 3E3E       ld a, $3E
+C047 2020       jr nz, $C069
+C049 45         ld b, l
+C04A 52         ld d, d
+C04B 41         ld b, c
+C04C 53         ld d, e
+C04D 49         ld c, c
+C04E 4E         ld c, (hl)
+C04F 47         ld b, a
+C050 2052       jr nz, $C0A4
+C052 48         ld c, b
+C053 59         ld e, c
+C054 54         ld d, h
+C055 48         ld c, b
+C056 4D         ld c, l
+C057 2020       jr nz, $C079
+C059 3C         inc a
+C05A 3C         inc a
+C05B 53         ld d, e
+C05C 41         ld b, c
+C05D 56         ld d, (hl)
+C05E 49         ld c, c
+C05F 4E         ld c, (hl)
+C060 47         ld b, a
+C061 2052       jr nz, $C0B5
+C063 48         ld c, b
+C064 59         ld e, c
+C065 54         ld d, h
+C066 48         ld c, b
+C067 4D         ld c, l
+C068 53         ld d, e
+C069 204F       jr nz, $C0BA
+C06B 4E         ld c, (hl)
+C06C 2054       jr nz, $C0C2
+C06E 41         ld b, c
+C06F 50         ld d, b
+C070 45         ld b, l
+C071 55         ld d, l
+C072 73         ld (hl), e
+C073 65         ld h, l
+C074 2073       jr nz, $C0E9
+C076 70         ld (hl), b
+C077 61         ld h, c
+C078 63         ld h, e
+C079 65         ld h, l
+C07A 2062       jr nz, $C0DE
+C07C 61         ld h, c
+C07D 72         ld (hl), d
+C07E 2074       jr nz, $C0F4
+C080 6F         ld l, a
+C081 2070       jr nz, $C0F3
+C083 61         ld h, c
+C084 75         ld (hl), l
+C085 73         ld (hl), e
+C086 65         ld h, l
+C087 54         ld d, h
+C088 79         ld a, c
+C089 70         ld (hl), b
+C08A 65         ld h, l
+C08B 2073       jr nz, $C100
+C08D 65         ld h, l
+C08E 71         ld (hl), c
+C08F 75         ld (hl), l
+C090 65         ld h, l
+C091 6E         ld l, (hl)
+C092 63         ld h, e
+C093 65         ld h, l
+C094 203A       jr nz, $C0D0
+C096 2050       jr nz, $C0E8
+C098 41         ld b, c
+C099 47         ld b, a
+C09A 45         ld b, l
+C09B 2046       jr nz, $C0E3
+C09D 55         ld d, l
+C09E 4C         ld c, h
+C09F 4C         ld c, h
+C0A0 2E20       ld l, $20
+C0A2 3E20       ld a, $20
+C0A4 49         ld c, c
+C0A5 4E         ld c, (hl)
+C0A6 46         ld b, (hl)
+C0A7 4F         ld c, a
+C0A8 52         ld d, d
+C0A9 4D         ld c, l
+C0AA 41         ld b, c
+C0AB 54         ld d, h
+C0AC 49         ld c, c
+C0AD 4F         ld c, a
+C0AE 4E         ld c, (hl)
+C0AF 203C       jr nz, $C0ED
+C0B1 2031       jr nz, $C0E4
+C0B3 07         rlca
+C0B4 41         ld b, c
+C0B5 05         dec b
+C0B6 320334     ld ($3403), a
+C0B9 013800     ld bc, $0038
+C0BC 46         ld b, (hl)
+C0BD FA480F     jp m, $0F48
+C0C0 3A1F31     ld a, ($311F)
+C0C3 05         dec b
+C0C4 41         ld b, c
+C0C5 04         inc b
+C0C6 54         ld d, h
+C0C7 03         inc bc
+C0C8 320233     ld ($3302), a
+C0CB 013600     ld bc, $0036
+C0CE 46         ld b, (hl)
+C0CF FA480B     jp m, $0B48
+C0D2 3A177D     ld a, ($7D17)
+C0D5 00         nop
+C0D6 21D4C0     ld hl, $C0D4
+C0D9 22750C     ld ($0C75), hl
+C0DC CD54C3     call $C354
+C0DF DF         rst $18
+C0E0 54         ld d, h
+C0E1 2136C3     ld hl, $C336
+C0E4 114A08     ld de, $084A
+C0E7 011400     ld bc, $0014
+C0EA EDB0       ldir
+C0EC EF         rst $28
+C0ED 0D         dec c
+C0EE 0D         dec c
+C0EF 0D         dec c
+C0F0 43         ld b, e
+C0F1 202D       jr nz, $C120
+C0F3 2043       jr nz, $C138
+C0F5 6F         ld l, a
+C0F6 6E         ld l, (hl)
+C0F7 74         ld (hl), h
+C0F8 69         ld l, c
+C0F9 6E         ld l, (hl)
+C0FA 75         ld (hl), l
+C0FB 65         ld h, l
+C0FC 2E0D       ld l, $0D
+C0FE 0D         dec c
+C0FF 4E         ld c, (hl)
+C100 202D       jr nz, $C12F
+C102 204E       jr nz, $C152
+C104 4F         ld c, a
+C105 52         ld d, d
+C106 4D         ld c, l
+C107 41         ld b, c
+C108 4C         ld c, h
+C109 2020       jr nz, $C12B
+C10B 73         ld (hl), e
+C10C 74         ld (hl), h
+C10D 61         ld h, c
+C10E 72         ld (hl), d
+C10F 74         ld (hl), h
+C110 2028       jr nz, $C13A
+C112 34         inc (hl)
+C113 3829       jr c, $C13E
+C115 0D         dec c
+C116 0D         dec c
+C117 53         ld d, e
+C118 202D       jr nz, $C147
+C11A 2053       jr nz, $C16F
+C11C 48         ld c, b
+C11D 55         ld d, l
+C11E 46         ld b, (hl)
+C11F 46         ld b, (hl)
+C120 4C         ld c, h
+C121 45         ld b, l
+C122 2073       jr nz, $C197
+C124 74         ld (hl), h
+C125 61         ld h, c
+C126 72         ld (hl), d
+C127 74         ld (hl), h
+C128 2028       jr nz, $C152
+C12A 3634       ld (hl), $34
+C12C 29         add hl, hl
+C12D 0D         dec c
+C12E 0D         dec c
+C12F 48         ld c, b
+C130 202D       jr nz, $C15F
+C132 2048       jr nz, $C17C
+C134 49         ld c, c
+C135 47         ld b, a
+C136 48         ld c, b
+C137 2020       jr nz, $C159
+C139 2020       jr nz, $C15B
+C13B 73         ld (hl), e
+C13C 74         ld (hl), h
+C13D 61         ld h, c
+C13E 72         ld (hl), d
+C13F 74         ld (hl), h
+C140 2028       jr nz, $C16A
+C142 313238     ld sp, $3832
+C145 29         add hl, hl
+C146 0D         dec c
+C147 0D         dec c
+C148 0D         dec c
+C149 4D         ld c, l
+C14A 43         ld b, e
+C14B 53         ld d, e
+C14C 49         ld c, c
+C14D 49         ld c, c
+C14E 2E28       ld l, $28
+C150 63         ld h, e
+C151 29         add hl, hl
+C152 203A       jr nz, $C18E
+C154 2053       jr nz, $C1A9
+C156 65         ld h, l
+C157 72         ld (hl), d
+C158 2033       jr nz, $C18D
+C15A 3030       jr nc, $C18C
+C15C 33         inc sp
+C15D 203A       jr nz, $C199
+C15F 00         nop
+C160 CF         rst $08
+C161 E67F       and $7F
+C163 FE43       cp $43
+C165 CA81C1     jp z, $C181
+C168 FE63       cp $63
+C16A CA5FC3     jp z, $C35F
+C16D FE53       cp $53
+C16F CAA9C1     jp z, $C1A9
+C172 FE48       cp $48
+C174 2833       jr z, $C1A9
+C176 FE4E       cp $4E
+C178 282F       jr z, $C1A9
+C17A FE0C       cp $0C
+C17C CA52C3     jp z, $C352
+C17F 18DF       jr $C160
+C181 3A2A28     ld a, ($282A)
+C184 FE00       cp $00
+C186 38D8       jr c, $C160
+C188 FE0A       cp $0A
+C18A 30D4       jr nc, $C160
+C18C C35FC3     jp $C35F
+C18F CD22D4     call $D422
+C192 1600       ld d, $00
+C194 3A2228     ld a, ($2822)
+C197 5F         ld e, a
+C198 19         add hl, de
+C199 C9         ret
+C19A 215028     ld hl, $2850
+C19D CD8FC1     call $C18F
+C1A0 7E         ld a, (hl)
+C1A1 320B28     ld ($280B), a
+C1A4 C9         ret
+C1A5 2A0028     ld hl, ($2800)
+C1A8 E9         jp (hl)
+C1A9 F5         push af
+C1AA EF         rst $28
+C1AB 43         ld b, e
+C1AC 6F         ld l, a
+C1AD 6E         ld l, (hl)
+C1AE 66         ld h, (hl)
+C1AF 69         ld l, c
+C1B0 72         ld (hl), d
+C1B1 6D         ld l, l
+C1B2 2074       jr nz, $C228
+C1B4 6F         ld l, a
+C1B5 2063       jr nz, $C21A
+C1B7 6C         ld l, h
+C1B8 65         ld h, l
+C1B9 61         ld h, c
+C1BA 72         ld (hl), d
+C1BB 2073       jr nz, $C230
+C1BD 74         ld (hl), h
+C1BE 6F         ld l, a
+C1BF 72         ld (hl), d
+C1C0 65         ld h, l
+C1C1 2059       jr nz, $C21C
+C1C3 1100DF     ld de, $DF00
+C1C6 7B         ld a, e
+C1C7 E67F       and $7F
+C1C9 FE59       cp $59
+C1CB C2D6C0     jp nz, $C0D6
+C1CE 210028     ld hl, $2800
+C1D1 010068     ld bc, $6800
+C1D4 3E00       ld a, $00
+C1D6 DF         rst $18
+C1D7 43         ld b, e
+C1D8 CD54C3     call $C354
+C1DB 210008     ld hl, $0800
+C1DE 11003F     ld de, $3F00
+C1E1 018003     ld bc, $0380
+C1E4 EDB0       ldir
+C1E6 3E00       ld a, $00
+C1E8 323528     ld ($2835), a
+C1EB 3E01       ld a, $01
+C1ED 323428     ld ($2834), a
+C1F0 060A       ld b, $0A
+C1F2 78         ld a, b
+C1F3 3D         dec a
+C1F4 322A28     ld ($282A), a
+C1F7 C5         push bc
+C1F8 21F029     ld hl, $29F0
+C1FB CD22D4     call $D422
+C1FE 3E2E       ld a, $2E
+C200 010F01     ld bc, $010F
+C203 DF         rst $18
+C204 43         ld b, e
+C205 C1         pop bc
+C206 10EA       djnz $C1F2
+C208 215FC3     ld hl, $C35F
+C20B 220028     ld ($2800), hl
+C20E 210A08     ld hl, $080A
+C211 221828     ld ($2818), hl
+C214 060A       ld b, $0A
+C216 78         ld a, b
+C217 322A28     ld ($282A), a
+C21A 214A08     ld hl, $084A
+C21D CD6ACF     call $CF6A
+C220 218028     ld hl, $2880
+C223 CD22D4     call $D422
+C226 C5         push bc
+C227 013801     ld bc, $0138
+C22A 3E20       ld a, $20
+C22C DF         rst $18
+C22D 43         ld b, e
+C22E C1         pop bc
+C22F 10E5       djnz $C216
+C231 213328     ld hl, $2833
+C234 3E01       ld a, $01
+C236 77         ld (hl), a
+C237 F1         pop af
+C238 0610       ld b, $10
+C23A FD210328   ld iy, $2803
+C23E FDCB00E6   set 4, (iy)
+C242 FE48       cp $48
+C244 2814       jr z, $C25A
+C246 F5         push af
+C247 3E02       ld a, $02
+C249 77         ld (hl), a
+C24A F1         pop af
+C24B 060C       ld b, $0C
+C24D FE53       cp $53
+C24F 2809       jr z, $C25A
+C251 FDCB00A6   res 4, (iy)
+C255 0608       ld b, $08
+C257 3E03       ld a, $03
+C259 77         ld (hl), a
+C25A 78         ld a, b
+C25B 321228     ld ($2812), a
+C25E AF         xor a
+C25F 322A28     ld ($282A), a
+C262 C35FC3     jp $C35F
+C265 CD54C3     call $C354
+C268 DF         rst $18
+C269 54         ld d, h
+C26A CD37D4     call $D437
+C26D 3A3428     ld a, ($2834)
+C270 CB47       bit 0, a
+C272 2003       jr nz, $C277
+C274 CDADD4     call $D4AD
+C277 210A08     ld hl, $080A
+C27A 22290C     ld ($0C29), hl
+C27D CD4ED4     call $D44E
+C280 3A2A28     ld a, ($282A)
+C283 C630       add a, $30
+C285 F7         rst $30
+C286 EF         rst $28
+C287 202D       jr nz, $C2B6
+C289 2050       jr nz, $C2DB
+C28B 61         ld h, c
+C28C 67         ld h, a
+C28D 65         ld h, l
+C28E 204E       jr nz, $C2DE
+C290 6F         ld l, a
+C291 2020       jr nz, $C2B3
+C293 2020       jr nz, $C2B5
+C295 2020       jr nz, $C2B7
+C297 2028       jr nz, $C2C1
+C299 2030       jr nz, $C2CB
+C29B 2074       jr nz, $C311
+C29D 6F         ld l, a
+C29E 2039       jr nz, $C2D9
+C2A0 2029       jr nz, $C2CB
+C2A2 0D         dec c
+C2A3 43         ld b, e
+C2A4 202D       jr nz, $C2D3
+C2A6 2043       jr nz, $C2EB
+C2A8 6F         ld l, a
+C2A9 6D         ld l, l
+C2AA 70         ld (hl), b
+C2AB 6F         ld l, a
+C2AC 73         ld (hl), e
+C2AD 65         ld h, l
+C2AE 0D         dec c
+C2AF 50         ld d, b
+C2B0 202D       jr nz, $C2DF
+C2B2 2050       jr nz, $C304
+C2B4 6C         ld l, h
+C2B5 61         ld h, c
+C2B6 79         ld a, c
+C2B7 2C         inc l
+C2B8 6D         ld l, l
+C2B9 6F         ld l, a
+C2BA 64         ld h, h
+C2BB 69         ld l, c
+C2BC 66         ld h, (hl)
+C2BD 79         ld a, c
+C2BE 0D         dec c
+C2BF 45         ld b, l
+C2C0 202D       jr nz, $C2EF
+C2C2 2045       jr nz, $C309
+C2C4 72         ld (hl), d
+C2C5 61         ld h, c
+C2C6 73         ld (hl), e
+C2C7 65         ld h, l
+C2C8 0D         dec c
+C2C9 54         ld d, h
+C2CA 202D       jr nz, $C2F9
+C2CC 2054       jr nz, $C322
+C2CE 72         ld (hl), d
+C2CF 61         ld h, c
+C2D0 6E         ld l, (hl)
+C2D1 73         ld (hl), e
+C2D2 66         ld h, (hl)
+C2D3 65         ld h, l
+C2D4 72         ld (hl), d
+C2D5 0D         dec c
+C2D6 52         ld d, d
+C2D7 202D       jr nz, $C306
+C2D9 2052       jr nz, $C32D
+C2DB 75         ld (hl), l
+C2DC 6E         ld l, (hl)
+C2DD 2063       jr nz, $C342
+C2DF 68         ld l, b
+C2E0 61         ld h, c
+C2E1 69         ld l, c
+C2E2 6E         ld l, (hl)
+C2E3 0D         dec c
+C2E4 41         ld b, c
+C2E5 202D       jr nz, $C314
+C2E7 2041       jr nz, $C32A
+C2E9 73         ld (hl), e
+C2EA 73         ld (hl), e
+C2EB 65         ld h, l
+C2EC 6D         ld l, l
+C2ED 62         ld h, d
+C2EE 6C         ld l, h
+C2EF 65         ld h, l
+C2F0 2063       jr nz, $C355
+C2F2 68         ld l, b
+C2F3 61         ld h, c
+C2F4 69         ld l, c
+C2F5 6E         ld l, (hl)
+C2F6 0D         dec c
+C2F7 49         ld c, c
+C2F8 202D       jr nz, $C327
+C2FA 2049       jr nz, $C345
+C2FC 6E         ld l, (hl)
+C2FD 66         ld h, (hl)
+C2FE 6F         ld l, a
+C2FF 2070       jr nz, $C371
+C301 61         ld h, c
+C302 67         ld h, a
+C303 65         ld h, l
+C304 2020       jr nz, $C326
+C306 2020       jr nz, $C328
+C308 2020       jr nz, $C32A
+C30A 3A2048     ld a, ($4820)
+C30D 202D       jr nz, $C33C
+C30F 2048       jr nz, $C359
+C311 65         ld h, l
+C312 6C         ld l, h
+C313 70         ld (hl), b
+C314 0D         dec c
+C315 53         ld d, e
+C316 202D       jr nz, $C345
+C318 2053       jr nz, $C36D
+C31A 61         ld h, c
+C31B 76         halt
+C31C 65         ld h, l
+C31D 206F       jr nz, $C38E
+C31F 6E         ld l, (hl)
+C320 2074       jr nz, $C396
+C322 61         ld h, c
+C323 70         ld (hl), b
+C324 65         ld h, l
+C325 2020       jr nz, $C347
+C327 203A       jr nz, $C363
+C329 2058       jr nz, $C383
+C32B 202D       jr nz, $C35A
+C32D 2000       jr nz, $C32F
+C32F CDC4D4     call $D4C4
+C332 EF         rst $28
+C333 2E0D       ld l, $0D
+C335 0D         dec c
+C336 54         ld d, h
+C337 79         ld a, c
+C338 70         ld (hl), b
+C339 65         ld h, l
+C33A 2063       jr nz, $C39F
+C33C 6F         ld l, a
+C33D 6D         ld l, l
+C33E 6D         ld l, l
+C33F 61         ld h, c
+C340 6E         ld l, (hl)
+C341 64         ld h, h
+C342 206C       jr nz, $C3B0
+C344 65         ld h, l
+C345 74         ld (hl), h
+C346 74         ld (hl), h
+C347 65         ld h, l
+C348 72         ld (hl), d
+C349 2E00       ld l, $00
+C34B 214A0B     ld hl, $0B4A
+C34E CD4ED4     call $D44E
+C351 C9         ret
+C352 DF         rst $18
+C353 5B         ld e, e
+C354 3E0C       ld a, $0C
+C356 F7         rst $30
+C357 C9         ret
+C358 3EFC       ld a, $FC
+C35A D301       out ($01), a
+C35C CD71C4     call $C471
+C35F 310010     ld sp, $1000
+C362 F3         di
+C363 21D4C0     ld hl, $C0D4
+C366 22750C     ld ($0C75), hl
+C369 CD65C2     call $C265
+C36C 210428     ld hl, $2804
+C36F CBAE       res 5, (hl)
+C371 213428     ld hl, $2834
+C374 CB8E       res 1, (hl)
+C376 210328     ld hl, $2803
+C379 CBC6       set 0, (hl)
+C37B CBAE       res 5, (hl)
+C37D CBB6       res 6, (hl)
+C37F CBD6       set 2, (hl)
+C381 CB66       bit 4, (hl)
+C383 2004       jr nz, $C389
+C385 3E01       ld a, $01
+C387 1802       jr $C38B
+C389 3E03       ld a, $03
+C38B 320928     ld ($2809), a
+C38E 3E32       ld a, $32
+C390 320A28     ld ($280A), a
+C393 3A1228     ld a, ($2812)
+C396 FE0C       cp $0C
+C398 C216C4     jp nz, $C416
+C39B 3E02       ld a, $02
+C39D 320928     ld ($2809), a
+C3A0 C316C4     jp $C416
+C3A3 DB01       in a, ($01)
+C3A5 FE0A       cp $0A
+C3A7 300D       jr nc, $C3B6
+C3A9 322A28     ld ($282A), a
+C3AC C35FC3     jp $C35F
+C3AF AF         xor a
+C3B0 322A28     ld ($282A), a
+C3B3 C35FC3     jp $C35F
+C3B6 3A3428     ld a, ($2834)
+C3B9 CB47       bit 0, a
+C3BB 2806       jr z, $C3C3
+C3BD CD70CC     call $CC70
+C3C0 C216C4     jp nz, $C416
+C3C3 DB02       in a, ($02)
+C3C5 17         rla
+C3C6 D216C4     jp nc, $C416
+C3C9 DB01       in a, ($01)
+C3CB FEF8       cp $F8
+C3CD CA16C4     jp z, $C416
+C3D0 1818       jr $C3EA
+C3D2 010000     ld bc, $0000
+C3D5 DB02       in a, ($02)
+C3D7 17         rla
+C3D8 380E       jr c, $C3E8
+C3DA CD70CC     call $CC70
+C3DD 0B         dec bc
+C3DE 78         ld a, b
+C3DF B1         or c
+C3E0 20F3       jr nz, $C3D5
+C3E2 CD37D4     call $D437
+C3E5 C316C4     jp $C416
+C3E8 DB01       in a, ($01)
+C3EA 5F         ld e, a
+C3EB E6F0       and $F0
+C3ED FE90       cp $90
+C3EF C2D5C3     jp nz, $C3D5
+C3F2 7B         ld a, e
+C3F3 E60F       and $0F
+C3F5 213528     ld hl, $2835
+C3F8 BE         cp (hl)
+C3F9 CA45C7     jp z, $C745
+C3FC C316C4     jp $C416
+C3FF 21720A     ld hl, $0A72
+C402 22290C     ld ($0C29), hl
+C405 DF         rst $18
+C406 41         ld b, c
+C407 FE11       cp $11
+C409 3008       jr nc, $C413
+C40B FE00       cp $00
+C40D 3804       jr c, $C413
+C40F 3D         dec a
+C410 323528     ld ($2835), a
+C413 CDADD4     call $D4AD
+C416 DF         rst $18
+C417 62         ld h, d
+C418 D2B6C3     jp nc, $C3B6
+C41B E67F       and $7F
+C41D FE1B       cp $1B
+C41F CAA5C1     jp z, $C1A5
+C422 FE0C       cp $0C
+C424 CA52C3     jp z, $C352
+C427 FE58       cp $58
+C429 CA78C4     jp z, $C478
+C42C FE78       cp $78
+C42E CAFFC3     jp z, $C3FF
+C431 FE45       cp $45
+C433 CA65D2     jp z, $D265
+C436 FE43       cp $43
+C438 CAABC4     jp z, $C4AB
+C43B FE50       cp $50
+C43D CA5AD0     jp z, $D05A
+C440 FE52       cp $52
+C442 CA8DCE     jp z, $CE8D
+C445 FE41       cp $41
+C447 CA4BC6     jp z, $C64B
+C44A FE54       cp $54
+C44C CA10D1     jp z, $D110
+C44F FE48       cp $48
+C451 CAD9D4     jp z, $D4D9
+C454 FE49       cp $49
+C456 CAF6D1     jp z, $D1F6
+C459 FE53       cp $53
+C45B CA5FC5     jp z, $C55F
+C45E D630       sub $30
+C460 FA16C4     jp m, $C416
+C463 D60A       sub $0A
+C465 F216C4     jp p, $C416
+C468 57         ld d, a
+C469 C60A       add a, $0A
+C46B 322A28     ld ($282A), a
+C46E C35FC3     jp $C35F
+C471 DB02       in a, ($02)
+C473 CB77       bit 6, a
+C475 28FA       jr z, $C471
+C477 C9         ret
+C478 CD9DD4     call $D49D
+C47B 21630A     ld hl, $0A63
+C47E 22290C     ld ($0C29), hl
+C481 CDC4D4     call $D4C4
+C484 CDADD4     call $D4AD
+C487 C316C4     jp $C416
+C48A E5         push hl
+C48B 2A290C     ld hl, ($0C29)
+C48E E5         push hl
+C48F 21CA0B     ld hl, $0BCA
+C492 22290C     ld ($0C29), hl
+C495 EF         rst $28
+C496 50         ld d, b
+C497 61         ld h, c
+C498 67         ld h, a
+C499 65         ld h, l
+C49A 2000       jr nz, $C49C
+C49C 3A2A28     ld a, ($282A)
+C49F C630       add a, $30
+C4A1 21CF0B     ld hl, $0BCF
+C4A4 77         ld (hl), a
+C4A5 E1         pop hl
+C4A6 22290C     ld ($0C29), hl
+C4A9 E1         pop hl
+C4AA C9         ret
+C4AB CD3AD0     call $D03A
+C4AE 210428     ld hl, $2804
+C4B1 CBFE       set 7, (hl)
+C4B3 210328     ld hl, $2803
+C4B6 CB7E       bit 7, (hl)
+C4B8 CAEBC4     jp z, $C4EB
+C4BB CD54C3     call $C354
+C4BE 2197C0     ld hl, $C097
+C4C1 11CB09     ld de, $09CB
+C4C4 010A00     ld bc, $000A
+C4C7 EDB0       ldir
+C4C9 CDCFC4     call $C4CF
+C4CC C35FC3     jp $C35F
+C4CF D9         exx
+C4D0 011400     ld bc, $0014
+C4D3 3EFF       ld a, $FF
+C4D5 FF         rst $38
+C4D6 10FB       djnz $C4D3
+C4D8 D9         exx
+C4D9 C9         ret
+C4DA DF         rst $18
+C4DB 7B         ld a, e
+C4DC E67F       and $7F
+C4DE FE0D       cp $0D
+C4E0 C8         ret z
+C4E1 FE1B       cp $1B
+C4E3 C8         ret z
+C4E4 F7         rst $30
+C4E5 AF         xor a
+C4E6 B8         cp b
+C4E7 C8         ret z
+C4E8 05         dec b
+C4E9 18EF       jr $C4DA
+C4EB CD54C3     call $C354
+C4EE CD15CD     call $CD15
+C4F1 21D908     ld hl, $08D9
+C4F4 22290C     ld ($0C29), hl
+C4F7 0619       ld b, $19
+C4F9 CDDAC4     call $C4DA
+C4FC FE1B       cp $1B
+C4FE CA5FC3     jp z, $C35F
+C501 CD1ECE     call $CE1E
+C504 EB         ex de, hl
+C505 21D908     ld hl, $08D9
+C508 011A00     ld bc, $001A
+C50B EDB0       ldir
+C50D FD219809   ld iy, $0998
+C511 FD36003F   ld (iy), $3F
+C515 FD360120   ld (iy+$01), $20
+C519 FD36193F   ld (iy+$19), $3F
+C51D FD361A20   ld (iy+$1A), $20
+C521 219809     ld hl, $0998
+C524 22290C     ld ($0C29), hl
+C527 DF         rst $18
+C528 41         ld b, c
+C529 CDD0D3     call $D3D0
+C52C A7         and a
+C52D 28DE       jr z, $C50D
+C52F 21B109     ld hl, $09B1
+C532 22290C     ld ($0C29), hl
+C535 DF         rst $18
+C536 41         ld b, c
+C537 CD01D4     call $D401
+C53A A7         and a
+C53B 28D0       jr z, $C50D
+C53D CD9DCF     call $CF9D
+C540 2A2428     ld hl, ($2824)
+C543 7D         ld a, l
+C544 B4         or h
+C545 28C6       jr z, $C50D
+C547 E5         push hl
+C548 C1         pop bc
+C549 CD09D4     call $D409
+C54C 2A2628     ld hl, ($2826)
+C54F ED42       sbc hl, bc
+C551 38BA       jr c, $C50D
+C553 FA0DC5     jp m, $C50D
+C556 CD7ECF     call $CF7E
+C559 CDE6D2     call $D2E6
+C55C C3A3C7     jp $C7A3
+C55F 210044     ld hl, $4400
+C562 221628     ld ($2816), hl
+C565 CD54C3     call $C354
+C568 215BC0     ld hl, $C05B
+C56B CD58D4     call $D458
+C56E 214A08     ld hl, $084A
+C571 22290C     ld ($0C29), hl
+C574 EF         rst $28
+C575 45         ld b, l
+C576 4E         ld c, (hl)
+C577 53         ld d, e
+C578 55         ld d, l
+C579 52         ld d, d
+C57A 45         ld b, l
+C57B 204D       jr nz, $C5CA
+C57D 49         ld c, c
+C57E 44         ld b, h
+C57F 49         ld c, c
+C580 2053       jr nz, $C5D5
+C582 57         ld d, a
+C583 49         ld c, c
+C584 54         ld d, h
+C585 43         ld b, e
+C586 48         ld c, b
+C587 2049       jr nz, $C5D2
+C589 53         ld d, e
+C58A 2049       jr nz, $C5D5
+C58C 4E         ld c, (hl)
+C58D 2054       jr nz, $C5E3
+C58F 41         ld b, c
+C590 50         ld d, b
+C591 45         ld b, l
+C592 2050       jr nz, $C5E4
+C594 4F         ld c, a
+C595 53         ld d, e
+C596 49         ld c, c
+C597 54         ld d, h
+C598 49         ld c, c
+C599 4F         ld c, a
+C59A 4E         ld c, (hl)
+C59B 2021       jr nz, $C5BE
+C59D 0D         dec c
+C59E 0D         dec c
+C59F 0D         dec c
+C5A0 53         ld d, e
+C5A1 61         ld h, c
+C5A2 76         halt
+C5A3 65         ld h, l
+C5A4 2070       jr nz, $C616
+C5A6 61         ld h, c
+C5A7 67         ld h, a
+C5A8 65         ld h, l
+C5A9 204E       jr nz, $C5F9
+C5AB 6F         ld l, a
+C5AC 27         daa
+C5AD 73         ld (hl), e
+C5AE 2030       jr nz, $C5E0
+C5B0 2074       jr nz, $C626
+C5B2 6F         ld l, a
+C5B3 203F       jr nz, $C5F4
+C5B5 110000     ld de, $0000
+C5B8 DF         rst $18
+C5B9 7B         ld a, e
+C5BA E67F       and $7F
+C5BC FE30       cp $30
+C5BE DA5FC3     jp c, $C35F
+C5C1 FE3A       cp $3A
+C5C3 D25FC3     jp nc, $C35F
+C5C6 F7         rst $30
+C5C7 DE30       sbc a, $30
+C5C9 47         ld b, a
+C5CA FE00       cp $00
+C5CC 280C       jr z, $C5DA
+C5CE 2A1628     ld hl, ($2816)
+C5D1 110008     ld de, $0800
+C5D4 19         add hl, de
+C5D5 10FD       djnz $C5D4
+C5D7 221628     ld ($2816), hl
+C5DA EF         rst $28
+C5DB 0D         dec c
+C5DC 0D         dec c
+C5DD 2054       jr nz, $C633
+C5DF 6F         ld l, a
+C5E0 2047       jr nz, $C629
+C5E2 6F         ld l, a
+C5E3 2070       jr nz, $C655
+C5E5 72         ld (hl), d
+C5E6 65         ld h, l
+C5E7 73         ld (hl), e
+C5E8 73         ld (hl), e
+C5E9 2054       jr nz, $C63F
+C5EB 1100DF     ld de, $DF00
+C5EE 7B         ld a, e
+C5EF FE54       cp $54
+C5F1 C25FC3     jp nz, $C35F
+C5F4 0602       ld b, $02
+C5F6 CDCFC4     call $C4CF
+C5F9 10FB       djnz $C5F6
+C5FB 210028     ld hl, $2800
+C5FE 220C0C     ld ($0C0C), hl
+C601 ED5B1628   ld de, ($2816)
+C605 ED530E0C   ld ($0C0E), de
+C609 0103C0     ld bc, $C003
+C60C ED43100C   ld ($0C10), bc
+C610 DF         rst $18
+C611 47         ld b, a
+C612 EF         rst $28
+C613 200D       jr nz, $C622
+C615 0D         dec c
+C616 0D         dec c
+C617 46         ld b, (hl)
+C618 69         ld l, c
+C619 6E         ld l, (hl)
+C61A 69         ld l, c
+C61B 73         ld (hl), e
+C61C 68         ld l, b
+C61D 65         ld h, l
+C61E 64         ld h, h
+C61F 202D       jr nz, $C64E
+C621 2070       jr nz, $C693
+C623 75         ld (hl), l
+C624 74         ld (hl), h
+C625 2073       jr nz, $C69A
+C627 77         ld (hl), a
+C628 69         ld l, c
+C629 74         ld (hl), h
+C62A 63         ld h, e
+C62B 68         ld l, b
+C62C 2062       jr nz, $C690
+C62E 61         ld h, c
+C62F 63         ld h, e
+C630 6B         ld l, e
+C631 2074       jr nz, $C6A7
+C633 6F         ld l, a
+C634 204D       jr nz, $C683
+C636 49         ld c, c
+C637 44         ld b, h
+C638 49         ld c, c
+C639 2070       jr nz, $C6AB
+C63B 6F         ld l, a
+C63C 73         ld (hl), e
+C63D 69         ld l, c
+C63E 74         ld (hl), h
+C63F 69         ld l, c
+C640 6F         ld l, a
+C641 6E         ld l, (hl)
+C642 202E       jr nz, $C672
+C644 1100DF     ld de, $DF00
+C647 7B         ld a, e
+C648 C35FC3     jp $C35F
+C64B CD54C3     call $C354
+C64E CD3CCE     call $CE3C
+C651 2187C0     ld hl, $C087
+C654 11D20B     ld de, $0BD2
+C657 011000     ld bc, $0010
+C65A EDB0       ldir
+C65C 21E8CB     ld hl, $CBE8
+C65F 11E20B     ld de, $0BE2
+C662 011400     ld bc, $0014
+C665 EDB0       ldir
+C667 1806       jr $C66F
+C669 214A08     ld hl, $084A
+C66C 22290C     ld ($0C29), hl
+C66F 21760B     ld hl, $0B76
+C672 ED5B290C   ld de, ($0C29)
+C676 ED52       sbc hl, de
+C678 DA69C6     jp c, $C669
+C67B 2A290C     ld hl, ($0C29)
+C67E 114A08     ld de, $084A
+C681 ED52       sbc hl, de
+C683 38E4       jr c, $C669
+C685 DF         rst $18
+C686 7B         ld a, e
+C687 E67F       and $7F
+C689 2A290C     ld hl, ($0C29)
+C68C FE20       cp $20
+C68E 2861       jr z, $C6F1
+C690 FE11       cp $11
+C692 2838       jr z, $C6CC
+C694 FE12       cp $12
+C696 2838       jr z, $C6D0
+C698 FE13       cp $13
+C69A 2831       jr z, $C6CD
+C69C FE14       cp $14
+C69E 282D       jr z, $C6CD
+C6A0 FE17       cp $17
+C6A2 28C5       jr z, $C669
+C6A4 FE1B       cp $1B
+C6A6 2872       jr z, $C71A
+C6A8 FE5E       cp $5E
+C6AA 282D       jr z, $C6D9
+C6AC FE21       cp $21
+C6AE 3804       jr c, $C6B4
+C6B0 FE2A       cp $2A
+C6B2 3827       jr c, $C6DB
+C6B4 FE30       cp $30
+C6B6 3804       jr c, $C6BC
+C6B8 FE3A       cp $3A
+C6BA 3829       jr c, $C6E5
+C6BC FE41       cp $41
+C6BE 38AF       jr c, $C66F
+C6C0 FE5B       cp $5B
+C6C2 3821       jr c, $C6E5
+C6C4 18A9       jr $C66F
+C6C6 F7         rst $30
+C6C7 3E20       ld a, $20
+C6C9 F7         rst $30
+C6CA 18A3       jr $C66F
+C6CC F7         rst $30
+C6CD F7         rst $30
+C6CE 189F       jr $C66F
+C6D0 F5         push af
+C6D1 7E         ld a, (hl)
+C6D2 FE70       cp $70
+C6D4 2818       jr z, $C6EE
+C6D6 F1         pop af
+C6D7 18ED       jr $C6C6
+C6D9 3E20       ld a, $20
+C6DB F5         push af
+C6DC EF         rst $28
+C6DD 70         ld (hl), b
+C6DE 67         ld h, a
+C6DF 00         nop
+C6E0 F1         pop af
+C6E1 C610       add a, $10
+C6E3 18E1       jr $C6C6
+C6E5 F5         push af
+C6E6 7E         ld a, (hl)
+C6E7 FE70       cp $70
+C6E9 2803       jr z, $C6EE
+C6EB F1         pop af
+C6EC 18D8       jr $C6C6
+C6EE F1         pop af
+C6EF 1809       jr $C6FA
+C6F1 F5         push af
+C6F2 7E         ld a, (hl)
+C6F3 FE70       cp $70
+C6F5 280B       jr z, $C702
+C6F7 F1         pop af
+C6F8 18CC       jr $C6C6
+C6FA 23         inc hl
+C6FB 23         inc hl
+C6FC 22290C     ld ($0C29), hl
+C6FF C36FC6     jp $C66F
+C702 F1         pop af
+C703 EF         rst $28
+C704 2020       jr nz, $C726
+C706 2020       jr nz, $C728
+C708 00         nop
+C709 C36FC6     jp $C66F
+C70C D9         exx
+C70D 2106C0     ld hl, $C006
+C710 11EF0B     ld de, $0BEF
+C713 010600     ld bc, $0006
+C716 EDB0       ldir
+C718 D9         exx
+C719 C9         ret
+C71A 2A290C     ld hl, ($0C29)
+C71D CD6ACF     call $CF6A
+C720 218028     ld hl, $2880
+C723 CD22D4     call $D422
+C726 EB         ex de, hl
+C727 214A08     ld hl, $084A
+C72A 22290C     ld ($0C29), hl
+C72D 013801     ld bc, $0138
+C730 7E         ld a, (hl)
+C731 FE00       cp $00
+C733 CC42C7     call z, $C742
+C736 12         ld (de), a
+C737 23         inc hl
+C738 23         inc hl
+C739 13         inc de
+C73A 0B         dec bc
+C73B 78         ld a, b
+C73C B1         or c
+C73D 20F1       jr nz, $C730
+C73F C35FC3     jp $C35F
+C742 23         inc hl
+C743 18EB       jr $C730
+C745 01D007     ld bc, $07D0
+C748 DB02       in a, ($02)
+C74A 17         rla
+C74B 3808       jr c, $C755
+C74D 0B         dec bc
+C74E 78         ld a, b
+C74F B1         or c
+C750 20F6       jr nz, $C748
+C752 C3D5C3     jp $C3D5
+C755 DB01       in a, ($01)
+C757 FE24       cp $24
+C759 3836       jr c, $C791
+C75B FE33       cp $33
+C75D 3032       jr nc, $C791
+C75F DE23       sbc a, $23
+C761 FE06       cp $06
+C763 3009       jr nc, $C76E
+C765 47         ld b, a
+C766 3E01       ld a, $01
+C768 CB27       sla a
+C76A 10FC       djnz $C768
+C76C 1826       jr $C794
+C76E DE06       sbc a, $06
+C770 47         ld b, a
+C771 3E01       ld a, $01
+C773 CB27       sla a
+C775 10FC       djnz $C773
+C777 F5         push af
+C778 3ECF       ld a, $CF
+C77A D307       out ($07), a
+C77C F1         pop af
+C77D 2F         cpl
+C77E D307       out ($07), a
+C780 3EFF       ld a, $FF
+C782 D305       out ($05), a
+C784 0696       ld b, $96
+C786 DB02       in a, ($02)
+C788 17         rla
+C789 DAE8C3     jp c, $C3E8
+C78C 10F8       djnz $C786
+C78E CD37D4     call $D437
+C791 C3D2C3     jp $C3D2
+C794 F5         push af
+C795 3ECF       ld a, $CF
+C797 D306       out ($06), a
+C799 F1         pop af
+C79A 2F         cpl
+C79B D306       out ($06), a
+C79D 3EFE       ld a, $FE
+C79F D304       out ($04), a
+C7A1 18E1       jr $C784
+C7A3 CD9DCF     call $CF9D
+C7A6 2A2428     ld hl, ($2824)
+C7A9 7C         ld a, h
+C7AA B5         or l
+C7AB CA5FC3     jp z, $C35F
+C7AE CD15CD     call $CD15
+C7B1 214A09     ld hl, $094A
+C7B4 CD1ACC     call $CC1A
+C7B7 21EA0B     ld hl, $0BEA
+C7BA 22290C     ld ($0C29), hl
+C7BD CDC4D4     call $D4C4
+C7C0 210328     ld hl, $2803
+C7C3 CB9E       res 3, (hl)
+C7C5 3EFA       ld a, $FA
+C7C7 D301       out ($01), a
+C7C9 CD71C4     call $C471
+C7CC 212028     ld hl, $2820
+C7CF DB04       in a, ($04)
+C7D1 E601       and $01
+C7D3 77         ld (hl), a
+C7D4 210E28     ld hl, $280E
+C7D7 CBCE       set 1, (hl)
+C7D9 C3C7C8     jp $C8C7
+C7DC AF         xor a
+C7DD 321428     ld ($2814), a
+C7E0 321628     ld ($2816), a
+C7E3 320728     ld ($2807), a
+C7E6 320828     ld ($2808), a
+C7E9 CD8AC4     call $C48A
+C7EC AF         xor a
+C7ED FD210428   ld iy, $2804
+C7F1 FDCB00DE   set 3, (iy)
+C7F5 FDCB006E   bit 5, (iy)
+C7F9 2806       jr z, $C801
+C7FB 3A0928     ld a, ($2809)
+C7FE CB3F       srl a
+C800 3C         inc a
+C801 320C28     ld ($280C), a
+C804 ED4B2428   ld bc, ($2824)
+C808 CD7ECF     call $CF7E
+C80B FD219F0B   ld iy, $0B9F
+C80F FD3600FF   ld (iy), $FF
+C813 FD3601FF   ld (iy+$01), $FF
+C817 FD210428   ld iy, $2804
+C81B FDCB00D6   set 2, (iy)
+C81F CD93C8     call $C893
+C822 DD7E00     ld a, (ix)
+C825 57         ld d, a
+C826 DD7E01     ld a, (ix+$01)
+C829 5F         ld e, a
+C82A CD30C8     call $C830
+C82D C355C8     jp $C855
+C830 3E4F       ld a, $4F
+C832 D307       out ($07), a
+C834 D306       out ($06), a
+C836 3ECF       ld a, $CF
+C838 D306       out ($06), a
+C83A 7A         ld a, d
+C83B 2F         cpl
+C83C D306       out ($06), a
+C83E 3ECF       ld a, $CF
+C840 D307       out ($07), a
+C842 7B         ld a, e
+C843 2F         cpl
+C844 D307       out ($07), a
+C846 3EFF       ld a, $FF
+C848 D304       out ($04), a
+C84A D305       out ($05), a
+C84C CD33CE     call $CE33
+C84F AF         xor a
+C850 D304       out ($04), a
+C852 D305       out ($05), a
+C854 C9         ret
+C855 FD210000   ld iy, $0000
+C859 3A0C28     ld a, ($280C)
+C85C FE00       cp $00
+C85E 280C       jr z, $C86C
+C860 3D         dec a
+C861 320C28     ld ($280C), a
+C864 210328     ld hl, $2803
+C867 CBF6       set 6, (hl)
+C869 C3C4C8     jp $C8C4
+C86C 3A0928     ld a, ($2809)
+C86F 320C28     ld ($280C), a
+C872 210328     ld hl, $2803
+C875 CBB6       res 6, (hl)
+C877 CB56       bit 2, (hl)
+C879 C2C4C8     jp nz, $C8C4
+C87C 3E0F       ld a, $0F
+C87E D307       out ($07), a
+C880 3E4F       ld a, $4F
+C882 D306       out ($06), a
+C884 3ECF       ld a, $CF
+C886 D306       out ($06), a
+C888 3E01       ld a, $01
+C88A 2F         cpl
+C88B D306       out ($06), a
+C88D CD33CE     call $CE33
+C890 C3C4C8     jp $C8C4
+C893 FD23       inc iy
+C895 FDE5       push iy
+C897 F1         pop af
+C898 CB77       bit 6, a
+C89A 280D       jr z, $C8A9
+C89C CDD6CF     call $CFD6
+C89F FE20       cp $20
+C8A1 CA3CCB     jp z, $CB3C
+C8A4 FE1B       cp $1B
+C8A6 CA58C3     jp z, $C358
+C8A9 DB04       in a, ($04)
+C8AB 320528     ld ($2805), a
+C8AE 57         ld d, a
+C8AF 3A1428     ld a, ($2814)
+C8B2 B2         or d
+C8B3 321428     ld ($2814), a
+C8B6 DB05       in a, ($05)
+C8B8 320628     ld ($2806), a
+C8BB 57         ld d, a
+C8BC 3A1628     ld a, ($2816)
+C8BF B2         or d
+C8C0 321628     ld ($2816), a
+C8C3 C9         ret
+C8C4 CD37D4     call $D437
+C8C7 AF         xor a
+C8C8 213228     ld hl, $2832
+C8CB 77         ld (hl), a
+C8CC FD210000   ld iy, $0000
+C8D0 210428     ld hl, $2804
+C8D3 CBDE       set 3, (hl)
+C8D5 184E       jr $C925
+C8D7 C5         push bc
+C8D8 119E0B     ld de, $0B9E
+C8DB 010500     ld bc, $0005
+C8DE EDB0       ldir
+C8E0 C1         pop bc
+C8E1 C9         ret
+C8E2 215FCB     ld hl, $CB5F
+C8E5 CDD7C8     call $C8D7
+C8E8 CDD6CF     call $CFD6
+C8EB 3014       jr nc, $C901
+C8ED FE1B       cp $1B
+C8EF CA58C3     jp z, $C358
+C8F2 FE20       cp $20
+C8F4 200B       jr nz, $C901
+C8F6 210328     ld hl, $2803
+C8F9 CB4E       bit 1, (hl)
+C8FB C214C9     jp nz, $C914
+C8FE C33CCB     jp $CB3C
+C901 DB02       in a, ($02)
+C903 17         rla
+C904 30E2       jr nc, $C8E8
+C906 DB01       in a, ($01)
+C908 FEFB       cp $FB
+C90A CA14C9     jp z, $C914
+C90D FEFA       cp $FA
+C90F 20D7       jr nz, $C8E8
+C911 CA46C9     jp z, $C946
+C914 2179CB     ld hl, $CB79
+C917 CDD7C8     call $C8D7
+C91A 3EFB       ld a, $FB
+C91C D301       out ($01), a
+C91E CD71C4     call $C471
+C921 1802       jr $C925
+C923 E3         ex (sp), hl
+C924 E3         ex (sp), hl
+C925 CD93C8     call $C893
+C928 3A3428     ld a, ($2834)
+C92B CB47       bit 0, a
+C92D C25EC9     jp nz, $C95E
+C930 DB02       in a, ($02)
+C932 17         rla
+C933 D223C9     jp nc, $C923
+C936 DB01       in a, ($01)
+C938 FEF8       cp $F8
+C93A 2832       jr z, $C96E
+C93C FEFC       cp $FC
+C93E CAE2C8     jp z, $C8E2
+C941 FEFA       cp $FA
+C943 C225C9     jp nz, $C925
+C946 210328     ld hl, $2803
+C949 CB4E       bit 1, (hl)
+C94B 2808       jr z, $C955
+C94D 213428     ld hl, $2834
+C950 CBCE       set 1, (hl)
+C952 C38DCE     jp $CE8D
+C955 2179CB     ld hl, $CB79
+C958 CDD7C8     call $C8D7
+C95B C3CCC7     jp $C7CC
+C95E DB04       in a, ($04)
+C960 E601       and $01
+C962 00         nop
+C963 00         nop
+C964 00         nop
+C965 00         nop
+C966 212028     ld hl, $2820
+C969 BE         cp (hl)
+C96A CA25C9     jp z, $C925
+C96D 77         ld (hl), a
+C96E 210E28     ld hl, $280E
+C971 CB4E       bit 1, (hl)
+C973 CA7BC9     jp z, $C97B
+C976 CB8E       res 1, (hl)
+C978 C3DCC7     jp $C7DC
+C97B 3EF8       ld a, $F8
+C97D D301       out ($01), a
+C97F 213228     ld hl, $2832
+C982 34         inc (hl)
+C983 3A3328     ld a, ($2833)
+C986 BE         cp (hl)
+C987 2005       jr nz, $C98E
+C989 210E28     ld hl, $280E
+C98C CBC6       set 0, (hl)
+C98E CDD6CF     call $CFD6
+C991 300F       jr nc, $C9A2
+C993 210428     ld hl, $2804
+C996 CBDE       set 3, (hl)
+C998 FE20       cp $20
+C99A CA3CCB     jp z, $CB3C
+C99D FE1B       cp $1B
+C99F CA58C3     jp z, $C358
+C9A2 FDE5       push iy
+C9A4 D1         pop de
+C9A5 7A         ld a, d
+C9A6 B3         or e
+C9A7 287C       jr z, $CA25
+C9A9 3A1228     ld a, ($2812)
+C9AC FE10       cp $10
+C9AE 2808       jr z, $C9B8
+C9B0 210428     ld hl, $2804
+C9B3 CB5E       bit 3, (hl)
+C9B5 C221CA     jp nz, $CA21
+C9B8 7A         ld a, d
+C9B9 FE00       cp $00
+C9BB 201E       jr nz, $C9DB
+C9BD 7B         ld a, e
+C9BE FE9E       cp $9E
+C9C0 3012       jr nc, $C9D4
+C9C2 FE91       cp $91
+C9C4 3007       jr nc, $C9CD
+C9C6 21F055     ld hl, $55F0
+C9C9 3E46       ld a, $46
+C9CB 1813       jr $C9E0
+C9CD 21C05D     ld hl, $5DC0
+C9D0 3E37       ld a, $37
+C9D2 180C       jr $C9E0
+C9D4 219C63     ld hl, $639C
+C9D7 3E20       ld a, $20
+C9D9 1805       jr $C9E0
+C9DB 21007D     ld hl, $7D00
+C9DE 3E00       ld a, $00
+C9E0 ED52       sbc hl, de
+C9E2 3803       jr c, $C9E7
+C9E4 3C         inc a
+C9E5 18F9       jr $C9E0
+C9E7 CE02       adc a, $02
+C9E9 FE0A       cp $0A
+C9EB 3001       jr nc, $C9EE
+C9ED AF         xor a
+C9EE 6F         ld l, a
+C9EF 3A0D28     ld a, ($280D)
+C9F2 C602       add a, $02
+C9F4 BD         cp l
+C9F5 3805       jr c, $C9FC
+C9F7 DE04       sbc a, $04
+C9F9 BD         cp l
+C9FA 3804       jr c, $CA00
+C9FC 7D         ld a, l
+C9FD 320D28     ld ($280D), a
+CA00 210428     ld hl, $2804
+CA03 CBDE       set 3, (hl)
+CA05 21F50B     ld hl, $0BF5
+CA08 22290C     ld ($0C29), hl
+CA0B 3A0D28     ld a, ($280D)
+CA0E CD61D4     call $D461
+CA11 FD210000   ld iy, $0000
+CA15 210E28     ld hl, $280E
+CA18 CB46       bit 0, (hl)
+CA1A CA25C9     jp z, $C925
+CA1D CB86       res 0, (hl)
+CA1F 1804       jr $CA25
+CA21 CB9E       res 3, (hl)
+CA23 18E0       jr $CA05
+CA25 210328     ld hl, $2803
+CA28 CB4E       bit 1, (hl)
+CA2A C298CA     jp nz, $CA98
+CA2D CB76       bit 6, (hl)
+CA2F 2067       jr nz, $CA98
+CA31 CB56       bit 2, (hl)
+CA33 2818       jr z, $CA4D
+CA35 3A0728     ld a, ($2807)
+CA38 2F         cpl
+CA39 57         ld d, a
+CA3A 3A1428     ld a, ($2814)
+CA3D A2         and d
+CA3E 321428     ld ($2814), a
+CA41 3A0828     ld a, ($2808)
+CA44 2F         cpl
+CA45 57         ld d, a
+CA46 3A1628     ld a, ($2816)
+CA49 A2         and d
+CA4A 321628     ld ($2816), a
+CA4D CB46       bit 0, (hl)
+CA4F 280B       jr z, $CA5C
+CA51 3A1428     ld a, ($2814)
+CA54 DDB600     or (ix)
+CA57 DD7700     ld (ix), a
+CA5A 180A       jr $CA66
+CA5C 3A1428     ld a, ($2814)
+CA5F 2F         cpl
+CA60 DDA600     and (ix)
+CA63 DD7700     ld (ix), a
+CA66 CB46       bit 0, (hl)
+CA68 280B       jr z, $CA75
+CA6A 3A1628     ld a, ($2816)
+CA6D DDB601     or (ix+$01)
+CA70 DD7701     ld (ix+$01), a
+CA73 180A       jr $CA7F
+CA75 3A1628     ld a, ($2816)
+CA78 2F         cpl
+CA79 DDA601     and (ix+$01)
+CA7C DD7701     ld (ix+$01), a
+CA7F 3A0528     ld a, ($2805)
+CA82 320728     ld ($2807), a
+CA85 3A0628     ld a, ($2806)
+CA88 320828     ld ($2808), a
+CA8B AF         xor a
+CA8C 321428     ld ($2814), a
+CA8F 321628     ld ($2816), a
+CA92 320528     ld ($2805), a
+CA95 320628     ld ($2806), a
+CA98 210328     ld hl, $2803
+CA9B CB4E       bit 1, (hl)
+CA9D 204C       jr nz, $CAEB
+CA9F CB46       bit 0, (hl)
+CAA1 2812       jr z, $CAB5
+CAA3 FD21180A   ld iy, $0A18
+CAA7 FD360006   ld (iy), $06
+CAAB FD21980A   ld iy, $0A98
+CAAF FD360020   ld (iy), $20
+CAB3 1810       jr $CAC5
+CAB5 FD21980A   ld iy, $0A98
+CAB9 FD360006   ld (iy), $06
+CABD FD21180A   ld iy, $0A18
+CAC1 FD360020   ld (iy), $20
+CAC5 CB56       bit 2, (hl)
+CAC7 2812       jr z, $CADB
+CAC9 FD21310A   ld iy, $0A31
+CACD FD360006   ld (iy), $06
+CAD1 FD21B10A   ld iy, $0AB1
+CAD5 FD360020   ld (iy), $20
+CAD9 1810       jr $CAEB
+CADB FD21B10A   ld iy, $0AB1
+CADF FD360006   ld (iy), $06
+CAE3 FD21310A   ld iy, $0A31
+CAE7 FD360020   ld (iy), $20
+CAEB FD210428   ld iy, $2804
+CAEF FDCB0056   bit 2, (iy)
+CAF3 2806       jr z, $CAFB
+CAF5 FDCB0096   res 2, (iy)
+CAF9 180C       jr $CB07
+CAFB FD219F0B   ld iy, $0B9F
+CAFF FD360020   ld (iy), $20
+CB03 FD360120   ld (iy+$01), $20
+CB07 DD23       inc ix
+CB09 DD23       inc ix
+CB0B 0B         dec bc
+CB0C 0B         dec bc
+CB0D 78         ld a, b
+CB0E B1         or c
+CB0F 2819       jr z, $CB2A
+CB11 210328     ld hl, $2803
+CB14 CB4E       bit 1, (hl)
+CB16 CA1FC8     jp z, $C81F
+CB19 2A1A28     ld hl, ($281A)
+CB1C 7E         ld a, (hl)
+CB1D 57         ld d, a
+CB1E 3A1E28     ld a, ($281E)
+CB21 77         ld (hl), a
+CB22 211E28     ld hl, $281E
+CB25 7A         ld a, d
+CB26 77         ld (hl), a
+CB27 C31FC8     jp $C81F
+CB2A 210328     ld hl, $2803
+CB2D CB4E       bit 1, (hl)
+CB2F 2003       jr nz, $CB34
+CB31 C3E9C7     jp $C7E9
+CB34 2A1A28     ld hl, ($281A)
+CB37 367F       ld (hl), $7F
+CB39 C3DFCE     jp $CEDF
+CB3C AF         xor a
+CB3D 321428     ld ($2814), a
+CB40 321628     ld ($2816), a
+CB43 CD37D4     call $D437
+CB46 3EFC       ld a, $FC
+CB48 D301       out ($01), a
+CB4A 210328     ld hl, $2803
+CB4D CB4E       bit 1, (hl)
+CB4F C24BCC     jp nz, $CC4B
+CB52 CD54C3     call $C354
+CB55 211908     ld hl, $0819
+CB58 22290C     ld ($0C29), hl
+CB5B EF         rst $28
+CB5C 3E3E       ld a, $3E
+CB5E 2050       jr nz, $CBB0
+CB60 41         ld b, c
+CB61 55         ld d, l
+CB62 53         ld d, e
+CB63 45         ld b, l
+CB64 203C       jr nz, $CBA2
+CB66 3C         inc a
+CB67 0D         dec c
+CB68 0D         dec c
+CB69 2044       jr nz, $CBAF
+CB6B 202D       jr nz, $CB9A
+CB6D 2043       jr nz, $CBB2
+CB6F 6C         ld l, h
+CB70 65         ld h, l
+CB71 61         ld h, c
+CB72 72         ld (hl), d
+CB73 2064       jr nz, $CBD9
+CB75 72         ld (hl), d
+CB76 75         ld (hl), l
+CB77 6D         ld l, l
+CB78 73         ld (hl), e
+CB79 2020       jr nz, $CB9B
+CB7B 2020       jr nz, $CB9D
+CB7D 2020       jr nz, $CB9F
+CB7F 2020       jr nz, $CBA1
+CB81 2043       jr nz, $CBC6
+CB83 202D       jr nz, $CBB2
+CB85 2043       jr nz, $CBCA
+CB87 6C         ld l, h
+CB88 65         ld h, l
+CB89 61         ld h, c
+CB8A 72         ld (hl), d
+CB8B 2063       jr nz, $CBF0
+CB8D 79         ld a, c
+CB8E 6D         ld l, l
+CB8F 62         ld h, d
+CB90 61         ld h, c
+CB91 6C         ld l, h
+CB92 73         ld (hl), e
+CB93 0D         dec c
+CB94 0D         dec c
+CB95 0D         dec c
+CB96 2049       jr nz, $CBE1
+CB98 202D       jr nz, $CBC7
+CB9A 2049       jr nz, $CBE5
+CB9C 6E         ld l, (hl)
+CB9D 73         ld (hl), e
+CB9E 65         ld h, l
+CB9F 72         ld (hl), d
+CBA0 74         ld (hl), h
+CBA1 206D       jr nz, $CC10
+CBA3 65         ld h, l
+CBA4 74         ld (hl), h
+CBA5 72         ld (hl), d
+CBA6 6F         ld l, a
+CBA7 2020       jr nz, $CBC9
+CBA9 2020       jr nz, $CBCB
+CBAB 2020       jr nz, $CBCD
+CBAD 2020       jr nz, $CBCF
+CBAF 204B       jr nz, $CBFC
+CBB1 202D       jr nz, $CBE0
+CBB3 204B       jr nz, $CC00
+CBB5 69         ld l, c
+CBB6 6C         ld l, h
+CBB7 6C         ld l, h
+CBB8 206D       jr nz, $CC27
+CBBA 65         ld h, l
+CBBB 74         ld (hl), h
+CBBC 72         ld (hl), d
+CBBD 6F         ld l, a
+CBBE 0D         dec c
+CBBF 0D         dec c
+CBC0 0D         dec c
+CBC1 204D       jr nz, $CC10
+CBC3 202D       jr nz, $CBF2
+CBC5 204D       jr nz, $CC14
+CBC7 75         ld (hl), l
+CBC8 6C         ld l, h
+CBC9 74         ld (hl), h
+CBCA 69         ld l, c
+CBCB 70         ld (hl), b
+CBCC 6C         ld l, h
+CBCD 79         ld a, c
+CBCE 2062       jr nz, $CC32
+CBD0 61         ld h, c
+CBD1 72         ld (hl), d
+CBD2 73         ld (hl), e
+CBD3 2020       jr nz, $CBF5
+CBD5 2878       jr z, $CC4F
+CBD7 2029       jr nz, $CC02
+CBD9 2020       jr nz, $CBFB
+CBDB 58         ld e, b
+CBDC 202D       jr nz, $CC0B
+CBDE 2000       jr nz, $CBE0
+CBE0 CDC4D4     call $D4C4
+CBE3 EF         rst $28
+CBE4 2E0D       ld l, $0D
+CBE6 0D         dec c
+CBE7 0D         dec c
+CBE8 2046       jr nz, $CC30
+CBEA 6F         ld l, a
+CBEB 72         ld (hl), d
+CBEC 206D       jr nz, $CC5B
+CBEE 65         ld h, l
+CBEF 6E         ld l, (hl)
+CBF0 75         ld (hl), l
+CBF1 2073       jr nz, $CC66
+CBF3 68         ld l, b
+CBF4 69         ld l, c
+CBF5 66         ld h, (hl)
+CBF6 74         ld (hl), h
+CBF7 2F         cpl
+CBF8 65         ld h, l
+CBF9 73         ld (hl), e
+CBFA 63         ld h, e
+CBFB 2020       jr nz, $CC1D
+CBFD 3A2020     ld a, ($2020)
+CC00 53         ld d, e
+CC01 70         ld (hl), b
+CC02 61         ld h, c
+CC03 63         ld h, e
+CC04 65         ld h, l
+CC05 2062       jr nz, $CC69
+CC07 61         ld h, c
+CC08 72         ld (hl), d
+CC09 2074       jr nz, $CC7F
+CC0B 6F         ld l, a
+CC0C 2043       jr nz, $CC51
+CC0E 6F         ld l, a
+CC0F 6E         ld l, (hl)
+CC10 74         ld (hl), h
+CC11 69         ld l, c
+CC12 6E         ld l, (hl)
+CC13 75         ld (hl), l
+CC14 65         ld h, l
+CC15 2E00       ld l, $00
+CC17 C37FCC     jp $CC7F
+CC1A E5         push hl
+CC1B 22290C     ld ($0C29), hl
+CC1E EF         rst $28
+CC1F 4F         ld c, a
+CC20 202D       jr nz, $CC4F
+CC22 2042       jr nz, $CC66
+CC24 65         ld h, l
+CC25 61         ld h, c
+CC26 74         ld (hl), h
+CC27 73         ld (hl), e
+CC28 2020       jr nz, $CC4A
+CC2A 2028       jr nz, $CC54
+CC2C 78         ld a, b
+CC2D 00         nop
+CC2E 3A0A28     ld a, ($280A)
+CC31 F7         rst $30
+CC32 3E29       ld a, $29
+CC34 F7         rst $30
+CC35 FD210428   ld iy, $2804
+CC39 FDCB006E   bit 5, (iy)
+CC3D 280A       jr z, $CC49
+CC3F 22290C     ld ($0C29), hl
+CC42 EF         rst $28
+CC43 204F       jr nz, $CC94
+CC45 66         ld h, (hl)
+CC46 66         ld h, (hl)
+CC47 62         ld h, d
+CC48 00         nop
+CC49 E1         pop hl
+CC4A C9         ret
+CC4B 3E2A       ld a, $2A
+CC4D 2A1A28     ld hl, ($281A)
+CC50 77         ld (hl), a
+CC51 C5         push bc
+CC52 DDE5       push ix
+CC54 CD70CC     call $CC70
+CC57 DF         rst $18
+CC58 62         ld h, d
+CC59 30F9       jr nc, $CC54
+CC5B DDE1       pop ix
+CC5D C1         pop bc
+CC5E E67F       and $7F
+CC60 FE1B       cp $1B
+CC62 CA58C3     jp z, $C358
+CC65 FE20       cp $20
+CC67 20EB       jr nz, $CC54
+CC69 3EFB       ld a, $FB
+CC6B D301       out ($01), a
+CC6D C325C9     jp $C925
+CC70 DB04       in a, ($04)
+CC72 E601       and $01
+CC74 212028     ld hl, $2820
+CC77 BE         cp (hl)
+CC78 C8         ret z
+CC79 77         ld (hl), a
+CC7A 3EF8       ld a, $F8
+CC7C D301       out ($01), a
+CC7E C9         ret
+CC7F CD70CC     call $CC70
+CC82 DF         rst $18
+CC83 62         ld h, d
+CC84 30F9       jr nc, $CC7F
+CC86 E67F       and $7F
+CC88 FE1B       cp $1B
+CC8A CA58C3     jp z, $C358
+CC8D FE58       cp $58
+CC8F 2820       jr z, $CCB1
+CC91 FE4D       cp $4D
+CC93 CA3DD3     jp z, $D33D
+CC96 FE44       cp $44
+CC98 CACAD0     jp z, $D0CA
+CC9B FE43       cp $43
+CC9D CA02D1     jp z, $D102
+CCA0 FE4B       cp $4B
+CCA2 CAC0CC     jp z, $CCC0
+CCA5 FE49       cp $49
+CCA7 CAE6D2     jp z, $D2E6
+CCAA FE20       cp $20
+CCAC CAA3C7     jp z, $C7A3
+CCAF 18CE       jr $CC7F
+CCB1 CD9DD4     call $D49D
+CCB4 21280A     ld hl, $0A28
+CCB7 22290C     ld ($0C29), hl
+CCBA CDC4D4     call $D4C4
+CCBD C37FCC     jp $CC7F
+CCC0 FD210428   ld iy, $2804
+CCC4 FDCB0086   res 0, (iy)
+CCC8 C3EED2     jp $D2EE
+CCCB 5F         ld e, a
+CCCC 210428     ld hl, $2804
+CCCF CBAE       res 5, (hl)
+CCD1 21B2C0     ld hl, $C0B2
+CCD4 3A1228     ld a, ($2812)
+CCD7 FE0C       cp $0C
+CCD9 2003       jr nz, $CCDE
+CCDB 21C2C0     ld hl, $C0C2
+CCDE 7B         ld a, e
+CCDF BE         cp (hl)
+CCE0 280B       jr z, $CCED
+CCE2 3E3A       ld a, $3A
+CCE4 BE         cp (hl)
+CCE5 2803       jr z, $CCEA
+CCE7 23         inc hl
+CCE8 18F4       jr $CCDE
+CCEA B7         or a
+CCEB 7B         ld a, e
+CCEC C9         ret
+CCED 23         inc hl
+CCEE 7E         ld a, (hl)
+CCEF 210328     ld hl, $2803
+CCF2 CB66       bit 4, (hl)
+CCF4 2002       jr nz, $CCF8
+CCF6 CB1F       rr a
+CCF8 320928     ld ($2809), a
+CCFB 7B         ld a, e
+CCFC CB66       bit 4, (hl)
+CCFE 2004       jr nz, $CD04
+CD00 FE38       cp $38
+CD02 28E6       jr z, $CCEA
+CD04 320A28     ld ($280A), a
+CD07 FE36       cp $36
+CD09 2002       jr nz, $CD0D
+CD0B CBD6       set 2, (hl)
+CD0D FE38       cp $38
+CD0F 2002       jr nz, $CD13
+CD11 CBD6       set 2, (hl)
+CD13 37         scf
+CD14 C9         ret
+CD15 215028     ld hl, $2850
+CD18 CD22D4     call $D422
+CD1B 7E         ld a, (hl)
+CD1C 320B28     ld ($280B), a
+CD1F CD54C3     call $C354
+CD22 CD8AC4     call $C48A
+CD25 210CC0     ld hl, $C00C
+CD28 11D80B     ld de, $0BD8
+CD2B 010D00     ld bc, $000D
+CD2E EDB0       ldir
+CD30 FD210428   ld iy, $2804
+CD34 FDCB008E   res 1, (iy)
+CD38 CD0CC7     call $C70C
+CD3B 214A08     ld hl, $084A
+CD3E 22290C     ld ($0C29), hl
+CD41 EF         rst $28
+CD42 52         ld d, d
+CD43 68         ld l, b
+CD44 79         ld a, c
+CD45 74         ld (hl), h
+CD46 68         ld l, b
+CD47 6D         ld l, l
+CD48 204E       jr nz, $CD98
+CD4A 6F         ld l, a
+CD4B 2020       jr nz, $CD6D
+CD4D 203A       jr nz, $CD89
+CD4F 2020       jr nz, $CD71
+CD51 00         nop
+CD52 3A2228     ld a, ($2822)
+CD55 DF         rst $18
+CD56 4A         ld c, d
+CD57 EF         rst $28
+CD58 0D         dec c
+CD59 0D         dec c
+CD5A 52         ld d, d
+CD5B 68         ld l, b
+CD5C 79         ld a, c
+CD5D 74         ld (hl), h
+CD5E 68         ld l, b
+CD5F 6D         ld l, l
+CD60 206E       jr nz, $CDD0
+CD62 61         ld h, c
+CD63 6D         ld l, l
+CD64 65         ld h, l
+CD65 203A       jr nz, $CDA1
+CD67 2020       jr nz, $CD89
+CD69 00         nop
+CD6A 210428     ld hl, $2804
+CD6D CB7E       bit 7, (hl)
+CD6F 200C       jr nz, $CD7D
+CD71 CD1ECE     call $CE1E
+CD74 ED5B290C   ld de, ($0C29)
+CD78 011A00     ld bc, $001A
+CD7B EDB0       ldir
+CD7D CBBE       res 7, (hl)
+CD7F EF         rst $28
+CD80 0D         dec c
+CD81 0D         dec c
+CD82 0D         dec c
+CD83 42         ld b, d
+CD84 65         ld h, l
+CD85 61         ld h, c
+CD86 74         ld (hl), h
+CD87 73         ld (hl), e
+CD88 2074       jr nz, $CDFE
+CD8A 6F         ld l, a
+CD8B 2042       jr nz, $CDCF
+CD8D 61         ld h, c
+CD8E 72         ld (hl), d
+CD8F 3A2000     ld a, ($0020)
+CD92 CDD6D3     call $D3D6
+CD95 DF         rst $18
+CD96 4A         ld c, d
+CD97 EF         rst $28
+CD98 2020       jr nz, $CDBA
+CD9A 2020       jr nz, $CDBC
+CD9C 2020       jr nz, $CDBE
+CD9E 204E       jr nz, $CDEE
+CDA0 6F         ld l, a
+CDA1 206F       jr nz, $CE12
+CDA3 66         ld h, (hl)
+CDA4 2042       jr nz, $CDE8
+CDA6 61         ld h, c
+CDA7 72         ld (hl), d
+CDA8 73         ld (hl), e
+CDA9 2020       jr nz, $CDCB
+CDAB 2020       jr nz, $CDCD
+CDAD 3A2000     ld a, ($0020)
+CDB0 CD05D4     call $D405
+CDB3 DF         rst $18
+CDB4 4A         ld c, d
+CDB5 EF         rst $28
+CDB6 0D         dec c
+CDB7 0D         dec c
+CDB8 41         ld b, c
+CDB9 64         ld h, h
+CDBA 64         ld h, h
+CDBB 2020       jr nz, $CDDD
+CDBD 2020       jr nz, $CDDF
+CDBF 3D         dec a
+CDC0 2020       jr nz, $CDE2
+CDC2 41         ld b, c
+CDC3 203A       jr nz, $CDFF
+CDC5 2020       jr nz, $CDE7
+CDC7 2020       jr nz, $CDE9
+CDC9 2020       jr nz, $CDEB
+CDCB 2020       jr nz, $CDED
+CDCD 2020       jr nz, $CDEF
+CDCF 53         ld d, e
+CDD0 69         ld l, c
+CDD1 6E         ld l, (hl)
+CDD2 67         ld h, a
+CDD3 6C         ld l, h
+CDD4 65         ld h, l
+CDD5 2020       jr nz, $CDF7
+CDD7 2020       jr nz, $CDF9
+CDD9 3D         dec a
+CDDA 2053       jr nz, $CE2F
+CDDC 203A       jr nz, $CE18
+CDDE 0D         dec c
+CDDF 0D         dec c
+CDE0 45         ld b, l
+CDE1 72         ld (hl), d
+CDE2 61         ld h, c
+CDE3 73         ld (hl), e
+CDE4 65         ld h, l
+CDE5 2020       jr nz, $CE07
+CDE7 3D         dec a
+CDE8 2020       jr nz, $CE0A
+CDEA 45         ld b, l
+CDEB 203A       jr nz, $CE27
+CDED 2020       jr nz, $CE0F
+CDEF 2020       jr nz, $CE11
+CDF1 2020       jr nz, $CE13
+CDF3 2020       jr nz, $CE15
+CDF5 2020       jr nz, $CE17
+CDF7 52         ld d, d
+CDF8 65         ld h, l
+CDF9 70         ld (hl), b
+CDFA 65         ld h, l
+CDFB 61         ld h, c
+CDFC 74         ld (hl), h
+CDFD 69         ld l, c
+CDFE 6E         ld l, (hl)
+CDFF 67         ld h, a
+CE00 203D       jr nz, $CE3F
+CE02 2052       jr nz, $CE56
+CE04 203A       jr nz, $CE40
+CE06 00         nop
+CE07 2171C0     ld hl, $C071
+CE0A 110A0B     ld de, $0B0A
+CE0D 011600     ld bc, $0016
+CE10 EDB0       ldir
+CE12 C9         ret
+CE13 2109A1     ld hl, $A109
+CE16 119310     ld de, $1093
+CE19 01000F     ld bc, $0F00
+CE1C EDB0       ldir
+CE1E 3A2228     ld a, ($2822)
+CE21 47         ld b, a
+CE22 21F029     ld hl, $29F0
+CE25 F5         push af
+CE26 CD22D4     call $D422
+CE29 F1         pop af
+CE2A B7         or a
+CE2B C8         ret z
+CE2C 111A00     ld de, $001A
+CE2F 19         add hl, de
+CE30 10FD       djnz $CE2F
+CE32 C9         ret
+CE33 C5         push bc
+CE34 0646       ld b, $46
+CE36 E3         ex (sp), hl
+CE37 E3         ex (sp), hl
+CE38 10FC       djnz $CE36
+CE3A C1         pop bc
+CE3B C9         ret
+CE3C CD8AC4     call $C48A
+CE3F FD214A08   ld iy, $084A
+CE43 218028     ld hl, $2880
+CE46 CD22D4     call $D422
+CE49 013801     ld bc, $0138
+CE4C FD7E00     ld a, (iy)
+CE4F FE00       cp $00
+CE51 2004       jr nz, $CE57
+CE53 FD23       inc iy
+CE55 18F5       jr $CE4C
+CE57 7E         ld a, (hl)
+CE58 FE70       cp $70
+CE5A 281F       jr z, $CE7B
+CE5C FE00       cp $00
+CE5E 2002       jr nz, $CE62
+CE60 3E20       ld a, $20
+CE62 FD7700     ld (iy), a
+CE65 FD23       inc iy
+CE67 3E20       ld a, $20
+CE69 FD7700     ld (iy), a
+CE6C FD23       inc iy
+CE6E 23         inc hl
+CE6F 0B         dec bc
+CE70 78         ld a, b
+CE71 B1         or c
+CE72 20D8       jr nz, $CE4C
+CE74 CD5FCF     call $CF5F
+CE77 22290C     ld ($0C29), hl
+CE7A C9         ret
+CE7B 3E70       ld a, $70
+CE7D FD7700     ld (iy), a
+CE80 FD23       inc iy
+CE82 3E67       ld a, $67
+CE84 FD7700     ld (iy), a
+CE87 FD23       inc iy
+CE89 23         inc hl
+CE8A 0B         dec bc
+CE8B 18BF       jr $CE4C
+CE8D 210428     ld hl, $2804
+CE90 CBE6       set 4, (hl)
+CE92 3A2A28     ld a, ($282A)
+CE95 323028     ld ($2830), a
+CE98 CD5FCF     call $CF5F
+CE9B 2B         dec hl
+CE9C 221A28     ld ($281A), hl
+CE9F CD54C3     call $C354
+CEA2 CD3CCE     call $CE3C
+CEA5 2171C0     ld hl, $C071
+CEA8 CD58D4     call $D458
+CEAB CD0CC7     call $C70C
+CEAE 210328     ld hl, $2803
+CEB1 CBCE       set 1, (hl)
+CEB3 CBDE       set 3, (hl)
+CEB5 CBD6       set 2, (hl)
+CEB7 213428     ld hl, $2834
+CEBA CB46       bit 0, (hl)
+CEBC 2021       jr nz, $CEDF
+CEBE CB4E       bit 1, (hl)
+CEC0 201D       jr nz, $CEDF
+CEC2 DF         rst $18
+CEC3 62         ld h, d
+CEC4 300A       jr nc, $CED0
+CEC6 FE20       cp $20
+CEC8 CADFCE     jp z, $CEDF
+CECB FE1B       cp $1B
+CECD CA58C3     jp z, $C358
+CED0 DB02       in a, ($02)
+CED2 17         rla
+CED3 30ED       jr nc, $CEC2
+CED5 DB01       in a, ($01)
+CED7 FEFA       cp $FA
+CED9 2804       jr z, $CEDF
+CEDB FEFB       cp $FB
+CEDD 20E3       jr nz, $CEC2
+CEDF 3EDB       ld a, $DB
+CEE1 321E28     ld ($281E), a
+CEE4 2A1A28     ld hl, ($281A)
+CEE7 23         inc hl
+CEE8 E5         push hl
+CEE9 B7         or a
+CEEA 11790B     ld de, $0B79
+CEED ED52       sbc hl, de
+CEEF E1         pop hl
+CEF0 D243CF     jp nc, $CF43
+CEF3 7E         ld a, (hl)
+CEF4 FE20       cp $20
+CEF6 28EF       jr z, $CEE7
+CEF8 FE70       cp $70
+CEFA 282B       jr z, $CF27
+CEFC FE30       cp $30
+CEFE 38E7       jr c, $CEE7
+CF00 FE3A       cp $3A
+CF02 D2E7CE     jp nc, $CEE7
+CF05 DE2F       sbc a, $2F
+CF07 322228     ld ($2822), a
+CF0A 221A28     ld ($281A), hl
+CF0D CD9DCF     call $CF9D
+CF10 2A2428     ld hl, ($2824)
+CF13 7C         ld a, h
+CF14 B5         or l
+CF15 285F       jr z, $CF76
+CF17 210428     ld hl, $2804
+CF1A CBA6       res 4, (hl)
+CF1C 210328     ld hl, $2803
+CF1F CB5E       bit 3, (hl)
+CF21 C2B7C7     jp nz, $C7B7
+CF24 C3E9C7     jp $C7E9
+CF27 23         inc hl
+CF28 23         inc hl
+CF29 7E         ld a, (hl)
+CF2A FE30       cp $30
+CF2C 380F       jr c, $CF3D
+CF2E FE3A       cp $3A
+CF30 D23DCF     jp nc, $CF3D
+CF33 DE2F       sbc a, $2F
+CF35 322A28     ld ($282A), a
+CF38 CD8AC4     call $C48A
+CF3B 18AA       jr $CEE7
+CF3D 3E2A       ld a, $2A
+CF3F 77         ld (hl), a
+CF40 C3E7CE     jp $CEE7
+CF43 210428     ld hl, $2804
+CF46 CB66       bit 4, (hl)
+CF48 CA56CF     jp z, $CF56
+CF4B CBA6       res 4, (hl)
+CF4D 214A08     ld hl, $084A
+CF50 CD6ACF     call $CF6A
+CF53 C398CE     jp $CE98
+CF56 3A3028     ld a, ($2830)
+CF59 322A28     ld ($282A), a
+CF5C C358C3     jp $C358
+CF5F 211C28     ld hl, $281C
+CF62 CD22D4     call $D422
+CF65 5E         ld e, (hl)
+CF66 23         inc hl
+CF67 56         ld d, (hl)
+CF68 EB         ex de, hl
+CF69 C9         ret
+CF6A E5         push hl
+CF6B 211C28     ld hl, $281C
+CF6E CD22D4     call $D422
+CF71 D1         pop de
+CF72 73         ld (hl), e
+CF73 23         inc hl
+CF74 72         ld (hl), d
+CF75 C9         ret
+CF76 2A1A28     ld hl, ($281A)
+CF79 363F       ld (hl), $3F
+CF7B C3DFCE     jp $CEDF
+CF7E D5         push de
+CF7F C5         push bc
+CF80 21002B     ld hl, $2B00
+CF83 CD22D4     call $D422
+CF86 3A2228     ld a, ($2822)
+CF89 47         ld b, a
+CF8A CD09D4     call $D409
+CF8D ED5B2628   ld de, ($2826)
+CF91 B7         or a
+CF92 2803       jr z, $CF97
+CF94 19         add hl, de
+CF95 10FD       djnz $CF94
+CF97 E5         push hl
+CF98 DDE1       pop ix
+CF9A C1         pop bc
+CF9B D1         pop de
+CF9C C9         ret
+CF9D C5         push bc
+CF9E D5         push de
+CF9F CDD6D3     call $D3D6
+CFA2 5F         ld e, a
+CFA3 1600       ld d, $00
+CFA5 CD05D4     call $D405
+CFA8 47         ld b, a
+CFA9 FE00       cp $00
+CFAB 210000     ld hl, $0000
+CFAE 2818       jr z, $CFC8
+CFB0 AF         xor a
+CFB1 ED5A       adc hl, de
+CFB3 10FC       djnz $CFB1
+CFB5 7D         ld a, l
+CFB6 5F         ld e, a
+CFB7 7C         ld a, h
+CFB8 FE00       cp $00
+CFBA 2015       jr nz, $CFD1
+CFBC 3A1228     ld a, ($2812)
+CFBF 47         ld b, a
+CFC0 1600       ld d, $00
+CFC2 210000     ld hl, $0000
+CFC5 19         add hl, de
+CFC6 10FD       djnz $CFC5
+CFC8 222428     ld ($2824), hl
+CFCB 212428     ld hl, $2824
+CFCE D1         pop de
+CFCF C1         pop bc
+CFD0 C9         ret
+CFD1 210000     ld hl, $0000
+CFD4 18F2       jr $CFC8
+CFD6 DDE5       push ix
+CFD8 C5         push bc
+CFD9 DF         rst $18
+CFDA 62         ld h, d
+CFDB 305A       jr nc, $D037
+CFDD E67F       and $7F
+CFDF 210328     ld hl, $2803
+CFE2 CB4E       bit 1, (hl)
+CFE4 2803       jr z, $CFE9
+CFE6 37         scf
+CFE7 184A       jr $D033
+CFE9 FE41       cp $41
+CFEB 2004       jr nz, $CFF1
+CFED CBC6       set 0, (hl)
+CFEF 1842       jr $D033
+CFF1 FE53       cp $53
+CFF3 2004       jr nz, $CFF9
+CFF5 CBD6       set 2, (hl)
+CFF7 183A       jr $D033
+CFF9 FE52       cp $52
+CFFB 2004       jr nz, $D001
+CFFD CB96       res 2, (hl)
+CFFF 1832       jr $D033
+D001 FE45       cp $45
+D003 2004       jr nz, $D009
+D005 CB86       res 0, (hl)
+D007 182A       jr $D033
+D009 FE4F       cp $4F
+D00B 2007       jr nz, $D014
+D00D 210428     ld hl, $2804
+D010 CBEE       set 5, (hl)
+D012 1819       jr $D02D
+D014 FE48       cp $48
+D016 2810       jr z, $D028
+D018 FE54       cp $54
+D01A 280C       jr z, $D028
+D01C FE46       cp $46
+D01E 2808       jr z, $D028
+D020 FE30       cp $30
+D022 380F       jr c, $D033
+D024 FE3A       cp $3A
+D026 300B       jr nc, $D033
+D028 CDCBCC     call $CCCB
+D02B 3006       jr nc, $D033
+D02D 214A09     ld hl, $094A
+D030 CD1ACC     call $CC1A
+D033 C1         pop bc
+D034 DDE1       pop ix
+D036 C9         ret
+D037 AF         xor a
+D038 18F9       jr $D033
+D03A 210328     ld hl, $2803
+D03D CBBE       res 7, (hl)
+D03F A8         xor b
+D040 78         ld a, b
+D041 FE0A       cp $0A
+D043 280F       jr z, $D054
+D045 322228     ld ($2822), a
+D048 CD9DCF     call $CF9D
+D04B 2A2428     ld hl, ($2824)
+D04E 7C         ld a, h
+D04F B5         or l
+D050 C8         ret z
+D051 04         inc b
+D052 18EC       jr $D040
+D054 210328     ld hl, $2803
+D057 CBFE       set 7, (hl)
+D059 C9         ret
+D05A CD54C3     call $C354
+D05D 210328     ld hl, $2803
+D060 CB8E       res 1, (hl)
+D062 212FC0     ld hl, $C02F
+D065 CD58D4     call $D458
+D068 CD8BD0     call $D08B
+D06B EF         rst $28
+D06C 0D         dec c
+D06D 2020       jr nz, $D08F
+D06F 2050       jr nz, $D0C1
+D071 6C         ld l, h
+D072 61         ld h, c
+D073 79         ld a, c
+D074 204E       jr nz, $D0C4
+D076 6F         ld l, a
+D077 203F       jr nz, $D0B8
+D079 1100DF     ld de, $DF00
+D07C 53         ld d, e
+D07D FE1B       cp $1B
+D07F CA5FC3     jp z, $C35F
+D082 F7         rst $30
+D083 D630       sub $30
+D085 322228     ld ($2822), a
+D088 C3A3C7     jp $C7A3
+D08B CD8AC4     call $C48A
+D08E 218D08     ld hl, $088D
+D091 22290C     ld ($0C29), hl
+D094 060A       ld b, $0A
+D096 1630       ld d, $30
+D098 7A         ld a, d
+D099 F7         rst $30
+D09A EF         rst $28
+D09B 0D         dec c
+D09C 2020       jr nz, $D0BE
+D09E 2000       jr nz, $D0A0
+D0A0 14         inc d
+D0A1 10F5       djnz $D098
+D0A3 060A       ld b, $0A
+D0A5 C5         push bc
+D0A6 21F029     ld hl, $29F0
+D0A9 CD22D4     call $D422
+D0AC 119008     ld de, $0890
+D0AF 011A00     ld bc, $001A
+D0B2 EDB0       ldir
+D0B4 E5         push hl
+D0B5 EB         ex de, hl
+D0B6 112600     ld de, $0026
+D0B9 19         add hl, de
+D0BA EB         ex de, hl
+D0BB E1         pop hl
+D0BC 011A00     ld bc, $001A
+D0BF EDB0       ldir
+D0C1 C1         pop bc
+D0C2 05         dec b
+D0C3 78         ld a, b
+D0C4 3D         dec a
+D0C5 C5         push bc
+D0C6 20EC       jr nz, $D0B4
+D0C8 C1         pop bc
+D0C9 C9         ret
+D0CA 3E01       ld a, $01
+D0CC FD210428   ld iy, $2804
+D0D0 FDCB00F6   set 6, (iy)
+D0D4 F5         push af
+D0D5 CD7ECF     call $CF7E
+D0D8 E5         push hl
+D0D9 CD9DCF     call $CF9D
+D0DC ED5B2428   ld de, ($2824)
+D0E0 E1         pop hl
+D0E1 F1         pop af
+D0E2 3D         dec a
+D0E3 2801       jr z, $D0E6
+D0E5 23         inc hl
+D0E6 FD210428   ld iy, $2804
+D0EA FDCB0076   bit 6, (iy)
+D0EE 2806       jr z, $D0F6
+D0F0 7E         ld a, (hl)
+D0F1 E602       and $02
+D0F3 77         ld (hl), a
+D0F4 1802       jr $D0F8
+D0F6 3600       ld (hl), $00
+D0F8 23         inc hl
+D0F9 23         inc hl
+D0FA 1B         dec de
+D0FB 7A         ld a, d
+D0FC B3         or e
+D0FD 20E7       jr nz, $D0E6
+D0FF C3A3C7     jp $C7A3
+D102 3E00       ld a, $00
+D104 FD210428   ld iy, $2804
+D108 FDCB00B6   res 6, (iy)
+D10C F5         push af
+D10D C3D5D0     jp $D0D5
+D110 CD54C3     call $C354
+D113 2119C0     ld hl, $C019
+D116 CD58D4     call $D458
+D119 CD8BD0     call $D08B
+D11C EF         rst $28
+D11D 0D         dec c
+D11E 2020       jr nz, $D140
+D120 2054       jr nz, $D176
+D122 72         ld (hl), d
+D123 61         ld h, c
+D124 6E         ld l, (hl)
+D125 73         ld (hl), e
+D126 66         ld h, (hl)
+D127 65         ld h, l
+D128 72         ld (hl), d
+D129 204E       jr nz, $D179
+D12B 6F         ld l, a
+D12C 203F       jr nz, $D16D
+D12E 110000     ld de, $0000
+D131 DF         rst $18
+D132 53         ld d, e
+D133 FE1B       cp $1B
+D135 CA5FC3     jp z, $C35F
+D138 F7         rst $30
+D139 D630       sub $30
+D13B 321428     ld ($2814), a
+D13E EF         rst $28
+D13F 0D         dec c
+D140 2020       jr nz, $D162
+D142 2054       jr nz, $D198
+D144 6F         ld l, a
+D145 206E       jr nz, $D1B5
+D147 75         ld (hl), l
+D148 6D         ld l, l
+D149 62         ld h, d
+D14A 65         ld h, l
+D14B 72         ld (hl), d
+D14C 203F       jr nz, $D18D
+D14E 110000     ld de, $0000
+D151 DF         rst $18
+D152 53         ld d, e
+D153 FE1B       cp $1B
+D155 CA5FC3     jp z, $C35F
+D158 F7         rst $30
+D159 D630       sub $30
+D15B 321628     ld ($2816), a
+D15E 322228     ld ($2822), a
+D161 061A       ld b, $1A
+D163 EF         rst $28
+D164 0D         dec c
+D165 2020       jr nz, $D187
+D167 2054       jr nz, $D1BD
+D169 69         ld l, c
+D16A 74         ld (hl), h
+D16B 6C         ld l, h
+D16C 65         ld h, l
+D16D 2066       jr nz, $D1D5
+D16F 6F         ld l, a
+D170 72         ld (hl), d
+D171 2074       jr nz, $D1E7
+D173 72         ld (hl), d
+D174 61         ld h, c
+D175 6E         ld l, (hl)
+D176 73         ld (hl), e
+D177 66         ld h, (hl)
+D178 65         ld h, l
+D179 72         ld (hl), d
+D17A 203F       jr nz, $D1BB
+D17C 1100CD     ld de, $CD00
+D17F DAC4FE     jp c, $FEC4
+D182 1B         dec de
+D183 CA5FC3     jp z, $C35F
+D186 CD1ECE     call $CE1E
+D189 EB         ex de, hl
+D18A 21A00B     ld hl, $0BA0
+D18D 011A00     ld bc, $001A
+D190 EDB0       ldir
+D192 3A1628     ld a, ($2816)
+D195 322228     ld ($2822), a
+D198 CD9DCF     call $CF9D
+D19B EB         ex de, hl
+D19C 3A1428     ld a, ($2814)
+D19F 322228     ld ($2822), a
+D1A2 CD9DCF     call $CF9D
+D1A5 010200     ld bc, $0002
+D1A8 EDB0       ldir
+D1AA 3A1428     ld a, ($2814)
+D1AD 322228     ld ($2822), a
+D1B0 CD05D4     call $D405
+D1B3 F5         push af
+D1B4 3A1628     ld a, ($2816)
+D1B7 322228     ld ($2822), a
+D1BA F1         pop af
+D1BB CD01D4     call $D401
+D1BE 3A1428     ld a, ($2814)
+D1C1 322228     ld ($2822), a
+D1C4 CDD6D3     call $D3D6
+D1C7 F5         push af
+D1C8 3A1628     ld a, ($2816)
+D1CB 322228     ld ($2822), a
+D1CE F1         pop af
+D1CF CDD0D3     call $D3D0
+D1D2 3A1628     ld a, ($2816)
+D1D5 322228     ld ($2822), a
+D1D8 CD7ECF     call $CF7E
+D1DB DDE5       push ix
+D1DD D1         pop de
+D1DE 3A1428     ld a, ($2814)
+D1E1 322228     ld ($2822), a
+D1E4 CD7ECF     call $CF7E
+D1E7 DDE5       push ix
+D1E9 E1         pop hl
+D1EA CD09D4     call $D409
+D1ED ED4B2628   ld bc, ($2826)
+D1F1 EDB0       ldir
+D1F3 C35FC3     jp $C35F
+D1F6 21003F     ld hl, $3F00
+D1F9 110008     ld de, $0800
+D1FC 018003     ld bc, $0380
+D1FF EDB0       ldir
+D201 218A0B     ld hl, $0B8A
+D204 060D       ld b, $0D
+D206 3E98       ld a, $98
+D208 DF         rst $18
+D209 4F         ld c, a
+D20A EB         ex de, hl
+D20B 21E8CB     ld hl, $CBE8
+D20E 011400     ld bc, $0014
+D211 EDB0       ldir
+D213 EB         ex de, hl
+D214 062D       ld b, $2D
+D216 3E98       ld a, $98
+D218 DF         rst $18
+D219 4F         ld c, a
+D21A EB         ex de, hl
+D21B 21A1C0     ld hl, $C0A1
+D21E 011100     ld bc, $0011
+D221 EDB0       ldir
+D223 EB         ex de, hl
+D224 0611       ld b, $11
+D226 3E98       ld a, $98
+D228 DF         rst $18
+D229 4F         ld c, a
+D22A 2A1828     ld hl, ($2818)
+D22D 22290C     ld ($0C29), hl
+D230 217A0B     ld hl, $0B7A
+D233 ED5B290C   ld de, ($0C29)
+D237 ED52       sbc hl, de
+D239 DCC7D3     call c, $D3C7
+D23C DF         rst $18
+D23D 7B         ld a, e
+D23E E67F       and $7F
+D240 FE0C       cp $0C
+D242 28EC       jr z, $D230
+D244 FE0D       cp $0D
+D246 28E8       jr z, $D230
+D248 FE1B       cp $1B
+D24A 2803       jr z, $D24F
+D24C F7         rst $30
+D24D 18E1       jr $D230
+D24F ED5B290C   ld de, ($0C29)
+D253 ED531828   ld ($2818), de
+D257 11003F     ld de, $3F00
+D25A 210008     ld hl, $0800
+D25D 018003     ld bc, $0380
+D260 EDB0       ldir
+D262 C35FC3     jp $C35F
+D265 CD54C3     call $C354
+D268 2145C0     ld hl, $C045
+D26B CD58D4     call $D458
+D26E CD8BD0     call $D08B
+D271 EF         rst $28
+D272 0D         dec c
+D273 2020       jr nz, $D295
+D275 2045       jr nz, $D2BC
+D277 72         ld (hl), d
+D278 61         ld h, c
+D279 73         ld (hl), e
+D27A 65         ld h, l
+D27B 204E       jr nz, $D2CB
+D27D 6F         ld l, a
+D27E 203F       jr nz, $D2BF
+D280 1100DF     ld de, $DF00
+D283 53         ld d, e
+D284 FE1B       cp $1B
+D286 CA5FC3     jp z, $C35F
+D289 321428     ld ($2814), a
+D28C F7         rst $30
+D28D EF         rst $28
+D28E 0D         dec c
+D28F 2020       jr nz, $D2B1
+D291 2043       jr nz, $D2D6
+D293 6F         ld l, a
+D294 6E         ld l, (hl)
+D295 66         ld h, (hl)
+D296 69         ld l, c
+D297 72         ld (hl), d
+D298 6D         ld l, l
+D299 2C         inc l
+D29A 2059       jr nz, $D2F5
+D29C 1100DF     ld de, $DF00
+D29F 7B         ld a, e
+D2A0 E67F       and $7F
+D2A2 FE59       cp $59
+D2A4 C25FC3     jp nz, $C35F
+D2A7 3A1428     ld a, ($2814)
+D2AA D630       sub $30
+D2AC 322228     ld ($2822), a
+D2AF CD1ECE     call $CE1E
+D2B2 061A       ld b, $1A
+D2B4 362E       ld (hl), $2E
+D2B6 23         inc hl
+D2B7 10FB       djnz $D2B4
+D2B9 CD7ECF     call $CF7E
+D2BC CD09D4     call $D409
+D2BF ED4B2628   ld bc, ($2826)
+D2C3 3600       ld (hl), $00
+D2C5 23         inc hl
+D2C6 0B         dec bc
+D2C7 78         ld a, b
+D2C8 B1         or c
+D2C9 20F8       jr nz, $D2C3
+D2CB CD9DCF     call $CF9D
+D2CE 3600       ld (hl), $00
+D2D0 23         inc hl
+D2D1 3600       ld (hl), $00
+D2D3 AF         xor a
+D2D4 CDD0D3     call $D3D0
+D2D7 CD01D4     call $D401
+D2DA C35FC3     jp $C35F
+D2DD 210328     ld hl, $2803
+D2E0 CB4E       bit 1, (hl)
+D2E2 C25FC3     jp nz, $C35F
+D2E5 C9         ret
+D2E6 FD210428   ld iy, $2804
+D2EA FDCB00C6   set 0, (iy)
+D2EE CDDDD2     call $D2DD
+D2F1 CD05D4     call $D405
+D2F4 5F         ld e, a
+D2F5 CDD6D3     call $D3D6
+D2F8 57         ld d, a
+D2F9 CD7ECF     call $CF7E
+D2FC FDCB0046   bit 0, (iy)
+D300 23         inc hl
+D301 2006       jr nz, $D309
+D303 3E40       ld a, $40
+D305 2F         cpl
+D306 A6         and (hl)
+D307 1803       jr $D30C
+D309 7E         ld a, (hl)
+D30A F640       or $40
+D30C 77         ld (hl), a
+D30D 2B         dec hl
+D30E 3A1228     ld a, ($2812)
+D311 3C         inc a
+D312 47         ld b, a
+D313 FD210428   ld iy, $2804
+D317 23         inc hl
+D318 10FD       djnz $D317
+D31A FDCB0046   bit 0, (iy)
+D31E 2006       jr nz, $D326
+D320 3E80       ld a, $80
+D322 2F         cpl
+D323 A6         and (hl)
+D324 1803       jr $D329
+D326 7E         ld a, (hl)
+D327 F680       or $80
+D329 77         ld (hl), a
+D32A 2B         dec hl
+D32B 7A         ld a, d
+D32C FE01       cp $01
+D32E 2803       jr z, $D333
+D330 15         dec d
+D331 18DB       jr $D30E
+D333 1D         dec e
+D334 CAA3C7     jp z, $C7A3
+D337 CDD6D3     call $D3D6
+D33A 57         ld d, a
+D33B 18BF       jr $D2FC
+D33D CDDDD2     call $D2DD
+D340 21200A     ld hl, $0A20
+D343 363F       ld (hl), $3F
+D345 22290C     ld ($0C29), hl
+D348 DF         rst $18
+D349 53         ld d, e
+D34A FE08       cp $08
+D34C 286D       jr z, $D3BB
+D34E FE31       cp $31
+D350 2869       jr z, $D3BB
+D352 FE30       cp $30
+D354 2865       jr z, $D3BB
+D356 F7         rst $30
+D357 D630       sub $30
+D359 321428     ld ($2814), a
+D35C 321628     ld ($2816), a
+D35F CD9DCF     call $CF9D
+D362 ED5B2428   ld de, ($2824)
+D366 210000     ld hl, $0000
+D369 3A1428     ld a, ($2814)
+D36C 47         ld b, a
+D36D 19         add hl, de
+D36E 10FD       djnz $D36D
+D370 E5         push hl
+D371 C1         pop bc
+D372 E5         push hl
+D373 B7         or a
+D374 CD09D4     call $D409
+D377 2A2628     ld hl, ($2826)
+D37A ED42       sbc hl, bc
+D37C DABAD3     jp c, $D3BA
+D37F CD7ECF     call $CF7E
+D382 ED5B2428   ld de, ($2824)
+D386 E5         push hl
+D387 19         add hl, de
+D388 EB         ex de, hl
+D389 E1         pop hl
+D38A ED4B2428   ld bc, ($2824)
+D38E EDB0       ldir
+D390 3A1428     ld a, ($2814)
+D393 FE02       cp $02
+D395 CA9ED3     jp z, $D39E
+D398 3D         dec a
+D399 321428     ld ($2814), a
+D39C 18E4       jr $D382
+D39E CD9DCF     call $CF9D
+D3A1 D1         pop de
+D3A2 72         ld (hl), d
+D3A3 23         inc hl
+D3A4 73         ld (hl), e
+D3A5 CD05D4     call $D405
+D3A8 4F         ld c, a
+D3A9 3A1628     ld a, ($2816)
+D3AC 47         ld b, a
+D3AD AF         xor a
+D3AE 89         adc a, c
+D3AF 10FD       djnz $D3AE
+D3B1 CD01D4     call $D401
+D3B4 CDCFC4     call $C4CF
+D3B7 C3A3C7     jp $C7A3
+D3BA D1         pop de
+D3BB FD21200A   ld iy, $0A20
+D3BF FD36002E   ld (iy), $2E
+D3C3 E1         pop hl
+D3C4 C37FCC     jp $CC7F
+D3C7 E5         push hl
+D3C8 210A08     ld hl, $080A
+D3CB 22290C     ld ($0C29), hl
+D3CE E1         pop hl
+D3CF C9         ret
+D3D0 0E00       ld c, $00
+D3D2 0601       ld b, $01
+D3D4 1804       jr $D3DA
+D3D6 0E00       ld c, $00
+D3D8 0600       ld b, $00
+D3DA E5         push hl
+D3DB D5         push de
+D3DC F5         push af
+D3DD 0D         dec c
+D3DE 2808       jr z, $D3E8
+D3E0 213C28     ld hl, $283C
+D3E3 CD22D4     call $D422
+D3E6 1806       jr $D3EE
+D3E8 214628     ld hl, $2846
+D3EB CD22D4     call $D422
+D3EE 110000     ld de, $0000
+D3F1 3A2228     ld a, ($2822)
+D3F4 5F         ld e, a
+D3F5 19         add hl, de
+D3F6 F1         pop af
+D3F7 05         dec b
+D3F8 2804       jr z, $D3FE
+D3FA 7E         ld a, (hl)
+D3FB D1         pop de
+D3FC E1         pop hl
+D3FD C9         ret
+D3FE 77         ld (hl), a
+D3FF 18FA       jr $D3FB
+D401 0E01       ld c, $01
+D403 18CD       jr $D3D2
+D405 0E01       ld c, $01
+D407 18CF       jr $D3D8
+D409 F5         push af
+D40A E5         push hl
+D40B 3A2A28     ld a, ($282A)
+D40E B7         or a
+D40F 2809       jr z, $D41A
+D411 218000     ld hl, $0080
+D414 222628     ld ($2826), hl
+D417 E1         pop hl
+D418 F1         pop af
+D419 C9         ret
+D41A 210002     ld hl, $0200
+D41D 222628     ld ($2826), hl
+D420 18F5       jr $D417
+D422 3A2A28     ld a, ($282A)
+D425 B7         or a
+D426 C8         ret z
+D427 11001C     ld de, $1C00
+D42A 19         add hl, de
+D42B 3D         dec a
+D42C C8         ret z
+D42D C5         push bc
+D42E 47         ld b, a
+D42F 110008     ld de, $0800
+D432 19         add hl, de
+D433 10FD       djnz $D432
+D435 C1         pop bc
+D436 C9         ret
+D437 3E4F       ld a, $4F
+D439 D306       out ($06), a
+D43B D307       out ($07), a
+D43D 3ECF       ld a, $CF
+D43F D306       out ($06), a
+D441 3EFF       ld a, $FF
+D443 D306       out ($06), a
+D445 3ECF       ld a, $CF
+D447 D307       out ($07), a
+D449 3EFF       ld a, $FF
+D44B D307       out ($07), a
+D44D C9         ret
+D44E 0630       ld b, $30
+D450 3E98       ld a, $98
+D452 DF         rst $18
+D453 4F         ld c, a
+D454 3E0D       ld a, $0D
+D456 F7         rst $30
+D457 C9         ret
+D458 11D20B     ld de, $0BD2
+D45B 011600     ld bc, $0016
+D45E EDB0       ldir
+D460 C9         ret
+D461 D9         exx
+D462 2A290C     ld hl, ($0C29)
+D465 0600       ld b, $00
+D467 FE64       cp $64
+D469 380A       jr c, $D475
+D46B DE64       sbc a, $64
+D46D 04         inc b
+D46E FE64       cp $64
+D470 3803       jr c, $D475
+D472 DE64       sbc a, $64
+D474 04         inc b
+D475 F5         push af
+D476 78         ld a, b
+D477 FE00       cp $00
+D479 2804       jr z, $D47F
+D47B C630       add a, $30
+D47D 1802       jr $D481
+D47F 3E20       ld a, $20
+D481 77         ld (hl), a
+D482 F1         pop af
+D483 23         inc hl
+D484 0E00       ld c, $00
+D486 0609       ld b, $09
+D488 FE0A       cp $0A
+D48A 3805       jr c, $D491
+D48C DE0A       sbc a, $0A
+D48E 0C         inc c
+D48F 10F7       djnz $D488
+D491 F5         push af
+D492 79         ld a, c
+D493 C630       add a, $30
+D495 77         ld (hl), a
+D496 F1         pop af
+D497 23         inc hl
+D498 C630       add a, $30
+D49A 77         ld (hl), a
+D49B D9         exx
+D49C C9         ret
+D49D 3A3428     ld a, ($2834)
+D4A0 E6FE       and $FE
+D4A2 5F         ld e, a
+D4A3 3A3428     ld a, ($2834)
+D4A6 EE01       xor $01
+D4A8 B3         or e
+D4A9 323428     ld ($2834), a
+D4AC C9         ret
+D4AD 216A0A     ld hl, $0A6A
+D4B0 22290C     ld ($0C29), hl
+D4B3 EF         rst $28
+D4B4 43         ld b, e
+D4B5 68         ld l, b
+D4B6 61         ld h, c
+D4B7 6E         ld l, (hl)
+D4B8 65         ld h, l
+D4B9 6C         ld l, h
+D4BA 6C         ld l, h
+D4BB 2000       jr nz, $D4BD
+D4BD 3A3528     ld a, ($2835)
+D4C0 3C         inc a
+D4C1 DF         rst $18
+D4C2 4A         ld c, d
+D4C3 C9         ret
+D4C4 3A3428     ld a, ($2834)
+D4C7 CB47       bit 0, a
+D4C9 2807       jr z, $D4D2
+D4CB EF         rst $28
+D4CC 49         ld c, c
+D4CD 6E         ld l, (hl)
+D4CE 74         ld (hl), h
+D4CF 2000       jr nz, $D4D1
+D4D1 C9         ret
+D4D2 EF         rst $28
+D4D3 4D         ld c, l
+D4D4 49         ld c, c
+D4D5 44         ld b, h
+D4D6 49         ld c, c
+D4D7 00         nop
+D4D8 C9         ret
+D4D9 00         nop
+D4DA EF         rst $28
+D4DB 0C         inc c
+D4DC 4E         ld c, (hl)
+D4DD 4F         ld c, a
+D4DE 52         ld d, d
+D4DF 4D         ld c, l
+D4E0 2C         inc l
+D4E1 53         ld d, e
+D4E2 48         ld c, b
+D4E3 55         ld d, l
+D4E4 46         ld b, (hl)
+D4E5 46         ld b, (hl)
+D4E6 4C         ld c, h
+D4E7 45         ld b, l
+D4E8 2026       jr nz, $D510
+D4EA 2048       jr nz, $D534
+D4EC 49         ld c, c
+D4ED 47         ld b, a
+D4EE 48         ld c, b
+D4EF 2061       jr nz, $D552
+D4F1 74         ld (hl), h
+D4F2 2073       jr nz, $D567
+D4F4 74         ld (hl), h
+D4F5 61         ld h, c
+D4F6 72         ld (hl), d
+D4F7 74         ld (hl), h
+D4F8 2063       jr nz, $D55D
+D4FA 6C         ld l, h
+D4FB 65         ld h, l
+D4FC 61         ld h, c
+D4FD 72         ld (hl), d
+D4FE 2072       jr nz, $D572
+D500 68         ld l, b
+D501 79         ld a, c
+D502 74         ld (hl), h
+D503 68         ld l, b
+D504 6D         ld l, l
+D505 73         ld (hl), e
+D506 2021       jr nz, $D529
+D508 2E0D       ld l, $0D
+D50A 55         ld d, l
+D50B 73         ld (hl), e
+D50C 65         ld h, l
+D50D 2043       jr nz, $D552
+D50F 2074       jr nz, $D585
+D511 6F         ld l, a
+D512 2063       jr nz, $D577
+D514 6F         ld l, a
+D515 6E         ld l, (hl)
+D516 74         ld (hl), h
+D517 69         ld l, c
+D518 6E         ld l, (hl)
+D519 75         ld (hl), l
+D51A 65         ld h, l
+D51B 2061       jr nz, $D57E
+D51D 73         ld (hl), e
+D51E 2062       jr nz, $D582
+D520 65         ld h, l
+D521 66         ld h, (hl)
+D522 6F         ld l, a
+D523 72         ld (hl), d
+D524 65         ld h, l
+D525 2028       jr nz, $D54F
+D527 69         ld l, c
+D528 66         ld h, (hl)
+D529 206D       jr nz, $D598
+D52B 65         ld h, l
+D52C 6D         ld l, l
+D52D 6F         ld l, a
+D52E 72         ld (hl), d
+D52F 79         ld a, c
+D530 2061       jr nz, $D593
+D532 6C         ld l, h
+D533 6C         ld l, h
+D534 6F         ld l, a
+D535 77         ld (hl), a
+D536 73         ld (hl), e
+D537 29         add hl, hl
+D538 2E0D       ld l, $0D
+D53A 42         ld b, d
+D53B 65         ld h, l
+D53C 61         ld h, c
+D53D 74         ld (hl), h
+D53E 73         ld (hl), e
+D53F 2028       jr nz, $D569
+D541 78         ld a, b
+D542 2029       jr nz, $D56D
+D544 206F       jr nz, $D5B5
+D546 70         ld (hl), b
+D547 74         ld (hl), h
+D548 69         ld l, c
+D549 6F         ld l, a
+D54A 6E         ld l, (hl)
+D54B 2063       jr nz, $D5B0
+D54D 61         ld h, c
+D54E 6E         ld l, (hl)
+D54F 2075       jr nz, $D5C6
+D551 73         ld (hl), e
+D552 65         ld h, l
+D553 2C         inc l
+D554 2046       jr nz, $D59C
+D556 3D         dec a
+D557 2046       jr nz, $D59F
+D559 69         ld l, c
+D55A 72         ld (hl), d
+D55B 73         ld (hl), e
+D55C 74         ld (hl), h
+D55D 2062       jr nz, $D5C1
+D55F 65         ld h, l
+D560 61         ld h, c
+D561 74         ld (hl), h
+D562 2074       jr nz, $D5D8
+D564 6F         ld l, a
+D565 2062       jr nz, $D5C9
+D567 61         ld h, c
+D568 72         ld (hl), d
+D569 0D         dec c
+D56A 31203D     ld sp, $3D20
+D56D 2042       jr nz, $D5B1
+D56F 65         ld h, l
+D570 61         ld h, c
+D571 74         ld (hl), h
+D572 73         ld (hl), e
+D573 2061       jr nz, $D5D6
+D575 73         ld (hl), e
+D576 2065       jr nz, $D5DD
+D578 6E         ld l, (hl)
+D579 74         ld (hl), h
+D57A 65         ld h, l
+D57B 72         ld (hl), d
+D57C 65         ld h, l
+D57D 64         ld h, h
+D57E 2020       jr nz, $D5A0
+D580 2D         dec l
+D581 2020       jr nz, $D5A3
+D583 32203D     ld ($3D20), a
+D586 2054       jr nz, $D5DC
+D588 77         ld (hl), a
+D589 69         ld l, c
+D58A 63         ld h, e
+D58B 65         ld h, l
+D58C 204E       jr nz, $D5DC
+D58E 6F         ld l, a
+D58F 206F       jr nz, $D600
+D591 66         ld h, (hl)
+D592 2062       jr nz, $D5F6
+D594 65         ld h, l
+D595 61         ld h, c
+D596 74         ld (hl), h
+D597 73         ld (hl), e
+D598 0D         dec c
+D599 49         ld c, c
+D59A 6E         ld l, (hl)
+D59B 27         daa
+D59C 53         ld d, e
+D59D 48         ld c, b
+D59E 55         ld d, l
+D59F 46         ld b, (hl)
+D5A0 46         ld b, (hl)
+D5A1 4C         ld c, h
+D5A2 45         ld b, l
+D5A3 27         daa
+D5A4 2054       jr nz, $D5FA
+D5A6 3D         dec a
+D5A7 54         ld d, h
+D5A8 72         ld (hl), d
+D5A9 69         ld l, c
+D5AA 70         ld (hl), b
+D5AB 6C         ld l, h
+D5AC 65         ld h, l
+D5AD 74         ld (hl), h
+D5AE 73         ld (hl), e
+D5AF 2C         inc l
+D5B0 2033       jr nz, $D5E5
+D5B2 3D         dec a
+D5B3 312F34     ld sp, $342F
+D5B6 2054       jr nz, $D60C
+D5B8 72         ld (hl), d
+D5B9 69         ld l, c
+D5BA 70         ld (hl), b
+D5BB 6C         ld l, h
+D5BC 65         ld h, l
+D5BD 74         ld (hl), h
+D5BE 73         ld (hl), e
+D5BF 2C         inc l
+D5C0 2036       jr nz, $D5F8
+D5C2 3D         dec a
+D5C3 312F38     ld sp, $382F
+D5C6 0D         dec c
+D5C7 49         ld c, c
+D5C8 6E         ld l, (hl)
+D5C9 2027       jr nz, $D5F2
+D5CB 4E         ld c, (hl)
+D5CC 4F         ld c, a
+D5CD 52         ld d, d
+D5CE 4D         ld c, l
+D5CF 41         ld b, c
+D5D0 4C         ld c, h
+D5D1 27         daa
+D5D2 2878       jr z, $D64C
+D5D4 34         inc (hl)
+D5D5 29         add hl, hl
+D5D6 2069       jr nz, $D641
+D5D8 73         ld (hl), e
+D5D9 206D       jr nz, $D648
+D5DB 61         ld h, c
+D5DC 78         ld a, b
+D5DD 2049       jr nz, $D628
+D5DF 6E         ld l, (hl)
+D5E0 2027       jr nz, $D609
+D5E2 48         ld c, b
+D5E3 49         ld c, c
+D5E4 47         ld b, a
+D5E5 48         ld c, b
+D5E6 2052       jr nz, $D63A
+D5E8 45         ld b, l
+D5E9 53         ld d, e
+D5EA 27         daa
+D5EB 2028       jr nz, $D615
+D5ED 78         ld a, b
+D5EE 3829       jr c, $D619
+D5F0 206D       jr nz, $D65F
+D5F2 61         ld h, c
+D5F3 78         ld a, b
+D5F4 0D         dec c
+D5F5 27         daa
+D5F6 4F         ld c, a
+D5F7 27         daa
+D5F8 2063       jr nz, $D65D
+D5FA 61         ld h, c
+D5FB 6E         ld l, (hl)
+D5FC 2062       jr nz, $D660
+D5FE 65         ld h, l
+D5FF 2075       jr nz, $D676
+D601 73         ld (hl), e
+D602 65         ld h, l
+D603 64         ld h, h
+D604 206F       jr nz, $D675
+D606 6E         ld l, (hl)
+D607 2061       jr nz, $D66A
+D609 6C         ld l, h
+D60A 6C         ld l, h
+D60B 2062       jr nz, $D66F
+D60D 75         ld (hl), l
+D60E 74         ld (hl), h
+D60F 2068       jr nz, $D679
+D611 69         ld l, c
+D612 67         ld h, a
+D613 68         ld l, b
+D614 65         ld h, l
+D615 73         ld (hl), e
+D616 74         ld (hl), h
+D617 206E       jr nz, $D687
+D619 75         ld (hl), l
+D61A 6D         ld l, l
+D61B 62         ld h, d
+D61C 65         ld h, l
+D61D 72         ld (hl), d
+D61E 73         ld (hl), e
+D61F 2074       jr nz, $D695
+D621 6F         ld l, a
+D622 200D       jr nz, $D631
+D624 67         ld h, a
+D625 69         ld l, c
+D626 76         halt
+D627 65         ld h, l
+D628 2061       jr nz, $D68B
+D62A 6E         ld l, (hl)
+D62B 206F       jr nz, $D69C
+D62D 66         ld h, (hl)
+D62E 66         ld h, (hl)
+D62F 62         ld h, d
+D630 65         ld h, l
+D631 61         ld h, c
+D632 74         ld (hl), h
+D633 2066       jr nz, $D69B
+D635 65         ld h, l
+D636 65         ld h, l
+D637 6C         ld l, h
+D638 2E0D       ld l, $0D
+D63A 0D         dec c
+D63B 52         ld d, d
+D63C 65         ld h, l
+D63D 6D         ld l, l
+D63E 65         ld h, l
+D63F 6D         ld l, l
+D640 62         ld h, d
+D641 65         ld h, l
+D642 72         ld (hl), d
+D643 2C         inc l
+D644 2077       jr nz, $D6BD
+D646 68         ld l, b
+D647 65         ld h, l
+D648 6E         ld l, (hl)
+D649 2065       jr nz, $D6B0
+D64B 72         ld (hl), d
+D64C 61         ld h, c
+D64D 73         ld (hl), e
+D64E 69         ld l, c
+D64F 6E         ld l, (hl)
+D650 67         ld h, a
+D651 206F       jr nz, $D6C2
+D653 6E         ld l, (hl)
+D654 6C         ld l, h
+D655 79         ld a, c
+D656 2074       jr nz, $D6CC
+D658 68         ld l, b
+D659 65         ld h, l
+D65A 2062       jr nz, $D6BE
+D65C 65         ld h, l
+D65D 61         ld h, c
+D65E 74         ld (hl), h
+D65F 73         ld (hl), e
+D660 2073       jr nz, $D6D5
+D662 65         ld h, l
+D663 6C         ld l, h
+D664 65         ld h, l
+D665 63         ld h, e
+D666 74         ld (hl), h
+D667 65         ld h, l
+D668 64         ld h, h
+D669 0D         dec c
+D66A 77         ld (hl), a
+D66B 69         ld l, c
+D66C 6C         ld l, h
+D66D 6C         ld l, h
+D66E 2062       jr nz, $D6D2
+D670 65         ld h, l
+D671 2065       jr nz, $D6D8
+D673 72         ld (hl), d
+D674 61         ld h, c
+D675 73         ld (hl), e
+D676 65         ld h, l
+D677 64         ld h, h
+D678 2E0D       ld l, $0D
+D67A 49         ld c, c
+D67B 6E         ld l, (hl)
+D67C 2061       jr nz, $D6DF
+D67E 73         ld (hl), e
+D67F 73         ld (hl), e
+D680 65         ld h, l
+D681 6D         ld l, l
+D682 62         ld h, d
+D683 6C         ld l, h
+D684 65         ld h, l
+D685 2063       jr nz, $D6EA
+D687 68         ld l, b
+D688 61         ld h, c
+D689 69         ld l, c
+D68A 6E         ld l, (hl)
+D68B 2C         inc l
+D68C 74         ld (hl), h
+D68D 6F         ld l, a
+D68E 2073       jr nz, $D703
+D690 65         ld h, l
+D691 6C         ld l, h
+D692 65         ld h, l
+D693 63         ld h, e
+D694 74         ld (hl), h
+D695 2066       jr nz, $D6FD
+D697 72         ld (hl), d
+D698 6F         ld l, a
+D699 6D         ld l, l
+D69A 2061       jr nz, $D6FD
+D69C 6E         ld l, (hl)
+D69D 6F         ld l, a
+D69E 74         ld (hl), h
+D69F 68         ld l, b
+D6A0 65         ld h, l
+D6A1 72         ld (hl), d
+D6A2 2070       jr nz, $D714
+D6A4 61         ld h, c
+D6A5 67         ld h, a
+D6A6 65         ld h, l
+D6A7 0D         dec c
+D6A8 75         ld (hl), l
+D6A9 73         ld (hl), e
+D6AA 65         ld h, l
+D6AB 2073       jr nz, $D720
+D6AD 68         ld l, b
+D6AE 69         ld l, c
+D6AF 66         ld h, (hl)
+D6B0 74         ld (hl), h
+D6B1 2061       jr nz, $D714
+D6B3 6E         ld l, (hl)
+D6B4 64         ld h, h
+D6B5 206E       jr nz, $D725
+D6B7 75         ld (hl), l
+D6B8 6D         ld l, l
+D6B9 62         ld h, d
+D6BA 65         ld h, l
+D6BB 72         ld (hl), d
+D6BC 206F       jr nz, $D72D
+D6BE 66         ld h, (hl)
+D6BF 2070       jr nz, $D731
+D6C1 61         ld h, c
+D6C2 67         ld h, a
+D6C3 65         ld h, l
+D6C4 2072       jr nz, $D738
+D6C6 65         ld h, l
+D6C7 71         ld (hl), c
+D6C8 75         ld (hl), l
+D6C9 69         ld l, c
+D6CA 72         ld (hl), d
+D6CB 65         ld h, l
+D6CC 64         ld h, h
+D6CD 2074       jr nz, $D743
+D6CF 6F         ld l, a
+D6D0 67         ld h, a
+D6D1 74         ld (hl), h
+D6D2 68         ld l, b
+D6D3 65         ld h, l
+D6D4 72         ld (hl), d
+D6D5 0D         dec c
+D6D6 0D         dec c
+D6D7 2863       jr z, $D73C
+D6D9 29         add hl, hl
+D6DA 2020       jr nz, $D6FC
+D6DC 4D         ld c, l
+D6DD 2E43       ld l, $43
+D6DF 2E53       ld l, $53
+D6E1 2E20       ld l, $20
+D6E3 2020       jr nz, $D705
+D6E5 2020       jr nz, $D707
+D6E7 67         ld h, a
+D6E8 6F         ld l, a
+D6E9 6F         ld l, a
+D6EA 64         ld h, h
+D6EB 206C       jr nz, $D759
+D6ED 75         ld (hl), l
+D6EE 63         ld h, e
+D6EF 6B         ld l, e
+D6F0 2100CF     ld hl, $CF00
+D6F3 E67F       and $7F
+D6F5 C35FC3     jp $C35F
+D6F8 44         ld b, h
+D6F9 2E47       ld l, $47
+D6FB 2E53       ld l, $53
+D6FD 2E20       ld l, $20
+D6FF 32362F     ld ($2F36), a
+D702 362F       ld (hl), $2F
+D704 313938     ld sp, $3839
+D707 34         inc (hl)
+D708 00         nop
+D709 00         nop
+D70A 00         nop
+D70B 00         nop
+D70C 00         nop
+D70D 00         nop
+D70E 00         nop
+D70F 00         nop
+D710 00         nop
+D711 00         nop
+D712 00         nop
+D713 00         nop
+D714 00         nop
+D715 00         nop
+D716 00         nop
+D717 00         nop
+D718 00         nop
+D719 00         nop
+D71A 00         nop
+D71B 00         nop
+D71C 00         nop
+D71D 00         nop
+D71E 00         nop
+D71F 00         nop
+D720 00         nop
+D721 00         nop
+D722 00         nop
+D723 00         nop
+D724 00         nop
+D725 00         nop
+D726 00         nop
+D727 00         nop
+D728 00         nop
+D729 00         nop
+D72A 00         nop
+D72B 00         nop
+D72C 00         nop
+D72D 00         nop
+D72E 00         nop
+D72F 00         nop
+D730 00         nop
+D731 00         nop
+D732 00         nop
+D733 00         nop
+D734 00         nop
+D735 00         nop
+D736 00         nop
+D737 00         nop
+D738 00         nop
+D739 00         nop
+D73A 00         nop
+D73B 00         nop
+D73C 00         nop
+D73D 00         nop
+D73E 00         nop
+D73F 00         nop
+D740 00         nop
+D741 00         nop
+D742 00         nop
+D743 00         nop
+D744 00         nop
+D745 00         nop
+D746 00         nop
+D747 00         nop
+D748 00         nop
+D749 00         nop
+D74A 00         nop
+D74B 00         nop
+D74C 00         nop
+D74D 00         nop
+D74E 00         nop
+D74F 00         nop
+D750 00         nop
+D751 00         nop
+D752 00         nop
+D753 00         nop
+D754 00         nop
+D755 00         nop
+D756 00         nop
+D757 00         nop
+D758 00         nop
+D759 00         nop
+D75A 00         nop
+D75B 00         nop
+D75C 00         nop
+D75D 00         nop
+D75E 00         nop
+D75F 00         nop
+D760 00         nop
+D761 00         nop
+D762 00         nop
+D763 00         nop
+D764 00         nop
+D765 00         nop
+D766 00         nop
+D767 00         nop
+D768 00         nop
+D769 00         nop
+D76A 00         nop
+D76B 00         nop
+D76C 00         nop
+D76D 00         nop
+D76E 00         nop
+D76F 00         nop
+D770 00         nop
+D771 00         nop
+D772 00         nop
+D773 00         nop
+D774 00         nop
+D775 00         nop
+D776 00         nop
+D777 00         nop
+D778 00         nop
+D779 00         nop
+D77A 00         nop
+D77B 00         nop
+D77C 00         nop
+D77D 00         nop
+D77E 00         nop
+D77F 00         nop
+D780 00         nop
+D781 00         nop
+D782 00         nop
+D783 00         nop
+D784 00         nop
+D785 00         nop
+D786 00         nop
+D787 00         nop
+D788 00         nop
+D789 00         nop
+D78A 00         nop
+D78B 00         nop
+D78C 00         nop
+D78D 00         nop
+D78E 00         nop
+D78F 00         nop
+D790 00         nop
+D791 00         nop
+D792 00         nop
+D793 00         nop
+D794 00         nop
+D795 00         nop
+D796 00         nop
+D797 00         nop
+D798 00         nop
+D799 00         nop
+D79A 00         nop
+D79B 00         nop
+D79C 00         nop
+D79D 00         nop
+D79E 00         nop
+D79F 00         nop
+D7A0 00         nop
+D7A1 00         nop
+D7A2 00         nop
+D7A3 00         nop
+D7A4 00         nop
+D7A5 00         nop
+D7A6 00         nop
+D7A7 00         nop
+D7A8 00         nop
+D7A9 00         nop
+D7AA 00         nop
+D7AB 00         nop
+D7AC 00         nop
+D7AD 00         nop
+D7AE 00         nop
+D7AF 00         nop
+D7B0 00         nop
+D7B1 00         nop
+D7B2 00         nop
+D7B3 00         nop
+D7B4 00         nop
+D7B5 00         nop
+D7B6 00         nop
+D7B7 00         nop
+D7B8 00         nop
+D7B9 00         nop
+D7BA 00         nop
+D7BB 00         nop
+D7BC 00         nop
+D7BD 00         nop
+D7BE 00         nop
+D7BF 00         nop
+D7C0 00         nop
+D7C1 00         nop
+D7C2 00         nop
+D7C3 00         nop
+D7C4 00         nop
+D7C5 00         nop
+D7C6 00         nop
+D7C7 00         nop
+D7C8 00         nop
+D7C9 00         nop
+D7CA 00         nop
+D7CB 00         nop
+D7CC 00         nop
+D7CD 00         nop
+D7CE 00         nop
+D7CF 00         nop
+D7D0 2020       jr nz, $D7F2
+D7D2 2020       jr nz, $D7F4
+D7D4 2020       jr nz, $D7F6
+D7D6 2020       jr nz, $D7F8
+D7D8 2020       jr nz, $D7FA
+D7DA 2020       jr nz, $D7FC
+D7DC 2020       jr nz, $D7FE
+D7DE 2020       jr nz, $D800
+D7E0 2020       jr nz, $D802
+D7E2 2020       jr nz, $D804
+D7E4 2020       jr nz, $D806
+D7E6 2020       jr nz, $D808
+D7E8 2020       jr nz, $D80A
+D7EA 2020       jr nz, $D80C
+D7EC 2020       jr nz, $D80E
+D7EE 2020       jr nz, $D810
+D7F0 2020       jr nz, $D812
+D7F2 2020       jr nz, $D814
+D7F4 2020       jr nz, $D816
+D7F6 2020       jr nz, $D818
+D7F8 2020       jr nz, $D81A
+D7FA 2020       jr nz, $D81C
+D7FC 2020       jr nz, $D81E
+D7FE 2020       jr nz, $D820
+D800 3030       jr nc, $D832
+D802 3030       jr nc, $D834
+D804 3030       jr nc, $D836
+D806 3030       jr nc, $D838
+D808 3030       jr nc, $D83A
+D80A 3030       jr nc, $D83C
+D80C 3030       jr nc, $D83E
+D80E 3030       jr nc, $D840
+D810 3030       jr nc, $D842
+D812 3030       jr nc, $D844
+D814 3030       jr nc, $D846
+D816 3030       jr nc, $D848
+D818 3030       jr nc, $D84A
+D81A 3030       jr nc, $D84C
+D81C 3030       jr nc, $D84E
+D81E 3030       jr nc, $D850
+D820 3030       jr nc, $D852
+D822 3030       jr nc, $D854
+D824 3030       jr nc, $D856
+D826 3030       jr nc, $D858
+D828 3030       jr nc, $D85A
+D82A 3030       jr nc, $D85C
+D82C 3030       jr nc, $D85E
+D82E 3030       jr nc, $D860
+D830 3030       jr nc, $D862
+D832 3030       jr nc, $D864
+D834 3030       jr nc, $D866
+D836 3030       jr nc, $D868
+D838 3030       jr nc, $D86A
+D83A 3030       jr nc, $D86C
+D83C 3030       jr nc, $D86E
+D83E 3030       jr nc, $D870
+D840 3030       jr nc, $D872
+D842 3030       jr nc, $D874
+D844 3030       jr nc, $D876
+D846 3030       jr nc, $D878
+D848 3030       jr nc, $D87A
+D84A 3030       jr nc, $D87C
+D84C 3030       jr nc, $D87E
+D84E 3030       jr nc, $D880
+D850 3030       jr nc, $D882
+D852 3030       jr nc, $D884
+D854 3030       jr nc, $D886
+D856 3030       jr nc, $D888
+D858 3030       jr nc, $D88A
+D85A 3030       jr nc, $D88C
+D85C 3030       jr nc, $D88E
+D85E 3030       jr nc, $D890
+D860 3030       jr nc, $D892
+D862 3030       jr nc, $D894
+D864 3030       jr nc, $D896
+D866 3030       jr nc, $D898
+D868 3030       jr nc, $D89A
+D86A 3030       jr nc, $D89C
+D86C 3030       jr nc, $D89E
+D86E 3030       jr nc, $D8A0
+D870 3030       jr nc, $D8A2
+D872 3030       jr nc, $D8A4
+D874 3030       jr nc, $D8A6
+D876 3030       jr nc, $D8A8
+D878 3030       jr nc, $D8AA
+D87A 3030       jr nc, $D8AC
+D87C 3030       jr nc, $D8AE
+D87E 3030       jr nc, $D8B0
+D880 3030       jr nc, $D8B2
+D882 3030       jr nc, $D8B4
+D884 3030       jr nc, $D8B6
+D886 3030       jr nc, $D8B8
+D888 3030       jr nc, $D8BA
+D88A 3030       jr nc, $D8BC
+D88C 3030       jr nc, $D8BE
+D88E 3030       jr nc, $D8C0
+D890 3030       jr nc, $D8C2
+D892 3030       jr nc, $D8C4
+D894 3030       jr nc, $D8C6
+D896 3030       jr nc, $D8C8
+D898 3030       jr nc, $D8CA
+D89A 3030       jr nc, $D8CC
+D89C 3030       jr nc, $D8CE
+D89E 3030       jr nc, $D8D0
+D8A0 3030       jr nc, $D8D2
+D8A2 3030       jr nc, $D8D4
+D8A4 3030       jr nc, $D8D6
+D8A6 3030       jr nc, $D8D8
+D8A8 3030       jr nc, $D8DA
+D8AA 3030       jr nc, $D8DC
+D8AC 3030       jr nc, $D8DE
+D8AE 3030       jr nc, $D8E0
+D8B0 3030       jr nc, $D8E2
+D8B2 3030       jr nc, $D8E4
+D8B4 3030       jr nc, $D8E6
+D8B6 3030       jr nc, $D8E8
+D8B8 3030       jr nc, $D8EA
+D8BA 3030       jr nc, $D8EC
+D8BC 3030       jr nc, $D8EE
+D8BE 3030       jr nc, $D8F0
+D8C0 3030       jr nc, $D8F2
+D8C2 3030       jr nc, $D8F4
+D8C4 3030       jr nc, $D8F6
+D8C6 3030       jr nc, $D8F8
+D8C8 3030       jr nc, $D8FA
+D8CA 3030       jr nc, $D8FC
+D8CC 3030       jr nc, $D8FE
+D8CE 3030       jr nc, $D900
+D8D0 3030       jr nc, $D902
+D8D2 3030       jr nc, $D904
+D8D4 3030       jr nc, $D906
+D8D6 3030       jr nc, $D908
+D8D8 3030       jr nc, $D90A
+D8DA 3030       jr nc, $D90C
+D8DC 3030       jr nc, $D90E
+D8DE 3030       jr nc, $D910
+D8E0 3030       jr nc, $D912
+D8E2 3030       jr nc, $D914
+D8E4 3030       jr nc, $D916
+D8E6 3030       jr nc, $D918
+D8E8 3030       jr nc, $D91A
+D8EA 3030       jr nc, $D91C
+D8EC 3030       jr nc, $D91E
+D8EE 3030       jr nc, $D920
+D8F0 3030       jr nc, $D922
+D8F2 3030       jr nc, $D924
+D8F4 3030       jr nc, $D926
+D8F6 3030       jr nc, $D928
+D8F8 3030       jr nc, $D92A
+D8FA 3030       jr nc, $D92C
+D8FC 3030       jr nc, $D92E
+D8FE 3030       jr nc, $D930
+D900 3030       jr nc, $D932
+D902 3030       jr nc, $D934
+D904 3030       jr nc, $D936
+D906 3030       jr nc, $D938
+D908 3030       jr nc, $D93A
+D90A 3030       jr nc, $D93C
+D90C 3030       jr nc, $D93E
+D90E 3030       jr nc, $D940
+D910 3030       jr nc, $D942
+D912 3030       jr nc, $D944
+D914 3030       jr nc, $D946
+D916 3030       jr nc, $D948
+D918 3030       jr nc, $D94A
+D91A 3030       jr nc, $D94C
+D91C 3030       jr nc, $D94E
+D91E 3030       jr nc, $D950
+D920 3030       jr nc, $D952
+D922 3030       jr nc, $D954
+D924 3030       jr nc, $D956
+D926 3030       jr nc, $D958
+D928 3030       jr nc, $D95A
+D92A 3030       jr nc, $D95C
+D92C 3030       jr nc, $D95E
+D92E 3030       jr nc, $D960
+D930 3030       jr nc, $D962
+D932 3030       jr nc, $D964
+D934 3030       jr nc, $D966
+D936 3030       jr nc, $D968
+D938 3030       jr nc, $D96A
+D93A 3030       jr nc, $D96C
+D93C 3030       jr nc, $D96E
+D93E 3030       jr nc, $D970
+D940 3030       jr nc, $D972
+D942 3030       jr nc, $D974
+D944 3030       jr nc, $D976
+D946 3030       jr nc, $D978
+D948 3030       jr nc, $D97A
+D94A 3030       jr nc, $D97C
+D94C 3030       jr nc, $D97E
+D94E 3030       jr nc, $D980
+D950 3030       jr nc, $D982
+D952 3030       jr nc, $D984
+D954 3030       jr nc, $D986
+D956 3030       jr nc, $D988
+D958 3030       jr nc, $D98A
+D95A 3030       jr nc, $D98C
+D95C 3030       jr nc, $D98E
+D95E 3030       jr nc, $D990
+D960 3030       jr nc, $D992
+D962 3030       jr nc, $D994
+D964 3030       jr nc, $D996
+D966 3030       jr nc, $D998
+D968 3030       jr nc, $D99A
+D96A 3030       jr nc, $D99C
+D96C 3030       jr nc, $D99E
+D96E 3030       jr nc, $D9A0
+D970 3030       jr nc, $D9A2
+D972 3030       jr nc, $D9A4
+D974 3030       jr nc, $D9A6
+D976 3030       jr nc, $D9A8
+D978 3030       jr nc, $D9AA
+D97A 3030       jr nc, $D9AC
+D97C 3030       jr nc, $D9AE
+D97E 3030       jr nc, $D9B0
+D980 3030       jr nc, $D9B2
+D982 3030       jr nc, $D9B4
+D984 3030       jr nc, $D9B6
+D986 3030       jr nc, $D9B8
+D988 3030       jr nc, $D9BA
+D98A 3030       jr nc, $D9BC
+D98C 3030       jr nc, $D9BE
+D98E 3030       jr nc, $D9C0
+D990 3030       jr nc, $D9C2
+D992 3030       jr nc, $D9C4
+D994 3030       jr nc, $D9C6
+D996 3030       jr nc, $D9C8
+D998 3030       jr nc, $D9CA
+D99A 3030       jr nc, $D9CC
+D99C 3030       jr nc, $D9CE
+D99E 3030       jr nc, $D9D0
+D9A0 3030       jr nc, $D9D2
+D9A2 3030       jr nc, $D9D4
+D9A4 3030       jr nc, $D9D6
+D9A6 3030       jr nc, $D9D8
+D9A8 3030       jr nc, $D9DA
+D9AA 3030       jr nc, $D9DC
+D9AC 3030       jr nc, $D9DE
+D9AE 3030       jr nc, $D9E0
+D9B0 3030       jr nc, $D9E2
+D9B2 3030       jr nc, $D9E4
+D9B4 3030       jr nc, $D9E6
+D9B6 3030       jr nc, $D9E8
+D9B8 3030       jr nc, $D9EA
+D9BA 3030       jr nc, $D9EC
+D9BC 3030       jr nc, $D9EE
+D9BE 3030       jr nc, $D9F0
+D9C0 3030       jr nc, $D9F2
+D9C2 3030       jr nc, $D9F4
+D9C4 3030       jr nc, $D9F6
+D9C6 3030       jr nc, $D9F8
+D9C8 3030       jr nc, $D9FA
+D9CA 3030       jr nc, $D9FC
+D9CC 3030       jr nc, $D9FE
+D9CE 3030       jr nc, $DA00
+D9D0 3030       jr nc, $DA02
+D9D2 3030       jr nc, $DA04
+D9D4 3030       jr nc, $DA06
+D9D6 3030       jr nc, $DA08
+D9D8 3030       jr nc, $DA0A
+D9DA 3030       jr nc, $DA0C
+D9DC 3030       jr nc, $DA0E
+D9DE 3030       jr nc, $DA10
+D9E0 3030       jr nc, $DA12
+D9E2 3030       jr nc, $DA14
+D9E4 3030       jr nc, $DA16
+D9E6 3030       jr nc, $DA18
+D9E8 3030       jr nc, $DA1A
+D9EA 3030       jr nc, $DA1C
+D9EC 3030       jr nc, $DA1E
+D9EE 3030       jr nc, $DA20
+D9F0 3030       jr nc, $DA22
+D9F2 3030       jr nc, $DA24
+D9F4 3030       jr nc, $DA26
+D9F6 3030       jr nc, $DA28
+D9F8 3030       jr nc, $DA2A
+D9FA 3030       jr nc, $DA2C
+D9FC 3030       jr nc, $DA2E
+D9FE 3030       jr nc, $DA30
+DA00 3030       jr nc, $DA32
+DA02 3030       jr nc, $DA34
+DA04 3030       jr nc, $DA36
+DA06 3030       jr nc, $DA38
+DA08 3030       jr nc, $DA3A
+DA0A 3030       jr nc, $DA3C
+DA0C 3030       jr nc, $DA3E
+DA0E 3030       jr nc, $DA40
+DA10 3030       jr nc, $DA42
+DA12 3030       jr nc, $DA44
+DA14 3030       jr nc, $DA46
+DA16 3030       jr nc, $DA48
+DA18 3030       jr nc, $DA4A
+DA1A 3030       jr nc, $DA4C
+DA1C 3030       jr nc, $DA4E
+DA1E 3030       jr nc, $DA50
+DA20 3030       jr nc, $DA52
+DA22 3030       jr nc, $DA54
+DA24 3030       jr nc, $DA56
+DA26 3030       jr nc, $DA58
+DA28 3030       jr nc, $DA5A
+DA2A 3030       jr nc, $DA5C
+DA2C 3030       jr nc, $DA5E
+DA2E 3030       jr nc, $DA60
+DA30 3030       jr nc, $DA62
+DA32 3030       jr nc, $DA64
+DA34 3030       jr nc, $DA66
+DA36 3030       jr nc, $DA68
+DA38 3030       jr nc, $DA6A
+DA3A 3030       jr nc, $DA6C
+DA3C 3030       jr nc, $DA6E
+DA3E 3030       jr nc, $DA70
+DA40 3030       jr nc, $DA72
+DA42 3030       jr nc, $DA74
+DA44 3030       jr nc, $DA76
+DA46 3030       jr nc, $DA78
+DA48 3030       jr nc, $DA7A
+DA4A 3030       jr nc, $DA7C
+DA4C 3030       jr nc, $DA7E
+DA4E 3030       jr nc, $DA80
+DA50 3030       jr nc, $DA82
+DA52 3030       jr nc, $DA84
+DA54 3030       jr nc, $DA86
+DA56 3030       jr nc, $DA88
+DA58 3030       jr nc, $DA8A
+DA5A 3030       jr nc, $DA8C
+DA5C 3030       jr nc, $DA8E
+DA5E 3030       jr nc, $DA90
+DA60 3030       jr nc, $DA92
+DA62 3030       jr nc, $DA94
+DA64 3030       jr nc, $DA96
+DA66 3030       jr nc, $DA98
+DA68 3030       jr nc, $DA9A
+DA6A 3030       jr nc, $DA9C
+DA6C 3030       jr nc, $DA9E
+DA6E 3030       jr nc, $DAA0
+DA70 3030       jr nc, $DAA2
+DA72 3030       jr nc, $DAA4
+DA74 3030       jr nc, $DAA6
+DA76 3030       jr nc, $DAA8
+DA78 3030       jr nc, $DAAA
+DA7A 3030       jr nc, $DAAC
+DA7C 3030       jr nc, $DAAE
+DA7E 3030       jr nc, $DAB0
+DA80 3030       jr nc, $DAB2
+DA82 3030       jr nc, $DAB4
+DA84 3030       jr nc, $DAB6
+DA86 3030       jr nc, $DAB8
+DA88 3030       jr nc, $DABA
+DA8A 3030       jr nc, $DABC
+DA8C 3030       jr nc, $DABE
+DA8E 3030       jr nc, $DAC0
+DA90 3030       jr nc, $DAC2
+DA92 3030       jr nc, $DAC4
+DA94 3030       jr nc, $DAC6
+DA96 3030       jr nc, $DAC8
+DA98 3030       jr nc, $DACA
+DA9A 3030       jr nc, $DACC
+DA9C 3030       jr nc, $DACE
+DA9E 3030       jr nc, $DAD0
+DAA0 3030       jr nc, $DAD2
+DAA2 3030       jr nc, $DAD4
+DAA4 3030       jr nc, $DAD6
+DAA6 3030       jr nc, $DAD8
+DAA8 3030       jr nc, $DADA
+DAAA 3030       jr nc, $DADC
+DAAC 3030       jr nc, $DADE
+DAAE 3030       jr nc, $DAE0
+DAB0 3030       jr nc, $DAE2
+DAB2 3030       jr nc, $DAE4
+DAB4 3030       jr nc, $DAE6
+DAB6 3030       jr nc, $DAE8
+DAB8 3030       jr nc, $DAEA
+DABA 3030       jr nc, $DAEC
+DABC 3030       jr nc, $DAEE
+DABE 3030       jr nc, $DAF0
+DAC0 3030       jr nc, $DAF2
+DAC2 3030       jr nc, $DAF4
+DAC4 3030       jr nc, $DAF6
+DAC6 3030       jr nc, $DAF8
+DAC8 3030       jr nc, $DAFA
+DACA 3030       jr nc, $DAFC
+DACC 3030       jr nc, $DAFE
+DACE 3030       jr nc, $DB00
+DAD0 3030       jr nc, $DB02
+DAD2 3030       jr nc, $DB04
+DAD4 3030       jr nc, $DB06
+DAD6 3030       jr nc, $DB08
+DAD8 3030       jr nc, $DB0A
+DADA 3030       jr nc, $DB0C
+DADC 3030       jr nc, $DB0E
+DADE 3030       jr nc, $DB10
+DAE0 3030       jr nc, $DB12
+DAE2 3030       jr nc, $DB14
+DAE4 3030       jr nc, $DB16
+DAE6 3030       jr nc, $DB18
+DAE8 3030       jr nc, $DB1A
+DAEA 3030       jr nc, $DB1C
+DAEC 3030       jr nc, $DB1E
+DAEE 3030       jr nc, $DB20
+DAF0 3030       jr nc, $DB22
+DAF2 3030       jr nc, $DB24
+DAF4 3030       jr nc, $DB26
+DAF6 3030       jr nc, $DB28
+DAF8 3030       jr nc, $DB2A
+DAFA 3030       jr nc, $DB2C
+DAFC 3030       jr nc, $DB2E
+DAFE 3030       jr nc, $DB30
+DB00 3030       jr nc, $DB32
+DB02 3030       jr nc, $DB34
+DB04 3030       jr nc, $DB36
+DB06 3030       jr nc, $DB38
+DB08 3030       jr nc, $DB3A
+DB0A 3030       jr nc, $DB3C
+DB0C 3030       jr nc, $DB3E
+DB0E 3030       jr nc, $DB40
+DB10 3030       jr nc, $DB42
+DB12 3030       jr nc, $DB44
+DB14 3030       jr nc, $DB46
+DB16 3030       jr nc, $DB48
+DB18 3030       jr nc, $DB4A
+DB1A 3030       jr nc, $DB4C
+DB1C 3030       jr nc, $DB4E
+DB1E 3030       jr nc, $DB50
+DB20 3030       jr nc, $DB52
+DB22 3030       jr nc, $DB54
+DB24 3030       jr nc, $DB56
+DB26 3030       jr nc, $DB58
+DB28 3030       jr nc, $DB5A
+DB2A 3030       jr nc, $DB5C
+DB2C 3030       jr nc, $DB5E
+DB2E 3030       jr nc, $DB60
+DB30 3030       jr nc, $DB62
+DB32 3030       jr nc, $DB64
+DB34 3030       jr nc, $DB66
+DB36 3030       jr nc, $DB68
+DB38 3030       jr nc, $DB6A
+DB3A 3030       jr nc, $DB6C
+DB3C 3030       jr nc, $DB6E
+DB3E 3030       jr nc, $DB70
+DB40 3030       jr nc, $DB72
+DB42 3030       jr nc, $DB74
+DB44 3030       jr nc, $DB76
+DB46 3030       jr nc, $DB78
+DB48 3030       jr nc, $DB7A
+DB4A 3030       jr nc, $DB7C
+DB4C 3030       jr nc, $DB7E
+DB4E 3030       jr nc, $DB80
+DB50 3030       jr nc, $DB82
+DB52 3030       jr nc, $DB84
+DB54 3030       jr nc, $DB86
+DB56 3030       jr nc, $DB88
+DB58 3030       jr nc, $DB8A
+DB5A 3030       jr nc, $DB8C
+DB5C 3030       jr nc, $DB8E
+DB5E 3030       jr nc, $DB90
+DB60 3030       jr nc, $DB92
+DB62 3030       jr nc, $DB94
+DB64 3030       jr nc, $DB96
+DB66 3030       jr nc, $DB98
+DB68 3030       jr nc, $DB9A
+DB6A 3030       jr nc, $DB9C
+DB6C 3030       jr nc, $DB9E
+DB6E 3030       jr nc, $DBA0
+DB70 3030       jr nc, $DBA2
+DB72 3030       jr nc, $DBA4
+DB74 3030       jr nc, $DBA6
+DB76 3030       jr nc, $DBA8
+DB78 3030       jr nc, $DBAA
+DB7A 3030       jr nc, $DBAC
+DB7C 3030       jr nc, $DBAE
+DB7E 3030       jr nc, $DBB0
+DB80 3030       jr nc, $DBB2
+DB82 3030       jr nc, $DBB4
+DB84 3030       jr nc, $DBB6
+DB86 3030       jr nc, $DBB8
+DB88 3030       jr nc, $DBBA
+DB8A 3030       jr nc, $DBBC
+DB8C 3030       jr nc, $DBBE
+DB8E 3030       jr nc, $DBC0
+DB90 3030       jr nc, $DBC2
+DB92 3030       jr nc, $DBC4
+DB94 3030       jr nc, $DBC6
+DB96 3030       jr nc, $DBC8
+DB98 3030       jr nc, $DBCA
+DB9A 3030       jr nc, $DBCC
+DB9C 3030       jr nc, $DBCE
+DB9E 3030       jr nc, $DBD0
+DBA0 3030       jr nc, $DBD2
+DBA2 3030       jr nc, $DBD4
+DBA4 3030       jr nc, $DBD6
+DBA6 3030       jr nc, $DBD8
+DBA8 3030       jr nc, $DBDA
+DBAA 3030       jr nc, $DBDC
+DBAC 3030       jr nc, $DBDE
+DBAE 3030       jr nc, $DBE0
+DBB0 3030       jr nc, $DBE2
+DBB2 3030       jr nc, $DBE4
+DBB4 3030       jr nc, $DBE6
+DBB6 3030       jr nc, $DBE8
+DBB8 3030       jr nc, $DBEA
+DBBA 3030       jr nc, $DBEC
+DBBC 3030       jr nc, $DBEE
+DBBE 3030       jr nc, $DBF0
+DBC0 3030       jr nc, $DBF2
+DBC2 3030       jr nc, $DBF4
+DBC4 3030       jr nc, $DBF6
+DBC6 3030       jr nc, $DBF8
+DBC8 3030       jr nc, $DBFA
+DBCA 3030       jr nc, $DBFC
+DBCC 3030       jr nc, $DBFE
+DBCE 3030       jr nc, $DC00
+DBD0 3030       jr nc, $DC02
+DBD2 3030       jr nc, $DC04
+DBD4 3030       jr nc, $DC06
+DBD6 3030       jr nc, $DC08
+DBD8 3030       jr nc, $DC0A
+DBDA 3030       jr nc, $DC0C
+DBDC 3030       jr nc, $DC0E
+DBDE 3030       jr nc, $DC10
+DBE0 3030       jr nc, $DC12
+DBE2 3030       jr nc, $DC14
+DBE4 3030       jr nc, $DC16
+DBE6 3030       jr nc, $DC18
+DBE8 3030       jr nc, $DC1A
+DBEA 3030       jr nc, $DC1C
+DBEC 3030       jr nc, $DC1E
+DBEE 3030       jr nc, $DC20
+DBF0 3030       jr nc, $DC22
+DBF2 3030       jr nc, $DC24
+DBF4 3030       jr nc, $DC26
+DBF6 3030       jr nc, $DC28
+DBF8 3030       jr nc, $DC2A
+DBFA 3030       jr nc, $DC2C
+DBFC 3030       jr nc, $DC2E
+DBFE 3030       jr nc, $DC30
+DC00 3030       jr nc, $DC32
+DC02 3030       jr nc, $DC34
+DC04 3030       jr nc, $DC36
+DC06 3030       jr nc, $DC38
+DC08 3030       jr nc, $DC3A
+DC0A 3030       jr nc, $DC3C
+DC0C 3030       jr nc, $DC3E
+DC0E 3030       jr nc, $DC40
+DC10 3030       jr nc, $DC42
+DC12 3030       jr nc, $DC44
+DC14 3030       jr nc, $DC46
+DC16 3030       jr nc, $DC48
+DC18 3030       jr nc, $DC4A
+DC1A 3030       jr nc, $DC4C
+DC1C 3030       jr nc, $DC4E
+DC1E 3030       jr nc, $DC50
+DC20 3030       jr nc, $DC52
+DC22 3030       jr nc, $DC54
+DC24 3030       jr nc, $DC56
+DC26 3030       jr nc, $DC58
+DC28 3030       jr nc, $DC5A
+DC2A 3030       jr nc, $DC5C
+DC2C 3030       jr nc, $DC5E
+DC2E 3030       jr nc, $DC60
+DC30 3030       jr nc, $DC62
+DC32 3030       jr nc, $DC64
+DC34 3030       jr nc, $DC66
+DC36 3030       jr nc, $DC68
+DC38 3030       jr nc, $DC6A
+DC3A 3030       jr nc, $DC6C
+DC3C 3030       jr nc, $DC6E
+DC3E 3030       jr nc, $DC70
+DC40 3030       jr nc, $DC72
+DC42 3030       jr nc, $DC74
+DC44 3030       jr nc, $DC76
+DC46 3030       jr nc, $DC78
+DC48 3030       jr nc, $DC7A
+DC4A 3030       jr nc, $DC7C
+DC4C 3030       jr nc, $DC7E
+DC4E 3030       jr nc, $DC80
+DC50 3030       jr nc, $DC82
+DC52 3030       jr nc, $DC84
+DC54 3030       jr nc, $DC86
+DC56 3030       jr nc, $DC88
+DC58 3030       jr nc, $DC8A
+DC5A 3030       jr nc, $DC8C
+DC5C 3030       jr nc, $DC8E
+DC5E 3030       jr nc, $DC90
+DC60 3030       jr nc, $DC92
+DC62 3030       jr nc, $DC94
+DC64 3030       jr nc, $DC96
+DC66 3030       jr nc, $DC98
+DC68 3030       jr nc, $DC9A
+DC6A 3030       jr nc, $DC9C
+DC6C 3030       jr nc, $DC9E
+DC6E 3030       jr nc, $DCA0
+DC70 3030       jr nc, $DCA2
+DC72 3030       jr nc, $DCA4
+DC74 3030       jr nc, $DCA6
+DC76 3030       jr nc, $DCA8
+DC78 3030       jr nc, $DCAA
+DC7A 3030       jr nc, $DCAC
+DC7C 3030       jr nc, $DCAE
+DC7E 3030       jr nc, $DCB0
+DC80 3030       jr nc, $DCB2
+DC82 3030       jr nc, $DCB4
+DC84 3030       jr nc, $DCB6
+DC86 3030       jr nc, $DCB8
+DC88 3030       jr nc, $DCBA
+DC8A 3030       jr nc, $DCBC
+DC8C 3030       jr nc, $DCBE
+DC8E 3030       jr nc, $DCC0
+DC90 3030       jr nc, $DCC2
+DC92 3030       jr nc, $DCC4
+DC94 3030       jr nc, $DCC6
+DC96 3030       jr nc, $DCC8
+DC98 3030       jr nc, $DCCA
+DC9A 3030       jr nc, $DCCC
+DC9C 3030       jr nc, $DCCE
+DC9E 3030       jr nc, $DCD0
+DCA0 3030       jr nc, $DCD2
+DCA2 3030       jr nc, $DCD4
+DCA4 3030       jr nc, $DCD6
+DCA6 3030       jr nc, $DCD8
+DCA8 3030       jr nc, $DCDA
+DCAA 3030       jr nc, $DCDC
+DCAC 3030       jr nc, $DCDE
+DCAE 3030       jr nc, $DCE0
+DCB0 3030       jr nc, $DCE2
+DCB2 3030       jr nc, $DCE4
+DCB4 3030       jr nc, $DCE6
+DCB6 3030       jr nc, $DCE8
+DCB8 3030       jr nc, $DCEA
+DCBA 3030       jr nc, $DCEC
+DCBC 3030       jr nc, $DCEE
+DCBE 3030       jr nc, $DCF0
+DCC0 3030       jr nc, $DCF2
+DCC2 3030       jr nc, $DCF4
+DCC4 3030       jr nc, $DCF6
+DCC6 3030       jr nc, $DCF8
+DCC8 3030       jr nc, $DCFA
+DCCA 3030       jr nc, $DCFC
+DCCC 3030       jr nc, $DCFE
+DCCE 3030       jr nc, $DD00
+DCD0 3030       jr nc, $DD02
+DCD2 3030       jr nc, $DD04
+DCD4 3030       jr nc, $DD06
+DCD6 3030       jr nc, $DD08
+DCD8 3030       jr nc, $DD0A
+DCDA 3030       jr nc, $DD0C
+DCDC 3030       jr nc, $DD0E
+DCDE 3030       jr nc, $DD10
+DCE0 3030       jr nc, $DD12
+DCE2 3030       jr nc, $DD14
+DCE4 3030       jr nc, $DD16
+DCE6 3030       jr nc, $DD18
+DCE8 3030       jr nc, $DD1A
+DCEA 3030       jr nc, $DD1C
+DCEC 3030       jr nc, $DD1E
+DCEE 3030       jr nc, $DD20
+DCF0 3030       jr nc, $DD22
+DCF2 3030       jr nc, $DD24
+DCF4 3030       jr nc, $DD26
+DCF6 3030       jr nc, $DD28
+DCF8 3030       jr nc, $DD2A
+DCFA 3030       jr nc, $DD2C
+DCFC 3030       jr nc, $DD2E
+DCFE 3030       jr nc, $DD30
+DD00 3030       jr nc, $DD32
+DD02 3030       jr nc, $DD34
+DD04 3030       jr nc, $DD36
+DD06 3030       jr nc, $DD38
+DD08 3030       jr nc, $DD3A
+DD0A 3030       jr nc, $DD3C
+DD0C 3030       jr nc, $DD3E
+DD0E 3030       jr nc, $DD40
+DD10 3030       jr nc, $DD42
+DD12 3030       jr nc, $DD44
+DD14 3030       jr nc, $DD46
+DD16 3030       jr nc, $DD48
+DD18 3030       jr nc, $DD4A
+DD1A 3030       jr nc, $DD4C
+DD1C 3030       jr nc, $DD4E
+DD1E 3030       jr nc, $DD50
+DD20 3030       jr nc, $DD52
+DD22 3030       jr nc, $DD54
+DD24 3030       jr nc, $DD56
+DD26 3030       jr nc, $DD58
+DD28 3030       jr nc, $DD5A
+DD2A 3030       jr nc, $DD5C
+DD2C 3030       jr nc, $DD5E
+DD2E 3030       jr nc, $DD60
+DD30 3030       jr nc, $DD62
+DD32 3030       jr nc, $DD64
+DD34 3030       jr nc, $DD66
+DD36 3030       jr nc, $DD68
+DD38 3030       jr nc, $DD6A
+DD3A 3030       jr nc, $DD6C
+DD3C 3030       jr nc, $DD6E
+DD3E 3030       jr nc, $DD70
+DD40 3030       jr nc, $DD72
+DD42 3030       jr nc, $DD74
+DD44 3030       jr nc, $DD76
+DD46 3030       jr nc, $DD78
+DD48 3030       jr nc, $DD7A
+DD4A 3030       jr nc, $DD7C
+DD4C 3030       jr nc, $DD7E
+DD4E 3030       jr nc, $DD80
+DD50 3030       jr nc, $DD82
+DD52 3030       jr nc, $DD84
+DD54 3030       jr nc, $DD86
+DD56 3030       jr nc, $DD88
+DD58 3030       jr nc, $DD8A
+DD5A 3030       jr nc, $DD8C
+DD5C 3030       jr nc, $DD8E
+DD5E 3030       jr nc, $DD90
+DD60 3030       jr nc, $DD92
+DD62 3030       jr nc, $DD94
+DD64 3030       jr nc, $DD96
+DD66 3030       jr nc, $DD98
+DD68 3030       jr nc, $DD9A
+DD6A 3030       jr nc, $DD9C
+DD6C 3030       jr nc, $DD9E
+DD6E 3030       jr nc, $DDA0
+DD70 3030       jr nc, $DDA2
+DD72 3030       jr nc, $DDA4
+DD74 3030       jr nc, $DDA6
+DD76 3030       jr nc, $DDA8
+DD78 3030       jr nc, $DDAA
+DD7A 3030       jr nc, $DDAC
+DD7C 3030       jr nc, $DDAE
+DD7E 3030       jr nc, $DDB0
+DD80 3030       jr nc, $DDB2
+DD82 3030       jr nc, $DDB4
+DD84 3030       jr nc, $DDB6
+DD86 3030       jr nc, $DDB8
+DD88 3030       jr nc, $DDBA
+DD8A 3030       jr nc, $DDBC
+DD8C 3030       jr nc, $DDBE
+DD8E 3030       jr nc, $DDC0
+DD90 3030       jr nc, $DDC2
+DD92 3030       jr nc, $DDC4
+DD94 3030       jr nc, $DDC6
+DD96 3030       jr nc, $DDC8
+DD98 3030       jr nc, $DDCA
+DD9A 3030       jr nc, $DDCC
+DD9C 3030       jr nc, $DDCE
+DD9E 3030       jr nc, $DDD0
+DDA0 3030       jr nc, $DDD2
+DDA2 3030       jr nc, $DDD4
+DDA4 3030       jr nc, $DDD6
+DDA6 3030       jr nc, $DDD8
+DDA8 3030       jr nc, $DDDA
+DDAA 3030       jr nc, $DDDC
+DDAC 3030       jr nc, $DDDE
+DDAE 3030       jr nc, $DDE0
+DDB0 3030       jr nc, $DDE2
+DDB2 3030       jr nc, $DDE4
+DDB4 3030       jr nc, $DDE6
+DDB6 3030       jr nc, $DDE8
+DDB8 3030       jr nc, $DDEA
+DDBA 3030       jr nc, $DDEC
+DDBC 3030       jr nc, $DDEE
+DDBE 3030       jr nc, $DDF0
+DDC0 3030       jr nc, $DDF2
+DDC2 3030       jr nc, $DDF4
+DDC4 3030       jr nc, $DDF6
+DDC6 3030       jr nc, $DDF8
+DDC8 3030       jr nc, $DDFA
+DDCA 3030       jr nc, $DDFC
+DDCC 3030       jr nc, $DDFE
+DDCE 3030       jr nc, $DE00
+DDD0 3030       jr nc, $DE02
+DDD2 3030       jr nc, $DE04
+DDD4 3030       jr nc, $DE06
+DDD6 3030       jr nc, $DE08
+DDD8 3030       jr nc, $DE0A
+DDDA 3030       jr nc, $DE0C
+DDDC 3030       jr nc, $DE0E
+DDDE 3030       jr nc, $DE10
+DDE0 3030       jr nc, $DE12
+DDE2 3030       jr nc, $DE14
+DDE4 3030       jr nc, $DE16
+DDE6 3030       jr nc, $DE18
+DDE8 3030       jr nc, $DE1A
+DDEA 3030       jr nc, $DE1C
+DDEC 3030       jr nc, $DE1E
+DDEE 3030       jr nc, $DE20
+DDF0 3030       jr nc, $DE22
+DDF2 3030       jr nc, $DE24
+DDF4 3030       jr nc, $DE26
+DDF6 3030       jr nc, $DE28
+DDF8 3030       jr nc, $DE2A
+DDFA 3030       jr nc, $DE2C
+DDFC 3030       jr nc, $DE2E
+DDFE 3030       jr nc, $DE30
+DE00 3030       jr nc, $DE32
+DE02 3030       jr nc, $DE34
+DE04 3030       jr nc, $DE36
+DE06 3030       jr nc, $DE38
+DE08 3030       jr nc, $DE3A
+DE0A 3030       jr nc, $DE3C
+DE0C 3030       jr nc, $DE3E
+DE0E 3030       jr nc, $DE40
+DE10 3030       jr nc, $DE42
+DE12 3030       jr nc, $DE44
+DE14 3030       jr nc, $DE46
+DE16 3030       jr nc, $DE48
+DE18 3030       jr nc, $DE4A
+DE1A 3030       jr nc, $DE4C
+DE1C 3030       jr nc, $DE4E
+DE1E 3030       jr nc, $DE50
+DE20 3030       jr nc, $DE52
+DE22 3030       jr nc, $DE54
+DE24 3030       jr nc, $DE56
+DE26 3030       jr nc, $DE58
+DE28 3030       jr nc, $DE5A
+DE2A 3030       jr nc, $DE5C
+DE2C 3030       jr nc, $DE5E
+DE2E 3030       jr nc, $DE60
+DE30 3030       jr nc, $DE62
+DE32 3030       jr nc, $DE64
+DE34 3030       jr nc, $DE66
+DE36 3030       jr nc, $DE68
+DE38 3030       jr nc, $DE6A
+DE3A 3030       jr nc, $DE6C
+DE3C 3030       jr nc, $DE6E
+DE3E 3030       jr nc, $DE70
+DE40 3030       jr nc, $DE72
+DE42 3030       jr nc, $DE74
+DE44 3030       jr nc, $DE76
+DE46 3030       jr nc, $DE78
+DE48 3030       jr nc, $DE7A
+DE4A 3030       jr nc, $DE7C
+DE4C 3030       jr nc, $DE7E
+DE4E 3030       jr nc, $DE80
+DE50 3030       jr nc, $DE82
+DE52 3030       jr nc, $DE84
+DE54 3030       jr nc, $DE86
+DE56 3030       jr nc, $DE88
+DE58 3030       jr nc, $DE8A
+DE5A 3030       jr nc, $DE8C
+DE5C 3030       jr nc, $DE8E
+DE5E 3030       jr nc, $DE90
+DE60 3030       jr nc, $DE92
+DE62 3030       jr nc, $DE94
+DE64 3030       jr nc, $DE96
+DE66 3030       jr nc, $DE98
+DE68 3030       jr nc, $DE9A
+DE6A 3030       jr nc, $DE9C
+DE6C 3030       jr nc, $DE9E
+DE6E 3030       jr nc, $DEA0
+DE70 3030       jr nc, $DEA2
+DE72 3030       jr nc, $DEA4
+DE74 3030       jr nc, $DEA6
+DE76 3030       jr nc, $DEA8
+DE78 3030       jr nc, $DEAA
+DE7A 3030       jr nc, $DEAC
+DE7C 3030       jr nc, $DEAE
+DE7E 3030       jr nc, $DEB0
+DE80 3030       jr nc, $DEB2
+DE82 3030       jr nc, $DEB4
+DE84 3030       jr nc, $DEB6
+DE86 3030       jr nc, $DEB8
+DE88 3030       jr nc, $DEBA
+DE8A 3030       jr nc, $DEBC
+DE8C 3030       jr nc, $DEBE
+DE8E 3030       jr nc, $DEC0
+DE90 3030       jr nc, $DEC2
+DE92 3030       jr nc, $DEC4
+DE94 3030       jr nc, $DEC6
+DE96 3030       jr nc, $DEC8
+DE98 3030       jr nc, $DECA
+DE9A 3030       jr nc, $DECC
+DE9C 3030       jr nc, $DECE
+DE9E 3030       jr nc, $DED0
+DEA0 3030       jr nc, $DED2
+DEA2 3030       jr nc, $DED4
+DEA4 3030       jr nc, $DED6
+DEA6 3030       jr nc, $DED8
+DEA8 3030       jr nc, $DEDA
+DEAA 3030       jr nc, $DEDC
+DEAC 3030       jr nc, $DEDE
+DEAE 3030       jr nc, $DEE0
+DEB0 3030       jr nc, $DEE2
+DEB2 3030       jr nc, $DEE4
+DEB4 3030       jr nc, $DEE6
+DEB6 3030       jr nc, $DEE8
+DEB8 3030       jr nc, $DEEA
+DEBA 3030       jr nc, $DEEC
+DEBC 3030       jr nc, $DEEE
+DEBE 3030       jr nc, $DEF0
+DEC0 3030       jr nc, $DEF2
+DEC2 3030       jr nc, $DEF4
+DEC4 3030       jr nc, $DEF6
+DEC6 3030       jr nc, $DEF8
+DEC8 3030       jr nc, $DEFA
+DECA 3030       jr nc, $DEFC
+DECC 3030       jr nc, $DEFE
+DECE 3030       jr nc, $DF00
+DED0 3030       jr nc, $DF02
+DED2 3030       jr nc, $DF04
+DED4 3030       jr nc, $DF06
+DED6 3030       jr nc, $DF08
+DED8 3030       jr nc, $DF0A
+DEDA 3030       jr nc, $DF0C
+DEDC 3030       jr nc, $DF0E
+DEDE 3030       jr nc, $DF10
+DEE0 3030       jr nc, $DF12
+DEE2 3030       jr nc, $DF14
+DEE4 3030       jr nc, $DF16
+DEE6 3030       jr nc, $DF18
+DEE8 3030       jr nc, $DF1A
+DEEA 3030       jr nc, $DF1C
+DEEC 3030       jr nc, $DF1E
+DEEE 3030       jr nc, $DF20
+DEF0 3030       jr nc, $DF22
+DEF2 3030       jr nc, $DF24
+DEF4 3030       jr nc, $DF26
+DEF6 3030       jr nc, $DF28
+DEF8 3030       jr nc, $DF2A
+DEFA 3030       jr nc, $DF2C
+DEFC 3030       jr nc, $DF2E
+DEFE 3030       jr nc, $DF30
+DF00 3030       jr nc, $DF32
+DF02 3030       jr nc, $DF34
+DF04 3030       jr nc, $DF36
+DF06 3030       jr nc, $DF38
+DF08 3030       jr nc, $DF3A
+DF0A 3030       jr nc, $DF3C
+DF0C 3030       jr nc, $DF3E
+DF0E 3030       jr nc, $DF40
+DF10 3030       jr nc, $DF42
+DF12 3030       jr nc, $DF44
+DF14 3030       jr nc, $DF46
+DF16 3030       jr nc, $DF48
+DF18 3030       jr nc, $DF4A
+DF1A 3030       jr nc, $DF4C
+DF1C 3030       jr nc, $DF4E
+DF1E 3030       jr nc, $DF50
+DF20 3030       jr nc, $DF52
+DF22 3030       jr nc, $DF54
+DF24 3030       jr nc, $DF56
+DF26 3030       jr nc, $DF58
+DF28 3030       jr nc, $DF5A
+DF2A 3030       jr nc, $DF5C
+DF2C 3030       jr nc, $DF5E
+DF2E 3030       jr nc, $DF60
+DF30 3030       jr nc, $DF62
+DF32 3030       jr nc, $DF64
+DF34 3030       jr nc, $DF66
+DF36 3030       jr nc, $DF68
+DF38 3030       jr nc, $DF6A
+DF3A 3030       jr nc, $DF6C
+DF3C 3030       jr nc, $DF6E
+DF3E 3030       jr nc, $DF70
+DF40 3030       jr nc, $DF72
+DF42 3030       jr nc, $DF74
+DF44 3030       jr nc, $DF76
+DF46 3030       jr nc, $DF78
+DF48 3030       jr nc, $DF7A
+DF4A 3030       jr nc, $DF7C
+DF4C 3030       jr nc, $DF7E
+DF4E 3030       jr nc, $DF80
+DF50 3030       jr nc, $DF82
+DF52 3030       jr nc, $DF84
+DF54 3030       jr nc, $DF86
+DF56 3030       jr nc, $DF88
+DF58 3030       jr nc, $DF8A
+DF5A 3030       jr nc, $DF8C
+DF5C 3030       jr nc, $DF8E
+DF5E 3030       jr nc, $DF90
+DF60 3030       jr nc, $DF92
+DF62 3030       jr nc, $DF94
+DF64 3030       jr nc, $DF96
+DF66 3030       jr nc, $DF98
+DF68 3030       jr nc, $DF9A
+DF6A 3030       jr nc, $DF9C
+DF6C 3030       jr nc, $DF9E
+DF6E 3030       jr nc, $DFA0
+DF70 3030       jr nc, $DFA2
+DF72 3030       jr nc, $DFA4
+DF74 3030       jr nc, $DFA6
+DF76 3030       jr nc, $DFA8
+DF78 3030       jr nc, $DFAA
+DF7A 3030       jr nc, $DFAC
+DF7C 3030       jr nc, $DFAE
+DF7E 3030       jr nc, $DFB0
+DF80 3030       jr nc, $DFB2
+DF82 3030       jr nc, $DFB4
+DF84 3030       jr nc, $DFB6
+DF86 3030       jr nc, $DFB8
+DF88 3030       jr nc, $DFBA
+DF8A 3030       jr nc, $DFBC
+DF8C 3030       jr nc, $DFBE
+DF8E 3030       jr nc, $DFC0
+DF90 3030       jr nc, $DFC2
+DF92 3030       jr nc, $DFC4
+DF94 3030       jr nc, $DFC6
+DF96 3030       jr nc, $DFC8
+DF98 3030       jr nc, $DFCA
+DF9A 3030       jr nc, $DFCC
+DF9C 3030       jr nc, $DFCE
+DF9E 3030       jr nc, $DFD0
+DFA0 3030       jr nc, $DFD2
+DFA2 3030       jr nc, $DFD4
+DFA4 3030       jr nc, $DFD6
+DFA6 3030       jr nc, $DFD8
+DFA8 3030       jr nc, $DFDA
+DFAA 3030       jr nc, $DFDC
+DFAC 3030       jr nc, $DFDE
+DFAE 3030       jr nc, $DFE0
+DFB0 3030       jr nc, $DFE2
+DFB2 3030       jr nc, $DFE4
+DFB4 3030       jr nc, $DFE6
+DFB6 3030       jr nc, $DFE8
+DFB8 3030       jr nc, $DFEA
+DFBA 3030       jr nc, $DFEC
+DFBC 3030       jr nc, $DFEE
+DFBE 3030       jr nc, $DFF0
+DFC0 3030       jr nc, $DFF2
+DFC2 3030       jr nc, $DFF4
+DFC4 3030       jr nc, $DFF6
+DFC6 3030       jr nc, $DFF8
+DFC8 3030       jr nc, $DFFA
+DFCA 3030       jr nc, $DFFC
+DFCC 3030       jr nc, $DFFE
+DFCE 3030       jr nc, $E000
+DFD0 3030       jr nc, $E002
+DFD2 3030       jr nc, $E004
+DFD4 3030       jr nc, $E006
+DFD6 3030       jr nc, $E008
+DFD8 3030       jr nc, $E00A
+DFDA 3030       jr nc, $E00C
+DFDC 3030       jr nc, $E00E
+DFDE 3030       jr nc, $E010
+DFE0 3030       jr nc, $E012
+DFE2 3030       jr nc, $E014
+DFE4 3030       jr nc, $E016
+DFE6 3030       jr nc, $E018
+DFE8 3030       jr nc, $E01A
+DFEA 3030       jr nc, $E01C
+DFEC 3030       jr nc, $E01E
+DFEE 3030       jr nc, $E020
+DFF0 3030       jr nc, $E022
+DFF2 3030       jr nc, $E024
+DFF4 3030       jr nc, $E026
+DFF6 3030       jr nc, $E028
+DFF8 3030       jr nc, $E02A
+DFFA 3030       jr nc, $E02C
+DFFC 3030       jr nc, $E02E
+DFFE 3030       jr nc, $E030
