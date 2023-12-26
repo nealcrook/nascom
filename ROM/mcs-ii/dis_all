@@ -537,8 +537,8 @@ $dis->code(0x018e,"kse");
 $dis->code(0x000d,"X_000D");
 $dis->code(0x001a,"X_001A");
 $dis->code(0x003e,"X_003E");
-$dis->code(0x0051,"X_0051");
-$dis->code(0x005b,"X_005B");
+$dis->code(0x0051,"mflp");
+$dis->code(0x005b,"srlx");
 $dis->defw(0x0198,1, "initt");
 $dis->defw(0x019a,1);
 $dis->defw(0x019c,1);
@@ -619,7 +619,7 @@ $dis->line_comments(0x436,@comments);
 
 
 $dis->code(0x0483,"X_0483");
-$dis->code(0x0489,"X_0489");
+$dis->code(0x0489,"exec");
 $dis->code(0x04a7,"X_04a7");
 $dis->code(0x04bd,"X_04BD");
 $dis->code(0x0306,"brst0");
@@ -644,6 +644,14 @@ $dis->code(0x074f);
 $dis->defb(0x0639,6,"gds");
 $dis->block_comment(0x03aa,";;; point to workspace\n;;; zero-out \$6d bytes");
 $dis->code(0x03aa,"strtb");
+$dis->code(0x06b0,"X_06B0");
+$dis->code(0x06bb,"X_06BB");
+$dis->code(0x06ca,"X_06CA");
+$dis->code(0x06ea,"X_06EA");
+$dis->code(0x0713,"X_0713");
+$dis->code(0x0717,"X_0717");
+$dis->code(0x0726,"X_0726");
+$dis->code(0x0733,"X_0733");
 #$dis->code(0x0758,"X_0758");
 
 my $staba = 0x76d;
@@ -750,7 +758,7 @@ for (my $i = 0; $i< 143; $i=$i+1) {
              "has not changed",
              "update",
              "",
-             "send to UART",
+             "MIDI command: Timing Clock",
     );
 $dis->code(0xcc70, TIME);
 $dis->line_comments(0xcc70,@comments);

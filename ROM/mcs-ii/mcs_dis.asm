@@ -115,7 +115,7 @@ L_004D:
         ret
 
 
-X_0051:
+mflp:
         ld a, $10
         push hl
         ld hl, initz
@@ -124,7 +124,7 @@ X_0051:
         jr L_004D
 
 
-X_005B:
+srlx:
         push af
         out ($01), a
 
@@ -922,7 +922,7 @@ X_0483:
         ret
 
 
-X_0489:
+exec:
         ld a, $FF
         ld (conflg), a
         pop af
@@ -1320,7 +1320,7 @@ L_0669:
         pop hl
         rst $18
         defb $71
-        jp X_0051
+        jp mflp
 
 
 L_0672:
@@ -1384,21 +1384,127 @@ L_06A6:
         jr L_0663
 
 
-        ; Start of unknown area $06B0 to $0738
-        defb $21, $66, $07, $DF, $72, $21, $63, $07, $DF, $71, $C9, $7D, $32, $28, $0C, $21
-        defb $6A, $07, $DF, $72, $21, $62, $07, $DF, $71, $C9, $DF, $70, $D0, $E6, $7F, $21
-        defb $28, $0C, $CB, $6E, $CC, $01, $07, $CB, $4E, $20, $0D, $F5, $D7, $1B, $F1, $B7
-        defb $28, $06, $FE, $1B, $28, $02, $CB, $FE, $37, $C9, $F5, $21, $28, $0C, $CB, $7E
-        defb $CC, $F7, $06, $CB, $BE, $F1, $C9, $D7, $08, $FE, $0D, $C0, $CB, $66, $C0, $3E
-        defb $0A, $B7, $F5, $EA, $08, $07, $EE, $80, $CB, $46, $28, $02, $EE, $80, $CD, $5B
-        defb $00, $F1, $C9, $DF, $63, $18, $FC, $DF, $78, $21, $64, $07, $E5, $2A, $73, $0C
-        defb $E3, $22, $73, $0C, $E1, $C9, $21, $67, $07, $E5, $2A, $75, $0C, $E3, $22, $75
-        defb $0C, $E1, $C9, $E5, $21, $75, $0C, $18, $03
-        ; End of unknown area $06B0 to $0738
+X_06B0:
+        ld hl, $0766
+        rst $18
+        defb $72
+        ld hl, $0763
+        rst $18
+        defb $71
+        ret
+
+
+X_06BB:
+        ld a, l
+        ld ($0C28), a
+        ld hl, $076A
+        rst $18
+        defb $72
+        ld hl, $0762
+        rst $18
+        defb $71
+        ret
+
+
+X_06CA:
+        rst $18
+        defb $70
+        ret nc
+        and $7F
+        ld hl, $0C28
+        bit 5, (hl)
+        call z, L_0701
+        bit 1, (hl)
+        jr nz, L_06E8
+        push af
+        rst $10
+        defb $1B
+        pop af
+        or a
+        jr z, L_06E8
+        cp $1B
+        jr z, L_06E8
+        set 7, (hl)
+
+L_06E8:
+        scf
+        ret
+
+
+X_06EA:
+        push af
+        ld hl, $0C28
+        bit 7, (hl)
+        call z, L_06F7
+        res 7, (hl)
+        pop af
+        ret
+
+
+L_06F7:
+        rst $10
+        defb $08
+        cp $0D
+        ret nz
+        bit 4, (hl)
+        ret nz
+        ld a, $0A
+
+L_0701:
+        or a
+        push af
+        jp pe, L_0708
+        xor $80
+
+L_0708:
+        bit 0, (hl)
+        jr z, L_070E
+        xor $80
+
+L_070E:
+        call srlx
+        pop af
+        ret
+
+
+X_0713:
+        rst $18
+        defb $63
+        jr X_0713
+
+
+X_0717:
+        rst $18
+        defb $78
+        ld hl, $0764
+        push hl
+        ld hl, ($0C73)
+        ex (sp), hl
+        ld ($0C73), hl
+        pop hl
+        ret
+
+
+X_0726:
+        ld hl, $0767
+        push hl
+        ld hl, ($0C75)
+        ex (sp), hl
+        ld ($0C75), hl
+        pop hl
+        ret
+
+
+X_0733:
+        push hl
+        ld hl, $0C75
+        jr L_073C
 
 
 L_0739:
         ld hl, $0C73
+
+L_073C:
         push de
         push bc
         ld e, (hl)
@@ -1444,36 +1550,36 @@ staba:
         defw $FFFD
         defw X_051B
         defw drum
-        defw X_0489
+        defw exec
         defw errm
         defw g
-        defw $0713
+        defw X_0713
         defw $056E
         defw X_01E4
         defw kop
         defw errm
         defw COLD
-        defw $0717
+        defw X_0717
         defw X_04BD
         defw $B806
         defw $D800
         defw read
         defw L_00FC
         defw X_LINE16
-        defw $06B0
+        defw X_06B0
         defw read
         defw write
-        defw $06BB
+        defw X_06BB
         defw $B800
         defw $FFFA
         defw MRET
         defw SCALJ
         defw X_003E
         defw L_0045
-        defw X_0051
+        defw mflp
         defw args
         defw $00CE
-        defw $0733
+        defw X_0733
         defw inlin
         defw num
         defw crt
@@ -1485,17 +1591,17 @@ staba:
         defw errm
         defw X_001A
         defw sout
-        defw $06EA
-        defw X_005B
+        defw X_06EA
+        defw srlx
         defw srlin
         defw $071C
         defw $0729
-        defw $073C
-        defw $06CA
+        defw L_073C
+        defw X_06CA
         defw $0C77
         defw $0C7A
         defw $0719
-        defw $0726
+        defw X_0726
         defw rlin
         defw $0349
         defw blink
@@ -3103,7 +3209,7 @@ TIME:
         ret z                   ; has not changed
         ld (hl), a              ; update
         ld a, $F8               ; 
-        out ($01), a            ; send to UART
+        out ($01), a            ; MIDI command: Timing Clock
         ret
 
 
@@ -4583,9 +4689,9 @@ L_D4D9:
 ; $05A0 CCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ; $05F0 BBBBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCBCCCCCCCCCBCCCCCBCBBBBBBC
 ; $0640 CCCBCCCCCCCBCBCCBCCCCCCCCCCCCCCCCCCCBBCCBCBBCCBCCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCC
-; $0690 CCCCCCCCCCCCCCCCCBBBCCCBBBCCCCCC------------------------------------------------
-; $06E0 --------------------------------------------------------------------------------
-; $0730 ---------CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC---------------------WWWWWWWWWWWWWWWWWWW
+; $0690 CCCCCCCCCCCCCCCCCBBBCCCBBBCCCCCCCCCCBCCCCBCCCCCCCCCBCCCCBCCBCCCCCCCCCCCCCCCCCBCC
+; $06E0 CCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCBCCCCCCCCCCCCCCCCCCCCCCC
+; $0730 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC---------------------WWWWWWWWWWWWWWWWWWW
 ; $0780 WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
 ; $07D0 WWWWWWWWWWWWWWWWWWWWWWWWWWW--------------------
 
@@ -4723,8 +4829,8 @@ L_D4D9:
 ; $0040 => L_0040          CLS      => $C354
 ; $0045 => L_0045          COLD     => $0000
 ; $004D => L_004D          conflg   => $0C26
-; $0051 => X_0051          CONT     => $C181
-; $005B => X_005B          cpos     => $02C6
+; $0051 => mflp            CONT     => $C181
+; $005B => srlx            cpos     => $02C6
 ; $005E => L_005E          cr1      => $01BA
 ; $0066 => L_NMI           cr3      => $01C1
 ; $0069 => BIN             crlf     => $0339
@@ -4759,388 +4865,402 @@ L_D4D9:
 ; $0198 => initt           dret     => $002F
 ; $01A9 => crt             drum     => $C000
 ; $01BA => cr1             errm     => $0323
-; $01C1 => cr3             g        => $060F
-; $01CF => crt0            gds      => $0639
-; $01D1 => crt1            initt    => $0198
-; $01D4 => crt2            initz    => $0C00
-; $01D6 => X_LINE16        inl2     => $02F5
-; $01E4 => X_01E4          inlin    => $02F4
-; $01ED => L_01ED          k20      => $0164
-; $01F4 => L_01F4          k30      => $016E
-; $01FC => L_01FC          k35      => $0174
-; $0207 => crt6            k40      => $017A
-; $020E => crt8            k55      => $0183
-; $020F => crt10           k60      => $018C
-; $021B => crt12           k7       => $0157
-; $021F => crt14           k8       => $0160
-; $022F => crt18           KBD      => $00DC
-; $0236 => crt20           kop      => $0606
-; $024A => crt25           kopt     => $0C27
-; $0251 => crt26           KSC1A    => $00EC
-; $0257 => crt28           ksc2     => $010E
-; $0260 => crt29           ksc4     => $011D
-; $0264 => crt30           ksc5     => $0146
-; $026F => crt31           KSC8     => $00EE
-; $0273 => crt32           kse      => $018E
-; $0279 => crt33           ktab     => $05A6
-; $0283 => ctst            L_0028   => $0028
-; $0294 => ct8             L_0029   => $0029
-; $0297 => crt34           L_0034   => $0034
-; $029C => crt36           L_0040   => $0040
-; $02AA => crt38           L_0045   => $0045
-; $02BF => crt50           L_004D   => $004D
-; $02C6 => cpos            L_005E   => $005E
-; $02CD => M_LINE16        L_00F0   => $00F0
-; $02F4 => inlin           L_00FC   => $00FC
-; $02F5 => inl2            L_01ED   => $01ED
-; $0306 => brst0           L_01F4   => $01F4
-; $0312 => X_0312          L_01FC   => $01FC
-; $0316 => X_0316          L_033D   => $033D
-; $031A => space           L_03B0   => $03B0
-; $031E => X_031E          L_0433   => $0433
-; $0323 => errm            L_0440   => $0440
-; $0339 => crlf            L_0476   => $0476
-; $033D => L_033D          L_047A   => $047A
-; $0353 => num             L_047E   => $047E
-; $0365 => nn1             L_0480   => $0480
-; $037D => nn2             L_0498   => $0498
-; $038C => rlin            L_04DD   => $04DD
-; $0391 => rl2             L_04EB   => $04EB
-; $03AA => strtb           L_04F7   => $04F7
-; $03B0 => L_03B0          L_0510   => $0510
-; $03C0 => MRET            L_052A   => $052A
-; $0433 => L_0433          L_0538   => $0538
-; $0436 => X_0436          L_0558   => $0558
-; $0440 => L_0440          L_055C   => $055C
-; $0476 => L_0476          L_0560   => $0560
-; $047A => L_047A          L_061A   => $061A
-; $047E => L_047E          L_061F   => $061F
-; $0480 => L_0480          L_0641   => $0641
-; $0483 => X_0483          L_0652   => $0652
-; $0489 => X_0489          L_0655   => $0655
-; $0498 => L_0498          L_0663   => $0663
-; $04A7 => X_04a7          L_0669   => $0669
-; $04BD => X_04BD          L_0672   => $0672
-; $04C2 => args            L_0685   => $0685
-; $04C5 => args2           L_068F   => $068F
-; $04C9 => args3           L_0691   => $0691
-; $04CE => write           L_06A0   => $06A0
-; $04D7 => w3              L_06A6   => $06A6
-; $04DD => L_04DD          L_0739   => $0739
-; $04EB => L_04EB          L_0741   => $0741
-; $04F7 => L_04F7          L_0753   => $0753
-; $0510 => L_0510          L_C0D6   => $C0D6
-; $051B => X_051B          L_C1F2   => $C1F2
-; $0522 => X_0522          L_C216   => $C216
-; $0527 => X_0527          L_C25A   => $C25A
-; $052A => L_052A          L_C265   => $C265
-; $0538 => L_0538          L_C277   => $C277
-; $0558 => L_0558          L_C389   => $C389
-; $055C => L_055C          L_C38B   => $C38B
-; $0560 => L_0560          L_C3B6   => $C3B6
-; $0567 => X_0567          L_C3C3   => $C3C3
-; $0570 => rcalb           L_C3D2   => $C3D2
-; $0587 => RCAL4           L_C3D5   => $C3D5
-; $058B => SCAL2           L_C3E8   => $C3E8
-; $058C => SCAL3           L_C3EA   => $C3EA
-; $0599 => SCALJ           L_C3FF   => $C3FF
-; $05A1 => scali           L_C413   => $C413
-; $05A6 => ktab            L_C416   => $C416
-; $0606 => kop             L_C471   => $C471
-; $060B => break           L_C478   => $C478
-; $060F => g               L_C48A   => $C48A
-; $061A => L_061A          L_C4AB   => $C4AB
-; $061F => L_061F          L_C4CF   => $C4CF
-; $0639 => gds             L_C4D3   => $C4D3
-; $063F => sout            L_C4DA   => $C4DA
-; $0641 => L_0641          L_C4EB   => $C4EB
-; $064A => read            L_C50D   => $C50D
-; $0652 => L_0652          L_C55F   => $C55F
-; $0655 => L_0655          L_C5D4   => $C5D4
-; $0663 => L_0663          L_C5DA   => $C5DA
-; $0669 => L_0669          L_C5F6   => $C5F6
-; $0672 => L_0672          L_C64B   => $C64B
-; $0685 => L_0685          L_C669   => $C669
-; $068F => L_068F          L_C66F   => $C66F
-; $0691 => L_0691          L_C6B4   => $C6B4
-; $06A0 => L_06A0          L_C6BC   => $C6BC
-; $06A6 => L_06A6          L_C6C6   => $C6C6
-; $0739 => L_0739          L_C6CC   => $C6CC
-; $0741 => L_0741          L_C6CD   => $C6CD
-; $0753 => L_0753          L_C6D0   => $C6D0
-; $076D => staba           L_C6D9   => $C6D9
-; $0C00 => initz           L_C6DB   => $C6DB
-; $0C0B => argn            L_C6E5   => $C6E5
-; $0C20 => numn            L_C6EE   => $C6EE
-; $0C21 => numv            L_C6F1   => $C6F1
-; $0C23 => brkadr          L_C6FA   => $C6FA
-; $0C25 => brkval          L_C702   => $C702
-; $0C26 => conflg          L_C70C   => $C70C
-; $0C27 => kopt            L_C71A   => $C71A
-; $0C29 => cursor          L_C730   => $C730
-; $0C71 => _stab           L_C742   => $C742
-; $2820 => PTIME           L_C745   => $C745
-; $2822 => DPAGE           L_C748   => $C748
-; $C000 => drum            L_C755   => $C755
-; $C003 => M_BPM           L_C768   => $C768
-; $C00C => M_RUN           L_C76E   => $C76E
-; $C019 => M_XFER          L_C773   => $C773
-; $C02F => M_PLAY          L_C784   => $C784
-; $C045 => M_ERAS          L_C786   => $C786
-; $C05B => M_SAVE          L_C791   => $C791
-; $C071 => M_SPACE         L_C794   => $C794
-; $C087 => M_SEQ           L_C7A3   => $C7A3
-; $C097 => M_FULL          L_C7B7   => $C7B7
-; $C0A2 => M_INFO          L_C7CC   => $C7CC
-; $C0B2 => M_INFO2         L_C7DC   => $C7DC
-; $C0D6 => L_C0D6          L_C7E9   => $C7E9
-; $C0ED => M_MENU          L_C801   => $C801
-; $C160 => X_C160          L_C81F   => $C81F
-; $C181 => CONT            L_C830   => $C830
-; $C18F => X_C18F          L_C855   => $C855
-; $C19A => X_C19A          L_C86C   => $C86C
-; $C1A5 => X_C1A5          L_C893   => $C893
-; $C1A9 => START           L_C8A9   => $C8A9
-; $C1F2 => L_C1F2          L_C8C4   => $C8C4
-; $C216 => L_C216          L_C8C7   => $C8C7
-; $C25A => L_C25A          L_C8D7   => $C8D7
-; $C265 => L_C265          L_C8E2   => $C8E2
-; $C277 => L_C277          L_C8E8   => $C8E8
-; $C280 => X_C280          L_C901   => $C901
-; $C332 => X_C332          L_C914   => $C914
-; $C352 => WOT2            L_C923   => $C923
-; $C354 => CLS             L_C925   => $C925
-; $C358 => X_C358          L_C946   => $C946
-; $C35F => WOT1            L_C955   => $C955
-; $C36C => X_C36c          L_C95E   => $C95E
-; $C389 => L_C389          L_C96E   => $C96E
-; $C38B => L_C38B          L_C97B   => $C97B
-; $C3A3 => X_C3A3          L_C98E   => $C98E
-; $C3AF => X_C3AF          L_C9A2   => $C9A2
-; $C3B6 => L_C3B6          L_C9B8   => $C9B8
-; $C3C3 => L_C3C3          L_C9CD   => $C9CD
-; $C3D2 => L_C3D2          L_C9D4   => $C9D4
-; $C3D5 => L_C3D5          L_C9DB   => $C9DB
-; $C3E8 => L_C3E8          L_C9E0   => $C9E0
-; $C3EA => L_C3EA          L_C9E7   => $C9E7
-; $C3FF => L_C3FF          L_C9EE   => $C9EE
-; $C413 => L_C413          L_C9FC   => $C9FC
-; $C416 => L_C416          L_CA00   => $CA00
-; $C471 => L_C471          L_CA05   => $CA05
-; $C478 => L_C478          L_CA21   => $CA21
-; $C48A => L_C48A          L_CA25   => $CA25
-; $C4AB => L_C4AB          L_CA4D   => $CA4D
-; $C4CF => L_C4CF          L_CA5C   => $CA5C
-; $C4D3 => L_C4D3          L_CA66   => $CA66
-; $C4DA => L_C4DA          L_CA75   => $CA75
-; $C4EB => L_C4EB          L_CA7F   => $CA7F
-; $C50D => L_C50D          L_CA98   => $CA98
-; $C55C => X_C55C          L_CAB5   => $CAB5
-; $C55F => L_C55F          L_CAC5   => $CAC5
-; $C5D4 => L_C5D4          L_CADB   => $CADB
-; $C5DA => L_C5DA          L_CAEB   => $CAEB
-; $C5F6 => L_C5F6          L_CAFB   => $CAFB
-; $C64B => L_C64B          L_CB07   => $CB07
-; $C651 => X_C651          L_CB2A   => $CB2A
-; $C669 => L_C669          L_CB34   => $CB34
-; $C66F => L_C66F          L_CB3C   => $CB3C
-; $C6B4 => L_C6B4          L_CC1A   => $CC1A
-; $C6BC => L_C6BC          L_CC49   => $CC49
-; $C6C6 => L_C6C6          L_CC4B   => $CC4B
-; $C6CC => L_C6CC          L_CC54   => $CC54
-; $C6CD => L_C6CD          L_CC7F   => $CC7F
-; $C6D0 => L_C6D0          L_CCB1   => $CCB1
-; $C6D9 => L_C6D9          L_CCC0   => $CCC0
-; $C6DB => L_C6DB          L_CCCB   => $CCCB
-; $C6E5 => L_C6E5          L_CCDE   => $CCDE
-; $C6EE => L_C6EE          L_CCEA   => $CCEA
-; $C6F1 => L_C6F1          L_CCED   => $CCED
-; $C6FA => L_C6FA          L_CCF8   => $CCF8
-; $C702 => L_C702          L_CD04   => $CD04
-; $C70C => L_C70C          L_CD0D   => $CD0D
-; $C71A => L_C71A          L_CD13   => $CD13
-; $C730 => L_C730          L_CD15   => $CD15
-; $C742 => L_C742          L_CD7D   => $CD7D
-; $C745 => L_C745          L_CE1E   => $CE1E
-; $C748 => L_C748          L_CE2F   => $CE2F
-; $C755 => L_C755          L_CE33   => $CE33
-; $C768 => L_C768          L_CE36   => $CE36
-; $C76E => L_C76E          L_CE3C   => $CE3C
-; $C773 => L_C773          L_CE4C   => $CE4C
-; $C784 => L_C784          L_CE57   => $CE57
-; $C786 => L_C786          L_CE62   => $CE62
-; $C791 => L_C791          L_CE7B   => $CE7B
-; $C794 => L_C794          L_CE8D   => $CE8D
-; $C7A3 => L_C7A3          L_CE98   => $CE98
-; $C7B1 => X_C7B1          L_CEC2   => $CEC2
-; $C7B7 => L_C7B7          L_CED0   => $CED0
-; $C7CC => L_C7CC          L_CEDF   => $CEDF
-; $C7DC => L_C7DC          L_CEE7   => $CEE7
-; $C7E9 => L_C7E9          L_CF27   => $CF27
-; $C7EC => X_C7EC          L_CF3D   => $CF3D
-; $C801 => L_C801          L_CF43   => $CF43
-; $C81F => L_C81F          L_CF56   => $CF56
-; $C830 => L_C830          L_CF5F   => $CF5F
-; $C855 => L_C855          L_CF6A   => $CF6A
-; $C86C => L_C86C          L_CF76   => $CF76
-; $C893 => L_C893          L_CF7E   => $CF7E
-; $C89F => X_C89F          L_CF94   => $CF94
-; $C8A9 => L_C8A9          L_CF97   => $CF97
-; $C8C4 => L_C8C4          L_CF9D   => $CF9D
-; $C8C7 => L_C8C7          L_CFB1   => $CFB1
-; $C8D7 => L_C8D7          L_CFC5   => $CFC5
-; $C8E2 => L_C8E2          L_CFC8   => $CFC8
-; $C8E8 => L_C8E8          L_CFD1   => $CFD1
-; $C901 => L_C901          L_CFD6   => $CFD6
-; $C914 => L_C914          L_CFE9   => $CFE9
-; $C923 => L_C923          L_CFF1   => $CFF1
-; $C925 => L_C925          L_CFF9   => $CFF9
-; $C946 => L_C946          L_D001   => $D001
-; $C955 => L_C955          L_D009   => $D009
-; $C95E => L_C95E          L_D014   => $D014
-; $C96E => L_C96E          L_D028   => $D028
-; $C97B => L_C97B          L_D02D   => $D02D
-; $C98E => L_C98E          L_D033   => $D033
-; $C9A2 => L_C9A2          L_D037   => $D037
-; $C9B8 => L_C9B8          L_D03A   => $D03A
-; $C9CD => L_C9CD          L_D040   => $D040
-; $C9D4 => L_C9D4          L_D054   => $D054
-; $C9DB => L_C9DB          L_D05A   => $D05A
-; $C9E0 => L_C9E0          L_D08B   => $D08B
-; $C9E7 => L_C9E7          L_D098   => $D098
-; $C9EE => L_C9EE          L_D0B4   => $D0B4
-; $C9FC => L_C9FC          L_D0CA   => $D0CA
-; $CA00 => L_CA00          L_D0D5   => $D0D5
-; $CA05 => L_CA05          L_D0E6   => $D0E6
-; $CA21 => L_CA21          L_D0F6   => $D0F6
-; $CA25 => L_CA25          L_D0F8   => $D0F8
-; $CA4D => L_CA4D          L_D102   => $D102
-; $CA5C => L_CA5C          L_D110   => $D110
-; $CA66 => L_CA66          L_D1F6   => $D1F6
-; $CA75 => L_CA75          L_D230   => $D230
-; $CA7F => L_CA7F          L_D24F   => $D24F
-; $CA98 => L_CA98          L_D265   => $D265
-; $CAB5 => L_CAB5          L_D2B4   => $D2B4
-; $CAC5 => L_CAC5          L_D2C3   => $D2C3
-; $CADB => L_CADB          L_D2DD   => $D2DD
-; $CAEB => L_CAEB          L_D2E6   => $D2E6
-; $CAFB => L_CAFB          L_D2EE   => $D2EE
-; $CB07 => L_CB07          L_D2FC   => $D2FC
-; $CB2A => L_CB2A          L_D309   => $D309
-; $CB34 => L_CB34          L_D30C   => $D30C
-; $CB3C => L_CB3C          L_D30E   => $D30E
-; $CC1A => L_CC1A          L_D317   => $D317
-; $CC49 => L_CC49          L_D326   => $D326
-; $CC4B => L_CC4B          L_D329   => $D329
-; $CC54 => L_CC54          L_D333   => $D333
-; $CC70 => TIME            L_D33D   => $D33D
-; $CC7F => L_CC7F          L_D36D   => $D36D
-; $CCB1 => L_CCB1          L_D382   => $D382
-; $CCC0 => L_CCC0          L_D39E   => $D39E
-; $CCCB => L_CCCB          L_D3AE   => $D3AE
-; $CCDE => L_CCDE          L_D3BA   => $D3BA
-; $CCEA => L_CCEA          L_D3BB   => $D3BB
-; $CCED => L_CCED          L_D3C7   => $D3C7
-; $CCF8 => L_CCF8          L_D3D0   => $D3D0
-; $CD04 => L_CD04          L_D3D2   => $D3D2
-; $CD0D => L_CD0D          L_D3D6   => $D3D6
-; $CD13 => L_CD13          L_D3D8   => $D3D8
-; $CD15 => L_CD15          L_D3DA   => $D3DA
-; $CD7D => L_CD7D          L_D3E8   => $D3E8
-; $CE13 => X_CE13          L_D3EE   => $D3EE
-; $CE1E => L_CE1E          L_D3FB   => $D3FB
-; $CE2F => L_CE2F          L_D3FE   => $D3FE
-; $CE33 => L_CE33          L_D401   => $D401
-; $CE36 => L_CE36          L_D405   => $D405
-; $CE3C => L_CE3C          L_D409   => $D409
-; $CE4C => L_CE4C          L_D417   => $D417
-; $CE57 => L_CE57          L_D41A   => $D41A
-; $CE62 => L_CE62          L_D422   => $D422
-; $CE7B => L_CE7B          L_D432   => $D432
-; $CE8D => L_CE8D          L_D437   => $D437
-; $CE98 => L_CE98          L_D458   => $D458
-; $CEC2 => L_CEC2          L_D461   => $D461
-; $CED0 => L_CED0          L_D475   => $D475
-; $CEDF => L_CEDF          L_D47F   => $D47F
-; $CEE7 => L_CEE7          L_D481   => $D481
-; $CF27 => L_CF27          L_D488   => $D488
-; $CF3D => L_CF3D          L_D491   => $D491
-; $CF43 => L_CF43          L_D49D   => $D49D
-; $CF56 => L_CF56          L_D4AD   => $D4AD
-; $CF5F => L_CF5F          L_D4C4   => $D4C4
-; $CF6A => L_CF6A          L_D4D2   => $D4D2
-; $CF76 => L_CF76          L_D4D9   => $D4D9
-; $CF7E => L_CF7E          L_NMI    => $0066
-; $CF94 => L_CF94          L_RST20  => $0020
-; $CF97 => L_CF97          L_RST30  => $0030
-; $CF9D => L_CF9D          M_BPM    => $C003
-; $CFB1 => L_CFB1          M_ERAS   => $C045
-; $CFC5 => L_CFC5          M_FULL   => $C097
-; $CFC8 => L_CFC8          M_INFO   => $C0A2
-; $CFD1 => L_CFD1          M_INFO2  => $C0B2
-; $CFD6 => L_CFD6          M_LINE16 => $02CD
-; $CFE9 => L_CFE9          M_MENU   => $C0ED
-; $CFF1 => L_CFF1          M_PLAY   => $C02F
-; $CFF9 => L_CFF9          M_RUN    => $C00C
-; $D001 => L_D001          M_SAVE   => $C05B
-; $D009 => L_D009          M_SEQ    => $C087
-; $D014 => L_D014          M_SPACE  => $C071
-; $D028 => L_D028          M_XFER   => $C019
-; $D02D => L_D02D          MRET     => $03C0
-; $D033 => L_D033          nn1      => $0365
-; $D037 => L_D037          nn2      => $037D
-; $D03A => L_D03A          num      => $0353
-; $D040 => L_D040          numn     => $0C20
-; $D054 => L_D054          numv     => $0C21
-; $D05A => L_D05A          PTIME    => $2820
-; $D06B => X_D06B          RCAL4    => $0587
-; $D08B => L_D08B          rcalb    => $0570
-; $D098 => L_D098          read     => $064A
-; $D0B4 => L_D0B4          RK2      => $0099
-; $D0CA => L_D0CA          RK3      => $00A9
-; $D0D5 => L_D0D5          RK5      => $00B2
-; $D0E6 => L_D0E6          RK6      => $00B8
-; $D0F6 => L_D0F6          RK7      => $00C2
-; $D0F8 => L_D0F8          rkbd     => $008E
-; $D102 => L_D102          rl2      => $0391
-; $D110 => L_D110          rlin     => $038C
-; $D181 => X_D181          rst_rcal => $0010
-; $D1F6 => L_D1F6          rst_rdel => $0038
-; $D230 => L_D230          rst_rin  => $0008
-; $D24F => L_D24F          rst_scal => $0018
-; $D265 => L_D265          SCAL2    => $058B
-; $D2B4 => L_D2B4          SCAL3    => $058C
-; $D2C3 => L_D2C3          scali    => $05A1
-; $D2DD => L_D2DD          SCALJ    => $0599
-; $D2E6 => L_D2E6          sout     => $063F
-; $D2EE => L_D2EE          space    => $031A
-; $D2FC => L_D2FC          srlin    => $0087
-; $D309 => L_D309          staba    => $076D
-; $D30C => L_D30C          START    => $C1A9
-; $D30E => L_D30E          strtb    => $03AA
-; $D317 => L_D317          TIME     => $CC70
-; $D326 => L_D326          w3       => $04D7
-; $D329 => L_D329          WOT1     => $C35F
-; $D333 => L_D333          WOT2     => $C352
-; $D33D => L_D33D          write    => $04CE
-; $D36D => L_D36D          X_000D   => $000D
-; $D382 => L_D382          X_001A   => $001A
-; $D39E => L_D39E          X_003E   => $003E
-; $D3AE => L_D3AE          X_0051   => $0051
-; $D3BA => L_D3BA          X_005B   => $005B
-; $D3BB => L_D3BB          X_01E4   => $01E4
-; $D3C7 => L_D3C7          X_0312   => $0312
-; $D3D0 => L_D3D0          X_0316   => $0316
-; $D3D2 => L_D3D2          X_031E   => $031E
-; $D3D6 => L_D3D6          X_0436   => $0436
-; $D3D8 => L_D3D8          X_0483   => $0483
-; $D3DA => L_D3DA          X_0489   => $0489
-; $D3E8 => L_D3E8          X_04a7   => $04A7
-; $D3EE => L_D3EE          X_04BD   => $04BD
-; $D3FB => L_D3FB          X_051B   => $051B
-; $D3FE => L_D3FE          X_0522   => $0522
-; $D401 => L_D401          X_0527   => $0527
-; $D405 => L_D405          X_0567   => $0567
+; $01C1 => cr3             exec     => $0489
+; $01CF => crt0            g        => $060F
+; $01D1 => crt1            gds      => $0639
+; $01D4 => crt2            initt    => $0198
+; $01D6 => X_LINE16        initz    => $0C00
+; $01E4 => X_01E4          inl2     => $02F5
+; $01ED => L_01ED          inlin    => $02F4
+; $01F4 => L_01F4          k20      => $0164
+; $01FC => L_01FC          k30      => $016E
+; $0207 => crt6            k35      => $0174
+; $020E => crt8            k40      => $017A
+; $020F => crt10           k55      => $0183
+; $021B => crt12           k60      => $018C
+; $021F => crt14           k7       => $0157
+; $022F => crt18           k8       => $0160
+; $0236 => crt20           KBD      => $00DC
+; $024A => crt25           kop      => $0606
+; $0251 => crt26           kopt     => $0C27
+; $0257 => crt28           KSC1A    => $00EC
+; $0260 => crt29           ksc2     => $010E
+; $0264 => crt30           ksc4     => $011D
+; $026F => crt31           ksc5     => $0146
+; $0273 => crt32           KSC8     => $00EE
+; $0279 => crt33           kse      => $018E
+; $0283 => ctst            ktab     => $05A6
+; $0294 => ct8             L_0028   => $0028
+; $0297 => crt34           L_0029   => $0029
+; $029C => crt36           L_0034   => $0034
+; $02AA => crt38           L_0040   => $0040
+; $02BF => crt50           L_0045   => $0045
+; $02C6 => cpos            L_004D   => $004D
+; $02CD => M_LINE16        L_005E   => $005E
+; $02F4 => inlin           L_00F0   => $00F0
+; $02F5 => inl2            L_00FC   => $00FC
+; $0306 => brst0           L_01ED   => $01ED
+; $0312 => X_0312          L_01F4   => $01F4
+; $0316 => X_0316          L_01FC   => $01FC
+; $031A => space           L_033D   => $033D
+; $031E => X_031E          L_03B0   => $03B0
+; $0323 => errm            L_0433   => $0433
+; $0339 => crlf            L_0440   => $0440
+; $033D => L_033D          L_0476   => $0476
+; $0353 => num             L_047A   => $047A
+; $0365 => nn1             L_047E   => $047E
+; $037D => nn2             L_0480   => $0480
+; $038C => rlin            L_0498   => $0498
+; $0391 => rl2             L_04DD   => $04DD
+; $03AA => strtb           L_04EB   => $04EB
+; $03B0 => L_03B0          L_04F7   => $04F7
+; $03C0 => MRET            L_0510   => $0510
+; $0433 => L_0433          L_052A   => $052A
+; $0436 => X_0436          L_0538   => $0538
+; $0440 => L_0440          L_0558   => $0558
+; $0476 => L_0476          L_055C   => $055C
+; $047A => L_047A          L_0560   => $0560
+; $047E => L_047E          L_061A   => $061A
+; $0480 => L_0480          L_061F   => $061F
+; $0483 => X_0483          L_0641   => $0641
+; $0489 => exec            L_0652   => $0652
+; $0498 => L_0498          L_0655   => $0655
+; $04A7 => X_04a7          L_0663   => $0663
+; $04BD => X_04BD          L_0669   => $0669
+; $04C2 => args            L_0672   => $0672
+; $04C5 => args2           L_0685   => $0685
+; $04C9 => args3           L_068F   => $068F
+; $04CE => write           L_0691   => $0691
+; $04D7 => w3              L_06A0   => $06A0
+; $04DD => L_04DD          L_06A6   => $06A6
+; $04EB => L_04EB          L_06E8   => $06E8
+; $04F7 => L_04F7          L_06F7   => $06F7
+; $0510 => L_0510          L_0701   => $0701
+; $051B => X_051B          L_0708   => $0708
+; $0522 => X_0522          L_070E   => $070E
+; $0527 => X_0527          L_0739   => $0739
+; $052A => L_052A          L_073C   => $073C
+; $0538 => L_0538          L_0741   => $0741
+; $0558 => L_0558          L_0753   => $0753
+; $055C => L_055C          L_C0D6   => $C0D6
+; $0560 => L_0560          L_C1F2   => $C1F2
+; $0567 => X_0567          L_C216   => $C216
+; $0570 => rcalb           L_C25A   => $C25A
+; $0587 => RCAL4           L_C265   => $C265
+; $058B => SCAL2           L_C277   => $C277
+; $058C => SCAL3           L_C389   => $C389
+; $0599 => SCALJ           L_C38B   => $C38B
+; $05A1 => scali           L_C3B6   => $C3B6
+; $05A6 => ktab            L_C3C3   => $C3C3
+; $0606 => kop             L_C3D2   => $C3D2
+; $060B => break           L_C3D5   => $C3D5
+; $060F => g               L_C3E8   => $C3E8
+; $061A => L_061A          L_C3EA   => $C3EA
+; $061F => L_061F          L_C3FF   => $C3FF
+; $0639 => gds             L_C413   => $C413
+; $063F => sout            L_C416   => $C416
+; $0641 => L_0641          L_C471   => $C471
+; $064A => read            L_C478   => $C478
+; $0652 => L_0652          L_C48A   => $C48A
+; $0655 => L_0655          L_C4AB   => $C4AB
+; $0663 => L_0663          L_C4CF   => $C4CF
+; $0669 => L_0669          L_C4D3   => $C4D3
+; $0672 => L_0672          L_C4DA   => $C4DA
+; $0685 => L_0685          L_C4EB   => $C4EB
+; $068F => L_068F          L_C50D   => $C50D
+; $0691 => L_0691          L_C55F   => $C55F
+; $06A0 => L_06A0          L_C5D4   => $C5D4
+; $06A6 => L_06A6          L_C5DA   => $C5DA
+; $06B0 => X_06B0          L_C5F6   => $C5F6
+; $06BB => X_06BB          L_C64B   => $C64B
+; $06CA => X_06CA          L_C669   => $C669
+; $06E8 => L_06E8          L_C66F   => $C66F
+; $06EA => X_06EA          L_C6B4   => $C6B4
+; $06F7 => L_06F7          L_C6BC   => $C6BC
+; $0701 => L_0701          L_C6C6   => $C6C6
+; $0708 => L_0708          L_C6CC   => $C6CC
+; $070E => L_070E          L_C6CD   => $C6CD
+; $0713 => X_0713          L_C6D0   => $C6D0
+; $0717 => X_0717          L_C6D9   => $C6D9
+; $0726 => X_0726          L_C6DB   => $C6DB
+; $0733 => X_0733          L_C6E5   => $C6E5
+; $0739 => L_0739          L_C6EE   => $C6EE
+; $073C => L_073C          L_C6F1   => $C6F1
+; $0741 => L_0741          L_C6FA   => $C6FA
+; $0753 => L_0753          L_C702   => $C702
+; $076D => staba           L_C70C   => $C70C
+; $0C00 => initz           L_C71A   => $C71A
+; $0C0B => argn            L_C730   => $C730
+; $0C20 => numn            L_C742   => $C742
+; $0C21 => numv            L_C745   => $C745
+; $0C23 => brkadr          L_C748   => $C748
+; $0C25 => brkval          L_C755   => $C755
+; $0C26 => conflg          L_C768   => $C768
+; $0C27 => kopt            L_C76E   => $C76E
+; $0C29 => cursor          L_C773   => $C773
+; $0C71 => _stab           L_C784   => $C784
+; $2820 => PTIME           L_C786   => $C786
+; $2822 => DPAGE           L_C791   => $C791
+; $C000 => drum            L_C794   => $C794
+; $C003 => M_BPM           L_C7A3   => $C7A3
+; $C00C => M_RUN           L_C7B7   => $C7B7
+; $C019 => M_XFER          L_C7CC   => $C7CC
+; $C02F => M_PLAY          L_C7DC   => $C7DC
+; $C045 => M_ERAS          L_C7E9   => $C7E9
+; $C05B => M_SAVE          L_C801   => $C801
+; $C071 => M_SPACE         L_C81F   => $C81F
+; $C087 => M_SEQ           L_C830   => $C830
+; $C097 => M_FULL          L_C855   => $C855
+; $C0A2 => M_INFO          L_C86C   => $C86C
+; $C0B2 => M_INFO2         L_C893   => $C893
+; $C0D6 => L_C0D6          L_C8A9   => $C8A9
+; $C0ED => M_MENU          L_C8C4   => $C8C4
+; $C160 => X_C160          L_C8C7   => $C8C7
+; $C181 => CONT            L_C8D7   => $C8D7
+; $C18F => X_C18F          L_C8E2   => $C8E2
+; $C19A => X_C19A          L_C8E8   => $C8E8
+; $C1A5 => X_C1A5          L_C901   => $C901
+; $C1A9 => START           L_C914   => $C914
+; $C1F2 => L_C1F2          L_C923   => $C923
+; $C216 => L_C216          L_C925   => $C925
+; $C25A => L_C25A          L_C946   => $C946
+; $C265 => L_C265          L_C955   => $C955
+; $C277 => L_C277          L_C95E   => $C95E
+; $C280 => X_C280          L_C96E   => $C96E
+; $C332 => X_C332          L_C97B   => $C97B
+; $C352 => WOT2            L_C98E   => $C98E
+; $C354 => CLS             L_C9A2   => $C9A2
+; $C358 => X_C358          L_C9B8   => $C9B8
+; $C35F => WOT1            L_C9CD   => $C9CD
+; $C36C => X_C36c          L_C9D4   => $C9D4
+; $C389 => L_C389          L_C9DB   => $C9DB
+; $C38B => L_C38B          L_C9E0   => $C9E0
+; $C3A3 => X_C3A3          L_C9E7   => $C9E7
+; $C3AF => X_C3AF          L_C9EE   => $C9EE
+; $C3B6 => L_C3B6          L_C9FC   => $C9FC
+; $C3C3 => L_C3C3          L_CA00   => $CA00
+; $C3D2 => L_C3D2          L_CA05   => $CA05
+; $C3D5 => L_C3D5          L_CA21   => $CA21
+; $C3E8 => L_C3E8          L_CA25   => $CA25
+; $C3EA => L_C3EA          L_CA4D   => $CA4D
+; $C3FF => L_C3FF          L_CA5C   => $CA5C
+; $C413 => L_C413          L_CA66   => $CA66
+; $C416 => L_C416          L_CA75   => $CA75
+; $C471 => L_C471          L_CA7F   => $CA7F
+; $C478 => L_C478          L_CA98   => $CA98
+; $C48A => L_C48A          L_CAB5   => $CAB5
+; $C4AB => L_C4AB          L_CAC5   => $CAC5
+; $C4CF => L_C4CF          L_CADB   => $CADB
+; $C4D3 => L_C4D3          L_CAEB   => $CAEB
+; $C4DA => L_C4DA          L_CAFB   => $CAFB
+; $C4EB => L_C4EB          L_CB07   => $CB07
+; $C50D => L_C50D          L_CB2A   => $CB2A
+; $C55C => X_C55C          L_CB34   => $CB34
+; $C55F => L_C55F          L_CB3C   => $CB3C
+; $C5D4 => L_C5D4          L_CC1A   => $CC1A
+; $C5DA => L_C5DA          L_CC49   => $CC49
+; $C5F6 => L_C5F6          L_CC4B   => $CC4B
+; $C64B => L_C64B          L_CC54   => $CC54
+; $C651 => X_C651          L_CC7F   => $CC7F
+; $C669 => L_C669          L_CCB1   => $CCB1
+; $C66F => L_C66F          L_CCC0   => $CCC0
+; $C6B4 => L_C6B4          L_CCCB   => $CCCB
+; $C6BC => L_C6BC          L_CCDE   => $CCDE
+; $C6C6 => L_C6C6          L_CCEA   => $CCEA
+; $C6CC => L_C6CC          L_CCED   => $CCED
+; $C6CD => L_C6CD          L_CCF8   => $CCF8
+; $C6D0 => L_C6D0          L_CD04   => $CD04
+; $C6D9 => L_C6D9          L_CD0D   => $CD0D
+; $C6DB => L_C6DB          L_CD13   => $CD13
+; $C6E5 => L_C6E5          L_CD15   => $CD15
+; $C6EE => L_C6EE          L_CD7D   => $CD7D
+; $C6F1 => L_C6F1          L_CE1E   => $CE1E
+; $C6FA => L_C6FA          L_CE2F   => $CE2F
+; $C702 => L_C702          L_CE33   => $CE33
+; $C70C => L_C70C          L_CE36   => $CE36
+; $C71A => L_C71A          L_CE3C   => $CE3C
+; $C730 => L_C730          L_CE4C   => $CE4C
+; $C742 => L_C742          L_CE57   => $CE57
+; $C745 => L_C745          L_CE62   => $CE62
+; $C748 => L_C748          L_CE7B   => $CE7B
+; $C755 => L_C755          L_CE8D   => $CE8D
+; $C768 => L_C768          L_CE98   => $CE98
+; $C76E => L_C76E          L_CEC2   => $CEC2
+; $C773 => L_C773          L_CED0   => $CED0
+; $C784 => L_C784          L_CEDF   => $CEDF
+; $C786 => L_C786          L_CEE7   => $CEE7
+; $C791 => L_C791          L_CF27   => $CF27
+; $C794 => L_C794          L_CF3D   => $CF3D
+; $C7A3 => L_C7A3          L_CF43   => $CF43
+; $C7B1 => X_C7B1          L_CF56   => $CF56
+; $C7B7 => L_C7B7          L_CF5F   => $CF5F
+; $C7CC => L_C7CC          L_CF6A   => $CF6A
+; $C7DC => L_C7DC          L_CF76   => $CF76
+; $C7E9 => L_C7E9          L_CF7E   => $CF7E
+; $C7EC => X_C7EC          L_CF94   => $CF94
+; $C801 => L_C801          L_CF97   => $CF97
+; $C81F => L_C81F          L_CF9D   => $CF9D
+; $C830 => L_C830          L_CFB1   => $CFB1
+; $C855 => L_C855          L_CFC5   => $CFC5
+; $C86C => L_C86C          L_CFC8   => $CFC8
+; $C893 => L_C893          L_CFD1   => $CFD1
+; $C89F => X_C89F          L_CFD6   => $CFD6
+; $C8A9 => L_C8A9          L_CFE9   => $CFE9
+; $C8C4 => L_C8C4          L_CFF1   => $CFF1
+; $C8C7 => L_C8C7          L_CFF9   => $CFF9
+; $C8D7 => L_C8D7          L_D001   => $D001
+; $C8E2 => L_C8E2          L_D009   => $D009
+; $C8E8 => L_C8E8          L_D014   => $D014
+; $C901 => L_C901          L_D028   => $D028
+; $C914 => L_C914          L_D02D   => $D02D
+; $C923 => L_C923          L_D033   => $D033
+; $C925 => L_C925          L_D037   => $D037
+; $C946 => L_C946          L_D03A   => $D03A
+; $C955 => L_C955          L_D040   => $D040
+; $C95E => L_C95E          L_D054   => $D054
+; $C96E => L_C96E          L_D05A   => $D05A
+; $C97B => L_C97B          L_D08B   => $D08B
+; $C98E => L_C98E          L_D098   => $D098
+; $C9A2 => L_C9A2          L_D0B4   => $D0B4
+; $C9B8 => L_C9B8          L_D0CA   => $D0CA
+; $C9CD => L_C9CD          L_D0D5   => $D0D5
+; $C9D4 => L_C9D4          L_D0E6   => $D0E6
+; $C9DB => L_C9DB          L_D0F6   => $D0F6
+; $C9E0 => L_C9E0          L_D0F8   => $D0F8
+; $C9E7 => L_C9E7          L_D102   => $D102
+; $C9EE => L_C9EE          L_D110   => $D110
+; $C9FC => L_C9FC          L_D1F6   => $D1F6
+; $CA00 => L_CA00          L_D230   => $D230
+; $CA05 => L_CA05          L_D24F   => $D24F
+; $CA21 => L_CA21          L_D265   => $D265
+; $CA25 => L_CA25          L_D2B4   => $D2B4
+; $CA4D => L_CA4D          L_D2C3   => $D2C3
+; $CA5C => L_CA5C          L_D2DD   => $D2DD
+; $CA66 => L_CA66          L_D2E6   => $D2E6
+; $CA75 => L_CA75          L_D2EE   => $D2EE
+; $CA7F => L_CA7F          L_D2FC   => $D2FC
+; $CA98 => L_CA98          L_D309   => $D309
+; $CAB5 => L_CAB5          L_D30C   => $D30C
+; $CAC5 => L_CAC5          L_D30E   => $D30E
+; $CADB => L_CADB          L_D317   => $D317
+; $CAEB => L_CAEB          L_D326   => $D326
+; $CAFB => L_CAFB          L_D329   => $D329
+; $CB07 => L_CB07          L_D333   => $D333
+; $CB2A => L_CB2A          L_D33D   => $D33D
+; $CB34 => L_CB34          L_D36D   => $D36D
+; $CB3C => L_CB3C          L_D382   => $D382
+; $CC1A => L_CC1A          L_D39E   => $D39E
+; $CC49 => L_CC49          L_D3AE   => $D3AE
+; $CC4B => L_CC4B          L_D3BA   => $D3BA
+; $CC54 => L_CC54          L_D3BB   => $D3BB
+; $CC70 => TIME            L_D3C7   => $D3C7
+; $CC7F => L_CC7F          L_D3D0   => $D3D0
+; $CCB1 => L_CCB1          L_D3D2   => $D3D2
+; $CCC0 => L_CCC0          L_D3D6   => $D3D6
+; $CCCB => L_CCCB          L_D3D8   => $D3D8
+; $CCDE => L_CCDE          L_D3DA   => $D3DA
+; $CCEA => L_CCEA          L_D3E8   => $D3E8
+; $CCED => L_CCED          L_D3EE   => $D3EE
+; $CCF8 => L_CCF8          L_D3FB   => $D3FB
+; $CD04 => L_CD04          L_D3FE   => $D3FE
+; $CD0D => L_CD0D          L_D401   => $D401
+; $CD13 => L_CD13          L_D405   => $D405
+; $CD15 => L_CD15          L_D409   => $D409
+; $CD7D => L_CD7D          L_D417   => $D417
+; $CE13 => X_CE13          L_D41A   => $D41A
+; $CE1E => L_CE1E          L_D422   => $D422
+; $CE2F => L_CE2F          L_D432   => $D432
+; $CE33 => L_CE33          L_D437   => $D437
+; $CE36 => L_CE36          L_D458   => $D458
+; $CE3C => L_CE3C          L_D461   => $D461
+; $CE4C => L_CE4C          L_D475   => $D475
+; $CE57 => L_CE57          L_D47F   => $D47F
+; $CE62 => L_CE62          L_D481   => $D481
+; $CE7B => L_CE7B          L_D488   => $D488
+; $CE8D => L_CE8D          L_D491   => $D491
+; $CE98 => L_CE98          L_D49D   => $D49D
+; $CEC2 => L_CEC2          L_D4AD   => $D4AD
+; $CED0 => L_CED0          L_D4C4   => $D4C4
+; $CEDF => L_CEDF          L_D4D2   => $D4D2
+; $CEE7 => L_CEE7          L_D4D9   => $D4D9
+; $CF27 => L_CF27          L_NMI    => $0066
+; $CF3D => L_CF3D          L_RST20  => $0020
+; $CF43 => L_CF43          L_RST30  => $0030
+; $CF56 => L_CF56          M_BPM    => $C003
+; $CF5F => L_CF5F          M_ERAS   => $C045
+; $CF6A => L_CF6A          M_FULL   => $C097
+; $CF76 => L_CF76          M_INFO   => $C0A2
+; $CF7E => L_CF7E          M_INFO2  => $C0B2
+; $CF94 => L_CF94          M_LINE16 => $02CD
+; $CF97 => L_CF97          M_MENU   => $C0ED
+; $CF9D => L_CF9D          M_PLAY   => $C02F
+; $CFB1 => L_CFB1          M_RUN    => $C00C
+; $CFC5 => L_CFC5          M_SAVE   => $C05B
+; $CFC8 => L_CFC8          M_SEQ    => $C087
+; $CFD1 => L_CFD1          M_SPACE  => $C071
+; $CFD6 => L_CFD6          M_XFER   => $C019
+; $CFE9 => L_CFE9          mflp     => $0051
+; $CFF1 => L_CFF1          MRET     => $03C0
+; $CFF9 => L_CFF9          nn1      => $0365
+; $D001 => L_D001          nn2      => $037D
+; $D009 => L_D009          num      => $0353
+; $D014 => L_D014          numn     => $0C20
+; $D028 => L_D028          numv     => $0C21
+; $D02D => L_D02D          PTIME    => $2820
+; $D033 => L_D033          RCAL4    => $0587
+; $D037 => L_D037          rcalb    => $0570
+; $D03A => L_D03A          read     => $064A
+; $D040 => L_D040          RK2      => $0099
+; $D054 => L_D054          RK3      => $00A9
+; $D05A => L_D05A          RK5      => $00B2
+; $D06B => X_D06B          RK6      => $00B8
+; $D08B => L_D08B          RK7      => $00C2
+; $D098 => L_D098          rkbd     => $008E
+; $D0B4 => L_D0B4          rl2      => $0391
+; $D0CA => L_D0CA          rlin     => $038C
+; $D0D5 => L_D0D5          rst_rcal => $0010
+; $D0E6 => L_D0E6          rst_rdel => $0038
+; $D0F6 => L_D0F6          rst_rin  => $0008
+; $D0F8 => L_D0F8          rst_scal => $0018
+; $D102 => L_D102          SCAL2    => $058B
+; $D110 => L_D110          SCAL3    => $058C
+; $D181 => X_D181          scali    => $05A1
+; $D1F6 => L_D1F6          SCALJ    => $0599
+; $D230 => L_D230          sout     => $063F
+; $D24F => L_D24F          space    => $031A
+; $D265 => L_D265          srlin    => $0087
+; $D2B4 => L_D2B4          srlx     => $005B
+; $D2C3 => L_D2C3          staba    => $076D
+; $D2DD => L_D2DD          START    => $C1A9
+; $D2E6 => L_D2E6          strtb    => $03AA
+; $D2EE => L_D2EE          TIME     => $CC70
+; $D2FC => L_D2FC          w3       => $04D7
+; $D309 => L_D309          WOT1     => $C35F
+; $D30C => L_D30C          WOT2     => $C352
+; $D30E => L_D30E          write    => $04CE
+; $D317 => L_D317          X_000D   => $000D
+; $D326 => L_D326          X_001A   => $001A
+; $D329 => L_D329          X_003E   => $003E
+; $D333 => L_D333          X_01E4   => $01E4
+; $D33D => L_D33D          X_0312   => $0312
+; $D36D => L_D36D          X_0316   => $0316
+; $D382 => L_D382          X_031E   => $031E
+; $D39E => L_D39E          X_0436   => $0436
+; $D3AE => L_D3AE          X_0483   => $0483
+; $D3BA => L_D3BA          X_04a7   => $04A7
+; $D3BB => L_D3BB          X_04BD   => $04BD
+; $D3C7 => L_D3C7          X_051B   => $051B
+; $D3D0 => L_D3D0          X_0522   => $0522
+; $D3D2 => L_D3D2          X_0527   => $0527
+; $D3D6 => L_D3D6          X_0567   => $0567
+; $D3D8 => L_D3D8          X_06B0   => $06B0
+; $D3DA => L_D3DA          X_06BB   => $06BB
+; $D3E8 => L_D3E8          X_06CA   => $06CA
+; $D3EE => L_D3EE          X_06EA   => $06EA
+; $D3FB => L_D3FB          X_0713   => $0713
+; $D3FE => L_D3FE          X_0717   => $0717
+; $D401 => L_D401          X_0726   => $0726
+; $D405 => L_D405          X_0733   => $0733
 ; $D409 => L_D409          X_C160   => $C160
 ; $D417 => L_D417          X_C18F   => $C18F
 ; $D41A => L_D41A          X_C19A   => $C19A
