@@ -1,0 +1,350 @@
+#!/usr/bin/perl
+#
+# script to use the z80 disassembler to reverse the NASCOM IMP ROM
+# The ROM is 2Kbytes located at 0x0000 and expects 1K RAM at 0x2800??
+#
+
+use warnings;
+use CPU::Z80::Disassembler;
+
+my $file_name = "imp.bin_golden";
+my $addr = 0x0000;
+my $file = "imp_dis.txt";
+my $asm_file = "imp_dis.asm";
+
+
+$dis = CPU::Z80::Disassembler->new;
+$dis->memory->load_file($file_name, $addr);
+$dis->write_dump($file);
+
+# mock up stuff for NAS-SYS RST codes
+
+###########################################
+# RST 0 - START
+
+###########################################
+# RST 8 - RIN
+
+###########################################
+# RST 10 - RCAL
+## TODO put the actual code thread in here so that it can be followed.
+##$dis->memory->poke(0x10, 0xc9);
+##$dis->code(0x10);
+##$dis->set_call(0x10, \&handle_rcal);
+
+# advance return PC past in-line subroutine code
+sub handle_rcal {
+    my $addr = $_[1];
+    $dis->defb($addr);
+    return $addr+1;
+}
+
+###########################################
+# RST 18 - SCAL
+##$dis->memory->poke(0x18, 0xc9);
+##$dis->code(0x18);
+##$dis->set_call(0x18, \&handle_scal);
+
+# advance return PC past in-line subroutine code
+##  sub handle_scal {
+##      my $addr = $_[1];
+##      $dis->defb($addr);
+##      return $addr+1;
+##  }
+
+###########################################
+# RST 20 - BRKPT
+
+###########################################
+# RST 28 - PRS
+##  $dis->memory->poke(0x28, 0xc9);
+##  $dis->code(0x28);
+##  $dis->set_call(0x28, \&handle_prs);
+
+# advance return PC past in-line null-terminated string
+sub handle_prs {
+    my $ref = $_[0];
+    my $addr = $_[1];
+
+    my $start = $addr;
+    my $len = 0;
+    my $is_string;
+    while (1) {
+        my $byte = $dis->memory->peek($addr);
+        if (($byte > 31) and ($byte < 128)) {
+            # printable
+            if (($len == 0) or ($is_string==1)) {
+                # string, new section, first of section OR
+                # string continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 1;
+            }
+            else {
+                # byte -> string change
+                if ($gen_label) {
+                    $dis->defb($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defb($start, $len);
+                }
+                $len = 1;
+                $is_string = 1;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        else {
+            # not printable
+            if (($len == 0) or ($is_string==0)) {
+                # byte, new section, first of section OR
+                # byte continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 0;
+            }
+            else {
+                # string -> byte change
+                if ($gen_label) {
+                    $dis->defm($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defm($start, $len);
+                }
+                $len = 1;
+                $is_string = 0;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        last if ($byte==0);
+    }
+
+    # emit the final section
+    if ($len != 0) {
+        if ($is_string) {
+            if ($gen_label) {
+                $dis->defm($start, $len, $label);
+            }
+            else {
+                $dis->defm($start, $len);
+            }
+        }
+        else {
+            if ($gen_label) {
+                $dis->defb($start, $len, $label);
+            }
+            else {
+                $dis->defb($start, $len);
+            }
+        }
+    }
+    return $addr;
+}
+
+
+# Create a message of length $len starting at address $addr and
+# using label $label.
+# Use defm and defb to report the bytes of the message
+# Return the next address
+sub msg_by_len {
+    my $addr = $_[0];
+    my $len = $_[1];
+    my $label = $_[2];
+
+    my $start = $addr;
+    my $end = $addr + $len; # loop while < $end
+    my $gen_label = 1;  # flag
+    $len = 0;
+    my $is_string;
+
+    # byte new section, first of section
+    # byte continue existing section
+    # string -> byte change
+
+    while ($addr < $end) {
+        my $byte = $dis->memory->peek($addr);
+        if (($byte > 31) and ($byte < 128)) {
+            # printable
+            if (($len == 0) or ($is_string==1)) {
+                # string, new section, first of section OR
+                # string continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 1;
+            }
+            else {
+                # byte -> string change
+                if ($gen_label) {
+                    $dis->defb($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defb($start, $len);
+                }
+                $len = 1;
+                $is_string = 1;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+        else {
+            # not printable
+            if (($len == 0) or ($is_string==0)) {
+                # byte, new section, first of section OR
+                # byte continue existing section
+                $len += 1;
+                $addr += 1;
+                $is_string = 0;
+            }
+            else {
+                # string -> byte change
+                if ($gen_label) {
+                    $dis->defm($start, $len, $label);
+                    $gen_label = 0;
+                }
+                else {
+                    $dis->defm($start, $len);
+                }
+                $len = 1;
+                $is_string = 0;
+                $start = $addr;
+                $addr += 1;
+            }
+        }
+    }
+    # emit the final section
+    if ($len != 0) {
+        if ($is_string) {
+            if ($gen_label) {
+                $dis->defm($start, $len, $label);
+            }
+            else {
+                $dis->defm($start, $len);
+            }
+        }
+        else {
+            if ($gen_label) {
+                $dis->defb($start, $len, $label);
+            }
+            else {
+                $dis->defb($start, $len);
+            }
+        }
+    }
+    return $end;
+}
+
+###########################################
+# RST 30 - ROUT
+##$dis->memory->poke(0x30, 0xc9);
+##$dis->code(0x30);
+
+###########################################
+# RST 38 - RDEL
+##$dis->memory->poke(0x38, 0xc9);
+##$dis->code(0x38);
+
+###########################################
+# NAS-SYS initialisation routine
+##$dis->memory->poke(0xd, 0xc9);
+##$dis->code(0xd,"STMON");
+
+###########################################
+# NAS-SYS entry point
+# Never actually come back from here, but
+# model it as "ret"
+##$dis->memory->poke(0x5, 0xc9);
+##$dis->code(0x5,"NAS");
+
+# given a list of addresses, do a $dis->code on each
+# of them, with a label of the form X_<addr> where
+# <addr> is a 4-digit hex address with leading zeros
+sub dis_here {
+    while (my $addr = shift @_) {
+        my $label = sprintf("X_%04X", $addr);
+        $dis->code($addr,$label);
+    }
+}
+
+# given an address, declare the first as a byte and the next two as a word
+# with a label
+# and return the next address
+# $prefix is the prefix of the label, and $use_addr defines the format
+sub dis_tab1 {
+    my $prefix = $_[0];
+    my $addr = $_[1];
+    my $use_addr = $_[2];
+    $dis->defb($addr,1);
+    $dis->defw($addr+1,1);
+    my $ascii = $dis->memory->peek($addr);
+    my $val = $dis->memory->peek16u($addr+1);
+    my $label;
+    if ($use_addr) {
+        $label = sprintf("%s_%04X", $prefix, $val);
+    }
+    else {
+        $label = sprintf("%s_CHR%02X", $prefix, $ascii);
+    }
+    $dis->code($val,$label);
+    return $addr+3;
+}
+
+# @comments = ("foo", "bar");
+# code_com(0x1234, "label", @comments);
+#
+# gotcha: need all the subsequent commented lines to be marked as code BEFORE this is called
+sub code_com {
+    my $addr = shift @_;
+    my $label = shift @_;
+
+    $dis->code($addr, $label);
+    $dis->line_comments($addr, @_);
+}
+
+
+###########################################
+# Stuff specific to the code being disassembled
+
+# There is a PIO
+# There is a UART
+# There might be an output latch??
+# There is a (programmable??) baud rate controller
+# There should be an area of ROM dedicated to dot matrix character generator
+#
+# See I/O out to port 0x30, 0x31, 0x32, 0x33
+# See I/O in  to port 0x18, 0x28, 0x30
+# Guess 0x18 0x28 is UART RXD/status
+
+# Entry points
+$dis->code(0x0000,"COLD");
+$dis->code(0x026a,"COLD1");
+$dis->code(0x0008,"X_RST8");
+$dis->code(0x0010,"X_RST10");
+$dis->code(0x0018,"X_RST18");
+$dis->code(0x0020,"X_RST20");
+#$dis->code(0x0028,"L_RST28");
+$dis->code(0x0030,"X_RST30");
+$dis->code(0x0038,"X_RST38");
+$dis->code(0x0066,"X_NMI");
+$dis->code(0x0074,"X_0074");
+$dis->code(0x008b,"X_008B");
+$dis->code(0x00ad,"X_00AD");
+$dis->code(0x00d6,"X_00D6");
+$dis->code(0x04d7,"X_04D7");
+$dis->code(0x04e7,"X_04E7");
+$dis->code(0x0523,"X_0523");
+$dis->code(0x054C,"X_054C");
+$dis->code(0x0556,"X_0556");
+#$dis->code(0x055d,"X_055D");
+#$dis->code(0x07c2,"X_07C2");
+#$dis->code(0x07d7,"X_07D7");
+
+
+# This can optimise code and so it may prevent 100% match
+# on re-assembly.
+##$dis->analyse;
+
+$dis->write_asm($asm_file);
