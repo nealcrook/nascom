@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# rebuild from source and check that the binary matches the golden versions
+#
+# Grr! There is a bug in z80asm where (ix) references get assembled
+# incorrectly (the offset byte is omitted from the generated code so that
+# the code is both wrong and the wrong size). The fix is to replace each
+# occurrence of (ix) and (iy) with (ix+0), (iy+0) respectively.
+#
+# Therefore, the imp.bin code will not match.. but imp_dis.bin will match.
+
+
+z80asm -i imp_dis.asm       -limp.lst        -oimp.bin
+z80asm -i imp_dis_edit.asm  -limp_edit.lst   -oimp_edit.bin
+
+# check
+diff imp.bin      imp_edit.bin
+diff imp.bin      imp.bin_golden
+diff imp_edit.bin imp.bin_golden

@@ -314,9 +314,14 @@ sub code_com {
 # There is a (programmable??) baud rate controller
 # There should be an area of ROM dedicated to dot matrix character generator
 #
-# See I/O out to port 0x30, 0x31, 0x32, 0x33
+#                                 A-dat B-dat A-ctl B-ctl
+# See I/O out to port             0x30, 0x31, 0x32, 0x33
 # See I/O in  to port 0x18, 0x28, 0x30
 # Guess 0x18 0x28 is UART RXD/status
+
+$dis->block_comment(0x0000,";;; PIO A[7] - OUT error LED\n;;; PIO A[6] - OUT buffer full\n;;; PIO A[5] - OUT enable paper (vertical) feed\n;;; PIO A[4] - IN  online switch sense\n;;; PIO A[3] - IN  linefeed switch sense\n;;; PIO A[2] - IN  LH carriage position sense\n;;; PIO A[1] - IN  RH carriage position sense\n;;; PIO A[0] - IN  ??? skt1\n;;; PIO B[7] - OUT enable head motor (horizontal motion)\n;;; PIO B[6:0] - OUT print head; forms a vertical column/pattern of 7 dots\n");
+
+
 
 # Entry points
 $dis->code(0x0000,"COLD");
@@ -329,15 +334,84 @@ $dis->code(0x0020,"X_RST20");
 $dis->code(0x0030,"X_RST30");
 $dis->code(0x0038,"X_RST38");
 $dis->code(0x0066,"X_NMI");
+
+@comments = ("RET",
+             "",
+             "Port B output mode -- one-time setup of PIO",
+             "PIO B Ctrl",
+             "Port A control mode",
+             "PIO A Ctrl",
+             "Port A [7:5] output, [4:0] input",
+             "PIO A Ctrl",
+             "Enable/disable head motor? All print heads OFF",
+             "PIO B Data",
+             "next print head data?",
+             "",
+             "",
+             "",
+             "",
+    );
+$dis->line_comments(0x26a,@comments);
+
+
+@comments = ("",
+             "",
+             "",
+             "",
+             "",
+             "enable head motion??",
+             "",
+             "wait for NMI at 1.2kHz ",
+             "",
+             "got 10 of them",
+             "",
+             "toggle head motion enable",
+             "go do it again, 8 times in total",
+             "",
+             "",
+             "",
+    );
+$dis->line_comments(0x0048,@comments);
+
+@comments = ("Come here on NMI at 1.2kHz",
+             "get data for print head",
+             "send it to port B data",
+             "?? but HL does not get popped ??",
+             "various count values end up in here: 5, 35, 10",
+             "",
+             "2800 is loaded with RET (should really be RETN!!)",
+    );
+$dis->line_comments(0x0066,@comments);
+
+
+
+
 $dis->code(0x0074,"X_0074");
 $dis->code(0x008b,"X_008B");
 $dis->code(0x00ad,"X_00AD");
 $dis->code(0x00d6,"X_00D6");
 $dis->code(0x04d7,"X_04D7");
 $dis->code(0x04e7,"X_04E7");
-$dis->code(0x0523,"X_0523");
-$dis->code(0x054C,"X_054C");
-$dis->code(0x0556,"X_0556");
+
+# data
+
+# don't know what the initial data is..
+
+
+#$dis->defb(0xd708, 8);
+# matrix is 5 dots wide but each character takes 7 bytes
+#96 characters, ASCII codes 0x20 (32) - 0x7f (128)
+my $start = 0x0523+5+8*7;
+$dis->block_comment($start,";;; Character set. Each character takes 7 bytes\n;;; 96 characters, for ASCII codes 0x20 (32) - 0x7f (128)\n;;; bits [6:0] of each byte represent a vertical line; MSB at the top.\n;;; the middle rows are kind-of smeared together in pairs??");
+for (my $i = 0; $i< 96; $i=$i+1) {
+    $dis->defb($start + 7*$i, 7);
+}
+
+
+
+#$dis->code(0x0523,"X_0523");
+#$dis->code(0x054C,"X_054C");
+#$dis->code(0x0556,"X_0556");
 #$dis->code(0x055d,"X_055D");
 #$dis->code(0x07c2,"X_07C2");
 #$dis->code(0x07d7,"X_07D7");
