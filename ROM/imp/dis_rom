@@ -397,16 +397,22 @@ $dis->code(0x04e7,"X_04E7");
 
 # don't know what the initial data is..
 
+$dis->defb(0x523,0x18, tab1);
+
 
 #$dis->defb(0xd708, 8);
 # matrix is 5 dots wide but each character takes 7 bytes
 #96 characters, ASCII codes 0x20 (32) - 0x7f (128)
-my $start = 0x0523+5+8*7;
+my $start = 0x0560;
 $dis->block_comment($start,";;; Character set. Each character takes 7 bytes\n;;; 96 characters, for ASCII codes 0x20 (32) - 0x7f (128)\n;;; bits [6:0] of each byte represent a vertical line; MSB at the top.\n;;; the middle rows are kind-of smeared together in pairs??");
 for (my $i = 0; $i< 96; $i=$i+1) {
-    $dis->defb($start + 7*$i, 7);
+    if ($i == 0) {
+        $dis->defb($start + 7*$i, 7, "charset");
+    }
+    else {
+        $dis->defb($start + 7*$i, 7);
+    }
 }
-
 
 
 #$dis->code(0x0523,"X_0523");
