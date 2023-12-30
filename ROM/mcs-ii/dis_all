@@ -460,13 +460,15 @@ $dis->defw(0x0c71,1,"_stab");
 
 # Rhythm number
 $dis->memory->poke(0x2822, 0);
-$dis->memory->poke(0x2823, 0);
-$dis->defw(0x2822,1,"DPAGE");
+$dis->defb(0x2822,1,"RNUM");
 
 # previous state of port A[0]
 $dis->memory->poke(0x2820, 0);
 $dis->defb(0x2820,1,"PTIME");
 
+# Page number
+$dis->memory->poke(0x282a, 0);
+$dis->defb(0x282a,1,"DPAGE");
 
 
 
@@ -478,7 +480,7 @@ $dis->code(0x04c9,"args3");
 $dis->code(0x04ce,"write");
 $dis->code(0x04d7,"w3");
 $dis->code(0x051b,"X_051B");
-$dis->code(0x0522,"X_0522");
+#$dis->code(0x0522,"X_0522");
 $dis->code(0x0527,"X_0527");
 $dis->code(0x0570,"rcalb");
 $dis->code(0x0587,"RCAL4");
@@ -519,7 +521,8 @@ $dis->code(0x00a9,"RK3");
 $dis->code(0x00b2,"RK5");
 $dis->code(0x00b8,"RK6");
 $dis->code(0x00c2,"RK7");
-$dis->code(0x00dc,"KBD");
+$dis->code(0x00ce,"kbd");
+$dis->code(0x00dc,"ksc1");
 $dis->code(0x00ec,"KSC1A");
 $dis->code(0x00ee,"KSC8");
 $dis->code(0x010e,"ksc2");
@@ -534,8 +537,8 @@ $dis->code(0x017a,"k40");
 $dis->code(0x0183,"k55");
 $dis->code(0x018c,"k60");
 $dis->code(0x018e,"kse");
-$dis->code(0x000d,"X_000D");
-$dis->code(0x001a,"X_001A");
+$dis->code(0x000d,"stmon");
+$dis->code(0x001a,"tx1");
 $dis->code(0x003e,"X_003E");
 $dis->code(0x0051,"mflp");
 $dis->code(0x005b,"srlx");
@@ -595,23 +598,29 @@ $dis->code(0x03c0,"MRET");
              "[",
              "blah",
              "P",
-             "blah",
+             "illegal",
              "Y",
-             "blah",
+             "illegal",
              "C",
-             "blah",
+             "illegal",
              "W",
-             "blah",
+             "illegal",
              "G",
-             "blah",
+             "illegal",
              "J",
-             "blah",
+             "illegal",
              "S",
-             "blah",
+             "illegal",
              "Q",
-             "blah",
+             "illegal",
              "T",
-             "blah",
+             "Track Sheet command -> change A from 54 to 51 ??!!",
+             "remaining letters allegedly legal commands: ABDEFHIKLMNOQRUVXZ ??",
+             "argc (command character)",
+             "",
+             "",
+             "rlin - process command arguments (why??)",
+             "no error.. else fall through to error"
     );
 $dis->code(0x0436,"X_0436");
 $dis->line_comments(0x436,@comments);
@@ -647,11 +656,11 @@ $dis->code(0x03aa,"strtb");
 $dis->code(0x06b0,"X_06B0");
 $dis->code(0x06bb,"X_06BB");
 $dis->code(0x06ca,"X_06CA");
-$dis->code(0x06ea,"X_06EA");
-$dis->code(0x0713,"X_0713");
-$dis->code(0x0717,"X_0717");
-$dis->code(0x0726,"X_0726");
-$dis->code(0x0733,"X_0733");
+$dis->code(0x06ea,"xout");
+$dis->code(0x0713,"xn");
+$dis->code(0x0717,"normal");
+$dis->code(0x0726,"nnim");
+$dis->code(0x0733,"in");
 #$dis->code(0x0758,"X_0758");
 
 my $staba = 0x76d;
@@ -698,12 +707,24 @@ msg_by_null(0xc0ed, "M_MENU");
 $dis->code(0xc354,"CLS");
 $dis->code(0xc55c,"X_C55C");
 
-$dis->code(0xc160,"X_C160");
+$dis->defb(0xcbe8,1, "M_OPTION");
+
+$dis->code(0xc4ab,"compose");
+$dis->code(0xc55f,"save");
+$dis->code(0xc64b,"assemble");
+$dis->code(0xd05a,"play");
+$dis->code(0xd110,"transfer");
+$dis->code(0xd1f6,"info");
+$dis->code(0xd265,"erase");
+$dis->code(0xce8d,"run");
+$dis->code(0xd4d9,"help");
+$dis->code(0xd458,"D_MSG16");
+
 
 @comments = ("wait for character",
              "clear MSB",
              "C",
-             "continue",
+             "check for legal DPAGE and continue",
              "c",
              "??",
              "S",
@@ -712,23 +733,21 @@ $dis->code(0xc160,"X_C160");
              "high start",
              "N",
              "normal start",
-             "???",
-             "???T",
+             "CTRL-L",
+             "back to boot menu",
              "Illegal.. go round again",
     );
-$dis->code(0xc160,"X_C160");
+
 $dis->line_comments(0xc160,@comments);
 $dis->code(0xc181,"CONT");
-$dis->code(0xc35f,"WOT1");
+$dis->code(0xc35f,"CONT1");
 $dis->code(0xc1a9,"START");
-$dis->code(0xc352,"WOT2");
+$dis->code(0xc352,"RESTART");
 
-$dis->code(0xc18f,"X_C18F");
 $dis->code(0xc19a,"X_C19A");
 $dis->code(0xc1a5,"X_C1A5");
 $dis->code(0xc280,"X_C280");
 $dis->code(0xc332,"X_C332");
-$dis->code(0xc358,"X_C358");
 $dis->code(0xc36c,"X_C36c");
 $dis->code(0xc3a3,"X_C3A3");
 $dis->code(0xc3af,"X_C3AF");
@@ -859,8 +878,8 @@ $dis->line_comments(0xd44e,@comments);
              "no character",
              "clear MSB (no need..)",
              "ESC",
-             "",
-             "",
+             "jump through (\$2800) - usually to CONT1",
+             "CTRL-L",
              "",
              "X",
              "Toggle Int/Midi",
@@ -891,7 +910,6 @@ $dis->line_comments(0xd44e,@comments);
              "",
              "",
              "Store number 0-9 as Page Number",
-             "",
              "Start again",
     );
 $dis->line_comments(0xc416,@comments);
@@ -956,7 +974,8 @@ $dis->line_comments(0xcc7f,@comments);
 # out 00 01 04 05 06 07 (01 04 05 06 07 in drum stuff)
 
 # 00 out: kbd, LED, sstep control. in: kbd scan
-# 01 is UART
+# 01 is UART data
+# 02 is UART status
 # 04 is PIO A data
 # 05 is PIO B data
 # 06 is PIO A control

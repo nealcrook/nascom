@@ -1,6 +1,35 @@
 ;;; this is mcs_dis.asm hand-edited with comments (as well as comments that were
 ;;; annotated in by dis_all)
 
+;;; All data for the drum software is stored at $2800 and upwards
+;;; The "save" command uses NAS-SYS "G" to save all of this data
+;;; and, on reload, to execute at ????
+;;;
+;;; When starting the Drum Computer program, "clear store" writes 0
+;;; to memory from $2800 - $8FFF.
+;;;
+;;; There are 10 pages (0-9) each of 10 named rhythms (numbered 0-9)
+;;; Looks as though the pages are not stored contiguously -- the info
+;;; page is after the page 0 stuff?
+;;; Save of page  0    seems to save data $2800-$4300
+;;; Save of pages 0,1  seems to save data $2800-$4B00 (another 2Kbytes)
+;;;
+;;; $2800 - ???? common
+;;; $3f00 - $4280 info screen (little bit smaller than the 1Kbyte video RAM)
+;;;
+;;; $29f0 - ???? page 0 stuff
+;;; $     - ???? page 1 stuff
+;;; $     - ???? page 2 stuff
+;;; $     - ???? page 3 stuff
+;;; $     - ???? page 4 stuff
+;;; $     - ???? page 5 stuff
+;;; $     - ???? page 6 stuff
+;;; $     - ???? page 7 stuff
+;;; $     - ???? page 8 stuff
+;;; $85f0 - ???? page 9 stuff
+;;; $
+;;; ...... see comments to L_D422
+        
         org $0000
 
 
@@ -13,12 +42,12 @@ COLD:
 
 rst_rin:
         rst $18
-        defb $62
+        defb $62                ; in
         ret c
         jr rst_rin
 
 
-X_000D:
+stmon:
         jp strtb
 
 
@@ -35,11 +64,11 @@ rst_scal:
         jr rst_rcal
 
 
-X_001A:
+tx1:
         rst $10
         defb $00
         rst $18
-        defb $66
+        defb $66                ; X_0312 - modified from NAS-SYS
         ex de, hl
         ret
 
@@ -148,7 +177,7 @@ BIN:
 
 BIN2:
         rst $18
-        defb $62
+        defb $62                ; in
         jr c, BIN8
         dec hl
         ld a, h
@@ -184,7 +213,7 @@ srlin:
 
 rkbd:
         rst $18
-        defb $61
+        defb $61                ; kbd
         jr nc, RK2
         ld hl, $0250
         ld ($0C2C), hl
@@ -231,6 +260,8 @@ RK7:
         ret z
         ld hl, $0025
         ld ($0C2C), hl
+
+kbd:
         ld a, $02
         call L_0045
         ld hl, $0C01
@@ -239,7 +270,7 @@ RK7:
         ld (hl), a
         ld b, $08
 
-KBD:
+ksc1:
         ld a, $01
         call L_0045
         inc hl
@@ -251,7 +282,7 @@ KBD:
         jp nz, ksc2
 
 KSC1A:
-        djnz KBD
+        djnz ksc1
 
 KSC8:
         or a
@@ -267,11 +298,13 @@ _NMI:
         out ($00), a
         call L_00F0
         rst $18
-        defb $5B
+        defb $5B                ; mret
 
+;;; scal $53. Get a single digit (0-9) or ESC (1B). Return the character; Z set if ESC
+;;; this could be coded more efficiently..
 L_00FC:
         rst $18
-        defb $7B
+        defb $7B                ; blink
         cp $1B
         ret z
         sub $30
@@ -325,7 +358,7 @@ ksc4:
         jr z, ksc5
         and $7F
         rst $10
-        defb $4A
+        defb $4A                ; X_01E4
         jr nz, KSC8
 
 ksc5:
@@ -393,13 +426,13 @@ kse:
 
 
 initt:
-        defw $0060
-        defw $0605
-        defw $06EB
-        defw $0764
-        defw $0767
-        defb $C3, $2F, $00
-        defb $C3, $2F, $00
+        defw $0060              ; length of ktab
+        defw $0605              ; end of keyboard table
+        defw $06EB              ; subroutine table
+        defw $0764              ; output table
+        defw $0767              ; input table
+        defb $C3, $2F, $00      ; user jump (output)
+        defb $C3, $2F, $00      ; user jump (input)
         defb $00
 
 crt:
@@ -446,13 +479,14 @@ crt2:
 X_LINE16:
         ld hl, M_LINE16
         push de
-        ld de, $0BCE
-        ld bc, $0027
+        ld de, $0BCE            ; top line of display
+        ld bc, $0027            ; length to copy
         ldir
         pop de
         ret
 
-
+;;; some kind of output formatting, called as DF 4A
+;;; A = rhythm number, 0..9
 X_01E4:
         push de
         ld de, COLD
@@ -671,7 +705,7 @@ inlin:
 
 inl2:
         rst $18
-        defb $7B
+        defb $7B                ; blink
         rst $30
         cp $0D
         jr nz, inl2
@@ -891,8 +925,8 @@ L_0440:
         call z, L_0480          ; Track Sheet command -> change A from 54 to 51 ??!!
         ld (bc), a              ; remaining letters allegedly legal commands: ABDEFHIKLMNOQRUVXZ ??
         ld ($0C0A), a           ; argc (command character)
-        inc de                  ;
-        rst $18                 ;
+        inc de                  ; 
+        rst $18                 ; 
         defb $79                ; rlin - process command arguments (why??)
         jr nc, L_047A           ; no error.. else fall through to error
 
@@ -1062,51 +1096,58 @@ X_051B:
         ret
 
 
-X_0522:
+L_0522:
         ld a, $11
         rst $30
         jr L_052A
 
 
-X_0527:
+;;; get 1 or 2 digits and return the value as a binary number in A
+;;; eg, "20" would be returned as $14
+;;; ignore non-numeric input except for CR and BS as follows:
+;;; single digit can be terminated by CR
+;;; after entering single digit, accept BS to correct/change it
+;;; after entering second digit, return immediately (no BS possible,
+;;; no CR needed/permitted)
+getnum:
         push bc
         push de
         push hl
 
 L_052A:
-        xor a
+        xor a                   ; redundant?
         rst $18
-        defb $7B
-        call L_0560
-        jr c, L_052A
-        ld ($0C0C), a
-        add a, $30
-        rst $30
+        defb $7B                ; blink
+        call ascnum
+        jr c, L_052A            ; loop until ASCII '0'..'9'
+        ld ($0C0C), a           ; store as number
+        add a, $30              ; convert number back to ASCII
+        rst $30                 ; and display it
 
 L_0538:
         rst $18
-        defb $7B
+        defb $7B                ; blink
         and $7F
-        cp $08
-        jr z, X_0522
-        ld b, a
-        cp $0D
+        cp $08                  ; backspace
+        jr z, L_0522            ; do backspace
+        ld b, a                 ; preserve it
+        cp $0D                  ; CR
         ld a, ($0C0C)
-        jr z, L_055C
+        jr z, L_055C            ; CR so done: tidy up and return
         ld a, b
-        call L_0560
-        jr c, L_0538
-        ld d, a
+        call ascnum
+        jr c, L_0538            ; loop until ASCII '0'..'9'
+        ld d, a                 ; save LS digit
         add a, $30
-        rst $30
-        ld a, ($0C0C)
+        rst $30                 ; display it
+        ld a, ($0C0C)           ; get MS digit
         ld e, a
         ld b, $09
 
 L_0558:
         add a, e
-        djnz L_0558
-        add a, d
+        djnz L_0558             ; multiply MS digit by 10
+        add a, d                ; add LS digit
 
 L_055C:
         pop hl
@@ -1115,7 +1156,7 @@ L_055C:
         ret
 
 
-L_0560:
+ascnum:                          ;is A numeric ASCII (ie '0'..'9') C if no, NC if yes: return number 0..9
         sub $30
         ret c
         cp $0A
@@ -1433,7 +1474,7 @@ L_06E8:
         ret
 
 
-X_06EA:
+xout:
         push af
         ld hl, $0C28
         bit 7, (hl)
@@ -1469,17 +1510,17 @@ L_070E:
         ret
 
 
-X_0713:
+xn:
         rst $18
         defb $63
-        jr X_0713
+        jr xn
 
 
-X_0717:
+normal:
         rst $18
         defb $78
-        ld hl, $0764
-        push hl
+nnom:   ld hl, $0764
+nom:    push hl
         ld hl, ($0C73)
         ex (sp), hl
         ld ($0C73), hl
@@ -1487,9 +1528,9 @@ X_0717:
         ret
 
 
-X_0726:
+nnim:
         ld hl, $0767
-        push hl
+nim:    push hl
         ld hl, ($0C75)
         ex (sp), hl
         ld ($0C75), hl
@@ -1497,7 +1538,7 @@ X_0726:
         ret
 
 
-X_0733:
+in:
         push hl
         ld hl, $0C75
         jr L_073C
@@ -1548,20 +1589,20 @@ L_0753:
 ;;;
 
 staba:
-        defw X_0527             ;41 A
+        defw getnum             ;41 A
         defw $FFFD              ;42 B BASIC warm start (NAS-SYS uses Z for this)
         defw X_051B             ;43 C - illegal in command loop
         defw drum               ;44 D
         defw exec               ;45 E
         defw errm               ;46 F no such command (same as NAS-SYS)
         defw g                  ;47 G - illegal in command loop
-        defw X_0713             ;48 H
+        defw xn                 ;48 H
         defw $056E              ;49 I
         defw X_01E4             ;4A J - illegal in command loop
         defw kop                ;4B K
         defw errm               ;4C L no such command (same as NAS-SYS)
         defw COLD               ;4D M
-        defw X_0717             ;4E N
+        defw normal             ;4E N
         defw X_04BD             ;4F O
         defw $B806              ;50 P - illegal in command loop
         defw $D800              ;51 Q Track Sheet - jumps to empty area of ROM (but, as Q, illegal in command loop)
@@ -1580,8 +1621,8 @@ staba:
         defw L_0045             ;5E
         defw mflp               ;5F
         defw args               ;60
-        defw $00CE              ;61
-        defw X_0733             ;62
+        defw kbd                ;61
+        defw in                 ;62
         defw inlin              ;63
         defw num                ;64
         defw crt                ;65
@@ -1591,19 +1632,19 @@ staba:
         defw space              ;69
         defw crlf               ;6A
         defw errm               ;6B
-        defw X_001A             ;6C
+        defw tx1                ;6C
         defw sout               ;6D
-        defw X_06EA             ;6E
+        defw xout               ;6E
         defw srlx               ;6F
         defw srlin              ;70
-        defw $071C              ;71
-        defw $0729              ;72
+        defw nom                ;71
+        defw nim                ;72
         defw L_073C             ;73
         defw X_06CA             ;74
         defw $0C77              ;75
         defw $0C7A              ;76
-        defw $0719              ;77
-        defw X_0726             ;78
+        defw nnom               ;77
+        defw nnim               ;78
         defw rlin               ;79
         defw $0349              ;7A
         defw blink              ;7B
@@ -1672,8 +1713,14 @@ PTIME:
         org $2822
 
 
+RNUM:
+        defb $00
+
+        org $282A
+
+
 DPAGE:
-        defw COLD
+        defb $00
 
         org $C000
 
@@ -1750,20 +1797,20 @@ M_INFO2:
         defb $0B
         defm ":"
         defb $17
-        defm "}"
-        defb $00
+
+L_C0D4  defb $7D, $00           ; input table: RKBD, END
 
 L_C0D6:
-        ld hl, $C0D4
-        ld ($0C75), hl
-        call CLS
+        ld hl, L_C0D4           ; input table
+        ld ($0C75), hl          ; set input table (this table ignores UART input)
+        call CLS                ; clear screen
         rst $18
-        defb $54
-        ld hl, $C336
-        ld de, $084A
+        defb $54                ; print heading to line 16
+        ld hl, L_C336           ; "Type command letter."
+        ld de, $084A            ; line 2
         ld bc, $0014
-        ldir
-        rst $28
+        ldir                    ; copy it
+        rst $28                 ; print menu
 
 M_MENU:
         defb $0D, $0D, $0D
@@ -1778,95 +1825,96 @@ M_MENU:
         defm "MCSII.(c) : Ser 3003 :"
         defb $00
 
-X_C160:
+L_C160:
         rst $08                 ; wait for character
         and $7F                 ; clear MSB
         cp $43                  ; C
-        jp z, CONT              ; continue
+        jp z, CONT              ; check for legal DPAGE and continue
         cp $63                  ; c
-        jp z, WOT1              ; ??
+        jp z, CONT1             ; continue WITHOUT checking for legal DPAGE
         cp $53                  ; S
         jp z, START             ; shuffle start
         cp $48                  ; H
         jr z, START             ; high start
         cp $4E                  ; N
         jr z, START             ; normal start
-        cp $0C                  ; ???
-        jp z, WOT2              ; ???T
-        jr X_C160               ; Illegal.. go round again
+        cp $0C                  ; CTRL-L
+        jp z, RESTART           ; back to boot menu
+        jr L_C160               ; Illegal.. go round again
 
 
 CONT:
-        ld a, ($282A)
-        cp $00
-        jr c, X_C160
-        cp $0A
-        jr nc, X_C160
-        jp WOT1
-
-
-X_C18F:
-        call L_D422
-        ld d, $00
         ld a, (DPAGE)
+        cp $00
+        jr c, L_C160
+        cp $0A
+        jr nc, L_C160
+        jp CONT1
+
+
+L_C18F:
+        call L_D422             ; get DPAGE-dependent address in HL
+        ld d, $00
+        ld a, (RNUM)
         ld e, a
         add hl, de
         ret
 
 
-X_C19A:
+X_C19A:                         ; unreachable??
         ld hl, $2850
-        call X_C18F
+        call L_C18F
         ld a, (hl)
         ld ($280B), a
         ret
 
 
-X_C1A5:
+X_C1A5:                         ; go via RAM to CONT1
         ld hl, ($2800)
         jp (hl)
 
 
+;;; "cold start" of drum computer software - clears memory
 START:
-        push af
+        push af                 ; A shows how we got here: N(ormal) S(huffle) or H(igh) start
         rst $28
         defm "Confirm to clear store Y"
-        defb $11, $00
+        defb $11, $00           ; cursor left over the top of the Y
         rst $18
-        defb $7B
+        defb $7B                ; blink: wait for input
         and $7F
-        cp $59
-        jp nz, L_C0D6
+        cp $59                  ; 'Y'
+        jp nz, L_C0D6           ; abort; go back to menu/start of Drum code
         ld hl, $2800
         ld bc, $6800
         ld a, $00
         rst $18
-        defb $43
+        defb $43                ; Fill memory with 0; $6800 bytes @ $2800
         call CLS
         ld hl, $0800
-        ld de, $3F00
-        ld bc, $0380
+        ld de, $3F00            ; clear the Info page at $3f00 by copying an image
+        ld bc, $0380            ; of a cleared screen into it.
         ldir
         ld a, $00
         ld ($2835), a
         ld a, $01
         ld ($2834), a
-        ld b, $0A
+        ld b, $0A               ; 10 pages
 
 L_C1F2:
         ld a, b
-        dec a
-        ld ($282A), a
+        dec a                   ; page number, 9..0
+        ld (DPAGE), a           ; select page (on loop exit, leave page 0 selected)
         push bc
-        ld hl, $29F0
-        call L_D422
+        ld hl, $29F0            ; start of page 0 stuff
+        call L_D422             ; get DPAGE-dependent address in HL
         ld a, $2E
         ld bc, $010F
         rst $18
-        defb $43
+        defb $43                ; Fill memory with $2E, $010F bytes @ ??
         pop bc
-        djnz L_C1F2
-        ld hl, WOT1
+        djnz L_C1F2             ; loop, clearing all 10 pages 
+        ld hl, CONT1
         ld ($2800), hl
         ld hl, $080A
         ld ($2818), hl
@@ -1874,16 +1922,16 @@ L_C1F2:
 
 L_C216:
         ld a, b
-        ld ($282A), a
+        ld (DPAGE), a
         ld hl, $084A
         call L_CF6A
         ld hl, $2880
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         push bc
         ld bc, $0138
         ld a, $20
         rst $18
-        defb $43
+        defb $43                ; Fill memory with $20, $0138 bytes @ ??
         pop bc
         djnz L_C216
         ld hl, $2833
@@ -1911,14 +1959,14 @@ L_C25A:
         ld a, b
         ld ($2812), a
         xor a
-        ld ($282A), a
-        jp WOT1
+        ld (DPAGE), a
+        jp CONT1
 
 
 L_C265:
         call CLS
         rst $18
-        defb $54
+        defb $54                ; X_LINE16
         call L_D437
         ld a, ($2834)
         bit 0, a
@@ -1931,7 +1979,7 @@ L_C277:
         call D_LINE
 
 X_C280:
-        ld a, ($282A)
+        ld a, (DPAGE)
         add a, $30
         rst $30
         rst $28
@@ -1959,16 +2007,16 @@ X_C332:
         rst $28
         defm "."
         defb $0D, $0D
-        defm "Type command letter."
+L_C336  defm "Type command letter."
         defb $00
         ld hl, $0B4A
         call D_LINE
         ret
 
 
-WOT2:
+RESTART:
         rst $18
-        defb $5B
+        defb $5B                ; MRET - back to boot menu
 
 CLS:
         ld a, $0C
@@ -1976,17 +2024,17 @@ CLS:
         ret
 
 
-X_C358:
+L_C358:
         ld a, $FC
         out ($01), a            ; MIDI command: Stop
         call L_C471
 
-WOT1:
+CONT1:
         ld sp, $1000
         di
         ld hl, $C0D4
         ld ($0C75), hl
-        call L_C265
+        call L_C265             ; clear screen, print main Drum menu
 
 X_C36c:
         ld hl, $2804
@@ -2019,18 +2067,18 @@ L_C38B:
         jp L_C416
 
 
-X_C3A3:
-        in a, ($01)
+X_C3A3:                         ; unreachable??
+        in a, ($01)             ; UART data
         cp $0A
         jr nc, L_C3B6
-        ld ($282A), a
-        jp WOT1
+        ld (DPAGE), a
+        jp CONT1
 
 
-X_C3AF:
+X_C3AF:                         ; unreachable??
         xor a
-        ld ($282A), a
-        jp WOT1
+        ld (DPAGE), a
+        jp CONT1
 
 
 L_C3B6:
@@ -2041,12 +2089,12 @@ L_C3B6:
         jp nz, L_C416
 
 L_C3C3:
-        in a, ($02)
+        in a, ($02)             ; UART status
         rla
-        jp nc, L_C416
-        in a, ($01)
-        cp $F8
-        jp z, L_C416
+        jp nc, L_C416           ; no char
+        in a, ($01)             ; get MIDI char
+        cp $F8                  ; incoming timing clock?
+        jp z, L_C416            ; yes, go to menu??
         jr L_C3EA
 
 
@@ -2054,9 +2102,9 @@ L_C3D2:
         ld bc, COLD
 
 L_C3D5:
-        in a, ($02)
+        in a, ($02)             ; UART status
         rla
-        jr c, L_C3E8
+        jr c, L_C3E8            ; got char
         call TIME
         dec bc
         ld a, b
@@ -2067,7 +2115,7 @@ L_C3D5:
 
 
 L_C3E8:
-        in a, ($01)
+        in a, ($01)             ; get char from UART
 
 L_C3EA:
         ld e, a
@@ -2086,7 +2134,7 @@ L_C3FF:
         ld hl, $0A72
         ld (cursor), hl
         rst $18
-        defb $41
+        defb $41                ; getnum
         cp $11
         jr nc, L_C413
         cp $00
@@ -2103,45 +2151,45 @@ L_C416:
         jp nc, L_C3B6           ; no character
         and $7F                 ; clear MSB (no need..)
         cp $1B                  ; ESC
-        jp z, X_C1A5            ; 
-        cp $0C                  ; 
-        jp z, WOT2              ; 
+        jp z, X_C1A5            ; jump through ($2800) - usually to CONT1
+        cp $0C                  ; CTRL-L
+        jp z, RESTART           ; 
         cp $58                  ; X
         jp z, L_C478            ; Toggle Int/Midi
         cp $78                  ; x
         jp z, L_C3FF            ; Select channel
         cp $45                  ; E
-        jp z, L_D265            ; Erase
+        jp z, erase             ; Erase
         cp $43                  ; C
-        jp z, L_C4AB            ; Compose
+        jp z, compose           ; Compose
         cp $50                  ; P
-        jp z, L_D05A            ; Play,modify
+        jp z, play              ; Play,modify
         cp $52                  ; R
-        jp z, L_CE8D            ; Run chain
+        jp z, run               ; Run chain
         cp $41                  ; A
-        jp z, L_C64B            ; Assemble chain
+        jp z, assemble          ; Assemble chain
         cp $54                  ; T
-        jp z, L_D110            ; Transfer
+        jp z, transfer          ; Transfer
         cp $48                  ; H
-        jp z, L_D4D9            ; Help
+        jp z, help              ; Help
         cp $49                  ; I
-        jp z, L_D1F6            ; Info page
+        jp z, info              ; Info page
         cp $53                  ; S
-        jp z, L_C55F            ; Save on tape
+        jp z, save              ; Save on tape
         sub $30                 ; Number?
         jp m, L_C416            ; 
         sub $0A                 ; 
         jp p, L_C416            ; 
         ld d, a                 ; 
         add a, $0A              ; 
-        ld ($282A), a           ; Store number 0-9 as Page Number
-        jp WOT1                 ; 
+        ld (DPAGE), a           ; Store number 0-9 as Page Number
+        jp CONT1                ; Start again
 
 
 L_C471:
-        in a, ($02)             ; Start again
-        bit 6, a
-        jr z, L_C471
+        in a, ($02)             ; get UART status
+        bit 6, a                ; TX done?
+        jr z, L_C471            ; no.. loop waiting for TX done
         ret
 
 
@@ -2163,7 +2211,7 @@ L_C48A:
         rst $28
         defm "Page "
         defb $00
-        ld a, ($282A)
+        ld a, (DPAGE)
         add a, $30
         ld hl, $0BCF
         ld (hl), a
@@ -2173,23 +2221,23 @@ L_C48A:
         ret
 
 
-L_C4AB:
-        call L_D03A
+compose:
+        call L_D03A             ; ?find number for next unused rhythmn on this page
         ld hl, $2804
         set 7, (hl)
         ld hl, $2803
         bit 7, (hl)
-        jp z, L_C4EB
+        jp z, L_C4EB            ; Compose screen: prompt for rhythmn name etc.
         call CLS
-        ld hl, M_FULL
+        ld hl, M_FULL           ; else.. all 10 rythmns defined: Page full
         ld de, $09CB
         ld bc, $000A
         ldir
-        call L_C4CF
-        jp WOT1
+        call wait
+        jp CONT1
 
 
-L_C4CF:
+wait:                           ; wait a while
         exx
         ld bc, $0014
 
@@ -2201,35 +2249,44 @@ L_C4D3:
         ret
 
 
-L_C4DA:
+;;; Used to get rhyhmn name during 'compose' and during 'transfer'.
+;;; On entry, a value in B of N allows upto N+1 characters to be entered. The characters are then
+;;; read directly from VDU RAM so that the name is right-padded with spaces.
+;;; End with CR. Abort with ESCape (A holds most recent character on return, so ESCape can be detected)
+;;; When called for 'compose' B is set to 25 allowing 26 letters to be entered.
+;;; When called for 'transfer' B is set to 26, but due to the length of the prompt on the screen,
+;;; text entry starts too far in from the left: when 25 characters have been entered, the display
+;;; scrolls and the actual transfer name is read from the pre-scrolled position of video RAM resulting
+;;; in a name of all-spaces.
+getname:
         rst $18
-        defb $7B
+        defb $7B                ; blink
         and $7F
         cp $0D
-        ret z
+        ret z                   ; exit on CR
         cp $1B
-        ret z
-        rst $30
+        ret z                   ; exit on ESCape
+        rst $30                 ; output char
         xor a
         cp b
-        ret z
+        ret z                   ; exit on max length (B+1) reached
         dec b
-        jr L_C4DA
+        jr getname
 
 
-L_C4EB:
+L_C4EB:                         ; main compose screen/dialog
         call CLS
         call L_CD15
         ld hl, $08D9
         ld (cursor), hl
-        ld b, $19
-        call L_C4DA
+        ld b, $19               ; 25
+        call getname            ; get rythmn name: upto 25+1 characters
         cp $1B
-        jp z, WOT1
+        jp z, CONT1             ; name aborted; go back to main command loop
         call L_CE1E
         ex de, hl
         ld hl, $08D9
-        ld bc, X_001A
+        ld bc, $001A
         ldir
 
 L_C50D:
@@ -2241,14 +2298,14 @@ L_C50D:
         ld hl, $0998
         ld (cursor), hl
         rst $18
-        defb $41
+        defb $41                ; getnum
         call L_D3D0
         and a
         jr z, L_C50D
         ld hl, $09B1
         ld (cursor), hl
         rst $18
-        defb $41
+        defb $41                ; getnum
         call L_D401
         and a
         jr z, L_C50D
@@ -2271,12 +2328,12 @@ X_C55C:
         jp L_C7A3
 
 
-L_C55F:
+save:
         ld hl, $4400
         ld ($2816), hl
         call CLS
         ld hl, M_SAVE
-        call L_D458
+        call D_MSG16
         ld hl, $084A
         ld (cursor), hl
         rst $28
@@ -2286,12 +2343,12 @@ L_C55F:
         defb $11, $00
         nop
         rst $18
-        defb $7B
+        defb $7B                ; blink
         and $7F
         cp $30
-        jp c, WOT1
+        jp c, CONT1
         cp $3A
-        jp nc, WOT1
+        jp nc, CONT1
         rst $30
         sbc a, $30
         ld b, a
@@ -2311,13 +2368,13 @@ L_C5DA:
         defm " To Go press T"
         defb $11, $00
         rst $18
-        defb $7B
+        defb $7B                ; blink
         cp $54
-        jp nz, WOT1
+        jp nz, CONT1
         ld b, $02
 
 L_C5F6:
-        call L_C4CF
+        call wait
         djnz L_C5F6
         ld hl, $2800
         ld ($0C0C), hl
@@ -2326,27 +2383,27 @@ L_C5F6:
         ld bc, M_BPM
         ld ($0C10), bc
         rst $18
-        defb $47
+        defb $47                ; g (generate)
         rst $28
         defm " "
         defb $0D, $0D, $0D
         defm "Finished - put switch back to MIDI position ."
         defb $11, $00
         rst $18
-        defb $7B
-        jp WOT1
+        defb $7B                ; blink
+        jp CONT1
 
 
-L_C64B:
+assemble:
         call CLS
         call L_CE3C
 
 X_C651:
         ld hl, M_SEQ
         ld de, $0BD2
-        ld bc, rst_rcal
+        ld bc, $0010
         ldir
-        ld hl, $CBE8
+        ld hl, M_OPTION
         ld de, $0BE2
         ld bc, $0014
         ldir
@@ -2367,7 +2424,7 @@ L_C66F:
         sbc hl, de
         jr c, L_C669
         rst $18
-        defb $7B
+        defb $7B                ; blink
         and $7F
         ld hl, (cursor)
         cp $20
@@ -2494,7 +2551,7 @@ L_C71A:
         ld hl, (cursor)
         call L_CF6A
         ld hl, $2880
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         ex de, hl
         ld hl, $084A
         ld (cursor), hl
@@ -2512,7 +2569,7 @@ L_C730:
         ld a, b
         or c
         jr nz, L_C730
-        jp WOT1
+        jp CONT1
 
 
 L_C742:
@@ -2600,7 +2657,7 @@ L_C7A3:
         ld hl, ($2824)
         ld a, h
         or l
-        jp z, WOT1
+        jp z, CONT1
         call L_CD15
 
 X_C7B1:
@@ -2735,7 +2792,7 @@ X_C89F:
         cp $20
         jp z, L_CB3C
         cp $1B
-        jp z, X_C358
+        jp z, L_C358
 
 L_C8A9:
         in a, ($04)
@@ -2783,7 +2840,7 @@ L_C8E8:
         call L_CFD6
         jr nc, L_C901
         cp $1B
-        jp z, X_C358
+        jp z, L_C358
         cp $20
         jr nz, L_C901
         ld hl, $2803
@@ -2838,7 +2895,7 @@ L_C946:
         jr z, L_C955
         ld hl, $2834
         set 1, (hl)
-        jp L_CE8D
+        jp run
 
 
 L_C955:
@@ -2886,7 +2943,7 @@ L_C98E:
         cp $20
         jp z, L_CB3C
         cp $1B
-        jp z, X_C358
+        jp z, L_C358
 
 L_C9A2:
         push iy
@@ -3151,6 +3208,8 @@ L_CB3C:
         rst $28
         defm "."
         defb $0D, $0D, $0D
+
+M_OPTION:
         defm " For menu shift/esc  :  Space bar to Continue."
         defb $00
         jp L_CC7F
@@ -3189,13 +3248,13 @@ L_CC4B:
 L_CC54:
         call TIME
         rst $18
-        defb $62
+        defb $62                ; in
         jr nc, L_CC54
         pop ix
         pop bc
         and $7F
         cp $1B
-        jp z, X_C358
+        jp z, L_C358
         cp $20
         jr nz, L_CC54
         ld a, $FB
@@ -3222,7 +3281,7 @@ L_CC7F:
         jr nc, L_CC7F           ; no character
         and $7F                 ; clear MSB (no need..)
         cp $1B                  ; ESC
-        jp z, X_C358            ; Back to menu
+        jp z, L_C358            ; Back to menu
         cp $58                  ; X
         jr z, L_CCB1            ; Int/Midi
         cp $4D                  ; M
@@ -3315,14 +3374,14 @@ L_CD13:
 
 L_CD15:
         ld hl, $2850
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         ld a, (hl)
         ld ($280B), a
         call CLS
         call L_C48A
         ld hl, M_RUN
-        ld de, $0BD8
-        ld bc, X_000D
+        ld de, $0BD8            ; top line
+        ld bc, $000D            ; length of message
         ldir
         ld iy, $2804
         res 1, (iy)
@@ -3332,9 +3391,9 @@ L_CD15:
         rst $28
         defm "Rhythm No   :  "
         defb $00
-        ld a, (DPAGE)
+        ld a, (RNUM)
         rst $18
-        defb $4A
+        defb $4A                ; X_01E4
         rst $28
         defb $0D, $0D
         defm "Rhythm name :  "
@@ -3344,7 +3403,7 @@ L_CD15:
         jr nz, L_CD7D
         call L_CE1E
         ld de, (cursor)
-        ld bc, X_001A
+        ld bc, $001A
         ldir
 
 L_CD7D:
@@ -3355,13 +3414,13 @@ L_CD7D:
         defb $00
         call L_D3D6
         rst $18
-        defb $4A
+        defb $4A                ; X_01E4
         rst $28
         defm "       No of Bars    : "
         defb $00
         call L_D405
         rst $18
-        defb $4A
+        defb $4A                ; X_01E4
         rst $28
         defb $0D, $0D
         defm "Add    =  A :          Single    = S :"
@@ -3382,15 +3441,15 @@ X_CE13:
         ldir
 
 L_CE1E:
-        ld a, (DPAGE)
+        ld a, (RNUM)
         ld b, a
         ld hl, $29F0
         push af
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         pop af
         or a
         ret z
-        ld de, X_001A
+        ld de, $001A
 
 L_CE2F:
         add hl, de
@@ -3414,7 +3473,7 @@ L_CE3C:
         call L_C48A
         ld iy, $084A
         ld hl, $2880
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         ld bc, $0138
 
 L_CE4C:
@@ -3461,10 +3520,10 @@ L_CE7B:
         jr L_CE4C
 
 
-L_CE8D:
+run:
         ld hl, $2804
         set 4, (hl)
-        ld a, ($282A)
+        ld a, (DPAGE)
         ld ($2830), a
 
 L_CE98:
@@ -3474,7 +3533,7 @@ L_CE98:
         call CLS
         call L_CE3C
         ld hl, M_SPACE
-        call L_D458
+        call D_MSG16
         call L_C70C
         ld hl, $2803
         set 1, (hl)
@@ -3488,12 +3547,12 @@ L_CE98:
 
 L_CEC2:
         rst $18
-        defb $62
+        defb $62                ; in
         jr nc, L_CED0
         cp $20
         jp z, L_CEDF
         cp $1B
-        jp z, X_C358
+        jp z, L_C358
 
 L_CED0:
         in a, ($02)
@@ -3519,16 +3578,16 @@ L_CEE7:
         pop hl
         jp nc, L_CF43
         ld a, (hl)
-        cp $20
+        cp $20                  ;' '
         jr z, L_CEE7
-        cp $70
+        cp $70                  ;p
         jr z, L_CF27
-        cp $30
+        cp $30                  ;0
         jr c, L_CEE7
-        cp $3A
+        cp $3A                  ;beyond 9
         jp nc, L_CEE7
-        sbc a, $2F
-        ld (DPAGE), a
+        sbc a, $2F              ;ascii '0'..'9' to 0..9
+        ld (RNUM), a            ;and store as rhythm number
         ld ($281A), hl
         call L_CF9D
         ld hl, ($2824)
@@ -3552,7 +3611,7 @@ L_CF27:
         cp $3A
         jp nc, L_CF3D
         sbc a, $2F
-        ld ($282A), a
+        ld (DPAGE), a
         call L_C48A
         jr L_CEE7
 
@@ -3575,13 +3634,13 @@ L_CF43:
 
 L_CF56:
         ld a, ($2830)
-        ld ($282A), a
-        jp X_C358
+        ld (DPAGE), a
+        jp L_C358
 
 
 L_CF5F:
         ld hl, $281C
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         ld e, (hl)
         inc hl
         ld d, (hl)
@@ -3592,7 +3651,7 @@ L_CF5F:
 L_CF6A:
         push hl
         ld hl, $281C
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         pop de
         ld (hl), e
         inc hl
@@ -3610,8 +3669,8 @@ L_CF7E:
         push de
         push bc
         ld hl, $2B00
-        call L_D422
-        ld a, (DPAGE)
+        call L_D422             ; get DPAGE-dependent address in HL
+        ld a, (RNUM)
         ld b, a
         call L_D409
         ld de, ($2826)
@@ -3677,7 +3736,7 @@ L_CFD6:
         push ix
         push bc
         rst $18
-        defb $62
+        defb $62                ; in
         jr nc, L_D037
         and $7F
         ld hl, $2803
@@ -3688,35 +3747,35 @@ L_CFD6:
 
 
 L_CFE9:
-        cp $41
+        cp $41                  ;A
         jr nz, L_CFF1
         set 0, (hl)
         jr L_D033
 
 
 L_CFF1:
-        cp $53
+        cp $53                  ;S
         jr nz, L_CFF9
         set 2, (hl)
         jr L_D033
 
 
 L_CFF9:
-        cp $52
+        cp $52                  ;R
         jr nz, L_D001
         res 2, (hl)
         jr L_D033
 
 
 L_D001:
-        cp $45
+        cp $45                  ;E
         jr nz, L_D009
         res 0, (hl)
         jr L_D033
 
 
 L_D009:
-        cp $4F
+        cp $4F                  ;O
         jr nz, L_D014
         ld hl, $2804
         set 5, (hl)
@@ -3724,15 +3783,15 @@ L_D009:
 
 
 L_D014:
-        cp $48
+        cp $48                  ;H
         jr z, L_D028
-        cp $54
+        cp $54                  ;T
         jr z, L_D028
-        cp $46
+        cp $46                  ;F
         jr z, L_D028
-        cp $30
+        cp $30                  ;0
         jr c, L_D033
-        cp $3A
+        cp $3A                  ;beyond 9
         jr nc, L_D033
 
 L_D028:
@@ -3763,7 +3822,7 @@ L_D040:
         ld a, b
         cp $0A
         jr z, L_D054
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_CF9D
         ld hl, ($2824)
         ld a, h
@@ -3779,29 +3838,29 @@ L_D054:
         ret
 
 
-L_D05A:
+play:
         call CLS
         ld hl, $2803
         res 1, (hl)
         ld hl, M_PLAY
-        call L_D458
+        call D_MSG16
         call L_D08B
 
 X_D06B:
         rst $28
         defb $0D
-        defm "   Play No ?"
+        defm "   Play No ?"     ; get rhythmn number
         defb $11, $00
         rst $18
-        defb $53
+        defb $53                ; L_00FC - get digit
         cp $1B
-        jp z, WOT1
-        rst $30
-        sub $30
-        ld (DPAGE), a
+        jp z, CONT1             ; ESCape; restart command loop
+        rst $30                 ; display the digit
+        sub $30                 ; convert to 0..9
+        ld (RNUM), a            ; store it
         jp L_C7A3
 
-
+;;; called by play/transfer/erase. Displays list of names for current page of Rhythms??
 L_D08B:
         call L_C48A
         ld hl, $088D
@@ -3821,9 +3880,9 @@ L_D098:
         ld b, $0A
         push bc
         ld hl, $29F0
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         ld de, $0890
-        ld bc, X_001A
+        ld bc, $001A
         ldir
 
 L_D0B4:
@@ -3833,7 +3892,7 @@ L_D0B4:
         add hl, de
         ex de, hl
         pop hl
-        ld bc, X_001A
+        ld bc, $001A
         ldir
         pop bc
         dec b
@@ -3893,10 +3952,10 @@ L_D102:
         jp L_D0D5
 
 
-L_D110:
+transfer:
         call CLS
         ld hl, M_XFER
-        call L_D458
+        call D_MSG16
         call L_D08B
         rst $28
         defb $0D
@@ -3904,11 +3963,11 @@ L_D110:
         defb $11, $00
         nop
         rst $18
-        defb $53
+        defb $53                ; L_00FC  - get digit
         cp $1B
-        jp z, WOT1
-        rst $30
-        sub $30
+        jp z, CONT1             ; ESCape; restart command loop
+        rst $30                 ; display the digit
+        sub $30                 ; comvert to 0..9
         ld ($2814), a
         rst $28
         defb $0D
@@ -3916,71 +3975,73 @@ L_D110:
         defb $11, $00
         nop
         rst $18
-        defb $53
+        defb $53                ; L_00FC - get digit
         cp $1B
-        jp z, WOT1
+        jp z, CONT1             ; ESCape; restart command loop
         rst $30
         sub $30
         ld ($2816), a
-        ld (DPAGE), a
-        ld b, $1A
+        ld (RNUM), a
+        ld b, $1A               ; 26
         rst $28
         defb $0D
         defm "   Title for transfer ?"
         defb $11, $00
-        call L_C4DA
+        call getname            ; upto 26+1 characters theoretically..
 
 X_D181:
-        cp $1B
-        jp z, WOT1
+        cp $1B                  ; ESCape?
+        jp z, CONT1             ; abort to main command loop
         call L_CE1E
         ex de, hl
         ld hl, $0BA0
-        ld bc, X_001A
+        ld bc, $001A
         ldir
         ld a, ($2816)
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_CF9D
         ex de, hl
         ld a, ($2814)
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_CF9D
         ld bc, $0002
         ldir
         ld a, ($2814)
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_D405
         push af
         ld a, ($2816)
-        ld (DPAGE), a
+        ld (RNUM), a
         pop af
         call L_D401
         ld a, ($2814)
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_D3D6
         push af
         ld a, ($2816)
-        ld (DPAGE), a
+        ld (RNUM), a
         pop af
         call L_D3D0
         ld a, ($2816)
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_CF7E
         push ix
         pop de
         ld a, ($2814)
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_CF7E
         push ix
         pop hl
         call L_D409
         ld bc, ($2826)
         ldir
-        jp WOT1
+        jp CONT1
 
-
-L_D1F6:
-        ld hl, $3F00
+;;; Info screen is 1 screen of free-form text stored in RAM at $3F00. It is saved to/restored from tape.
+;;; It is cleared/initialised using N/S/H Start from the main menu. The clear-screen key code (CTRL-L) is
+;;; explicitly ignored, so ou cannot manually clear the screen later.
+info:
+        ld hl, $3F00            ;copy info screen from $3F00
         ld de, $0800
         ld bc, $0380
         ldir
@@ -3988,16 +4049,16 @@ L_D1F6:
         ld b, $0D
         ld a, $98
         rst $18
-        defb $4F
+        defb $4F                ;draw top-left line
         ex de, hl
-        ld hl, $CBE8
+        ld hl, M_OPTION
         ld bc, $0014
         ldir
         ex de, hl
         ld b, $2D
         ld a, $98
         rst $18
-        defb $4F
+        defb $4F                ;draw top-right line
         ex de, hl
         ld hl, $C0A1
         ld bc, $0011
@@ -4006,51 +4067,51 @@ L_D1F6:
         ld b, $11
         ld a, $98
         rst $18
-        defb $4F
-        ld hl, ($2818)
+        defb $4F                ;draw bottom line
+        ld hl, ($2818)          ;save info screen cursor position
         ld (cursor), hl
 
-L_D230:
+info1:
         ld hl, $0B7A
         ld de, (cursor)
         sbc hl, de
         call c, L_D3C7
         rst $18
-        defb $7B
-        and $7F
-        cp $0C
-        jr z, L_D230
-        cp $0D
-        jr z, L_D230
-        cp $1B
-        jr z, L_D24F
-        rst $30
-        jr L_D230
+        defb $7B                ;blink - wait for character
+        and $7F                 ;clear MSB
+        cp $0C                  ;CTRL-L
+        jr z, info1             ;(clear screen) ignore
+        cp $0D                  ;CTRL-M
+        jr z, info1             ;(enter) ignore
+        cp $1B                  ;ESC
+        jr z, info2             ;leave info screen
+        rst $30                 ;echo character
+        jr info1                ;loop
 
 
-L_D24F:
+info2:
         ld de, (cursor)
-        ld ($2818), de
-        ld de, $3F00
+        ld ($2818), de          ;restore info screen cursor position
+        ld de, $3F00            ;save info screen to $3F00
         ld hl, $0800
         ld bc, $0380
         ldir
-        jp WOT1
+        jp CONT1                ;leave info screen; back to main menu
 
 
-L_D265:
+erase:
         call CLS
         ld hl, M_ERAS
-        call L_D458
+        call D_MSG16
         call L_D08B
         rst $28
         defb $0D
         defm "   Erase No ?"
         defb $11, $00
         rst $18
-        defb $53
+        defb $53                ; L_00FC - get digit
         cp $1B
-        jp z, WOT1
+        jp z, CONT1
         ld ($2814), a
         rst $30
         rst $28
@@ -4058,13 +4119,13 @@ L_D265:
         defm "   Confirm, Y"
         defb $11, $00
         rst $18
-        defb $7B
+        defb $7B                ; blink
         and $7F
         cp $59
-        jp nz, WOT1
+        jp nz, CONT1
         ld a, ($2814)
         sub $30
-        ld (DPAGE), a
+        ld (RNUM), a
         call L_CE1E
         ld b, $1A
 
@@ -4090,13 +4151,13 @@ L_D2C3:
         xor a
         call L_D3D0
         call L_D401
-        jp WOT1
+        jp CONT1
 
 
 L_D2DD:
         ld hl, $2803
         bit 1, (hl)
-        jp nz, WOT1
+        jp nz, CONT1
         ret
 
 
@@ -4175,7 +4236,7 @@ L_D33D:
         ld (hl), $3F
         ld (cursor), hl
         rst $18
-        defb $53
+        defb $53                ; L_00FC - get digit
         cp $08
         jr z, L_D3BB
         cp $31
@@ -4237,7 +4298,7 @@ L_D3AE:
         adc a, c
         djnz L_D3AE
         call L_D401
-        call L_C4CF
+        call wait
         jp L_C7A3
 
 
@@ -4280,17 +4341,17 @@ L_D3DA:
         dec c
         jr z, L_D3E8
         ld hl, $283C
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
         jr L_D3EE
 
 
 L_D3E8:
         ld hl, $2846
-        call L_D422
+        call L_D422             ; get DPAGE-dependent address in HL
 
 L_D3EE:
         ld de, COLD
-        ld a, (DPAGE)
+        ld a, (RNUM)
         ld e, a
         add hl, de
         pop af
@@ -4322,7 +4383,7 @@ L_D405:
 L_D409:
         push af
         push hl
-        ld a, ($282A)
+        ld a, (DPAGE)
         or a
         jr z, L_D41A
         ld hl, $0080
@@ -4339,18 +4400,26 @@ L_D41A:
         ld ($2826), hl
         jr L_D417
 
-
+;;; come here with some value in HL; advance it depending upon the display page
+;;; .. but different space assigned for page 0 vs other pages
+;;; HL is $281C $283C $2846 $2850 $2880 $29F0 $2B00
+;;; ..presumably different regions within each page
+;;; ..which suggests that page 0 actually starts at $281c
+;;; page 0 data starts at $29f0 (or maybe earlier??)
+;;; page 0 itself occupies $800 bytes, but it is followed by $1400 of other stuff: ~$400 of
+;;; data for the Info page.. but what's the remaining $1000 for?
+;;; page 1-9 each occupy $800 bytes
 L_D422:
-        ld a, ($282A)
+        ld a, (DPAGE)
         or a
-        ret z
-        ld de, $1C00
+        ret z                   ; page=0, leave HL as-is
+        ld de, $1C00            ; step over page 0 data and the Info page data that follows it
         add hl, de
         dec a
-        ret z
+        ret z                   ; page=1, done
         push bc
         ld b, a
-        ld de, $0800
+        ld de, $0800            ; all the other pages occupy 2Kbytes
 
 L_D432:
         add hl, de
@@ -4384,7 +4453,7 @@ D_LINE:
         ret                     ; ROUT -> print CR
 
 
-L_D458:
+D_MSG16:                        ; copy 16-byte message (in HL) to line 16 (top line)
         ld de, $0BD2
         ld bc, $0016
         ldir
@@ -4443,13 +4512,13 @@ L_D491:
         ret
 
 
-L_D49D:
+L_D49D:                         ; seems to always set bit[0] of ($2834)
         ld a, ($2834)
         and $FE
-        ld e, a
+        ld e, a                 ; get bit[0] in E
         ld a, ($2834)
-        xor $01
-        or e
+        xor $01                 ; toggle bit[0]
+        or e                    ; 0->1, 1->1
         ld ($2834), a
         ret
 
@@ -4463,7 +4532,7 @@ L_D4AD:
         ld a, ($2835)
         inc a
         rst $18
-        defb $4A
+        defb $4A                ; X_01E4
         ret
 
 
@@ -4484,7 +4553,7 @@ L_D4D2:
         ret
 
 
-L_D4D9:
+help:
         nop
         rst $28
         defb $0C
@@ -4516,7 +4585,7 @@ L_D4D9:
         defb $00
         rst $08
         and $7F
-        jp WOT1
+        jp CONT1
 
 
         ; Start of unknown area $D6F8 to $D707
@@ -4706,7 +4775,7 @@ L_D4D9:
 ; $0C71 W
 
 
-; $2822 W
+
 
 ; $C000 CCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ; $C030 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -4816,405 +4885,406 @@ L_D4D9:
 ;
 ; $0000 => COLD            _NMI     => $00F2
 ; $0008 => rst_rin         _stab    => $0C71
-; $000D => X_000D          argn     => $0C0B
+; $000D => stmon           argn     => $0C0B
 ; $0010 => rst_rcal        args     => $04C2
 ; $0018 => rst_scal        args2    => $04C5
-; $001A => X_001A          args3    => $04C9
-; $0020 => L_RST20         BIN      => $0069
-; $0028 => L_0028          BIN2     => $006D
-; $0029 => L_0029          BIN8     => $0076
-; $002F => dret            blink    => $0078
-; $0030 => L_RST30         break    => $060B
-; $0034 => L_0034          brkadr   => $0C23
-; $0038 => rst_rdel        brkval   => $0C25
-; $003E => X_003E          brst0    => $0306
-; $0040 => L_0040          CLS      => $C354
-; $0045 => L_0045          COLD     => $0000
-; $004D => L_004D          conflg   => $0C26
-; $0051 => mflp            CONT     => $C181
-; $005B => srlx            cpos     => $02C6
-; $005E => L_005E          cr1      => $01BA
-; $0066 => L_NMI           cr3      => $01C1
-; $0069 => BIN             crlf     => $0339
-; $006D => BIN2            crt      => $01A9
-; $0076 => BIN8            crt0     => $01CF
-; $0078 => blink           crt1     => $01D1
-; $0087 => srlin           crt10    => $020F
-; $008E => rkbd            crt12    => $021B
-; $0099 => RK2             crt14    => $021F
-; $00A9 => RK3             crt18    => $022F
-; $00B2 => RK5             crt2     => $01D4
-; $00B8 => RK6             crt20    => $0236
-; $00C2 => RK7             crt25    => $024A
-; $00DC => KBD             crt26    => $0251
-; $00EC => KSC1A           crt28    => $0257
-; $00EE => KSC8            crt29    => $0260
-; $00F0 => L_00F0          crt30    => $0264
-; $00F2 => _NMI            crt31    => $026F
-; $00FC => L_00FC          crt32    => $0273
-; $010E => ksc2            crt33    => $0279
-; $011D => ksc4            crt34    => $0297
-; $0146 => ksc5            crt36    => $029C
-; $0157 => k7              crt38    => $02AA
-; $0160 => k8              crt50    => $02BF
-; $0164 => k20             crt6     => $0207
-; $016E => k30             crt8     => $020E
-; $0174 => k35             ct8      => $0294
-; $017A => k40             ctst     => $0283
-; $0183 => k55             cursor   => $0C29
-; $018C => k60             D_LINE   => $D44E
-; $018E => kse             DPAGE    => $2822
-; $0198 => initt           dret     => $002F
-; $01A9 => crt             drum     => $C000
-; $01BA => cr1             errm     => $0323
-; $01C1 => cr3             exec     => $0489
-; $01CF => crt0            g        => $060F
-; $01D1 => crt1            gds      => $0639
-; $01D4 => crt2            initt    => $0198
-; $01D6 => X_LINE16        initz    => $0C00
-; $01E4 => X_01E4          inl2     => $02F5
-; $01ED => L_01ED          inlin    => $02F4
-; $01F4 => L_01F4          k20      => $0164
-; $01FC => L_01FC          k30      => $016E
-; $0207 => crt6            k35      => $0174
-; $020E => crt8            k40      => $017A
-; $020F => crt10           k55      => $0183
-; $021B => crt12           k60      => $018C
-; $021F => crt14           k7       => $0157
-; $022F => crt18           k8       => $0160
-; $0236 => crt20           KBD      => $00DC
-; $024A => crt25           kop      => $0606
-; $0251 => crt26           kopt     => $0C27
-; $0257 => crt28           KSC1A    => $00EC
-; $0260 => crt29           ksc2     => $010E
-; $0264 => crt30           ksc4     => $011D
-; $026F => crt31           ksc5     => $0146
-; $0273 => crt32           KSC8     => $00EE
-; $0279 => crt33           kse      => $018E
-; $0283 => ctst            ktab     => $05A6
-; $0294 => ct8             L_0028   => $0028
-; $0297 => crt34           L_0029   => $0029
-; $029C => crt36           L_0034   => $0034
-; $02AA => crt38           L_0040   => $0040
-; $02BF => crt50           L_0045   => $0045
-; $02C6 => cpos            L_004D   => $004D
-; $02CD => M_LINE16        L_005E   => $005E
-; $02F4 => inlin           L_00F0   => $00F0
-; $02F5 => inl2            L_00FC   => $00FC
-; $0306 => brst0           L_01ED   => $01ED
-; $0312 => X_0312          L_01F4   => $01F4
-; $0316 => X_0316          L_01FC   => $01FC
-; $031A => space           L_033D   => $033D
-; $031E => X_031E          L_03B0   => $03B0
-; $0323 => errm            L_0433   => $0433
-; $0339 => crlf            L_0440   => $0440
-; $033D => L_033D          L_0476   => $0476
-; $0353 => num             L_047A   => $047A
-; $0365 => nn1             L_047E   => $047E
-; $037D => nn2             L_0480   => $0480
-; $038C => rlin            L_0498   => $0498
-; $0391 => rl2             L_04DD   => $04DD
-; $03AA => strtb           L_04EB   => $04EB
-; $03B0 => L_03B0          L_04F7   => $04F7
-; $03C0 => MRET            L_0510   => $0510
-; $0433 => L_0433          L_052A   => $052A
-; $0436 => X_0436          L_0538   => $0538
-; $0440 => L_0440          L_0558   => $0558
-; $0476 => L_0476          L_055C   => $055C
-; $047A => L_047A          L_0560   => $0560
-; $047E => L_047E          L_061A   => $061A
-; $0480 => L_0480          L_061F   => $061F
-; $0483 => X_0483          L_0641   => $0641
-; $0489 => exec            L_0652   => $0652
-; $0498 => L_0498          L_0655   => $0655
-; $04A7 => X_04a7          L_0663   => $0663
-; $04BD => X_04BD          L_0669   => $0669
-; $04C2 => args            L_0672   => $0672
-; $04C5 => args2           L_0685   => $0685
-; $04C9 => args3           L_068F   => $068F
-; $04CE => write           L_0691   => $0691
-; $04D7 => w3              L_06A0   => $06A0
-; $04DD => L_04DD          L_06A6   => $06A6
-; $04EB => L_04EB          L_06E8   => $06E8
-; $04F7 => L_04F7          L_06F7   => $06F7
-; $0510 => L_0510          L_0701   => $0701
-; $051B => X_051B          L_0708   => $0708
-; $0522 => X_0522          L_070E   => $070E
-; $0527 => X_0527          L_0739   => $0739
-; $052A => L_052A          L_073C   => $073C
-; $0538 => L_0538          L_0741   => $0741
-; $0558 => L_0558          L_0753   => $0753
-; $055C => L_055C          L_C0D6   => $C0D6
-; $0560 => L_0560          L_C1F2   => $C1F2
-; $0567 => X_0567          L_C216   => $C216
-; $0570 => rcalb           L_C25A   => $C25A
-; $0587 => RCAL4           L_C265   => $C265
-; $058B => SCAL2           L_C277   => $C277
-; $058C => SCAL3           L_C389   => $C389
-; $0599 => SCALJ           L_C38B   => $C38B
-; $05A1 => scali           L_C3B6   => $C3B6
-; $05A6 => ktab            L_C3C3   => $C3C3
-; $0606 => kop             L_C3D2   => $C3D2
-; $060B => break           L_C3D5   => $C3D5
-; $060F => g               L_C3E8   => $C3E8
-; $061A => L_061A          L_C3EA   => $C3EA
-; $061F => L_061F          L_C3FF   => $C3FF
-; $0639 => gds             L_C413   => $C413
-; $063F => sout            L_C416   => $C416
-; $0641 => L_0641          L_C471   => $C471
-; $064A => read            L_C478   => $C478
-; $0652 => L_0652          L_C48A   => $C48A
-; $0655 => L_0655          L_C4AB   => $C4AB
-; $0663 => L_0663          L_C4CF   => $C4CF
-; $0669 => L_0669          L_C4D3   => $C4D3
-; $0672 => L_0672          L_C4DA   => $C4DA
-; $0685 => L_0685          L_C4EB   => $C4EB
-; $068F => L_068F          L_C50D   => $C50D
-; $0691 => L_0691          L_C55F   => $C55F
-; $06A0 => L_06A0          L_C5D4   => $C5D4
-; $06A6 => L_06A6          L_C5DA   => $C5DA
-; $06B0 => X_06B0          L_C5F6   => $C5F6
-; $06BB => X_06BB          L_C64B   => $C64B
-; $06CA => X_06CA          L_C669   => $C669
-; $06E8 => L_06E8          L_C66F   => $C66F
-; $06EA => X_06EA          L_C6B4   => $C6B4
-; $06F7 => L_06F7          L_C6BC   => $C6BC
-; $0701 => L_0701          L_C6C6   => $C6C6
-; $0708 => L_0708          L_C6CC   => $C6CC
-; $070E => L_070E          L_C6CD   => $C6CD
-; $0713 => X_0713          L_C6D0   => $C6D0
-; $0717 => X_0717          L_C6D9   => $C6D9
-; $0726 => X_0726          L_C6DB   => $C6DB
-; $0733 => X_0733          L_C6E5   => $C6E5
-; $0739 => L_0739          L_C6EE   => $C6EE
-; $073C => L_073C          L_C6F1   => $C6F1
-; $0741 => L_0741          L_C6FA   => $C6FA
-; $0753 => L_0753          L_C702   => $C702
-; $076D => staba           L_C70C   => $C70C
-; $0C00 => initz           L_C71A   => $C71A
-; $0C0B => argn            L_C730   => $C730
-; $0C20 => numn            L_C742   => $C742
-; $0C21 => numv            L_C745   => $C745
-; $0C23 => brkadr          L_C748   => $C748
-; $0C25 => brkval          L_C755   => $C755
-; $0C26 => conflg          L_C768   => $C768
-; $0C27 => kopt            L_C76E   => $C76E
-; $0C29 => cursor          L_C773   => $C773
-; $0C71 => _stab           L_C784   => $C784
-; $2820 => PTIME           L_C786   => $C786
-; $2822 => DPAGE           L_C791   => $C791
-; $C000 => drum            L_C794   => $C794
-; $C003 => M_BPM           L_C7A3   => $C7A3
-; $C00C => M_RUN           L_C7B7   => $C7B7
-; $C019 => M_XFER          L_C7CC   => $C7CC
-; $C02F => M_PLAY          L_C7DC   => $C7DC
-; $C045 => M_ERAS          L_C7E9   => $C7E9
-; $C05B => M_SAVE          L_C801   => $C801
-; $C071 => M_SPACE         L_C81F   => $C81F
-; $C087 => M_SEQ           L_C830   => $C830
-; $C097 => M_FULL          L_C855   => $C855
-; $C0A2 => M_INFO          L_C86C   => $C86C
-; $C0B2 => M_INFO2         L_C893   => $C893
-; $C0D6 => L_C0D6          L_C8A9   => $C8A9
-; $C0ED => M_MENU          L_C8C4   => $C8C4
-; $C160 => X_C160          L_C8C7   => $C8C7
-; $C181 => CONT            L_C8D7   => $C8D7
-; $C18F => X_C18F          L_C8E2   => $C8E2
-; $C19A => X_C19A          L_C8E8   => $C8E8
-; $C1A5 => X_C1A5          L_C901   => $C901
-; $C1A9 => START           L_C914   => $C914
-; $C1F2 => L_C1F2          L_C923   => $C923
-; $C216 => L_C216          L_C925   => $C925
-; $C25A => L_C25A          L_C946   => $C946
-; $C265 => L_C265          L_C955   => $C955
-; $C277 => L_C277          L_C95E   => $C95E
-; $C280 => X_C280          L_C96E   => $C96E
-; $C332 => X_C332          L_C97B   => $C97B
-; $C352 => WOT2            L_C98E   => $C98E
-; $C354 => CLS             L_C9A2   => $C9A2
-; $C358 => X_C358          L_C9B8   => $C9B8
-; $C35F => WOT1            L_C9CD   => $C9CD
-; $C36C => X_C36c          L_C9D4   => $C9D4
-; $C389 => L_C389          L_C9DB   => $C9DB
-; $C38B => L_C38B          L_C9E0   => $C9E0
-; $C3A3 => X_C3A3          L_C9E7   => $C9E7
-; $C3AF => X_C3AF          L_C9EE   => $C9EE
-; $C3B6 => L_C3B6          L_C9FC   => $C9FC
-; $C3C3 => L_C3C3          L_CA00   => $CA00
-; $C3D2 => L_C3D2          L_CA05   => $CA05
-; $C3D5 => L_C3D5          L_CA21   => $CA21
-; $C3E8 => L_C3E8          L_CA25   => $CA25
-; $C3EA => L_C3EA          L_CA4D   => $CA4D
-; $C3FF => L_C3FF          L_CA5C   => $CA5C
-; $C413 => L_C413          L_CA66   => $CA66
-; $C416 => L_C416          L_CA75   => $CA75
-; $C471 => L_C471          L_CA7F   => $CA7F
-; $C478 => L_C478          L_CA98   => $CA98
-; $C48A => L_C48A          L_CAB5   => $CAB5
-; $C4AB => L_C4AB          L_CAC5   => $CAC5
-; $C4CF => L_C4CF          L_CADB   => $CADB
-; $C4D3 => L_C4D3          L_CAEB   => $CAEB
-; $C4DA => L_C4DA          L_CAFB   => $CAFB
-; $C4EB => L_C4EB          L_CB07   => $CB07
-; $C50D => L_C50D          L_CB2A   => $CB2A
-; $C55C => X_C55C          L_CB34   => $CB34
-; $C55F => L_C55F          L_CB3C   => $CB3C
-; $C5D4 => L_C5D4          L_CC1A   => $CC1A
-; $C5DA => L_C5DA          L_CC49   => $CC49
-; $C5F6 => L_C5F6          L_CC4B   => $CC4B
-; $C64B => L_C64B          L_CC54   => $CC54
-; $C651 => X_C651          L_CC7F   => $CC7F
-; $C669 => L_C669          L_CCB1   => $CCB1
-; $C66F => L_C66F          L_CCC0   => $CCC0
-; $C6B4 => L_C6B4          L_CCCB   => $CCCB
-; $C6BC => L_C6BC          L_CCDE   => $CCDE
-; $C6C6 => L_C6C6          L_CCEA   => $CCEA
-; $C6CC => L_C6CC          L_CCED   => $CCED
-; $C6CD => L_C6CD          L_CCF8   => $CCF8
-; $C6D0 => L_C6D0          L_CD04   => $CD04
-; $C6D9 => L_C6D9          L_CD0D   => $CD0D
-; $C6DB => L_C6DB          L_CD13   => $CD13
-; $C6E5 => L_C6E5          L_CD15   => $CD15
-; $C6EE => L_C6EE          L_CD7D   => $CD7D
-; $C6F1 => L_C6F1          L_CE1E   => $CE1E
-; $C6FA => L_C6FA          L_CE2F   => $CE2F
-; $C702 => L_C702          L_CE33   => $CE33
-; $C70C => L_C70C          L_CE36   => $CE36
-; $C71A => L_C71A          L_CE3C   => $CE3C
-; $C730 => L_C730          L_CE4C   => $CE4C
-; $C742 => L_C742          L_CE57   => $CE57
-; $C745 => L_C745          L_CE62   => $CE62
-; $C748 => L_C748          L_CE7B   => $CE7B
-; $C755 => L_C755          L_CE8D   => $CE8D
-; $C768 => L_C768          L_CE98   => $CE98
-; $C76E => L_C76E          L_CEC2   => $CEC2
-; $C773 => L_C773          L_CED0   => $CED0
-; $C784 => L_C784          L_CEDF   => $CEDF
-; $C786 => L_C786          L_CEE7   => $CEE7
-; $C791 => L_C791          L_CF27   => $CF27
-; $C794 => L_C794          L_CF3D   => $CF3D
-; $C7A3 => L_C7A3          L_CF43   => $CF43
-; $C7B1 => X_C7B1          L_CF56   => $CF56
-; $C7B7 => L_C7B7          L_CF5F   => $CF5F
-; $C7CC => L_C7CC          L_CF6A   => $CF6A
-; $C7DC => L_C7DC          L_CF76   => $CF76
-; $C7E9 => L_C7E9          L_CF7E   => $CF7E
-; $C7EC => X_C7EC          L_CF94   => $CF94
-; $C801 => L_C801          L_CF97   => $CF97
-; $C81F => L_C81F          L_CF9D   => $CF9D
-; $C830 => L_C830          L_CFB1   => $CFB1
-; $C855 => L_C855          L_CFC5   => $CFC5
-; $C86C => L_C86C          L_CFC8   => $CFC8
-; $C893 => L_C893          L_CFD1   => $CFD1
-; $C89F => X_C89F          L_CFD6   => $CFD6
-; $C8A9 => L_C8A9          L_CFE9   => $CFE9
-; $C8C4 => L_C8C4          L_CFF1   => $CFF1
-; $C8C7 => L_C8C7          L_CFF9   => $CFF9
-; $C8D7 => L_C8D7          L_D001   => $D001
-; $C8E2 => L_C8E2          L_D009   => $D009
-; $C8E8 => L_C8E8          L_D014   => $D014
-; $C901 => L_C901          L_D028   => $D028
-; $C914 => L_C914          L_D02D   => $D02D
-; $C923 => L_C923          L_D033   => $D033
-; $C925 => L_C925          L_D037   => $D037
-; $C946 => L_C946          L_D03A   => $D03A
-; $C955 => L_C955          L_D040   => $D040
-; $C95E => L_C95E          L_D054   => $D054
-; $C96E => L_C96E          L_D05A   => $D05A
-; $C97B => L_C97B          L_D08B   => $D08B
-; $C98E => L_C98E          L_D098   => $D098
-; $C9A2 => L_C9A2          L_D0B4   => $D0B4
-; $C9B8 => L_C9B8          L_D0CA   => $D0CA
-; $C9CD => L_C9CD          L_D0D5   => $D0D5
-; $C9D4 => L_C9D4          L_D0E6   => $D0E6
-; $C9DB => L_C9DB          L_D0F6   => $D0F6
-; $C9E0 => L_C9E0          L_D0F8   => $D0F8
-; $C9E7 => L_C9E7          L_D102   => $D102
-; $C9EE => L_C9EE          L_D110   => $D110
-; $C9FC => L_C9FC          L_D1F6   => $D1F6
+; $001A => tx1             args3    => $04C9
+; $0020 => L_RST20         assemble => $C64B
+; $0028 => L_0028          BIN      => $0069
+; $0029 => L_0029          BIN2     => $006D
+; $002F => dret            BIN8     => $0076
+; $0030 => L_RST30         blink    => $0078
+; $0034 => L_0034          break    => $060B
+; $0038 => rst_rdel        brkadr   => $0C23
+; $003E => X_003E          brkval   => $0C25
+; $0040 => L_0040          brst0    => $0306
+; $0045 => L_0045          CLS      => $C354
+; $004D => L_004D          COLD     => $0000
+; $0051 => mflp            compose  => $C4AB
+; $005B => srlx            conflg   => $0C26
+; $005E => L_005E          CONT     => $C181
+; $0066 => L_NMI           CONT1    => $C35F
+; $0069 => BIN             cpos     => $02C6
+; $006D => BIN2            cr1      => $01BA
+; $0076 => BIN8            cr3      => $01C1
+; $0078 => blink           crlf     => $0339
+; $0087 => srlin           crt      => $01A9
+; $008E => rkbd            crt0     => $01CF
+; $0099 => RK2             crt1     => $01D1
+; $00A9 => RK3             crt10    => $020F
+; $00B2 => RK5             crt12    => $021B
+; $00B8 => RK6             crt14    => $021F
+; $00C2 => RK7             crt18    => $022F
+; $00DC => KBD             crt2     => $01D4
+; $00EC => KSC1A           crt20    => $0236
+; $00EE => KSC8            crt25    => $024A
+; $00F0 => L_00F0          crt26    => $0251
+; $00F2 => _NMI            crt28    => $0257
+; $00FC => L_00FC          crt29    => $0260
+; $010E => ksc2            crt30    => $0264
+; $011D => ksc4            crt31    => $026F
+; $0146 => ksc5            crt32    => $0273
+; $0157 => k7              crt33    => $0279
+; $0160 => k8              crt34    => $0297
+; $0164 => k20             crt36    => $029C
+; $016E => k30             crt38    => $02AA
+; $0174 => k35             crt50    => $02BF
+; $017A => k40             crt6     => $0207
+; $0183 => k55             crt8     => $020E
+; $018C => k60             ct8      => $0294
+; $018E => kse             ctst     => $0283
+; $0198 => initt           cursor   => $0C29
+; $01A9 => crt             D_LINE   => $D44E
+; $01BA => cr1             D_MSG16  => $D458
+; $01C1 => cr3             DPAGE    => $282A
+; $01CF => crt0            dret     => $002F
+; $01D1 => crt1            drum     => $C000
+; $01D4 => crt2            erase    => $D265
+; $01D6 => X_LINE16        errm     => $0323
+; $01E4 => X_01E4          exec     => $0489
+; $01ED => L_01ED          g        => $060F
+; $01F4 => L_01F4          gds      => $0639
+; $01FC => L_01FC          help     => $D4D9
+; $0207 => crt6            in       => $0733
+; $020E => crt8            info     => $D1F6
+; $020F => crt10           initt    => $0198
+; $021B => crt12           initz    => $0C00
+; $021F => crt14           inl2     => $02F5
+; $022F => crt18           inlin    => $02F4
+; $0236 => crt20           k20      => $0164
+; $024A => crt25           k30      => $016E
+; $0251 => crt26           k35      => $0174
+; $0257 => crt28           k40      => $017A
+; $0260 => crt29           k55      => $0183
+; $0264 => crt30           k60      => $018C
+; $026F => crt31           k7       => $0157
+; $0273 => crt32           k8       => $0160
+; $0279 => crt33           KBD      => $00DC
+; $0283 => ctst            kop      => $0606
+; $0294 => ct8             kopt     => $0C27
+; $0297 => crt34           KSC1A    => $00EC
+; $029C => crt36           ksc2     => $010E
+; $02AA => crt38           ksc4     => $011D
+; $02BF => crt50           ksc5     => $0146
+; $02C6 => cpos            KSC8     => $00EE
+; $02CD => M_LINE16        kse      => $018E
+; $02F4 => inlin           ktab     => $05A6
+; $02F5 => inl2            L_0028   => $0028
+; $0306 => brst0           L_0029   => $0029
+; $0312 => X_0312          L_0034   => $0034
+; $0316 => X_0316          L_0040   => $0040
+; $031A => space           L_0045   => $0045
+; $031E => X_031E          L_004D   => $004D
+; $0323 => errm            L_005E   => $005E
+; $0339 => crlf            L_00F0   => $00F0
+; $033D => L_033D          L_00FC   => $00FC
+; $0353 => num             L_01ED   => $01ED
+; $0365 => nn1             L_01F4   => $01F4
+; $037D => nn2             L_01FC   => $01FC
+; $038C => rlin            L_033D   => $033D
+; $0391 => rl2             L_03B0   => $03B0
+; $03AA => strtb           L_0433   => $0433
+; $03B0 => L_03B0          L_0440   => $0440
+; $03C0 => MRET            L_0476   => $0476
+; $0433 => L_0433          L_047A   => $047A
+; $0436 => X_0436          L_047E   => $047E
+; $0440 => L_0440          L_0480   => $0480
+; $0476 => L_0476          L_0498   => $0498
+; $047A => L_047A          L_04DD   => $04DD
+; $047E => L_047E          L_04EB   => $04EB
+; $0480 => L_0480          L_04F7   => $04F7
+; $0483 => X_0483          L_0510   => $0510
+; $0489 => exec            L_052A   => $052A
+; $0498 => L_0498          L_0538   => $0538
+; $04A7 => X_04a7          L_0558   => $0558
+; $04BD => X_04BD          L_055C   => $055C
+; $04C2 => args            ascnum   => $0560
+; $04C5 => args2           L_061A   => $061A
+; $04C9 => args3           L_061F   => $061F
+; $04CE => write           L_0641   => $0641
+; $04D7 => w3              L_0652   => $0652
+; $04DD => L_04DD          L_0655   => $0655
+; $04EB => L_04EB          L_0663   => $0663
+; $04F7 => L_04F7          L_0669   => $0669
+; $0510 => L_0510          L_0672   => $0672
+; $051B => X_051B          L_0685   => $0685
+; $0522 => X_0522          L_068F   => $068F
+; $0527 => getnum          L_0691   => $0691
+; $052A => L_052A          L_06A0   => $06A0
+; $0538 => L_0538          L_06A6   => $06A6
+; $0558 => L_0558          L_06E8   => $06E8
+; $055C => L_055C          L_06F7   => $06F7
+; $0560 => ascnum          L_0701   => $0701
+; $0567 => X_0567          L_0708   => $0708
+; $0570 => rcalb           L_070E   => $070E
+; $0587 => RCAL4           L_0739   => $0739
+; $058B => SCAL2           L_073C   => $073C
+; $058C => SCAL3           L_0741   => $0741
+; $0599 => SCALJ           L_0753   => $0753
+; $05A1 => scali           L_C0D6   => $C0D6
+; $05A6 => ktab            L_C1F2   => $C1F2
+; $0606 => kop             L_C216   => $C216
+; $060B => break           L_C25A   => $C25A
+; $060F => g               L_C265   => $C265
+; $061A => L_061A          L_C277   => $C277
+; $061F => L_061F          L_C389   => $C389
+; $0639 => gds             L_C38B   => $C38B
+; $063F => sout            L_C3B6   => $C3B6
+; $0641 => L_0641          L_C3C3   => $C3C3
+; $064A => read            L_C3D2   => $C3D2
+; $0652 => L_0652          L_C3D5   => $C3D5
+; $0655 => L_0655          L_C3E8   => $C3E8
+; $0663 => L_0663          L_C3EA   => $C3EA
+; $0669 => L_0669          L_C3FF   => $C3FF
+; $0672 => L_0672          L_C413   => $C413
+; $0685 => L_0685          L_C416   => $C416
+; $068F => L_068F          L_C471   => $C471
+; $0691 => L_0691          L_C478   => $C478
+; $06A0 => L_06A0          L_C48A   => $C48A
+; $06A6 => L_06A6          wait     => $C4CF
+; $06B0 => X_06B0          L_C4D3   => $C4D3
+; $06BB => X_06BB          getname  => $C4DA
+; $06CA => X_06CA          L_C4EB   => $C4EB
+; $06E8 => L_06E8          L_C50D   => $C50D
+; $06EA => xout            L_C5D4   => $C5D4
+; $06F7 => L_06F7          L_C5DA   => $C5DA
+; $0701 => L_0701          L_C5F6   => $C5F6
+; $0708 => L_0708          L_C669   => $C669
+; $070E => L_070E          L_C66F   => $C66F
+; $0713 => xn              L_C6B4   => $C6B4
+; $0717 => normal          L_C6BC   => $C6BC
+; $0726 => nnim            L_C6C6   => $C6C6
+; $0733 => in              L_C6CC   => $C6CC
+; $0739 => L_0739          L_C6CD   => $C6CD
+; $073C => L_073C          L_C6D0   => $C6D0
+; $0741 => L_0741          L_C6D9   => $C6D9
+; $0753 => L_0753          L_C6DB   => $C6DB
+; $076D => staba           L_C6E5   => $C6E5
+; $0C00 => initz           L_C6EE   => $C6EE
+; $0C0B => argn            L_C6F1   => $C6F1
+; $0C20 => numn            L_C6FA   => $C6FA
+; $0C21 => numv            L_C702   => $C702
+; $0C23 => brkadr          L_C70C   => $C70C
+; $0C25 => brkval          L_C71A   => $C71A
+; $0C26 => conflg          L_C730   => $C730
+; $0C27 => kopt            L_C742   => $C742
+; $0C29 => cursor          L_C745   => $C745
+; $0C71 => _stab           L_C748   => $C748
+; $2820 => PTIME           L_C755   => $C755
+; $2822 => RNUM            L_C768   => $C768
+; $282A => DPAGE           L_C76E   => $C76E
+; $C000 => drum            L_C773   => $C773
+; $C003 => M_BPM           L_C784   => $C784
+; $C00C => M_RUN           L_C786   => $C786
+; $C019 => M_XFER          L_C791   => $C791
+; $C02F => M_PLAY          L_C794   => $C794
+; $C045 => M_ERAS          L_C7A3   => $C7A3
+; $C05B => M_SAVE          L_C7B7   => $C7B7
+; $C071 => M_SPACE         L_C7CC   => $C7CC
+; $C087 => M_SEQ           L_C7DC   => $C7DC
+; $C097 => M_FULL          L_C7E9   => $C7E9
+; $C0A2 => M_INFO          L_C801   => $C801
+; $C0B2 => M_INFO2         L_C81F   => $C81F
+; $C0D6 => L_C0D6          L_C830   => $C830
+; $C0ED => M_MENU          L_C855   => $C855
+; $C160 => X_C160          L_C86C   => $C86C
+; $C181 => CONT            L_C893   => $C893
+; $C18F => L_C18F          L_C8A9   => $C8A9
+; $C19A => X_C19A          L_C8C4   => $C8C4
+; $C1A5 => X_C1A5          L_C8C7   => $C8C7
+; $C1A9 => START           L_C8D7   => $C8D7
+; $C1F2 => L_C1F2          L_C8E2   => $C8E2
+; $C216 => L_C216          L_C8E8   => $C8E8
+; $C25A => L_C25A          L_C901   => $C901
+; $C265 => L_C265          L_C914   => $C914
+; $C277 => L_C277          L_C923   => $C923
+; $C280 => X_C280          L_C925   => $C925
+; $C332 => X_C332          L_C946   => $C946
+; $C352 => RESTART         L_C955   => $C955
+; $C354 => CLS             L_C95E   => $C95E
+; $C358 => X_C358          L_C96E   => $C96E
+; $C35F => CONT1           L_C97B   => $C97B
+; $C36C => X_C36c          L_C98E   => $C98E
+; $C389 => L_C389          L_C9A2   => $C9A2
+; $C38B => L_C38B          L_C9B8   => $C9B8
+; $C3A3 => X_C3A3          L_C9CD   => $C9CD
+; $C3AF => X_C3AF          L_C9D4   => $C9D4
+; $C3B6 => L_C3B6          L_C9DB   => $C9DB
+; $C3C3 => L_C3C3          L_C9E0   => $C9E0
+; $C3D2 => L_C3D2          L_C9E7   => $C9E7
+; $C3D5 => L_C3D5          L_C9EE   => $C9EE
+; $C3E8 => L_C3E8          L_C9FC   => $C9FC
+; $C3EA => L_C3EA          L_CA00   => $CA00
+; $C3FF => L_C3FF          L_CA05   => $CA05
+; $C413 => L_C413          L_CA21   => $CA21
+; $C416 => L_C416          L_CA25   => $CA25
+; $C471 => L_C471          L_CA4D   => $CA4D
+; $C478 => L_C478          L_CA5C   => $CA5C
+; $C48A => L_C48A          L_CA66   => $CA66
+; $C4AB => compose         L_CA75   => $CA75
+; $C4CF => wait            L_CA7F   => $CA7F
+; $C4D3 => L_C4D3          L_CA98   => $CA98
+; $C4DA => getname         L_CAB5   => $CAB5
+; $C4EB => L_C4EB          L_CAC5   => $CAC5
+; $C50D => L_C50D          L_CADB   => $CADB
+; $C55C => X_C55C          L_CAEB   => $CAEB
+; $C55F => save            L_CAFB   => $CAFB
+; $C5D4 => L_C5D4          L_CB07   => $CB07
+; $C5DA => L_C5DA          L_CB2A   => $CB2A
+; $C5F6 => L_C5F6          L_CB34   => $CB34
+; $C64B => assemble        L_CB3C   => $CB3C
+; $C651 => X_C651          L_CC1A   => $CC1A
+; $C669 => L_C669          L_CC49   => $CC49
+; $C66F => L_C66F          L_CC4B   => $CC4B
+; $C6B4 => L_C6B4          L_CC54   => $CC54
+; $C6BC => L_C6BC          L_CC7F   => $CC7F
+; $C6C6 => L_C6C6          L_CCB1   => $CCB1
+; $C6CC => L_C6CC          L_CCC0   => $CCC0
+; $C6CD => L_C6CD          L_CCCB   => $CCCB
+; $C6D0 => L_C6D0          L_CCDE   => $CCDE
+; $C6D9 => L_C6D9          L_CCEA   => $CCEA
+; $C6DB => L_C6DB          L_CCED   => $CCED
+; $C6E5 => L_C6E5          L_CCF8   => $CCF8
+; $C6EE => L_C6EE          L_CD04   => $CD04
+; $C6F1 => L_C6F1          L_CD0D   => $CD0D
+; $C6FA => L_C6FA          L_CD13   => $CD13
+; $C702 => L_C702          L_CD15   => $CD15
+; $C70C => L_C70C          L_CD7D   => $CD7D
+; $C71A => L_C71A          L_CE1E   => $CE1E
+; $C730 => L_C730          L_CE2F   => $CE2F
+; $C742 => L_C742          L_CE33   => $CE33
+; $C745 => L_C745          L_CE36   => $CE36
+; $C748 => L_C748          L_CE3C   => $CE3C
+; $C755 => L_C755          L_CE4C   => $CE4C
+; $C768 => L_C768          L_CE57   => $CE57
+; $C76E => L_C76E          L_CE62   => $CE62
+; $C773 => L_C773          L_CE7B   => $CE7B
+; $C784 => L_C784          L_CE98   => $CE98
+; $C786 => L_C786          L_CEC2   => $CEC2
+; $C791 => L_C791          L_CED0   => $CED0
+; $C794 => L_C794          L_CEDF   => $CEDF
+; $C7A3 => L_C7A3          L_CEE7   => $CEE7
+; $C7B1 => X_C7B1          L_CF27   => $CF27
+; $C7B7 => L_C7B7          L_CF3D   => $CF3D
+; $C7CC => L_C7CC          L_CF43   => $CF43
+; $C7DC => L_C7DC          L_CF56   => $CF56
+; $C7E9 => L_C7E9          L_CF5F   => $CF5F
+; $C7EC => X_C7EC          L_CF6A   => $CF6A
+; $C801 => L_C801          L_CF76   => $CF76
+; $C81F => L_C81F          L_CF7E   => $CF7E
+; $C830 => L_C830          L_CF94   => $CF94
+; $C855 => L_C855          L_CF97   => $CF97
+; $C86C => L_C86C          L_CF9D   => $CF9D
+; $C893 => L_C893          L_CFB1   => $CFB1
+; $C89F => X_C89F          L_CFC5   => $CFC5
+; $C8A9 => L_C8A9          L_CFC8   => $CFC8
+; $C8C4 => L_C8C4          L_CFD1   => $CFD1
+; $C8C7 => L_C8C7          L_CFD6   => $CFD6
+; $C8D7 => L_C8D7          L_CFE9   => $CFE9
+; $C8E2 => L_C8E2          L_CFF1   => $CFF1
+; $C8E8 => L_C8E8          L_CFF9   => $CFF9
+; $C901 => L_C901          L_D001   => $D001
+; $C914 => L_C914          L_D009   => $D009
+; $C923 => L_C923          L_D014   => $D014
+; $C925 => L_C925          L_D028   => $D028
+; $C946 => L_C946          L_D02D   => $D02D
+; $C955 => L_C955          L_D033   => $D033
+; $C95E => L_C95E          L_D037   => $D037
+; $C96E => L_C96E          L_D03A   => $D03A
+; $C97B => L_C97B          L_D040   => $D040
+; $C98E => L_C98E          L_D054   => $D054
+; $C9A2 => L_C9A2          L_D08B   => $D08B
+; $C9B8 => L_C9B8          L_D098   => $D098
+; $C9CD => L_C9CD          L_D0B4   => $D0B4
+; $C9D4 => L_C9D4          L_D0CA   => $D0CA
+; $C9DB => L_C9DB          L_D0D5   => $D0D5
+; $C9E0 => L_C9E0          L_D0E6   => $D0E6
+; $C9E7 => L_C9E7          L_D0F6   => $D0F6
+; $C9EE => L_C9EE          L_D0F8   => $D0F8
+; $C9FC => L_C9FC          L_D102   => $D102
 ; $CA00 => L_CA00          L_D230   => $D230
 ; $CA05 => L_CA05          L_D24F   => $D24F
-; $CA21 => L_CA21          L_D265   => $D265
-; $CA25 => L_CA25          L_D2B4   => $D2B4
-; $CA4D => L_CA4D          L_D2C3   => $D2C3
-; $CA5C => L_CA5C          L_D2DD   => $D2DD
-; $CA66 => L_CA66          L_D2E6   => $D2E6
-; $CA75 => L_CA75          L_D2EE   => $D2EE
-; $CA7F => L_CA7F          L_D2FC   => $D2FC
-; $CA98 => L_CA98          L_D309   => $D309
-; $CAB5 => L_CAB5          L_D30C   => $D30C
-; $CAC5 => L_CAC5          L_D30E   => $D30E
-; $CADB => L_CADB          L_D317   => $D317
-; $CAEB => L_CAEB          L_D326   => $D326
-; $CAFB => L_CAFB          L_D329   => $D329
-; $CB07 => L_CB07          L_D333   => $D333
-; $CB2A => L_CB2A          L_D33D   => $D33D
-; $CB34 => L_CB34          L_D36D   => $D36D
-; $CB3C => L_CB3C          L_D382   => $D382
-; $CC1A => L_CC1A          L_D39E   => $D39E
-; $CC49 => L_CC49          L_D3AE   => $D3AE
-; $CC4B => L_CC4B          L_D3BA   => $D3BA
-; $CC54 => L_CC54          L_D3BB   => $D3BB
-; $CC70 => TIME            L_D3C7   => $D3C7
-; $CC7F => L_CC7F          L_D3D0   => $D3D0
-; $CCB1 => L_CCB1          L_D3D2   => $D3D2
-; $CCC0 => L_CCC0          L_D3D6   => $D3D6
-; $CCCB => L_CCCB          L_D3D8   => $D3D8
-; $CCDE => L_CCDE          L_D3DA   => $D3DA
-; $CCEA => L_CCEA          L_D3E8   => $D3E8
-; $CCED => L_CCED          L_D3EE   => $D3EE
-; $CCF8 => L_CCF8          L_D3FB   => $D3FB
-; $CD04 => L_CD04          L_D3FE   => $D3FE
-; $CD0D => L_CD0D          L_D401   => $D401
-; $CD13 => L_CD13          L_D405   => $D405
-; $CD15 => L_CD15          L_D409   => $D409
-; $CD7D => L_CD7D          L_D417   => $D417
-; $CE13 => X_CE13          L_D41A   => $D41A
-; $CE1E => L_CE1E          L_D422   => $D422
-; $CE2F => L_CE2F          L_D432   => $D432
-; $CE33 => L_CE33          L_D437   => $D437
-; $CE36 => L_CE36          L_D458   => $D458
-; $CE3C => L_CE3C          L_D461   => $D461
-; $CE4C => L_CE4C          L_D475   => $D475
-; $CE57 => L_CE57          L_D47F   => $D47F
-; $CE62 => L_CE62          L_D481   => $D481
-; $CE7B => L_CE7B          L_D488   => $D488
-; $CE8D => L_CE8D          L_D491   => $D491
-; $CE98 => L_CE98          L_D49D   => $D49D
-; $CEC2 => L_CEC2          L_D4AD   => $D4AD
-; $CED0 => L_CED0          L_D4C4   => $D4C4
-; $CEDF => L_CEDF          L_D4D2   => $D4D2
-; $CEE7 => L_CEE7          L_D4D9   => $D4D9
-; $CF27 => L_CF27          L_NMI    => $0066
-; $CF3D => L_CF3D          L_RST20  => $0020
-; $CF43 => L_CF43          L_RST30  => $0030
-; $CF56 => L_CF56          M_BPM    => $C003
-; $CF5F => L_CF5F          M_ERAS   => $C045
-; $CF6A => L_CF6A          M_FULL   => $C097
-; $CF76 => L_CF76          M_INFO   => $C0A2
-; $CF7E => L_CF7E          M_INFO2  => $C0B2
-; $CF94 => L_CF94          M_LINE16 => $02CD
-; $CF97 => L_CF97          M_MENU   => $C0ED
-; $CF9D => L_CF9D          M_PLAY   => $C02F
-; $CFB1 => L_CFB1          M_RUN    => $C00C
-; $CFC5 => L_CFC5          M_SAVE   => $C05B
-; $CFC8 => L_CFC8          M_SEQ    => $C087
-; $CFD1 => L_CFD1          M_SPACE  => $C071
-; $CFD6 => L_CFD6          M_XFER   => $C019
-; $CFE9 => L_CFE9          mflp     => $0051
-; $CFF1 => L_CFF1          MRET     => $03C0
-; $CFF9 => L_CFF9          nn1      => $0365
-; $D001 => L_D001          nn2      => $037D
-; $D009 => L_D009          num      => $0353
-; $D014 => L_D014          numn     => $0C20
-; $D028 => L_D028          numv     => $0C21
+; $CA21 => L_CA21          L_D2B4   => $D2B4
+; $CA25 => L_CA25          L_D2C3   => $D2C3
+; $CA4D => L_CA4D          L_D2DD   => $D2DD
+; $CA5C => L_CA5C          L_D2E6   => $D2E6
+; $CA66 => L_CA66          L_D2EE   => $D2EE
+; $CA75 => L_CA75          L_D2FC   => $D2FC
+; $CA7F => L_CA7F          L_D309   => $D309
+; $CA98 => L_CA98          L_D30C   => $D30C
+; $CAB5 => L_CAB5          L_D30E   => $D30E
+; $CAC5 => L_CAC5          L_D317   => $D317
+; $CADB => L_CADB          L_D326   => $D326
+; $CAEB => L_CAEB          L_D329   => $D329
+; $CAFB => L_CAFB          L_D333   => $D333
+; $CB07 => L_CB07          L_D33D   => $D33D
+; $CB2A => L_CB2A          L_D36D   => $D36D
+; $CB34 => L_CB34          L_D382   => $D382
+; $CB3C => L_CB3C          L_D39E   => $D39E
+; $CC1A => L_CC1A          L_D3AE   => $D3AE
+; $CC49 => L_CC49          L_D3BA   => $D3BA
+; $CC4B => L_CC4B          L_D3BB   => $D3BB
+; $CC54 => L_CC54          L_D3C7   => $D3C7
+; $CC70 => TIME            L_D3D0   => $D3D0
+; $CC7F => L_CC7F          L_D3D2   => $D3D2
+; $CCB1 => L_CCB1          L_D3D6   => $D3D6
+; $CCC0 => L_CCC0          L_D3D8   => $D3D8
+; $CCCB => L_CCCB          L_D3DA   => $D3DA
+; $CCDE => L_CCDE          L_D3E8   => $D3E8
+; $CCEA => L_CCEA          L_D3EE   => $D3EE
+; $CCED => L_CCED          L_D3FB   => $D3FB
+; $CCF8 => L_CCF8          L_D3FE   => $D3FE
+; $CD04 => L_CD04          L_D401   => $D401
+; $CD0D => L_CD0D          L_D405   => $D405
+; $CD13 => L_CD13          L_D409   => $D409
+; $CD15 => L_CD15          L_D417   => $D417
+; $CD7D => L_CD7D          L_D41A   => $D41A
+; $CE13 => X_CE13          L_D422   => $D422
+; $CE1E => L_CE1E          L_D432   => $D432
+; $CE2F => L_CE2F          L_D437   => $D437
+; $CE33 => L_CE33          L_D461   => $D461
+; $CE36 => L_CE36          L_D475   => $D475
+; $CE3C => L_CE3C          L_D47F   => $D47F
+; $CE4C => L_CE4C          L_D481   => $D481
+; $CE57 => L_CE57          L_D488   => $D488
+; $CE62 => L_CE62          L_D491   => $D491
+; $CE7B => L_CE7B          L_D49D   => $D49D
+; $CE8D => run             L_D4AD   => $D4AD
+; $CE98 => L_CE98          L_D4C4   => $D4C4
+; $CEC2 => L_CEC2          L_D4D2   => $D4D2
+; $CED0 => L_CED0          L_NMI    => $0066
+; $CEDF => L_CEDF          L_RST20  => $0020
+; $CEE7 => L_CEE7          L_RST30  => $0030
+; $CF27 => L_CF27          M_BPM    => $C003
+; $CF3D => L_CF3D          M_ERAS   => $C045
+; $CF43 => L_CF43          M_FULL   => $C097
+; $CF56 => L_CF56          M_INFO   => $C0A2
+; $CF5F => L_CF5F          M_INFO2  => $C0B2
+; $CF6A => L_CF6A          M_LINE16 => $02CD
+; $CF76 => L_CF76          M_MENU   => $C0ED
+; $CF7E => L_CF7E          M_PLAY   => $C02F
+; $CF94 => L_CF94          M_RUN    => $C00C
+; $CF97 => L_CF97          M_SAVE   => $C05B
+; $CF9D => L_CF9D          M_SEQ    => $C087
+; $CFB1 => L_CFB1          M_SPACE  => $C071
+; $CFC5 => L_CFC5          M_XFER   => $C019
+; $CFC8 => L_CFC8          mflp     => $0051
+; $CFD1 => L_CFD1          MRET     => $03C0
+; $CFD6 => L_CFD6          nn1      => $0365
+; $CFE9 => L_CFE9          nn2      => $037D
+; $CFF1 => L_CFF1          nnim     => $0726
+; $CFF9 => L_CFF9          normal   => $0717
+; $D001 => L_D001          num      => $0353
+; $D009 => L_D009          numn     => $0C20
+; $D014 => L_D014          numv     => $0C21
+; $D028 => L_D028          play     => $D05A
 ; $D02D => L_D02D          PTIME    => $2820
 ; $D033 => L_D033          RCAL4    => $0587
 ; $D037 => L_D037          rcalb    => $0570
 ; $D03A => L_D03A          read     => $064A
 ; $D040 => L_D040          RK2      => $0099
 ; $D054 => L_D054          RK3      => $00A9
-; $D05A => L_D05A          RK5      => $00B2
+; $D05A => play            RK5      => $00B2
 ; $D06B => X_D06B          RK6      => $00B8
 ; $D08B => L_D08B          RK7      => $00C2
 ; $D098 => L_D098          rkbd     => $008E
@@ -5225,23 +5295,23 @@ L_D4D9:
 ; $D0F6 => L_D0F6          rst_rin  => $0008
 ; $D0F8 => L_D0F8          rst_scal => $0018
 ; $D102 => L_D102          SCAL2    => $058B
-; $D110 => L_D110          SCAL3    => $058C
+; $D110 => transfer        SCAL3    => $058C
 ; $D181 => X_D181          scali    => $05A1
-; $D1F6 => L_D1F6          SCALJ    => $0599
-; $D230 => L_D230          sout     => $063F
-; $D24F => L_D24F          space    => $031A
-; $D265 => L_D265          srlin    => $0087
+; $D1F6 => info            SCALJ    => $0599
+; $D230 => info1           sout     => $063F
+; $D24F => info2           space    => $031A
+; $D265 => erase           srlin    => $0087
 ; $D2B4 => L_D2B4          srlx     => $005B
 ; $D2C3 => L_D2C3          staba    => $076D
 ; $D2DD => L_D2DD          START    => $C1A9
 ; $D2E6 => L_D2E6          strtb    => $03AA
 ; $D2EE => L_D2EE          TIME     => $CC70
 ; $D2FC => L_D2FC          w3       => $04D7
-; $D309 => L_D309          WOT1     => $C35F
-; $D30C => L_D30C          WOT2     => $C352
+; $D309 => L_D309          CONT1    => $C35F
+; $D30C => L_D30C          RESTART  => $C352
 ; $D30E => L_D30E          write    => $04CE
-; $D317 => L_D317          X_000D   => $000D
-; $D326 => L_D326          X_001A   => $001A
+; $D317 => L_D317          stmon    => $000D
+; $D326 => L_D326          tx1      => $001A
 ; $D329 => L_D329          X_003E   => $003E
 ; $D333 => L_D333          X_01E4   => $01E4
 ; $D33D => L_D33D          X_0312   => $0312
@@ -5253,24 +5323,24 @@ L_D4D9:
 ; $D3BB => L_D3BB          X_04BD   => $04BD
 ; $D3C7 => L_D3C7          X_051B   => $051B
 ; $D3D0 => L_D3D0          X_0522   => $0522
-; $D3D2 => L_D3D2          X_0527   => $0527
+; $D3D2 => L_D3D2          getnum   => $0527
 ; $D3D6 => L_D3D6          X_0567   => $0567
 ; $D3D8 => L_D3D8          X_06B0   => $06B0
 ; $D3DA => L_D3DA          X_06BB   => $06BB
 ; $D3E8 => L_D3E8          X_06CA   => $06CA
-; $D3EE => L_D3EE          X_06EA   => $06EA
-; $D3FB => L_D3FB          X_0713   => $0713
-; $D3FE => L_D3FE          X_0717   => $0717
-; $D401 => L_D401          X_0726   => $0726
-; $D405 => L_D405          X_0733   => $0733
+; $D3EE => L_D3EE          xout     => $06EA
+; $D3FB => L_D3FB          xn       => $0713
+; $D3FE => L_D3FE          normal   => $0717
+; $D401 => L_D401          nnim     => $0726
+; $D405 => L_D405          in       => $0733
 ; $D409 => L_D409          X_C160   => $C160
-; $D417 => L_D417          X_C18F   => $C18F
+; $D417 => L_D417          L_C18F   => $C18F
 ; $D41A => L_D41A          X_C19A   => $C19A
 ; $D422 => L_D422          X_C1A5   => $C1A5
 ; $D432 => L_D432          X_C280   => $C280
 ; $D437 => L_D437          X_C332   => $C332
 ; $D44E => D_LINE          X_C358   => $C358
-; $D458 => L_D458          X_C36c   => $C36C
+; $D458 => D_MSG16         X_C36c   => $C36C
 ; $D461 => L_D461          X_C3A3   => $C3A3
 ; $D475 => L_D475          X_C3AF   => $C3AF
 ; $D47F => L_D47F          X_C55C   => $C55C
@@ -5281,4 +5351,4 @@ L_D4D9:
 ; $D4AD => L_D4AD          X_CE13   => $CE13
 ; $D4C4 => L_D4C4          X_D06B   => $D06B
 ; $D4D2 => L_D4D2          X_D181   => $D181
-; $D4D9 => L_D4D9          X_LINE16 => $01D6
+; $D4D9 => help            X_LINE16 => $01D6
