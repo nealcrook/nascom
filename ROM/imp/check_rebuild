@@ -14,6 +14,9 @@ z80asm -i imp_dis.asm       -limp.lst        -oimp.bin
 z80asm -i imp_dis_edit.asm  -limp_edit.lst   -oimp_edit.bin
 
 # check
+echo == expect error below due to assembler bug with missing IX offsets:
 diff imp.bin      imp_edit.bin
+echo == expect error below due to assembler bug with missing IX offsets:
 diff imp.bin      imp.bin_golden
+echo == expect no error below:
 diff imp_edit.bin imp.bin_golden
