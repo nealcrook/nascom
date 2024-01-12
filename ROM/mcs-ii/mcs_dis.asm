@@ -1688,10 +1688,11 @@ drum:
         jp L_C0D6
 
 
+drumw:
+        jp CONT1
+
+
 M_BPM:
-        defb $C3
-        defm "_"
-        defb $C3
         defm "B.P.M."
 
 M_RUN:
@@ -1756,11 +1757,12 @@ M_INFO2:
         defb $0B
         defm ":"
         defb $17
-        defm "}"
-        defb $00
+
+INTAB:
+        defb $7D, $00
 
 L_C0D6:
-        ld hl, $C0D4
+        ld hl, INTAB
         ld ($0C75), hl
         call CLS
         rst $18
@@ -1990,7 +1992,7 @@ L_C358:
 CONT1:
         ld sp, $1000
         di
-        ld hl, $C0D4
+        ld hl, INTAB
         ld ($0C75), hl
         call L_C265
 
@@ -2329,7 +2331,7 @@ L_C5F6:
         ld ($0C0C), hl
         ld de, ($2816)
         ld ($0C0E), de
-        ld bc, M_BPM
+        ld bc, drumw
         ld ($0C10), bc
         rst $18
         defb $47
@@ -2488,7 +2490,7 @@ L_C702:
 
 L_C70C:
         exx
-        ld hl, $C006
+        ld hl, M_BPM
         ld de, $0BEF
         ld bc, $0006
         ldir
@@ -4716,7 +4718,7 @@ help:
 
 
 
-; $C000 CCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+; $C000 CCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ; $C030 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ; $C080 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ; $C0D0 BBBBBBCCCCCCCCCCBCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -4878,153 +4880,155 @@ help:
 ; $01BA => cr1             DPAGE    => $282A
 ; $01C1 => cr3             dret     => $002F
 ; $01CF => crt0            drum     => $C000
-; $01D1 => crt1            erase    => $D265
-; $01D4 => crt2            errm     => $0323
-; $01D6 => X_LINE16        exec     => $0489
-; $01E4 => X_01E4          g        => $060F
-; $01ED => L_01ED          gds      => $0639
-; $01F4 => L_01F4          help     => $D4D9
-; $01FC => L_01FC          in       => $0733
-; $0207 => crt6            info     => $D1F6
-; $020E => crt8            initt    => $0198
-; $020F => crt10           initz    => $0C00
-; $021B => crt12           inl2     => $02F5
-; $021F => crt14           inlin    => $02F4
-; $022F => crt18           k20      => $0164
-; $0236 => crt20           k30      => $016E
-; $024A => crt25           k35      => $0174
-; $0251 => crt26           k40      => $017A
-; $0257 => crt28           k55      => $0183
-; $0260 => crt29           k60      => $018C
-; $0264 => crt30           k7       => $0157
-; $026F => crt31           k8       => $0160
-; $0273 => crt32           kbd      => $00CE
-; $0279 => crt33           kop      => $0606
-; $0283 => ctst            kopt     => $0C27
-; $0294 => ct8             ksc1     => $00DC
-; $0297 => crt34           KSC1A    => $00EC
-; $029C => crt36           ksc2     => $010E
-; $02AA => crt38           ksc4     => $011D
-; $02BF => crt50           ksc5     => $0146
-; $02C6 => cpos            KSC8     => $00EE
-; $02CD => M_LINE16        kse      => $018E
-; $02F4 => inlin           ktab     => $05A6
-; $02F5 => inl2            L_0028   => $0028
-; $0306 => brst0           L_0029   => $0029
-; $0312 => X_0312          L_0034   => $0034
-; $0316 => X_0316          L_0040   => $0040
-; $031A => space           L_0045   => $0045
-; $031E => X_031E          L_004D   => $004D
-; $0323 => errm            L_005E   => $005E
-; $0339 => crlf            L_00F0   => $00F0
-; $033D => L_033D          L_00FC   => $00FC
-; $0353 => num             L_01ED   => $01ED
-; $0365 => nn1             L_01F4   => $01F4
-; $037D => nn2             L_01FC   => $01FC
-; $038C => rlin            L_033D   => $033D
-; $0391 => rl2             L_03B0   => $03B0
-; $03AA => strtb           L_0433   => $0433
-; $03B0 => L_03B0          L_0440   => $0440
-; $03C0 => MRET            L_0476   => $0476
-; $0433 => L_0433          L_047A   => $047A
-; $0436 => X_0436          L_047E   => $047E
-; $0440 => L_0440          L_0480   => $0480
-; $0476 => L_0476          L_0498   => $0498
-; $047A => L_047A          L_04DD   => $04DD
-; $047E => L_047E          L_04EB   => $04EB
-; $0480 => L_0480          L_04F7   => $04F7
-; $0483 => X_0483          L_0510   => $0510
-; $0489 => exec            L_0522   => $0522
-; $0498 => L_0498          L_052A   => $052A
-; $04A7 => X_04a7          L_0538   => $0538
-; $04BD => X_04BD          L_0558   => $0558
-; $04C2 => args            L_055C   => $055C
-; $04C5 => args2           L_0560   => $0560
-; $04C9 => args3           L_061A   => $061A
-; $04CE => write           L_061F   => $061F
-; $04D7 => w3              L_0641   => $0641
-; $04DD => L_04DD          L_0652   => $0652
-; $04EB => L_04EB          L_0655   => $0655
-; $04F7 => L_04F7          L_0663   => $0663
-; $0510 => L_0510          L_0669   => $0669
-; $051B => X_051B          L_0672   => $0672
-; $0522 => L_0522          L_0685   => $0685
-; $0527 => X_0527          L_068F   => $068F
-; $052A => L_052A          L_0691   => $0691
-; $0538 => L_0538          L_06A0   => $06A0
-; $0558 => L_0558          L_06A6   => $06A6
-; $055C => L_055C          L_06E8   => $06E8
-; $0560 => L_0560          L_06F7   => $06F7
-; $0567 => X_0567          L_0701   => $0701
-; $0570 => rcalb           L_0708   => $0708
-; $0587 => RCAL4           L_070E   => $070E
-; $058B => SCAL2           L_0739   => $0739
-; $058C => SCAL3           L_073C   => $073C
-; $0599 => SCALJ           L_0741   => $0741
-; $05A1 => scali           L_0753   => $0753
-; $05A6 => ktab            L_C0D6   => $C0D6
-; $0606 => kop             L_C160   => $C160
-; $060B => break           L_C18F   => $C18F
-; $060F => g               L_C1F2   => $C1F2
-; $061A => L_061A          L_C216   => $C216
-; $061F => L_061F          L_C25A   => $C25A
-; $0639 => gds             L_C265   => $C265
-; $063F => sout            L_C277   => $C277
-; $0641 => L_0641          L_C358   => $C358
-; $064A => read            L_C389   => $C389
-; $0652 => L_0652          L_C38B   => $C38B
-; $0655 => L_0655          L_C3B6   => $C3B6
-; $0663 => L_0663          L_C3C3   => $C3C3
-; $0669 => L_0669          L_C3D2   => $C3D2
-; $0672 => L_0672          L_C3D5   => $C3D5
-; $0685 => L_0685          L_C3E8   => $C3E8
-; $068F => L_068F          L_C3EA   => $C3EA
-; $0691 => L_0691          L_C3FF   => $C3FF
-; $06A0 => L_06A0          L_C413   => $C413
-; $06A6 => L_06A6          L_C416   => $C416
-; $06B0 => X_06B0          L_C471   => $C471
-; $06BB => X_06BB          L_C478   => $C478
-; $06CA => X_06CA          L_C48A   => $C48A
-; $06E8 => L_06E8          L_C4CF   => $C4CF
-; $06EA => xout            L_C4D3   => $C4D3
-; $06F7 => L_06F7          L_C4DA   => $C4DA
-; $0701 => L_0701          L_C4EB   => $C4EB
-; $0708 => L_0708          L_C50D   => $C50D
-; $070E => L_070E          L_C5D4   => $C5D4
-; $0713 => xn              L_C5DA   => $C5DA
-; $0717 => normal          L_C5F6   => $C5F6
-; $0726 => nnim            L_C669   => $C669
-; $0733 => in              L_C66F   => $C66F
-; $0739 => L_0739          L_C6B4   => $C6B4
-; $073C => L_073C          L_C6BC   => $C6BC
-; $0741 => L_0741          L_C6C6   => $C6C6
-; $0753 => L_0753          L_C6CC   => $C6CC
-; $076D => staba           L_C6CD   => $C6CD
-; $0C00 => initz           L_C6D0   => $C6D0
-; $0C0B => argn            L_C6D9   => $C6D9
-; $0C20 => numn            L_C6DB   => $C6DB
-; $0C21 => numv            L_C6E5   => $C6E5
-; $0C23 => brkadr          L_C6EE   => $C6EE
-; $0C25 => brkval          L_C6F1   => $C6F1
-; $0C26 => conflg          L_C6FA   => $C6FA
-; $0C27 => kopt            L_C702   => $C702
-; $0C29 => cursor          L_C70C   => $C70C
-; $0C71 => _stab           L_C71A   => $C71A
-; $2820 => PTIME           L_C730   => $C730
-; $2822 => RNUM            L_C742   => $C742
-; $282A => DPAGE           L_C745   => $C745
-; $C000 => drum            L_C748   => $C748
-; $C003 => M_BPM           L_C755   => $C755
-; $C00C => M_RUN           L_C768   => $C768
-; $C019 => M_XFER          L_C76E   => $C76E
-; $C02F => M_PLAY          L_C773   => $C773
-; $C045 => M_ERAS          L_C784   => $C784
-; $C05B => M_SAVE          L_C786   => $C786
-; $C071 => M_SPACE         L_C791   => $C791
-; $C087 => M_SEQ           L_C794   => $C794
-; $C097 => M_FULL          L_C7A3   => $C7A3
-; $C0A2 => M_INFO          L_C7B7   => $C7B7
-; $C0B2 => M_INFO2         L_C7CC   => $C7CC
+; $01D1 => crt1            drumw    => $C003
+; $01D4 => crt2            erase    => $D265
+; $01D6 => X_LINE16        errm     => $0323
+; $01E4 => X_01E4          exec     => $0489
+; $01ED => L_01ED          g        => $060F
+; $01F4 => L_01F4          gds      => $0639
+; $01FC => L_01FC          help     => $D4D9
+; $0207 => crt6            in       => $0733
+; $020E => crt8            info     => $D1F6
+; $020F => crt10           initt    => $0198
+; $021B => crt12           initz    => $0C00
+; $021F => crt14           inl2     => $02F5
+; $022F => crt18           inlin    => $02F4
+; $0236 => crt20           INTAB    => $C0D4
+; $024A => crt25           k20      => $0164
+; $0251 => crt26           k30      => $016E
+; $0257 => crt28           k35      => $0174
+; $0260 => crt29           k40      => $017A
+; $0264 => crt30           k55      => $0183
+; $026F => crt31           k60      => $018C
+; $0273 => crt32           k7       => $0157
+; $0279 => crt33           k8       => $0160
+; $0283 => ctst            kbd      => $00CE
+; $0294 => ct8             kop      => $0606
+; $0297 => crt34           kopt     => $0C27
+; $029C => crt36           ksc1     => $00DC
+; $02AA => crt38           KSC1A    => $00EC
+; $02BF => crt50           ksc2     => $010E
+; $02C6 => cpos            ksc4     => $011D
+; $02CD => M_LINE16        ksc5     => $0146
+; $02F4 => inlin           KSC8     => $00EE
+; $02F5 => inl2            kse      => $018E
+; $0306 => brst0           ktab     => $05A6
+; $0312 => X_0312          L_0028   => $0028
+; $0316 => X_0316          L_0029   => $0029
+; $031A => space           L_0034   => $0034
+; $031E => X_031E          L_0040   => $0040
+; $0323 => errm            L_0045   => $0045
+; $0339 => crlf            L_004D   => $004D
+; $033D => L_033D          L_005E   => $005E
+; $0353 => num             L_00F0   => $00F0
+; $0365 => nn1             L_00FC   => $00FC
+; $037D => nn2             L_01ED   => $01ED
+; $038C => rlin            L_01F4   => $01F4
+; $0391 => rl2             L_01FC   => $01FC
+; $03AA => strtb           L_033D   => $033D
+; $03B0 => L_03B0          L_03B0   => $03B0
+; $03C0 => MRET            L_0433   => $0433
+; $0433 => L_0433          L_0440   => $0440
+; $0436 => X_0436          L_0476   => $0476
+; $0440 => L_0440          L_047A   => $047A
+; $0476 => L_0476          L_047E   => $047E
+; $047A => L_047A          L_0480   => $0480
+; $047E => L_047E          L_0498   => $0498
+; $0480 => L_0480          L_04DD   => $04DD
+; $0483 => X_0483          L_04EB   => $04EB
+; $0489 => exec            L_04F7   => $04F7
+; $0498 => L_0498          L_0510   => $0510
+; $04A7 => X_04a7          L_0522   => $0522
+; $04BD => X_04BD          L_052A   => $052A
+; $04C2 => args            L_0538   => $0538
+; $04C5 => args2           L_0558   => $0558
+; $04C9 => args3           L_055C   => $055C
+; $04CE => write           L_0560   => $0560
+; $04D7 => w3              L_061A   => $061A
+; $04DD => L_04DD          L_061F   => $061F
+; $04EB => L_04EB          L_0641   => $0641
+; $04F7 => L_04F7          L_0652   => $0652
+; $0510 => L_0510          L_0655   => $0655
+; $051B => X_051B          L_0663   => $0663
+; $0522 => L_0522          L_0669   => $0669
+; $0527 => X_0527          L_0672   => $0672
+; $052A => L_052A          L_0685   => $0685
+; $0538 => L_0538          L_068F   => $068F
+; $0558 => L_0558          L_0691   => $0691
+; $055C => L_055C          L_06A0   => $06A0
+; $0560 => L_0560          L_06A6   => $06A6
+; $0567 => X_0567          L_06E8   => $06E8
+; $0570 => rcalb           L_06F7   => $06F7
+; $0587 => RCAL4           L_0701   => $0701
+; $058B => SCAL2           L_0708   => $0708
+; $058C => SCAL3           L_070E   => $070E
+; $0599 => SCALJ           L_0739   => $0739
+; $05A1 => scali           L_073C   => $073C
+; $05A6 => ktab            L_0741   => $0741
+; $0606 => kop             L_0753   => $0753
+; $060B => break           L_C0D6   => $C0D6
+; $060F => g               L_C160   => $C160
+; $061A => L_061A          L_C18F   => $C18F
+; $061F => L_061F          L_C1F2   => $C1F2
+; $0639 => gds             L_C216   => $C216
+; $063F => sout            L_C25A   => $C25A
+; $0641 => L_0641          L_C265   => $C265
+; $064A => read            L_C277   => $C277
+; $0652 => L_0652          L_C358   => $C358
+; $0655 => L_0655          L_C389   => $C389
+; $0663 => L_0663          L_C38B   => $C38B
+; $0669 => L_0669          L_C3B6   => $C3B6
+; $0672 => L_0672          L_C3C3   => $C3C3
+; $0685 => L_0685          L_C3D2   => $C3D2
+; $068F => L_068F          L_C3D5   => $C3D5
+; $0691 => L_0691          L_C3E8   => $C3E8
+; $06A0 => L_06A0          L_C3EA   => $C3EA
+; $06A6 => L_06A6          L_C3FF   => $C3FF
+; $06B0 => X_06B0          L_C413   => $C413
+; $06BB => X_06BB          L_C416   => $C416
+; $06CA => X_06CA          L_C471   => $C471
+; $06E8 => L_06E8          L_C478   => $C478
+; $06EA => xout            L_C48A   => $C48A
+; $06F7 => L_06F7          L_C4CF   => $C4CF
+; $0701 => L_0701          L_C4D3   => $C4D3
+; $0708 => L_0708          L_C4DA   => $C4DA
+; $070E => L_070E          L_C4EB   => $C4EB
+; $0713 => xn              L_C50D   => $C50D
+; $0717 => normal          L_C5D4   => $C5D4
+; $0726 => nnim            L_C5DA   => $C5DA
+; $0733 => in              L_C5F6   => $C5F6
+; $0739 => L_0739          L_C669   => $C669
+; $073C => L_073C          L_C66F   => $C66F
+; $0741 => L_0741          L_C6B4   => $C6B4
+; $0753 => L_0753          L_C6BC   => $C6BC
+; $076D => staba           L_C6C6   => $C6C6
+; $0C00 => initz           L_C6CC   => $C6CC
+; $0C0B => argn            L_C6CD   => $C6CD
+; $0C20 => numn            L_C6D0   => $C6D0
+; $0C21 => numv            L_C6D9   => $C6D9
+; $0C23 => brkadr          L_C6DB   => $C6DB
+; $0C25 => brkval          L_C6E5   => $C6E5
+; $0C26 => conflg          L_C6EE   => $C6EE
+; $0C27 => kopt            L_C6F1   => $C6F1
+; $0C29 => cursor          L_C6FA   => $C6FA
+; $0C71 => _stab           L_C702   => $C702
+; $2820 => PTIME           L_C70C   => $C70C
+; $2822 => RNUM            L_C71A   => $C71A
+; $282A => DPAGE           L_C730   => $C730
+; $C000 => drum            L_C742   => $C742
+; $C003 => drumw           L_C745   => $C745
+; $C006 => M_BPM           L_C748   => $C748
+; $C00C => M_RUN           L_C755   => $C755
+; $C019 => M_XFER          L_C768   => $C768
+; $C02F => M_PLAY          L_C76E   => $C76E
+; $C045 => M_ERAS          L_C773   => $C773
+; $C05B => M_SAVE          L_C784   => $C784
+; $C071 => M_SPACE         L_C786   => $C786
+; $C087 => M_SEQ           L_C791   => $C791
+; $C097 => M_FULL          L_C794   => $C794
+; $C0A2 => M_INFO          L_C7A3   => $C7A3
+; $C0B2 => M_INFO2         L_C7B7   => $C7B7
+; $C0D4 => INTAB           L_C7CC   => $C7CC
 ; $C0D6 => L_C0D6          L_C7DC   => $C7DC
 ; $C0ED => M_MENU          L_C7E9   => $C7E9
 ; $C160 => L_C160          L_C801   => $C801
@@ -5199,7 +5203,7 @@ help:
 ; $CF27 => L_CF27          L_NMI    => $0066
 ; $CF3D => L_CF3D          L_RST20  => $0020
 ; $CF43 => L_CF43          L_RST30  => $0030
-; $CF56 => L_CF56          M_BPM    => $C003
+; $CF56 => L_CF56          M_BPM    => $C006
 ; $CF5F => L_CF5F          M_ERAS   => $C045
 ; $CF6A => L_CF6A          M_FULL   => $C097
 ; $CF76 => L_CF76          M_INFO   => $C0A2

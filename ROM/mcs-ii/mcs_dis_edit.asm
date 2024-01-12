@@ -29,6 +29,60 @@
 ;;; $85f0 - ???? page 9 stuff
 ;;; $
 ;;; ...... see comments to L_D422
+;;;
+;;; These memory addresses are referenced explicitly:
+;;; $2800-1  Vector (default: CONT1)
+;;; $2803    7: *
+;;;          6: *
+;;;          5: *
+;;;          4: *
+;;;          3: *
+;;;          2: *
+;;;          1: *
+;;;          0: *
+;;; $2804    7: *
+;;;          6: *
+;;;          5: *
+;;;          4: *
+;;;          3: *
+;;;          2: *
+;;;          1: *
+;;;          0: *
+;;; $2805    value from port 4: Port A Data
+;;; $2806    value from port 5: Port B Data
+;;; $2807    sometimes copied from $2805
+;;; $2808    sometimes copied from $2806
+;;; $2809    ??
+;;; $280A    ??beats
+;;; $280B    written, never read
+;;; $280C    sometimes copied from $2809
+;;; $280D    ??
+;;; $280E    1: *
+;;;          0: *
+;;; $2812    ??
+;;; $2814    ??
+;;; $2816    sometimes copied to RNUM
+;;; $2818    cursor position in info screen
+;;; $281A-B  ??
+;;; $281C-D  ??start of some region
+;;; $281E    ??
+;;; $2820    PTIME store previous time sync value read from Port A[0]
+;;; $2822    RNUM current rythmn number
+;;; $2824-5  ??
+;;; $2826-7  ??
+;;; $282A    DPAGE current page number
+;;; $2830    sometimes copy of/copied to DPAGE
+;;; $2832    cleared and incremented; compared to $2833
+;;; $2833    ??
+;;; $2834    Source of timing clock. 0: MIDI, 1: Int (default)
+;;; $2835    MIDI channel number (default: 0)
+;;; $283C    ??start of some region
+;;; $2846    ??start of some region
+;;; $2850    ??start of some region
+;;; $2880    ??start of some region
+;;; $29f0    ??start of some region
+;;; $2b00    ??start of some region
+
         
         org $0000
 
@@ -489,7 +543,7 @@ X_LINE16:
 ;;; A = rhythm number, 0..9
 X_01E4:
         push de
-        ld de, COLD
+        ld de, $0000
         sbc a, $0A
         jr c, L_01F4
         inc d
@@ -784,7 +838,7 @@ num:
         inc de
         jr z, num
         dec de
-        ld hl, COLD
+        ld hl, $0000
         ld (numv), hl
         xor a
         ld hl, numn
@@ -982,7 +1036,7 @@ L_0498:
 X_04a7:
         push de
         push bc
-        ld hl, COLD
+        ld hl, $0000
         add hl, sp
         ld sp, $0C61
         ld de, $0C61
@@ -1678,10 +1732,10 @@ numn:
         defb $00
 
 numv:
-        defw COLD
+        defw $0000
 
 brkadr:
-        defw COLD
+        defw $0000
 
 brkval:
         defb $00
@@ -1696,13 +1750,13 @@ kopt:
 
 
 cursor:
-        defw COLD
+        defw $0000
 
         org $0C71
 
 
 _stab:
-        defw COLD
+        defw $0000
 
         org $2820
 
@@ -1728,11 +1782,10 @@ DPAGE:
 drum:
         jp L_C0D6
 
+drumw:
+        jp CONT1
 
 M_BPM:
-        defb $C3
-        defm "_"
-        defb $C3
         defm "B.P.M."
 
 M_RUN:
@@ -1798,7 +1851,8 @@ M_INFO2:
         defm ":"
         defb $17
 
-L_C0D4  defb $7D, $00           ; input table: RKBD, END
+INTAB:
+        defb $7D, $00           ; input table: RKBD, END
 
 L_C0D6:
         ld hl, L_C0D4           ; input table
@@ -1896,9 +1950,9 @@ START:
         ld bc, $0380            ; of a cleared screen into it.
         ldir
         ld a, $00
-        ld ($2835), a
+        ld ($2835), a           ; Default to MIDI channel number 0
         ld a, $01
-        ld ($2834), a
+        ld ($2834), a           ; Default to internal timing clock
         ld b, $0A               ; 10 pages
 
 L_C1F2:
@@ -1970,8 +2024,8 @@ L_C265:
         call L_D437
         ld a, ($2834)
         bit 0, a
-        jr nz, L_C277
-        call L_D4AD
+        jr nz, L_C277           ; internal timing clock
+        call discha             ; MIDI timing clock; display channel
 
 L_C277:
         ld hl, $080A
@@ -2001,7 +2055,7 @@ X_C280:
         defb $0D
         defm "S - Save on tape   : X - "
         defb $00
-        call L_D4C4
+        call intmidi
 
 X_C332:
         rst $28
@@ -2031,9 +2085,9 @@ L_C358:
 
 CONT1:
         ld sp, $1000
-        di
-        ld hl, $C0D4
-        ld ($0C75), hl
+        di                      ; disable interrupts; they are never enabled.
+        ld hl, INTAB
+        ld ($0C75), hl          ; set new input table: poll kbd only (not serial port, because MIDI commands are appearing there)
         call L_C265             ; clear screen, print main Drum menu
 
 X_C36c:
@@ -2061,10 +2115,10 @@ L_C38B:
         ld ($280A), a
         ld a, ($2812)
         cp $0C
-        jp nz, L_C416
+        jp nz, L_C416           ; back to command loop
         ld a, $02
         ld ($2809), a
-        jp L_C416
+        jp L_C416               ; back to command loop
 
 
 X_C3A3:                         ; unreachable??
@@ -2081,25 +2135,25 @@ X_C3AF:                         ; unreachable??
         jp CONT1
 
 
-L_C3B6:
+L_C3B6:                         ; check for timing event
         ld a, ($2834)
         bit 0, a
         jr z, L_C3C3
-        call TIME
-        jp nz, L_C416
+        call TIME               ; timing clock on Port A[0]?
+        jp nz, L_C416           ; yes, back to command loop
 
 L_C3C3:
         in a, ($02)             ; UART status
         rla
-        jp nc, L_C416           ; no char
+        jp nc, L_C416           ; no char, back to command loop
         in a, ($01)             ; get MIDI char
         cp $F8                  ; incoming timing clock?
-        jp z, L_C416            ; yes, go to menu??
+        jp z, L_C416            ; yes, back to command loop
         jr L_C3EA
 
 
 L_C3D2:
-        ld bc, COLD
+        ld bc, $0000            ; timeout value
 
 L_C3D5:
         in a, ($02)             ; UART status
@@ -2111,44 +2165,44 @@ L_C3D5:
         or c
         jr nz, L_C3D5
         call L_D437
-        jp L_C416
+        jp L_C416               ; back to command loop
 
 
 L_C3E8:
-        in a, ($01)             ; get char from UART
+        in a, ($01)             ; UART data
 
 L_C3EA:
         ld e, a
-        and $F0
-        cp $90
-        jp nz, L_C3D5
+        and $F0                 ; ignore MIDI channel number
+        cp $90                  ; MIDI "note on" command?
+        jp nz, L_C3D5           ; no; go back and check UART status again
         ld a, e
-        and $0F
-        ld hl, $2835
+        and $0F                 ; just get channel number
+        ld hl, $2835            ; point to MIDI channel number
         cp (hl)
-        jp z, L_C745
-        jp L_C416
+        jp z, L_C745            ; yes, it is MIDI note-on command for this channel
+        jp L_C416               ; back to command loop
 
 
-L_C3FF:
+selcha:                         ; select channel
         ld hl, $0A72
         ld (cursor), hl
         rst $18
         defb $41                ; getnum
         cp $11
-        jr nc, L_C413
+        jr nc, L_C413           ; illegal, ignore
         cp $00
-        jr c, L_C413
+        jr c, L_C413            ; illegal, ignore
         dec a
-        ld ($2835), a
+        ld ($2835), a           ; store new, legal, MIDI channel number
 
 L_C413:
-        call L_D4AD
+        call discha             ; display channel
 
-L_C416:
+L_C416:                         ; command loop
         rst $18                 ; scal
         defb $62                ; in - scan the keyboard
-        jp nc, L_C3B6           ; no character
+        jp nc, L_C3B6           ; no character; check for timing event
         and $7F                 ; clear MSB (no need..)
         cp $1B                  ; ESC
         jp z, X_C1A5            ; jump through ($2800) - usually to CONT1
@@ -2157,7 +2211,7 @@ L_C416:
         cp $58                  ; X
         jp z, L_C478            ; Toggle Int/Midi
         cp $78                  ; x
-        jp z, L_C3FF            ; Select channel
+        jp z, selcha            ; Select channel
         cp $45                  ; E
         jp z, erase             ; Erase
         cp $43                  ; C
@@ -2177,9 +2231,9 @@ L_C416:
         cp $53                  ; S
         jp z, save              ; Save on tape
         sub $30                 ; Number?
-        jp m, L_C416            ; 
+        jp m, L_C416            ; no.. ignore.. back to command loop
         sub $0A                 ; 
-        jp p, L_C416            ; 
+        jp p, L_C416            ; no.. ignore.. back to command loop
         ld d, a                 ; 
         add a, $0A              ; 
         ld (DPAGE), a           ; Store number 0-9 as Page Number
@@ -2197,9 +2251,9 @@ L_C478:
         call L_D49D
         ld hl, $0A63
         ld (cursor), hl
-        call L_D4C4
-        call L_D4AD
-        jp L_C416
+        call intmidi
+        call discha
+        jp L_C416               ; back to command loop
 
 
 L_C48A:
@@ -2376,12 +2430,12 @@ L_C5DA:
 L_C5F6:
         call wait
         djnz L_C5F6
-        ld hl, $2800
-        ld ($0C0C), hl
-        ld de, ($2816)
-        ld ($0C0E), de
-        ld bc, M_BPM
-        ld ($0C10), bc
+        ld hl, $2800            ; from
+        ld ($0C0C), hl          ; ARG1
+        ld de, ($2816)          ; to.. ?selected number of pages
+        ld ($0C0E), de          ; ARG2
+        ld bc, drumw            ; start address: vector to CONT1
+        ld ($0C10), bc          ; ARG3
         rst $18
         defb $47                ; g (generate)
         rst $28
@@ -2539,7 +2593,7 @@ L_C702:
 
 L_C70C:
         exx
-        ld hl, $C006
+        ld hl, M_BPM
         ld de, $0BEF
         ld bc, $0006
         ldir
@@ -2577,78 +2631,78 @@ L_C742:
         jr L_C730
 
 
-L_C745:
+L_C745:                         ; got a MIDI "note on" command for this channel
         ld bc, $07D0
 
 L_C748:
-        in a, ($02)
+        in a, ($02)             ; UART status
         rla
-        jr c, L_C755
+        jr c, L_C755            ; got char
         dec bc
         ld a, b
         or c
         jr nz, L_C748
-        jp L_C3D5
+        jp L_C3D5               ; timeout??
 
 
 L_C755:
-        in a, ($01)
-        cp $24
+        in a, ($01)             ; get MIDI "note on" parameter 1: key
+        cp $24                  ; (there should be a parameter 2 also: velocity)
         jr c, L_C791
         cp $33
         jr nc, L_C791
         sbc a, $23
         cp $06
         jr nc, L_C76E
-        ld b, a
+        ld b, a                 ; bit number
         ld a, $01
 
 L_C768:
         sla a
-        djnz L_C768
+        djnz L_C768             ; set particular bit in A
         jr L_C794
 
 
 L_C76E:
         sbc a, $06
-        ld b, a
+        ld b, a                 ; bit number
         ld a, $01
 
 L_C773:
         sla a                   ; 
-        djnz L_C773             ; 
-        push af                 ; 
+        djnz L_C773             ; set particular bit in A
+        push af                 ; and save it
         ld a, $CF               ; 
         out ($07), a            ; port B control mode
-        pop af                  ; 
+        pop af                  ; get bit
         cpl                     ; 
-        out ($07), a            ; define which bits are outputs
+        out ($07), a            ; define bit as output
         ld a, $FF               ; 
-        out ($05), a            ; data B: set all outputs high
+        out ($05), a            ; and set that Port B output bit high (this seems over-complex..)
 
 L_C784:
         ld b, $96
 
 L_C786:
-        in a, ($02)
+        in a, ($02)             ; UART status
         rla
-        jp c, L_C3E8
+        jp c, L_C3E8            ; got char
         djnz L_C786
-        call L_D437
+        call L_D437             ; timeout?? 
 
 L_C791:
         jp L_C3D2
 
 
 L_C794:
-        push af                 ; 
+        push af                 ; bit is in A; save it
         ld a, $CF               ; 
         out ($06), a            ; port A control mode
         pop af                  ; 
         cpl                     ; 
-        out ($06), a            ; define which bits are output
+        out ($06), a            ; define bit as output (bit[0] always input)
         ld a, $FE               ; 
-        out ($04), a            ; data A: set [7:1] high, [0] low
+        out ($04), a            ; and set that Port A output bit high, [0] low
         jr L_C784
 
 
@@ -2667,7 +2721,7 @@ X_C7B1:
 L_C7B7:
         ld hl, $0BEA
         ld (cursor), hl
-        call L_D4C4
+        call intmidi
         ld hl, $2803
         res 3, (hl)
         ld a, $FA
@@ -2676,9 +2730,9 @@ L_C7B7:
 
 L_C7CC:
         ld hl, PTIME
-        in a, ($04)
-        and $01
-        ld (hl), a
+        in a, ($04)             ; check port A
+        and $01                 ; bit[0]
+        ld (hl), a              ; store current value
         ld hl, $280E
         set 1, (hl)
         jp L_C8C7
@@ -2709,7 +2763,7 @@ L_C801:
         ld bc, ($2824)
         call L_CF7E
         ld iy, $0B9F
-        ld (iy), $FF
+        ld (iy), $FF            ; 2 characters on the bottom line of the display??
         ld (iy+$01), $FF
         ld iy, $2804
         set 2, (iy)
@@ -2749,7 +2803,7 @@ L_C830:
 
 
 L_C855:
-        ld iy, COLD
+        ld iy, $0000
         ld a, ($280C)
         cp $00
         jr z, L_C86C
@@ -2817,7 +2871,7 @@ L_C8C7:
         xor a
         ld hl, $2832
         ld (hl), a
-        ld iy, COLD
+        ld iy, $0000
         ld hl, $2804
         set 3, (hl)
         jr L_C925
@@ -2845,22 +2899,22 @@ L_C8E8:
         jr nz, L_C901
         ld hl, $2803
         bit 1, (hl)
-        jp nz, L_C914
+        jp nz, midicont
         jp L_CB3C
 
 
 L_C901:
-        in a, ($02)
+        in a, ($02)             ; UART status
         rla
         jr nc, L_C8E8
-        in a, ($01)
-        cp $FB
-        jp z, L_C914
-        cp $FA
+        in a, ($01)             ; UART data
+        cp $FB                  ; MIDI command: Continue
+        jp z, midicont
+        cp $FA                  ; MIDI command: Start
         jr nz, L_C8E8
-        jp z, L_C946
+        jp z, midistar
 
-L_C914:
+midicont:
         ld hl, $CB79
         call L_C8D7
         ld a, $FB
@@ -2889,7 +2943,7 @@ L_C925:
         cp $FA
         jp nz, L_C925
 
-L_C946:
+midistar:
         ld hl, $2803
         bit 1, (hl)
         jr z, L_C955
@@ -3024,7 +3078,7 @@ L_CA05:
         ld (cursor), hl
         ld a, ($280D)
         call L_D461
-        ld iy, COLD
+        ld iy, $0000
         ld hl, $280E
         bit 0, (hl)
         jp z, L_C925
@@ -3204,7 +3258,7 @@ L_CB3C:
         defb $0D, $0D, $0D
         defm " M - Multiply bars  (x )  X - "
         defb $00
-        call L_D4C4
+        call intmidi
         rst $28
         defm "."
         defb $0D, $0D, $0D
@@ -3303,7 +3357,7 @@ L_CCB1:
         call L_D49D
         ld hl, $0A28
         ld (cursor), hl
-        call L_D4C4
+        call intmidi
         jp L_CC7F
 
 
@@ -3698,7 +3752,7 @@ L_CF9D:
         call L_D405
         ld b, a
         cp $00
-        ld hl, COLD
+        ld hl, $0000
         jr z, L_CFC8
         xor a
 
@@ -3713,7 +3767,7 @@ L_CFB1:
         ld a, ($2812)
         ld b, a
         ld d, $00
-        ld hl, COLD
+        ld hl, $0000
 
 L_CFC5:
         add hl, de
@@ -3728,54 +3782,55 @@ L_CFC8:
 
 
 L_CFD1:
-        ld hl, COLD
+        ld hl, $0000
         jr L_CFC8
 
-
+;;; Process menu X_C280?? But that's already done at L_C416. So what's happening here??
+;;; this scans (without pause) for a command.. so this can be used while playing??
 L_CFD6:
         push ix
         push bc
         rst $18
         defb $62                ; in
-        jr nc, L_D037
+        jr nc, L_D037           ; no character; tidy up and return
         and $7F
         ld hl, $2803
         bit 1, (hl)
         jr z, L_CFE9
         scf
-        jr L_D033
+        jr L_D033               ; tidy up and return
 
 
 L_CFE9:
-        cp $41                  ;A
+        cp $41                  ;A assemble chain??
         jr nz, L_CFF1
         set 0, (hl)
-        jr L_D033
+        jr L_D033               ; tidy up and return
 
 
 L_CFF1:
-        cp $53                  ;S
+        cp $53                  ;S ave on tape
         jr nz, L_CFF9
         set 2, (hl)
-        jr L_D033
+        jr L_D033               ; tidy up and return
 
 
 L_CFF9:
-        cp $52                  ;R
+        cp $52                  ;R un chain
         jr nz, L_D001
         res 2, (hl)
-        jr L_D033
+        jr L_D033               ; tidy up and return
 
 
 L_D001:
-        cp $45                  ;E
+        cp $45                  ;E rase
         jr nz, L_D009
         res 0, (hl)
-        jr L_D033
+        jr L_D033               ; tidy up and return
 
 
 L_D009:
-        cp $4F                  ;O
+        cp $4F                  ;O ??
         jr nz, L_D014
         ld hl, $2804
         set 5, (hl)
@@ -3783,26 +3838,26 @@ L_D009:
 
 
 L_D014:
-        cp $48                  ;H
+        cp $48                  ;H elp
         jr z, L_D028
-        cp $54                  ;T
+        cp $54                  ;T ransfer
         jr z, L_D028
-        cp $46                  ;F
+        cp $46                  ;F ??
         jr z, L_D028
         cp $30                  ;0
-        jr c, L_D033
+        jr c, L_D033            ; tidy up and return
         cp $3A                  ;beyond 9
-        jr nc, L_D033
+        jr nc, L_D033           ; tidy up and return
 
 L_D028:
         call L_CCCB
-        jr nc, L_D033
+        jr nc, L_D033           ; tidy up and return
 
 L_D02D:
         ld hl, $094A
         call L_CC1A
 
-L_D033:
+L_D033:                         ; tidy up and return
         pop bc
         pop ix
         ret
@@ -4249,7 +4304,7 @@ L_D33D:
         ld ($2816), a
         call L_CF9D
         ld de, ($2824)
-        ld hl, COLD
+        ld hl, $0000
         ld a, ($2814)
         ld b, a
 
@@ -4350,7 +4405,7 @@ L_D3E8:
         call L_D422             ; get DPAGE-dependent address in HL
 
 L_D3EE:
-        ld de, COLD
+        ld de, $0000
         ld a, (RNUM)
         ld e, a
         add hl, de
@@ -4523,7 +4578,7 @@ L_D49D:                         ; seems to always set bit[0] of ($2834)
         ret
 
 
-L_D4AD:
+discha:                         ; display MIDI channel
         ld hl, $0A6A
         ld (cursor), hl
         rst $28
@@ -4536,7 +4591,7 @@ L_D4AD:
         ret
 
 
-L_D4C4:
+intmidi:                        ; display Int or MIDI message text dependent on flags
         ld a, ($2834)
         bit 0, a
         jr z, L_D4D2
@@ -5035,7 +5090,7 @@ help:
 ; $0652 => L_0652          L_C3D5   => $C3D5
 ; $0655 => L_0655          L_C3E8   => $C3E8
 ; $0663 => L_0663          L_C3EA   => $C3EA
-; $0669 => L_0669          L_C3FF   => $C3FF
+; $0669 => L_0669          selcha   => $C3FF
 ; $0672 => L_0672          L_C413   => $C413
 ; $0685 => L_0685          L_C416   => $C416
 ; $068F => L_068F          L_C471   => $C471
@@ -5074,7 +5129,7 @@ help:
 ; $2822 => RNUM            L_C768   => $C768
 ; $282A => DPAGE           L_C76E   => $C76E
 ; $C000 => drum            L_C773   => $C773
-; $C003 => M_BPM           L_C784   => $C784
+; $C006 => M_BPM           L_C784   => $C784
 ; $C00C => M_RUN           L_C786   => $C786
 ; $C019 => M_XFER          L_C791   => $C791
 ; $C02F => M_PLAY          L_C794   => $C794
@@ -5096,10 +5151,10 @@ help:
 ; $C1F2 => L_C1F2          L_C8E2   => $C8E2
 ; $C216 => L_C216          L_C8E8   => $C8E8
 ; $C25A => L_C25A          L_C901   => $C901
-; $C265 => L_C265          L_C914   => $C914
+; $C265 => L_C265          midicont => $C914
 ; $C277 => L_C277          L_C923   => $C923
 ; $C280 => X_C280          L_C925   => $C925
-; $C332 => X_C332          L_C946   => $C946
+; $C332 => X_C332          midistar => $C946
 ; $C352 => RESTART         L_C955   => $C955
 ; $C354 => CLS             L_C95E   => $C95E
 ; $C358 => X_C358          L_C96E   => $C96E
@@ -5115,7 +5170,7 @@ help:
 ; $C3D5 => L_C3D5          L_C9EE   => $C9EE
 ; $C3E8 => L_C3E8          L_C9FC   => $C9FC
 ; $C3EA => L_C3EA          L_CA00   => $CA00
-; $C3FF => L_C3FF          L_CA05   => $CA05
+; $C3FF => selcha          L_CA05   => $CA05
 ; $C413 => L_C413          L_CA21   => $CA21
 ; $C416 => L_C416          L_CA25   => $CA25
 ; $C471 => L_C471          L_CA4D   => $CA4D
@@ -5184,10 +5239,10 @@ help:
 ; $C8E2 => L_C8E2          L_CFF1   => $CFF1
 ; $C8E8 => L_C8E8          L_CFF9   => $CFF9
 ; $C901 => L_C901          L_D001   => $D001
-; $C914 => L_C914          L_D009   => $D009
+; $C914 => midicont        L_D009   => $D009
 ; $C923 => L_C923          L_D014   => $D014
 ; $C925 => L_C925          L_D028   => $D028
-; $C946 => L_C946          L_D02D   => $D02D
+; $C946 => midistar        L_D02D   => $D02D
 ; $C955 => L_C955          L_D033   => $D033
 ; $C95E => L_C95E          L_D037   => $D037
 ; $C96E => L_C96E          L_D03A   => $D03A
@@ -5249,13 +5304,13 @@ help:
 ; $CE57 => L_CE57          L_D488   => $D488
 ; $CE62 => L_CE62          L_D491   => $D491
 ; $CE7B => L_CE7B          L_D49D   => $D49D
-; $CE8D => run             L_D4AD   => $D4AD
-; $CE98 => L_CE98          L_D4C4   => $D4C4
+; $CE8D => run             discha   => $D4AD
+; $CE98 => L_CE98          intmidi  => $D4C4
 ; $CEC2 => L_CEC2          L_D4D2   => $D4D2
 ; $CED0 => L_CED0          L_NMI    => $0066
 ; $CEDF => L_CEDF          L_RST20  => $0020
 ; $CEE7 => L_CEE7          L_RST30  => $0030
-; $CF27 => L_CF27          M_BPM    => $C003
+; $CF27 => L_CF27          M_BPM    => $C006
 ; $CF3D => L_CF3D          M_ERAS   => $C045
 ; $CF43 => L_CF43          M_FULL   => $C097
 ; $CF56 => L_CF56          M_INFO   => $C0A2
@@ -5348,7 +5403,7 @@ help:
 ; $D488 => L_D488          X_C7B1   => $C7B1
 ; $D491 => L_D491          X_C7EC   => $C7EC
 ; $D49D => L_D49D          X_C89F   => $C89F
-; $D4AD => L_D4AD          X_CE13   => $CE13
-; $D4C4 => L_D4C4          X_D06B   => $D06B
+; $D4AD => discha          X_CE13   => $CE13
+; $D4C4 => intmidi         X_D06B   => $D06B
 ; $D4D2 => L_D4D2          X_D181   => $D181
 ; $D4D9 => help            X_LINE16 => $01D6

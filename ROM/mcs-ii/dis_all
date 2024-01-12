@@ -690,7 +690,8 @@ msg_by_len(0x2cd, 39, "M_LINE16");
 
 # MIDI_1 ROM
 $dis->code(0xc000,"drum");
-msg_by_len(0xc003, 9, "M_BPM");
+$dis->code(0xc003,"drumw");
+msg_by_len(0xc006, 6, "M_BPM");
 msg_by_len(0xc00c, 13, "M_RUN");
 msg_by_len(0xc019, 22, "M_XFER");
 msg_by_len(0xc02F, 22, "M_PLAY");
@@ -700,7 +701,8 @@ msg_by_len(0xc071, 22, "M_SPACE");
 msg_by_len(0xc087, 16, "M_SEQ");
 msg_by_len(0xc097, 11, "M_FULL");
 msg_by_len(0xc0a2, 16, "M_INFO");
-msg_by_len(0xc0b2, 36, "M_INFO2");
+msg_by_len(0xc0b2, 34, "M_INFO2");
+$dis->defb(0xc0d4, 2, "INTAB");
 
 msg_by_null(0xc0ed, "M_MENU");
 
