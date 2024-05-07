@@ -155,6 +155,7 @@ sub cmd_mount {
 
     if (open $dsk[$drive]->{handle}, '+<', $file) {
         # so far so good
+        binmode $dsk[$drive]->{handle};
         $dsk[$drive]->{filename} = $file;
 
         # size the disk image
@@ -193,6 +194,7 @@ sub cmd_clone {
     return unless defined($drive);
 
     if (open my $handle, '>', $file) {
+        binmode $handle;
         seek $dsk[$drive]->{handle}, 0, 0;
         my $data;
         for my $blk (1..$dsk[$drive]->{blks}) {
@@ -251,6 +253,7 @@ sub cmd_new {
      }
 
     if (open my $handle, '>', $file) {
+        binmode $handle;
         my @data;
         # DNAME
         for (my $i=0; $i<20; $i=$i+1) {
@@ -468,6 +471,7 @@ sub cmd_import {
     foreach my $i (@$hf_names) {
         my %f;
         if (open $f{handle} , "$path$i") {
+            binmode $f{handle};
             my (undef, $host_ext) = split /\./, $i;
             $host_ext = lc $host_ext;
             # if no converter is defined for this file extension, use the default converter
@@ -1332,6 +1336,7 @@ sub set_export_handle {
             print "ERROR could not open file $fname\n";
             $f_ref->{handle} = undef;
         }
+        binmode $f_ref->{handle};
     }
     else {
         print "============= $f_ref->{fnam}.$f_ref->{fext} =============\n";
