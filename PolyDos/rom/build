@@ -4,6 +4,6 @@
 # using the gnu z80 assembler https://www.nongnu.org/z80asm/index.html
 #
 # $1 is the program base-name
-# eg: ./build PolyDos_2_Boot_ROM
+# eg: ./build PolyDos_2_Boot_ROM_mod
 
-../../../z80asm-1.8/z80asm ${1}.asm -l${1}.lst -o${1}.bin
+z80asm ${1}.asm -l${1}.lst -o${1}.bin

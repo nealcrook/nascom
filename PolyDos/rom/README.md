@@ -38,6 +38,15 @@ Files here:
   produced from assembling this file is an exact match of PolyDos_3_Boot_ROM.bin
   (but PolyDos_3_Boot_ROM.bin was not generated from this source).
 
+* PolyDos_4_Boot_ROM.nas - "nas" format hex dump of the PolyDos 4 boot
+  ROM. 1720 bytes so not the full size of the ROM.
+
+* PolyDos_4_Boot_ROM.bin - binary file converted from the .nas file.
+
+* PolyDos_4_Boot_ROM_mod.asm - source file derived from PD4S.TX with a tiny
+  number of modifications to make it assemble under the control of the GNU Z80
+  assembler, and with a few bytes of padding added to the end. The binary
+
 * build - a trivial shell script to invoke the GNU Z80 assembler.
 
 * SYSEQU.asm - a set of equates that is "included" for the build of either .asm
