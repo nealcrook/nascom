@@ -93,6 +93,11 @@ add_image("CPM-LSD",  0xc000, "$nascom/nascom4/cpm/map80vfc_rom/boot_code_standa
 add_image("CGEN-NAS", 0xe000, "$nascom/ROM/chargen/nas_an_gra.nas");
 add_image("CGEN-VFC", 0xe000, "$nascom/ROM/map80vfc/map80vfc_chargen_rom.bin");
 add_image("CGEN-SARGON",0xe000, "$nascom/ROM/chargen/sargon.nas");
+# drum machine
+add_image("CGEN-MCS",  0xe000, "$nascom/ROM/mcs-ii/nas_an_mcs.nas");
+add_image("MCS-MON",   0x0000, "$nascom/ROM/mcs-ii/MCS-II_MON_V3.bin_golden");
+add_image("MCS-MIDI1", 0xc000, "$nascom/ROM/mcs-ii/MCS-II_MIDI_1.bin_golden");
+add_image("MCS-MIDI2", 0xd000, "$nascom/ROM/mcs-ii/MCS-II_MIDI_2.bin_golden");
 
 # calculate the start block for each image, given the overhead
 set_block_offsets($menu_blocks + $profile_blocks);
@@ -111,7 +116,8 @@ my $menu =
     "K: NAS-SYS3 + BASIC + POLYDOS3  L: POLYDOS-LSD\r" .
     "M: NAS-SYS3 + BASIC + NASDOS    N: NASDOS-SD\r" .
     "O: NAS-SYS3 + PASCAL   P: NAS-SYS3 + NASFORTH\r" .
-    "Q: NASCOM CP/M\r" .
+#    "Q: NASCOM CP/M\r" .
+    "Q: MCS-II\r" .
     "R: MAP80 VFC CP/M      S: MAP80 VFC CP/M-LSD\r" .
     "T: NAS-SYS3 + LOLLIPOP        Reload char-gen:\r" .
     "U: NAS-SYS3 + INVADERS         X: NASCOM\r" .
@@ -178,7 +184,11 @@ add_profile('M',              "L:NASDOS",   "L:BASIC",          "P19=60", "GD000
 add_profile('N',              "L:NASDOS-SD","L:BASIC",          "P19=60", "GD000=19");
 add_profile('O',                            "L:PASCAL",         "P19=60", "GD000=19");
 add_profile('P',                            "L:NASFORTH",       "P19=00", "G1000=19");
-add_profile('Q', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
+#add_profile('Q', "L:NASCPM",                                              "GF000=3"); #[NAC HACK 2020Dec21] no protect
+# Drum machine: char gen + ROMs
+#add_profile('Q', "L:MCS-MON", "L:MCS-MIDI1", "L:MCS-MIDI2", "PEC=E1", "P18=5D", "L:CGEN-MCS", "PEC=0", "G0=11");
+#add_profile('Q', "L:MCS-MON", "L:MCS-MIDI1", "L:MCS-MIDI2", "L:BASIC", "P19=01", "G0=11");
+add_profile('Q', "PEC=E1", "P18=5D", "L:CGEN-MCS", "PEC=0", "L:MCS-MON", "L:MCS-MIDI1", "L:MCS-MIDI2", "L:BASIC", "P19=01", "G0=11");
 add_profile('R',                                                "PEE=00", "G0=20");   # MAP80 CP/M  - switch video
 add_profile('S', "L:CPM-LSD",                                   "PEE=00", "GC000=20");# MAP80 CP/M  - switch video, SDcard boot
 add_profile('T',               "L:LOLLIPOP",                              "G1000=19");
