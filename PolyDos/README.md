@@ -19,9 +19,9 @@ PolyDos was written for the NASCOM by Anders Hejlesberg. Anders wrote (29 April 
 Polydos was available in four versions:
 
 * GM515 PolyDos 1 for Nascom & GM805 using a WD1771 controller and 35-track disks (Pertec FD250) SD. Controller interfaced via the NASCOM's Z80-PIO.
-* GM516 PolyDos 2 for Nascom & GM815 using a WD1797 controller and 35-track disks (Pertec FD250) DS; SD or DD
-* GM533 PolyDos 3 for Nascom & Lucas using a WD1793 controller and 80-track disks. SS. DD.
-* GM534 PolyDos 4 for Nascom & GM825 using a ?????? controller and 80-track disks. SS or DS?; DD or QD?
+* GM516 PolyDos 2 for Nascom & GM815 using a WD1797 controller and 35-track disks (Pertec FD250) DS; SD or DD.
+* GM533 PolyDos 3 for Nascom & Lucas using a WD1793 controller and 80-track disks. SS; DD.
+* GM534 PolyDos 4 for Nascom & GM809 using a WD1797 controller and 80-track disks (Micropolis 1015) SS; DD.
 
 Each version requires a different ROM. The ROM code is slightly less than
 2Kbytes, and was supplied in 2, 2708 parts assembled to be decoded at a start
@@ -30,6 +30,7 @@ address of $D000.
 * The PolyDos 2 35-track double-sided single-density format used 2 sides of 35 tracks of 10 sectors of 256 bytes (175Kbytes/disk)
 * The PolyDos 2 35-track double-sided double-density format used 2 sides of 35 tracks of 18 sectors of 256 bytes (315Kbytes/disk)
 * The PolyDos 3 80-track single-sided double-density format used 1 side  of 80 tracks of 18 sectors of 256 bytes (360Kbytes/disk)
+* The PolyDos 4 80-track single-sided double-density format used 1 side  of 80 tracks of 18 sectors of 256 bytes (360Kbytes/disk)
 
 PolyDos uses linear block addressing, converted to tracks/sectors in the
 ROM. Sectors are allocated starting from the first track and allocating both
@@ -38,14 +39,14 @@ images here.
 
 ## Material available here
 
-* [boot-ROM (source and binary) for PolyDos 2 and PolyDos 3](rom/README.md)
-* [disk images for PolyDos 2 and PolyDos 3](disk/README.md)
+* [boot-ROM (source and binary) for PolyDos 2/3/4](rom/README.md)
+* [disk images for PolyDos 2/3/4](disk/README.md)
 * [documentation set in PDF format](doc/README.md)
 * [indexed library of software on PolyDos disk images](lib/README.md)
 
 ## Help Wanted
 
-If you have a copy of PolyDos 1 or PolyDos 4 or any other PolyDos-related
+If you have a copy of PolyDos 1 or any other PolyDos-related
 information, I'd love to see it; please get in touch.
 
 If you have documentation for the PolyText word processing system, I'd love to
