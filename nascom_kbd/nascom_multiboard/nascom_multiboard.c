@@ -1,8 +1,3 @@
-// NEXT: nmi and rst
-//       parallel keyboard decode
-
-
-
 // Code for "Nascom Multiboard",                                   -*- c -*-
 // a PCB containing a Raspberry Pi Pico, some level-shifters and various connectors.
 //
@@ -271,8 +266,8 @@ static uint8_t const ASCIIKbdArray[] = {
 
 int main() {
     bi_decl(bi_program_description("Nascom PS/2 keyboard adaptor and multiboard by foofoobedoo@gmail.com"));
-    bi_program_version_string("0.1 08Sep2022");
-    bi_program_url("http://www.github.com/nealcrook/nascom");
+    bi_decl(bi_program_version_string("0.3 26Jun2025"));
+    bi_decl(bi_program_url("http://www.github.com/nealcrook/nascom"));
 
     uint8_t mode;
 
@@ -605,16 +600,18 @@ static void nascom_kbd_core1(void) {
         allgpio = gpio_get_all();
 
         // Both signals idle low and blip high for ~4.5us to perform the reset/increment.
-        // Give maximum setup time at the NASCOM by responding to the high-going (earliest)
-        // edge.
-        if ((allgpio & 1<<P_KBD_RST) && !(allgpio_prev & 1<<P_KBD_RST)) {
-            // RST went 0->1; reset count
-            nscan_drive = 0;
-        }
+        // When scanned by NAS-SYS, RST and CLK are never high simultaneously
+        // when scanned by BASIC (shift-enter for pause/break) CLK goes high
+        // while RST is high.
+
         if ((allgpio & 1<<P_KBD_CLK) && !(allgpio_prev & 1<<P_KBD_CLK)) {
-            // CLK went 0->1; increment count
+            // CLK went 0->1 (edge); increment count
             // NASCOM does 8 clocks after reset so it relies on the counter wrapping
             nscan_drive = (nscan_drive + 1) %8;
+        }
+        if ((allgpio & 1<<P_KBD_RST)) {
+            // RST is 1 (level); reset count -> overrides CLK if it's also high
+            nscan_drive = 0;
         }
 
         // This RELIES on the pins being contiguous and P_KBD_D0 being GPIO 0. Otherwise,

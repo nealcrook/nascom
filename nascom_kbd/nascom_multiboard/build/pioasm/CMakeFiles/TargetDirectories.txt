@@ -1,3 +1,0 @@
-/home/crook/retro/rasp_pi_pico/nascom_multiboard/build/pioasm/CMakeFiles/rebuild_cache.dir
-/home/crook/retro/rasp_pi_pico/nascom_multiboard/build/pioasm/CMakeFiles/pioasm.dir
-/home/crook/retro/rasp_pi_pico/nascom_multiboard/build/pioasm/CMakeFiles/edit_cache.dir
