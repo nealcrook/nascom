@@ -8,6 +8,8 @@ Software, utilities and documentation for the Z80-based NASCOM computers.
 * doc
   * NASCOM 1 RAM expansion (tested) -- see nascom1_expansion for PCB
   * NASCOM 2 RAM expansion (untested)
+  * NASCOM Keyboard -- waveforms and description of the software-scanned keyboard
+  * NASCOM UART performance -- an attempt to understand the (speed) limitations of the NASCOM UART
 * gm808_eprom_programmer - code, photos and documentation for this 2708/2716 EPROM programmer
 * hw_sim - verilog simulation of the NASCOM 1 and NASCOM 2 video sub-systems
 * m5 - a very simple "high-level language"
