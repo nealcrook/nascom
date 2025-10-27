@@ -11,14 +11,16 @@
 
 The FPGA VHDL code and KiCad design database is here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4
 
-The pre-built files for programming the FPGA are here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4/output_files
+The pre-built files for programming the FPGA are here: https://github.com/nealcrook/multicomp6809/tree/master/multicomp/NASCOM4/output_files. The revision history is shown in the table below
 
-Current releases:
-
-* Rev1.0 - first release (NASCOM4_rev1p0.pof/NASCOM4_rev1p0.sof)
-* Rev1.1 - revisions to video control: (1) both VGA outputs are now active simultaneously. (2) The character generator is now programmable from the Z80 (details in the Handbook) (NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof)
-* Rev1.2 - Add support for the INVVIDEO bit. Now wordstar displays corrrectly. Associated menu release adds nasForth.
-* Rev1.3 - Modify .qsf file to add pullups to some FPGA inputs so that a Stage 2 system (minimal system + SDcard + Memory) works correctly.
+|Revision|Files                                 |Description       |
+|--------|--------------------------------------|------------------|
+|Rev1.0  |NASCOM4_rev1p0.pof/NASCOM4_rev1p0.sof |First release.|
+|Rev1.1  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Revisions to video control: (1) both VGA outputs are now active simultaneously. (2) The character generator is now programmable from the Z80 (details in the Handbook).|
+|Rev1.2  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Add support for the INVVIDEO bit. Now WordStar displays correctly. Associated menu release adds nasForth.|
+|Rev1.3  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Modify .qsf file to add pullups to some FPGA inputs so that a Stage 2 system (minimal system + SDcard + Memory) works correctly.|
+|Rev1.4  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Modify the VGA clock/timing in an attempt to make some "fussy" VGA monitors work correctly.|
+| -      |NASCOM4.pof/NASCOM4.sof |For convenience; should always match the files of the latest revision.|
 
 Here are some videos of its evolution:
 
