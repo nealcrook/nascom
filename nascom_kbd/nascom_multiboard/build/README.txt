@@ -1,0 +1,5 @@
+to rebuild:
+
+$ cmake ..
+$ make
+
