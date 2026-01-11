@@ -17,9 +17,9 @@ The pre-built files for programming the FPGA are here: https://github.com/nealcr
 |--------|--------------------------------------|------------------|
 |Rev1.0  |NASCOM4_rev1p0.pof/NASCOM4_rev1p0.sof |First release.|
 |Rev1.1  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Revisions to video control: (1) both VGA outputs are now active simultaneously. (2) The character generator is now programmable from the Z80 (details in the Handbook).|
-|Rev1.2  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Add support for the INVVIDEO bit. Now WordStar displays correctly. Associated menu release adds nasForth.|
-|Rev1.3  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Modify .qsf file to add pullups to some FPGA inputs so that a Stage 2 system (minimal system + SDcard + Memory) works correctly.|
-|Rev1.4  |NASCOM4_rev1p1.pof/NASCOM4_rev1p1.sof |Modify the VGA clock/timing in an attempt to make some "fussy" VGA monitors work correctly.|
+|Rev1.2  |NASCOM4_rev1p2.pof/NASCOM4_rev1p2.sof |Add support for the INVVIDEO bit. Now WordStar displays correctly. Associated menu release adds nasForth.|
+|Rev1.3  |NASCOM4_rev1p3.pof/NASCOM4_rev1p3.sof |Modify .qsf file to add pullups to some FPGA inputs so that a Stage 2 system (minimal system + SDcard + Memory) works correctly.|
+|Rev1.4  |NASCOM4_rev1p4.pof/NASCOM4_rev1p4.sof |Modify the VGA clock/timing in an attempt to make some "fussy" VGA monitors work correctly.|
 | -      |NASCOM4.pof/NASCOM4.sof |For convenience; should always match the files of the latest revision.|
 
 Here are some videos of its evolution:
