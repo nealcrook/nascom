@@ -80,6 +80,7 @@ add_image("POLYDOS2", 0xD000, "$nascom/PolyDos/rom/PolyDos_2_Boot_ROM.bin");
 add_image("POLYDOS2-SD", 0xD000, "$nascom/sdcard/host_programs/polydos_util_rom_d000.bin");
 add_image("POLYDOS-LSD", 0xD000, "$nascom/nascom4/PolyDos/polydos_rom_d000.bin");
 add_image("POLYDOS3", 0xD000, "$nascom/PolyDos/rom/PolyDos_3_Boot_ROM.bin");
+add_image("POLYDOS4", 0xD000, "$nascom/PolyDos/rom/PolyDos_4_Boot_ROM.bin");
 add_image("PASCAL",   0xD000, "$nascom/ROM/pascal/bls_pascal2_d000.bin");
 add_image("NASFORTH", 0x1000, "../../../nascom_other/NASFORTH.NAS");
 add_image("NASDOS",   0xD000, "../../../nascom_other/nascom_nasdos/NASDOS/nasdos.rom");
@@ -113,7 +114,7 @@ my $menu =
     "G: NAS-SYS1 + ZEAP + BASIC\r" .
     "H: NAS-SYS3 + ZEAP + BASIC + DISDEBUG\r" .
     "I: NAS-SYS3 + BASIC + POLYDOS2  J: POLYDOS2-SD\r" .
-    "K: NAS-SYS3 + BASIC + POLYDOS3  L: POLYDOS-LSD\r" .
+    "K: NAS-SYS3 + BASIC + POLYDOS4  L: POLYDOS-LSD\r" .
     "M: NAS-SYS3 + BASIC + NASDOS    N: NASDOS-SD\r" .
     "O: NAS-SYS3 + PASCAL   P: NAS-SYS3 + NASFORTH\r" .
 #    "Q: NASCOM CP/M\r" .
@@ -136,7 +137,7 @@ $menu = $menu . (chr(0) x $pad);
 # Specify the profile number (0-25) then a list of arguments. Arguments are:
 # "W1234=5678" -- memory write: write to address 1234 with data 5678.
 # "P12=56"     -- I/O write: write to port 12 with data 56.
-# "G1000=40"   -- Go! write 40 to port 3 (memory remap) and jump to 1000
+# "G1000=40"   -- Go! write 40 to port 0x18 (memory remap) and jump to 1000
 # "L:BBUG"     -- Load image. Converted to "I1234 L4000=8"
 #                 which means Image at block 1234 is loaded to memory
 #                 for 8 blocks.
@@ -178,7 +179,8 @@ add_profile('G', "L:NASSYS1", "L:ZEAP",  "L:BASIC",             "P19=61", "G0=11
 add_profile('H',              "L:DISDEB", "L:ZEAP",  "L:BASIC", "P19=70", "G0=19");
 add_profile('I',              "L:POLYDOS2", "L:BASIC",          "P19=60", "GD000=19");
 add_profile('J',              "L:POLYDOS2-SD", "L:BASIC",       "P19=60", "GD000=19");
-add_profile('K',              "L:POLYDOS3", "L:BASIC",          "P19=60", "GD000=19");
+#add_profile('K',              "L:POLYDOS3", "L:BASIC",          "P19=60", "GD000=19");
+add_profile('K',              "L:POLYDOS4", "L:BASIC",          "P19=60", "GD000=19");
 add_profile('L',              "L:POLYDOS-LSD", "L:BASIC",       "P19=60", "GD000=19");
 add_profile('M',              "L:NASDOS",   "L:BASIC",          "P19=60", "GD000=19");
 add_profile('N',              "L:NASDOS-SD","L:BASIC",          "P19=60", "GD000=19");
