@@ -160,7 +160,7 @@ $menu = $menu . (chr(0) x $pad);
 # b3 enable NAS-SYS3 ROM                              b3 protect B000-BFFF
 # b2 enable special boot ROM                          b2 protect A000-AFFF
 # b1 vRAM high (for NASCOM CP/M)                      b1 unused
-# b0 enable nascom vRAM                               b0 protect 0000-7FFF
+# b0 enable nascom vRAM                               b0 protect 0000-07FF
 #
 # 19 for normal stuff with internal NAS-SYS3 ROM
 # 11 when loading another monitor program
